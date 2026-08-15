@@ -103,7 +103,7 @@
   },
   "parent_run_id": "20260815-030931-windows",
   "profile": "qwen38_p8s1_top2",
-  "profile_hash": "7be6462de369fe8633c03d08f14fcaa89b62dee3fc4bb740a399d526e95d335d",
+  "profile_hash": "6d1a8ad97a52eb7b4ff4fcc47a0a1cbc7a5abf500a15b807f24394d72629f27c",
   "quality_gates": {
     "all_expert_reconstruction_mse": {
       "observed": 4.5130571372023476e-13,
