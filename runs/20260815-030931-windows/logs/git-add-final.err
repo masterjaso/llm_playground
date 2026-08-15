@@ -1,0 +1,7 @@
+warning: in the working copy of 'src/assembly/checkpoint.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/dense2moe/checkpoint/filter.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/dense2moe/cli.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/dense2moe/evaluation/__init__.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/dense2moe/models/__init__.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/dense2moe/evaluation/pilot.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/dense2moe/models/moe.py', LF will be replaced by CRLF the next time Git touches it

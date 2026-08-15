@@ -1,0 +1,7 @@
+{
+  "capacity": 17408,
+  "layer": 0,
+  "next_exact_command": "d2m train-layer --run-dir runs\\20260815-030931-windows --layer 0",
+  "path": "runs\\20260815-030931-windows\\partitions\\layer-0000.json",
+  "status": "PARTITION_READY"
+}

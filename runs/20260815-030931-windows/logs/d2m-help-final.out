@@ -1,0 +1,11 @@
+usage: d2m [-h]
+           {doctor,inspect-source,estimate,download,extract-text-checkpoint,test,pilot,prepare-data,capture,partition-layer,train-layer,worker,train-layers,assemble,repair,evaluate,export-gguf,build-imatrix,quantize,benchmark,report,status,run}
+           ...
+
+Resumable dense-to-MoE conversion pipeline
+
+positional arguments:
+  {doctor,inspect-source,estimate,download,extract-text-checkpoint,test,pilot,prepare-data,capture,partition-layer,train-layer,worker,train-layers,assemble,repair,evaluate,export-gguf,build-imatrix,quantize,benchmark,report,status,run}
+
+options:
+  -h, --help            show this help message and exit

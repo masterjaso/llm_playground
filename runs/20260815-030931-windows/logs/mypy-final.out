@@ -1,0 +1,4 @@
+src\dense2moe\cli.py:326: error: Argument "blocker" to "write_handoff" of "StateStore" has incompatible type "str | Any | int"; expected "str | None"  [arg-type]
+src\dense2moe\cli.py:366: error: Argument "blocker" to "write_handoff" of "StateStore" has incompatible type "Collection[str]"; expected "str | None"  [arg-type]
+src\dense2moe\cli.py:388: error: Argument "blocker" to "write_handoff" of "StateStore" has incompatible type "Collection[str]"; expected "str | None"  [arg-type]
+Found 3 errors in 1 file (checked 38 source files)

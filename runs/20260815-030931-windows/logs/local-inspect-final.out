@@ -1,0 +1,22 @@
+{
+  "config_keys": [
+    "architectures",
+    "image_token_id",
+    "language_model_only",
+    "model_type",
+    "text_config",
+    "tie_word_embeddings",
+    "transformers_version",
+    "video_token_id",
+    "vision_config",
+    "vision_end_token_id",
+    "vision_start_token_id"
+  ],
+  "next_exact_command": "d2m estimate --run-dir runs\\20260815-030931-windows --config configs/qwen38_p32s1_top2.yaml",
+  "revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
+  "revision_pinned": true,
+  "source_manifest": "runs\\20260815-030931-windows\\source-manifest.json",
+  "status": "SOURCE_READY",
+  "tensor_count": 1199,
+  "text_tensor_count": 851
+}

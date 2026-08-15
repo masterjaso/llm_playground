@@ -1,0 +1,27 @@
+{
+  "artifacts": {
+    "assembly_manifest": "runs\\20260815-030931-windows\\artifacts\\hf-moe\\manifest.json",
+    "decision_register": "runs\\20260815-030931-windows\\decision-register.json",
+    "environment": "runs\\20260815-030931-windows\\environment.json",
+    "fact_ledger": "runs\\20260815-030931-windows\\repository-fact-ledger.json",
+    "manifest": "runs\\20260815-030931-windows\\artifacts\\hf-moe\\manifest.json",
+    "pilot_metrics": "runs\\20260815-030931-windows\\metrics\\pilot.json",
+    "source_manifest": "runs\\20260815-030931-windows\\source-manifest.json",
+    "text_checkpoint_manifest": "runs\\20260815-030931-windows\\text-checkpoint\\text-filter-manifest.json",
+    "training_queue": "runs\\20260815-030931-windows\\metrics\\training-queue.json"
+  },
+  "blocker": "Not all layer checkpoints are trained and validated",
+  "last_successful_command": "pilot",
+  "next_exact_command": "d2m prepare-data --run-dir runs\\20260815-030931-windows",
+  "phase": "evaluation",
+  "phase_status": "blocked",
+  "run_id": "20260815-030931-windows",
+  "terminal_state": "BLOCKED",
+  "validation": {
+    "assembly": {
+      "layers": 1,
+      "manifest": "runs\\20260815-030931-windows\\artifacts\\hf-moe\\manifest.json",
+      "status": "BLOCKED"
+    }
+  }
+}

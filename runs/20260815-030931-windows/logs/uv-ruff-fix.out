@@ -1,0 +1,172 @@
+S112 `try`-`except`-`continue` detected, consider logging the exception
+  --> src\dense2moe\checkpoint\filter.py:36:9
+   |
+34 |               with SafetensorsSliceReader(path) as reader:
+35 |                   names.extend(reader.keys())
+36 | /         except Exception:
+37 | |             continue
+   | |____________________^
+38 |       selected = text_tensor_filter(names)
+39 |       manifest = {
+   |
+
+BLE001 Do not catch blind exception: `Exception`
+  --> src\dense2moe\checkpoint\filter.py:36:16
+   |
+34 |             with SafetensorsSliceReader(path) as reader:
+35 |                 names.extend(reader.keys())
+36 |         except Exception:
+   |                ^^^^^^^^^
+37 |             continue
+38 |     selected = text_tensor_filter(names)
+   |
+
+SIM118 Use `key in dict` instead of `key in dict.keys()`
+  --> src\dense2moe\checkpoint\safetensors.py:32:21
+   |
+30 |             with safe_open(str(self.path), framework="np") as handle:
+31 |                 infos: dict[str, TensorInfo] = {}
+32 |                 for name in handle.keys():
+   |                     ^^^^^^^^^^^^^^^^^^^^^
+33 |                     sliced = handle.get_slice(name)
+34 |                     shape = tuple(sliced.get_shape())
+   |
+help: Remove `.keys()`
+
+PYI034 `__enter__` methods in classes like `SafetensorsSliceReader` usually return `self` at runtime
+  --> src\dense2moe\checkpoint\safetensors.py:65:9
+   |
+63 |         return self.slice(name, slice(start, stop))
+64 |
+65 |     def __enter__(self) -> SafetensorsSliceReader:
+   |         ^^^^^^^^^
+66 |         return self
+   |
+help: Use `Self` as return type
+
+BLE001 Do not catch blind exception: `Exception`
+   --> src\dense2moe\cli.py:187:16
+    |
+185 |             )
+186 |             result = {"status": "DOWNLOAD_COMPLETE", "destination": str(downloaded), "model": args.model, "revision": args.revision, …
+187 |         except Exception as exc:
+    |                ^^^^^^^^^
+188 |             result = {"status": "BLOCKED", "destination": str(target), "model": args.model, "revision": args.revision, "trust_remote_…
+189 |     atomic_write_json(store.run_dir / "download.json", result)
+    |
+
+F841 Local variable `indices` is assigned to but never used
+   --> src\dense2moe\cli.py:219:9
+    |
+217 |         weight_sums = np.sum(normalize_topk_weights(weights), axis=-1).tolist()
+218 |     except ImportError:
+219 |         indices, weights, weight_sums = [], [], []
+    |         ^^^^^^^
+220 |     next_command = f"d2m pilot --run-dir {args.run_dir} --config {args.config or 'configs/qwen38_p32s1_top2.yaml'}"
+221 |     result = {"status": "TESTS_GREEN", "profile": profile.name, "partition_exhaustive": len(plan.all_indices) == profile.dense_interm…
+    |
+help: Remove assignment to unused variable `indices`
+
+BLE001 Do not catch blind exception: `Exception`
+   --> src\dense2moe\cli.py:429:12
+    |
+427 |         _emit(payload, bool(args.json_output))
+428 |         return 0 if payload.get("status") not in {"BLOCKED", "FAILED"} else 2
+429 |     except Exception as exc:
+    |            ^^^^^^^^^
+430 |         payload = {"status": "FAILED", "error": str(exc), "command": args.command}
+431 |         _record(store, args, payload, ok=False)
+    |
+
+SIM210 Use `bool(...)` instead of `True if ... else False`
+   --> src\dense2moe\cli.py:432:24
+    |
+430 |         payload = {"status": "FAILED", "error": str(exc), "command": args.command}
+431 |         _record(store, args, payload, ok=False)
+432 |         _emit(payload, True if args.json_output else False)
+    |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+433 |         return 1
+    |
+help: Replace with `bool(...)
+
+S112 `try`-`except`-`continue` detected, consider logging the exception
+   --> src\dense2moe\discovery\source.py:112:9
+    |
+110 |               with safe_open(str(path), framework="numpy") as handle:
+111 |                   tensor_names.extend(handle.keys())
+112 | /         except Exception:
+113 | |             # A malformed or unavailable optional reader is evidence, not a
+114 | |             # reason to invent an inventory.
+115 | |             continue
+    | |____________________^
+116 |       text_names = filter_text_tensor_names(tensor_names)
+117 |       license_name = "unknown"
+    |
+
+BLE001 Do not catch blind exception: `Exception`
+   --> src\dense2moe\discovery\source.py:112:16
+    |
+110 |             with safe_open(str(path), framework="numpy") as handle:
+111 |                 tensor_names.extend(handle.keys())
+112 |         except Exception:
+    |                ^^^^^^^^^
+113 |             # A malformed or unavailable optional reader is evidence, not a
+114 |             # reason to invent an inventory.
+    |
+
+BLE001 Do not catch blind exception: `Exception`
+   --> src\dense2moe\discovery\source.py:149:16
+    |
+147 |             if isinstance(loaded, Mapping):
+148 |                 config = dict(loaded)
+149 |         except Exception as exc:
+    |                ^^^^^^^^^
+150 |             config = {"error": str(exc)}
+151 |         card = getattr(info, "cardData", None)
+    |
+
+BLE001 Do not catch blind exception: `Exception`
+   --> src\dense2moe\discovery\source.py:158:12
+    |
+156 |             license_name = str(card.get("license", "unknown"))
+157 |         return SourceManifest(model, resolved_revision, is_pinned_revision(resolved_revision), config, [], [], files, license_name)
+158 |     except Exception as exc:
+    |            ^^^^^^^^^
+159 |         return SourceManifest(model, revision, is_pinned_revision(revision), {"error": str(exc)}, [], [], [], "unknown")
+    |
+
+BLE001 Do not catch blind exception: `Exception`
+  --> src\dense2moe\hardware.py:74:24
+   |
+72 |                 except TypeError:  # older torch versions do not accept keyword flags
+73 |                     bf16_supported = bool(torch.cuda.is_bf16_supported(index))
+74 |                 except Exception:
+   |                        ^^^^^^^^^
+75 |                     bf16_supported = False
+76 |                 device_record: dict[str, Any] = {
+   |
+
+BLE001 Do not catch blind exception: `Exception`
+  --> src\dense2moe\hardware.py:91:28
+   |
+89 |                         torch.cuda.synchronize(index)
+90 |                         device_record[f"{dtype_name}_matmul"] = True
+91 |                     except Exception as exc:  # pragma: no cover - hardware dependent
+   |                            ^^^^^^^^^
+92 |                         device_record[f"{dtype_name}_matmul"] = False
+93 |                         device_record[f"{dtype_name}_error"] = str(exc)
+   |
+
+BLE001 Do not catch blind exception: `Exception`
+   --> src\dense2moe\hardware.py:98:12
+    |
+ 96 |         if result["cuda_available"]:
+ 97 |             result["peer_access"] = [[bool(torch.cuda.can_device_access_peer(i, j)) for j in range(torch.cuda.device_count())] for i …
+ 98 |     except Exception as exc:  # pragma: no cover - optional dependency/hardware dependent
+    |            ^^^^^^^^^
+ 99 |         result["error"] = str(exc)
+100 |     return result
+    |
+
+Found 80 errors (65 fixed, 15 remaining).
+No fixes available (4 hidden fixes can be enabled with the `--unsafe-fixes` option).
