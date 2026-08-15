@@ -1,6 +1,6 @@
-"""Compatibility namespace for layer-worker helpers."""
+"""Authoritative layer-worker helpers."""
 
-from training.worker import OOMBackoff, train_tiny_layer
+from .distill import train_real_layer
+from .worker import OOMBackoff, train_tiny_layer
 
-__all__ = ["OOMBackoff", "train_tiny_layer"]
-
+__all__ = ["OOMBackoff", "train_real_layer", "train_tiny_layer"]

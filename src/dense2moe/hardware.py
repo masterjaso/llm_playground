@@ -70,7 +70,7 @@ def probe_torch() -> dict[str, Any]:
                 try:
                     bf16_supported = bool(torch.cuda.is_bf16_supported())
                 except TypeError:  # older torch versions do not accept keyword flags
-                    bf16_supported = bool(torch.cuda.is_bf16_supported(index))
+                    bf16_supported = False
                 except (OSError, RuntimeError, ValueError):
                     bf16_supported = False
                 device_record: dict[str, Any] = {

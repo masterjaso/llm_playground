@@ -1,0 +1,18 @@
+{
+  "contract": {
+    "expected_artifacts": [
+      "source-manifest.json"
+    ],
+    "expected_observations": [
+      "pinned revision",
+      "verified text config geometry",
+      "text tensor inventory"
+    ],
+    "expected_validation_results": [
+      "SOURCE_READY"
+    ]
+  },
+  "phase": "source",
+  "result": "confirmed",
+  "timestamp": "2026-08-15T15:17:27.362920Z"
+}

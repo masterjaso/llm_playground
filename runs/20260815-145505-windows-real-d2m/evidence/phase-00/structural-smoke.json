@@ -1,0 +1,23 @@
+{
+  "capacity": 17408,
+  "checks": [
+    "config_profile_arithmetic",
+    "partition_roundtrip_contract",
+    "router_topk_count",
+    "router_weights_normalized",
+    "atomic_state_contract",
+    "job_queue_contract"
+  ],
+  "next_exact_command": "d2m pilot --run-dir runs/20260815-145505-windows-real-d2m --config configs/qwen38_p8s1_top2.yaml",
+  "partition_disjoint": true,
+  "partition_exhaustive": true,
+  "profile": "qwen38_p8s1_top2",
+  "router_topk": 2,
+  "router_weight_sums": [
+    1.0,
+    1.0,
+    1.0,
+    1.0
+  ],
+  "status": "TESTS_GREEN"
+}

@@ -14,7 +14,12 @@ from typing import Any
 
 from .logging import append_jsonl
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
+
+# Facts are monotonic: an observation with lower assurance never replaces a
+# pinned/verified value.  Keeping the ordering in one place makes doctor and
+# source inspection agree on merge semantics.
+FACT_PRECEDENCE = {"unknown": 0, "inferred": 1, "measured": 2, "verified": 3}
 
 
 def utc_now() -> str:
@@ -38,6 +43,9 @@ class RunState:
     terminal_state: str | None = None
     active_blocker: str | None = None
     prediction_contract: dict[str, Any] = field(default_factory=dict)
+    parent_run_id: str | None = None
+    source_config_hash: str | None = None
+    source_index_hash: str | None = None
 
     @classmethod
     def new(cls, run_id: str) -> RunState:
@@ -49,6 +57,8 @@ class RunState:
         data.setdefault("schema_version", SCHEMA_VERSION)
         data.setdefault("run_id", "unknown")
         data.setdefault("timestamps", {"created": utc_now(), "updated": utc_now()})
+        # Ignore forward-compatible fields from a newer writer, while filling
+        # defaults for fields introduced by this schema.
         return cls(**{field_name: data[field_name] for field_name in cls.__dataclass_fields__ if field_name in data})
 
     def as_dict(self) -> dict[str, Any]:
@@ -101,6 +111,16 @@ class StateStore:
             if not hasattr(state, key):
                 raise AttributeError(f"unknown run-state field: {key}")
             setattr(state, key, value)
+        # BLOCKED is a resumable condition.  A successful transition that
+        # clears the blocker must also clear the legacy BLOCKED marker; final
+        # outcomes remain immutable unless explicitly changed by the caller.
+        if changes.get("active_blocker") is None and "active_blocker" in changes:
+            if state.terminal_state == "BLOCKED":
+                state.terminal_state = None
+            if state.phase_status == "blocked":
+                state.phase_status = "pending"
+        if state.terminal_state == "BLOCKED" and state.active_blocker is None:
+            state.terminal_state = None
         self.save(state)
         append_jsonl(self.events_path, {"event": "state_transition", "changes": changes})
         return state
@@ -125,6 +145,15 @@ class StateStore:
         next_command = next_command or state.next_exact_command or "d2m status --run-dir <run-dir> --json"
         state.next_exact_command = next_command
         state.active_blocker = blocker
+        if blocker is None:
+            if state.terminal_state == "BLOCKED":
+                state.terminal_state = None
+            if state.phase_status == "blocked":
+                state.phase_status = "pending"
+        elif state.terminal_state not in {"SUCCEEDED", "RESEARCH_CANDIDATE", "FAILED_SAFELY"}:
+            # Retain the marker for old reports, but it is intentionally not a
+            # terminal state for resume logic.
+            state.terminal_state = "BLOCKED"
         self.save(state)
         handoff = self.run_dir / "HANDOFF.md"
         lines = [
@@ -160,6 +189,39 @@ def atomic_write_json(path: str | os.PathLike[str], payload: Any) -> None:
             os.unlink(temporary)
 
 
+def merge_fact_ledgers(existing: Mapping[str, Any], observed: Mapping[str, Any]) -> dict[str, Any]:
+    """Merge environment/source facts without downgrading assurance.
+
+    A fact is represented as ``{"status": ..., "value": ...}``.  Unknown or
+    malformed observations are retained only when no stronger fact exists.
+    The function is pure so it can be tested independently of the CLI.
+    """
+
+    result: dict[str, Any] = {str(key): dict(value) if isinstance(value, Mapping) else value for key, value in existing.items()}
+    for key, candidate_raw in observed.items():
+        candidate = dict(candidate_raw) if isinstance(candidate_raw, Mapping) else {"status": "unknown", "value": candidate_raw}
+        candidate_status = str(candidate.get("status", "unknown")).lower()
+        if candidate_status not in FACT_PRECEDENCE:
+            candidate_status = "unknown"
+        candidate["status"] = candidate_status
+        previous_raw = result.get(str(key))
+        previous = dict(previous_raw) if isinstance(previous_raw, Mapping) else {"status": "unknown", "value": previous_raw}
+        previous_status = str(previous.get("status", "unknown")).lower()
+        if previous_status not in FACT_PRECEDENCE:
+            previous_status = "unknown"
+        # Only an equal/stronger observation may replace a value.  For equal
+        # assurance, prefer a non-null value and merge auxiliary evidence.
+        if FACT_PRECEDENCE[candidate_status] >= FACT_PRECEDENCE[previous_status] and (
+            candidate.get("value") is not None or previous.get("value") is None
+        ):
+            merged = dict(previous)
+            merged.update(candidate)
+            result[str(key)] = merged
+        elif str(key) not in result:
+            result[str(key)] = candidate
+    return result
+
+
 def atomic_artifact_publish(source: str | os.PathLike[str], destination: str | os.PathLike[str]) -> Path:
     """Atomically publish a validated file without overwriting an existing one."""
 
@@ -177,11 +239,16 @@ def atomic_artifact_publish(source: str | os.PathLike[str], destination: str | o
     return dst
 
 
-def bootstrap_run(run_dir: str | os.PathLike[str], run_id: str | None = None) -> StateStore:
+def bootstrap_run(
+    run_dir: str | os.PathLike[str],
+    run_id: str | None = None,
+    *,
+    parent_run_id: str | None = None,
+) -> StateStore:
     store = StateStore(run_dir)
     if not store.state_path.exists():
         state = RunState.new(run_id or Path(run_dir).name)
+        state.parent_run_id = parent_run_id
         store.save(state)
         store.write_handoff()
     return store
-

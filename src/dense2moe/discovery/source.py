@@ -80,6 +80,18 @@ def _file_inventory(root: Path) -> list[dict[str, Any]]:
     files: list[dict[str, Any]] = []
     if not root.exists():
         return files
+    # A continuation run may point at an immutable snapshot whose parent run
+    # already recorded a complete inventory.  Reusing that evidence avoids a
+    # second multi-gigabyte hash pass while preserving the original hashes.
+    cached = root.parent / "source-manifest.json"
+    if cached.exists():
+        try:
+            payload = json.loads(cached.read_text(encoding="utf-8"))
+            cached_files = payload.get("files", []) if isinstance(payload, Mapping) else []
+            if isinstance(cached_files, list) and cached_files:
+                return [dict(item) for item in cached_files if isinstance(item, Mapping)]
+        except (OSError, ValueError, TypeError, json.JSONDecodeError):
+            pass
     for path in sorted(p for p in root.rglob("*") if p.is_file()):
         digest = hashlib.sha256()
         size = 0

@@ -61,26 +61,52 @@ def partition_indices(
     shared_intermediate_size: int,
     *,
     strategy: str = "contiguous",
+    scores: Any | None = None,
+    seed: int = 0,
 ) -> PartitionPlan:
     if dense_intermediate_size <= 0 or routed_experts <= 0 or expert_intermediate_size <= 0 or shared_intermediate_size <= 0:
         raise ValueError("partition dimensions must be positive")
     if shared_intermediate_size + routed_experts * expert_intermediate_size != dense_intermediate_size:
         raise ValueError("partition capacity must equal dense_intermediate_size")
     indices = list(range(dense_intermediate_size))
-    if strategy not in {"contiguous", "interleave"}:
+    if strategy not in {"contiguous", "interleave", "activation_magnitude", "output_contribution", "balanced_signature", "random"}:
         raise ValueError(f"unknown partition strategy: {strategy}")
-    if strategy == "interleave":
+    if strategy in {"activation_magnitude", "output_contribution", "balanced_signature"}:
+        if scores is None:
+            raise ValueError(f"{strategy} requires deterministic neuron scores")
+        try:
+            import numpy as np  # type: ignore
+
+            values = np.asarray(scores)
+            if values.ndim > 1:
+                values = np.mean(np.abs(values), axis=tuple(range(values.ndim - 1)))
+            if values.shape[0] != dense_intermediate_size:
+                raise ValueError("partition scores do not match dense width")
+            order = sorted(range(dense_intermediate_size), key=lambda i: (-float(values[i]), i))
+        except ImportError:
+            order = list(range(dense_intermediate_size))
+        shared = tuple(order[:shared_intermediate_size])
+        remaining = order[shared_intermediate_size:]
+        groups = tuple(tuple(remaining[i * expert_intermediate_size : (i + 1) * expert_intermediate_size]) for i in range(routed_experts))
+    elif strategy == "random":
+        import random
+
+        order = list(range(dense_intermediate_size))
+        random.Random(seed).shuffle(order)
+        shared = tuple(order[:shared_intermediate_size])
+        remaining = order[shared_intermediate_size:]
+        groups = tuple(tuple(remaining[i * expert_intermediate_size : (i + 1) * expert_intermediate_size]) for i in range(routed_experts))
+    elif strategy == "interleave":
         # A deterministic permutation gives each expert a spread of source
         # neurons while keeping the shared block stable.
         shared = tuple(indices[:shared_intermediate_size])
         remaining = indices[shared_intermediate_size:]
-        groups = [remaining[offset::routed_experts][:expert_intermediate_size] for offset in range(routed_experts)]
-        plan = PartitionPlan(dense_intermediate_size, routed_experts, expert_intermediate_size, shared_intermediate_size, shared, tuple(tuple(group) for group in groups))
+        groups = tuple(tuple(remaining[offset::routed_experts][:expert_intermediate_size]) for offset in range(routed_experts))
     else:
         shared = tuple(indices[:shared_intermediate_size])
         remaining = indices[shared_intermediate_size:]
-        groups = [remaining[i * expert_intermediate_size : (i + 1) * expert_intermediate_size] for i in range(routed_experts)]
-        plan = PartitionPlan(dense_intermediate_size, routed_experts, expert_intermediate_size, shared_intermediate_size, shared, tuple(tuple(group) for group in groups))
+        groups = tuple(tuple(remaining[i * expert_intermediate_size : (i + 1) * expert_intermediate_size]) for i in range(routed_experts))
+    plan = PartitionPlan(dense_intermediate_size, routed_experts, expert_intermediate_size, shared_intermediate_size, shared, tuple(tuple(group) for group in groups))
     plan.validate()
     return plan
 

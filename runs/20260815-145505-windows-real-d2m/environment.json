@@ -1,0 +1,102 @@
+{
+  "disk": {
+    "/": {
+      "free": 349334106112,
+      "total": 999137734656,
+      "used": 649803628544
+    }
+  },
+  "environment_variables": {
+    "WSL_DISTRO_NAME": "Ubuntu-22.04"
+  },
+  "memory": {
+    "available": 40139300864,
+    "free": 2380632064,
+    "swap_free": 8286851072,
+    "swap_total": 8589934592,
+    "total": 50515243008
+  },
+  "platform": {
+    "machine": "x86_64",
+    "python": "3.11.15 (main, Jun 23 2026, 15:19:43) [Clang 22.1.3 ]",
+    "release": "6.18.33.2-microsoft-standard-WSL2",
+    "system": "Linux",
+    "version": "#1 SMP PREEMPT_DYNAMIC Thu Jun 18 21:54:43 UTC 2026"
+  },
+  "tools": {
+    "cmake": {
+      "command": [
+        "cmake",
+        "--version"
+      ],
+      "returncode": null,
+      "stderr": "not found",
+      "stdout": "",
+      "unavailable": true
+    },
+    "git": {
+      "command": [
+        "/usr/bin/git",
+        "--version"
+      ],
+      "returncode": 0,
+      "stderr": "",
+      "stdout": "git version 2.53.0\n"
+    },
+    "ninja": {
+      "command": [
+        "ninja",
+        "--version"
+      ],
+      "returncode": null,
+      "stderr": "not found",
+      "stdout": "",
+      "unavailable": true
+    },
+    "nvcc": {
+      "command": [
+        "nvcc",
+        "--version"
+      ],
+      "returncode": null,
+      "stderr": "not found",
+      "stdout": "",
+      "unavailable": true
+    },
+    "nvidia_smi_list": {
+      "command": [
+        "/usr/lib/wsl/lib/nvidia-smi",
+        "-L"
+      ],
+      "returncode": 0,
+      "stderr": "",
+      "stdout": "GPU 0: NVIDIA GeForce RTX 5060 Ti (UUID: GPU-49db48ba-f49e-6bf4-1d37-0eef00b47376)\nGPU 1: NVIDIA GeForce RTX 4060 (UUID: GPU-750f2411-a4ee-0f5a-40d0-9bef4e9143dc)\n"
+    },
+    "nvidia_smi_query": {
+      "command": [
+        "/usr/lib/wsl/lib/nvidia-smi",
+        "--query-gpu=index,name,memory.total,driver_version,pci.bus_id,temperature.gpu,power.limit",
+        "--format=csv"
+      ],
+      "returncode": 0,
+      "stderr": "",
+      "stdout": "index, name, memory.total [MiB], driver_version, pci.bus_id, temperature.gpu, power.limit [W]\n0, NVIDIA GeForce RTX 5060 Ti, 16311 MiB, 610.88, 00000000:01:00.0, 42, 180.00 W\n1, NVIDIA GeForce RTX 4060, 8188 MiB, 610.88, 00000000:06:00.0, 35, 115.00 W\n"
+    },
+    "python": {
+      "command": [
+        "/mnt/c/workplace/llm_playground/.venv/bin/python3",
+        "--version"
+      ],
+      "returncode": 0,
+      "stderr": "",
+      "stdout": "Python 3.11.15\n"
+    }
+  },
+  "torch": {
+    "installed": false,
+    "reason": "PyTorch is not installed in the active Windows interpreter"
+  },
+  "windows": false,
+  "working_directory": "/mnt/c/workplace/llm_playground",
+  "wsl": true
+}

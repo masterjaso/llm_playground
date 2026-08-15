@@ -1,0 +1,33 @@
+{
+  "estimate": {
+    "activation_bytes": 65536000000,
+    "assembled_checkpoint_bytes": 45561665556,
+    "build_bytes": 2147483648,
+    "extracted_checkpoint_bytes": 45561665556,
+    "gguf_bytes": 46472898867,
+    "imatrix_bytes": 4294967296,
+    "layer_checkpoint_bytes": 7289866488,
+    "logs_bytes": 536870912,
+    "quantized_bytes": 13668499666,
+    "safety_margin_bytes": 42994938714,
+    "source_checkpoint_bytes": 55563006776,
+    "total_bytes": 329627863479
+  },
+  "profile": {
+    "active_intermediate_size": 5120,
+    "dense_intermediate_size": 17408,
+    "dtype": "bfloat16",
+    "expert_intermediate_size": 2048,
+    "hidden_size": 5120,
+    "model": "Qwen/Qwen3.8-27B",
+    "name": "qwen38_p8s1_top2",
+    "num_hidden_layers": 64,
+    "revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
+    "routed_capacity": 16384,
+    "routed_experts": 8,
+    "shared_intermediate_size": 1024,
+    "sparsity": 0.7058823529411764,
+    "top_k": 2,
+    "total_capacity": 17408
+  }
+}

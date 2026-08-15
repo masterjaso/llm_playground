@@ -1,0 +1,64 @@
+{
+  "artifacts": {
+    "oracle_ablation": "runs/20260815-145505-windows-real-d2m/metrics/oracle-ablation.json",
+    "pilot": "runs/20260815-145505-windows-real-d2m/metrics/pilot.json"
+  },
+  "commands": [
+    "d2m pilot --run-dir runs/20260815-145505-windows-real-d2m --json",
+    "d2m oracle-study --run-dir runs/20260815-145505-windows-real-d2m --layer 0 --json"
+  ],
+  "created_at": "2026-08-15T15:34:50.891114Z",
+  "decision": "Do not train a router for contiguous p8 yet. Contribution-signature partition is the best bounded fallback but remains red (0.2758 normalized MSE); next experiment must increase effective routed capacity or use a learned/expanded expert decomposition. This is a profile-capacity finding, not a terminal run failure.",
+  "falsifier": "Best oracle normalized MSE remains above 0.10 on representative real layer-0 inputs.",
+  "git_commit": "8efd4adc00b86dd8a48906354e53c4fc9b4dac6d",
+  "hypothesis": "Contribution-aware partitioning and oracle top-2 routing can meet the p8 ceiling before router training.",
+  "metrics": {
+    "best_variant": "contribution_signature_top2",
+    "variants": [
+      {
+        "all_expert_reconstruction_mse": 1.3296730437366018e-20,
+        "name": "contiguous_top2",
+        "oracle_cosine": 0.9577569961547852,
+        "oracle_normalized_mse": 0.6007022409093975
+      },
+      {
+        "all_expert_reconstruction_mse": 1.3296730437366018e-20,
+        "name": "contiguous_top3_diagnostic",
+        "oracle_cosine": 0.966671884059906,
+        "oracle_normalized_mse": 0.6040498842152063
+      },
+      {
+        "all_expert_reconstruction_mse": 1.2627775581945033e-20,
+        "name": "interleave_top2",
+        "oracle_cosine": 0.9498973488807678,
+        "oracle_normalized_mse": 0.6359064222579596
+      },
+      {
+        "all_expert_reconstruction_mse": 1.9841234002075688e-20,
+        "name": "activation_magnitude_top2",
+        "oracle_cosine": 0.9735567569732666,
+        "oracle_normalized_mse": 0.4166747295965313
+      },
+      {
+        "all_expert_reconstruction_mse": 1.91999073022314e-20,
+        "name": "contribution_signature_top2",
+        "oracle_cosine": 0.9838516712188721,
+        "oracle_normalized_mse": 0.27584055734895174
+      },
+      {
+        "all_expert_reconstruction_mse": 1.3480353224242853e-20,
+        "name": "wider_shared_top2",
+        "oracle_cosine": 0.9640544652938843,
+        "oracle_normalized_mse": 0.5153543869452125
+      }
+    ]
+  },
+  "next_exact_command": "d2m prepare-data --run-dir runs/20260815-145505-windows-real-d2m --corpus-manifest <approved-jsonl>",
+  "phase": "phase-04-oracle-ceiling-and-bounded-fallback",
+  "result": "FAIL",
+  "validation_gate": {
+    "green_cosine": ">=0.98",
+    "green_oracle_normalized_mse": "<=0.05",
+    "yellow_oracle_normalized_mse": "<=0.10"
+  }
+}

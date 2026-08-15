@@ -1,0 +1,16 @@
+{
+  "code_commit": "8efd4adc00b86dd8a48906354e53c4fc9b4dac6d",
+  "created_at": "2026-08-15T15:37:46.110879Z",
+  "decision": "Use native Qwen 3.5 dense runtime as teacher reference and local versioned SwiGLU MoE target fallback; do not claim native MoE or remote-code support.",
+  "native_dense_mlp": true,
+  "native_ep_plan": null,
+  "native_hybrid_attention": true,
+  "native_model_type": "qwen3_5_text",
+  "native_shared_routed_moe": false,
+  "schema_version": 1,
+  "source_config_hash": "191e0af232104ed8b65258cf3fb2b842e288008baca7633c11b82a1ac7203aab",
+  "source_index_hash": "77042094076611b69791a610065f28b7013b8c621795fa86ddccc8bac7d1b9df",
+  "source_repository": "Qwen/Qwen3.8-27B",
+  "source_revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
+  "transformers_version": "5.15.0"
+}

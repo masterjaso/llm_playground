@@ -1,0 +1,33 @@
+{
+  "code_commit": "8efd4adc00b86dd8a48906354e53c4fc9b4dac6d",
+  "created_at": "2026-08-15T15:36:14.787258Z",
+  "note": "No profile is promoted until p8 has a viable real calibration/training path.",
+  "parent_run_id": "20260815-030931-windows",
+  "profile": "qwen38_p8s1_top2",
+  "profile_hash": "7be6462de369fe8633c03d08f14fcaa89b62dee3fc4bb740a399d526e95d335d",
+  "profiles": [
+    {
+      "active_intermediate_size": 5120,
+      "oracle_normalized_mse": 0.27584055734895174,
+      "profile": "qwen38_p8s1_top2",
+      "quality_status": "red",
+      "total_capacity": 17408
+    },
+    {
+      "oracle_normalized_mse": 0.6987244561695385,
+      "profile": "qwen38_p16s1_top2",
+      "quality_status": "untrained-structural-only"
+    },
+    {
+      "oracle_normalized_mse": 0.7502168320902833,
+      "profile": "qwen38_p32s1_top2",
+      "quality_status": "untrained-structural-only"
+    }
+  ],
+  "run_id": "20260815-145505-windows-real-d2m",
+  "source_config_hash": "191e0af232104ed8b65258cf3fb2b842e288008baca7633c11b82a1ac7203aab",
+  "source_index_hash": "77042094076611b69791a610065f28b7013b8c621795fa86ddccc8bac7d1b9df",
+  "source_repository": "Qwen/Qwen3.8-27B",
+  "source_revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
+  "status": "PARTIAL_ORACLE_STUDY"
+}

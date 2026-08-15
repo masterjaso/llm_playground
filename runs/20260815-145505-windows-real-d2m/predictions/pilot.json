@@ -1,0 +1,13 @@
+{
+  "contract": {
+    "expected_artifacts": [
+      "metrics/pilot.json"
+    ],
+    "expected_validation_results": [
+      "PILOT_COMPLETE"
+    ]
+  },
+  "phase": "pilot",
+  "result": "confirmed",
+  "timestamp": "2026-08-15T15:36:52.000694Z"
+}

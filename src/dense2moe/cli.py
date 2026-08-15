@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import shlex
 import shutil
 import sys
 from collections.abc import Callable
@@ -18,31 +19,31 @@ from typing import Any
 from .assembly import assemble_checkpoint
 from .capture import capture_activations
 from .config import load_config
+from .data import prepare_calibration_manifest
 from .discovery.source import inspect_hub_source, inspect_local_source, verify_qwen_geometry
 from .estimates import estimate_resources
 from .evaluation import quality_gate
-from .export.gguf import validate_gguf, write_tiny_gguf
+from .export.gguf import validate_gguf
 from .hardware import collect_environment
 from .logging import read_jsonl
 from .partition import partition_indices
 from .scheduling import JobQueue
-from .state import StateStore, atomic_write_json, bootstrap_run, utc_now
+from .state import StateStore, atomic_write_json, bootstrap_run, merge_fact_ledgers, utc_now
 
-TERMINAL_STATES = {"SUCCEEDED", "RESEARCH_CANDIDATE", "FAILED_SAFELY", "BLOCKED"}
+TERMINAL_STATES = {"SUCCEEDED", "RESEARCH_CANDIDATE", "FAILED_SAFELY"}
 
 
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="d2m", description="Resumable dense-to-MoE conversion pipeline")
     sub = parser.add_subparsers(dest="command", required=True)
-    commands = [
-        "doctor", "inspect-source", "estimate", "download", "extract-text-checkpoint", "test", "pilot",
-        "prepare-data", "capture", "partition-layer", "train-layer", "worker", "train-layers", "assemble",
-        "repair", "evaluate", "export-gguf", "build-imatrix", "quantize", "benchmark", "report", "status", "run",
-    ]
-    for name in commands:
+    def base(name: str) -> argparse.ArgumentParser:
         command = sub.add_parser(name)
         command.add_argument("--run-dir", required=True)
         command.add_argument("--json", action="store_true", dest="json_output")
+        return command
+
+    for name in ("doctor", "inspect-source", "estimate", "download", "extract-text-checkpoint", "test", "pilot", "oracle-study", "partition-layer", "repair", "evaluate", "export-gguf", "build-imatrix", "quantize", "benchmark", "report", "status", "run"):
+        command = base(name)
         command.add_argument("--config")
         command.add_argument("--model", default="Qwen/Qwen3.8-27B")
         command.add_argument("--revision", default="main")
@@ -52,6 +53,56 @@ def _parser() -> argparse.ArgumentParser:
         command.add_argument("--resume", action="store_true")
         command.add_argument("--force", action="store_true")
         command.add_argument("--execute", action="store_true", help="perform network/download work explicitly requested")
+
+    prepare = base("prepare-data")
+    prepare.add_argument("--corpus-manifest", required=True)
+    prepare.add_argument("--train-tokens", type=int, default=131_072)
+    prepare.add_argument("--holdout-tokens", type=int, default=16_384)
+    prepare.add_argument("--seed", type=int, default=17)
+    prepare.add_argument("--holdout-seed", type=int, default=29)
+    prepare.add_argument("--sequence-length", type=int, default=2048)
+    prepare.add_argument("--output-format", choices=("json", "jsonl"), default="json")
+    prepare.add_argument("--tokenizer-revision", default="declared-by-input")
+
+    capture = base("capture")
+    capture.add_argument("--layers", default="0", help="comma-separated layer IDs or ranges")
+    capture.add_argument("--dataset-manifest", required=True)
+    capture.add_argument("--shard-tokens", type=int, default=8192)
+    capture.add_argument("--dtype", default="float32")
+    capture.add_argument("--device-map", default="cpu")
+    capture.add_argument("--resume", action="store_true")
+
+    train_layer = base("train-layer")
+    train_layer.add_argument("--layer", type=int, required=True)
+    train_layer.add_argument("--profile", required=True)
+    train_layer.add_argument("--epochs", type=int, default=1)
+    train_layer.add_argument("--microbatch", type=int, default=1)
+    train_layer.add_argument("--learning-rate", type=float, default=1e-3)
+    train_layer.add_argument("--resume", action="store_true")
+    train_layer.add_argument("--force", action="store_true")
+
+    validate_layer = base("validate-layer")
+    validate_layer.add_argument("--layer", type=int, required=True)
+    validate_layer.add_argument("--profile", required=True)
+
+    train_layers = base("train-layers")
+    train_layers.add_argument("--profile", required=True)
+    train_layers.add_argument("--workers", type=int, default=1)
+    train_layers.add_argument("--devices", default="cpu")
+    train_layers.add_argument("--resume", action="store_true")
+
+    assemble = base("assemble")
+    assemble.add_argument("--profile", required=True)
+    assemble.add_argument("--strict", action="store_true")
+
+    worker = base("worker")
+    worker.add_argument("--layer", type=int, required=True)
+    worker.add_argument("--profile", required=True)
+    worker.add_argument("--epochs", type=int, default=1)
+    worker.add_argument("--microbatch", type=int, default=1)
+    worker.add_argument("--learning-rate", type=float, default=1e-3)
+    worker.add_argument("--resume", action="store_true")
+    worker.add_argument("--force", action="store_true")
     return parser
 
 
@@ -66,12 +117,20 @@ def _emit(payload: Any, json_output: bool) -> None:
 
 
 def _store(args: argparse.Namespace) -> StateStore:
-    return bootstrap_run(args.run_dir)
+    return bootstrap_run(args.run_dir, parent_run_id="20260815-030931-windows")
 
 
 def _write_fact_ledger(store: StateStore, facts: dict[str, Any]) -> Path:
     path = store.run_dir / "repository-fact-ledger.json"
-    payload = {"schema_version": 1, "updated": utc_now(), "facts": facts}
+    existing: dict[str, Any] = {}
+    if path.exists():
+        try:
+            loaded = json.loads(path.read_text(encoding="utf-8"))
+            if isinstance(loaded, dict):
+                existing = dict(loaded.get("facts", {}))
+        except (OSError, ValueError, TypeError, json.JSONDecodeError):
+            existing = {}
+    payload = {"schema_version": 2, "updated": utc_now(), "facts": merge_fact_ledgers(existing, facts)}
     atomic_write_json(path, payload)
     return path
 
@@ -154,8 +213,7 @@ def _inspect_source(args: argparse.Namespace, store: StateStore) -> dict[str, An
     atomic_write_json(path, manifest.as_dict())
     facts_path = store.run_dir / "repository-fact-ledger.json"
     facts: dict[str, Any] = json.loads(facts_path.read_text(encoding="utf-8")) if facts_path.exists() else {"schema_version": 1, "facts": {}}
-    facts.setdefault("facts", {})
-    facts["facts"].update({
+    observed_facts = {
         "source_model_availability": {"status": "verified" if manifest.files or args.source_dir else "unknown", "value": args.model},
         "source_revision": {"status": "verified" if manifest.revision_pinned else "unknown", "value": manifest.revision},
         "source_config_shape": {"status": "verified" if manifest.config and "error" not in manifest.config and verify_qwen_geometry(manifest.config).get("shape_verified") else "unknown", "value": verify_qwen_geometry(manifest.config) if manifest.config else {}},
@@ -163,7 +221,9 @@ def _inspect_source(args: argparse.Namespace, store: StateStore) -> dict[str, An
         "source_text_model_class": {"status": "verified" if manifest.config else "unknown", "value": verify_qwen_geometry(manifest.config).get("model_type") if manifest.config else None},
         "source_license": {"status": "verified" if manifest.license != "unknown" else "unknown", "value": manifest.license},
         "target_moe_class": {"status": "unknown", "value": "requires native Transformers compatibility check"},
-    })
+    }
+    facts["facts"] = merge_fact_ledgers(dict(facts.get("facts", {})), observed_facts)
+    facts["schema_version"] = 2
     atomic_write_json(facts_path, facts)
     decision_path = store.run_dir / "decision-register.json"
     decisions: dict[str, Any] = json.loads(decision_path.read_text(encoding="utf-8")) if decision_path.exists() else {"schema_version": 1}
@@ -173,7 +233,14 @@ def _inspect_source(args: argparse.Namespace, store: StateStore) -> dict[str, An
     status = "SOURCE_READY" if manifest.revision_pinned and manifest.config and "error" not in manifest.config else "SOURCE_DISCOVERY_INCOMPLETE"
     next_command = f"d2m estimate --run-dir {args.run_dir} --config {args.config or 'configs/qwen38_p32s1_top2.yaml'}"
     result = {"status": status, "source_manifest": str(path), "revision": manifest.revision, "revision_pinned": manifest.revision_pinned, "config_keys": sorted(manifest.config), "tensor_count": len(manifest.tensor_names), "text_tensor_count": len(manifest.text_tensor_names), "next_exact_command": next_command}
-    store.transition(current_phase="source", phase_status="complete" if status == "SOURCE_READY" else "blocked", source_revision=manifest.revision, last_successful_command="inspect-source" if status == "SOURCE_READY" else store.load().last_successful_command, next_exact_command=next_command, validation_results={"source": result})
+    config_hash = None
+    index_hash = None
+    for item in manifest.files:
+        if str(item.get("path", "")) == "config.json":
+            config_hash = item.get("sha256")
+        if str(item.get("path", "")) == "model.safetensors.index.json":
+            index_hash = item.get("sha256")
+    store.transition(current_phase="source", phase_status="complete" if status == "SOURCE_READY" else "blocked", source_revision=manifest.revision, source_config_hash=str(config_hash or "") or None, source_index_hash=str(index_hash or "") or None, last_successful_command="inspect-source" if status == "SOURCE_READY" else store.load().last_successful_command, next_exact_command=next_command, validation_results={"source": result})
     store.write_prediction("source", {"expected_artifacts": ["source-manifest.json"], "expected_observations": ["pinned revision", "verified text config geometry", "text tensor inventory"], "expected_validation_results": ["SOURCE_READY"]}, "confirmed" if status == "SOURCE_READY" else "scope-discovery")
     if status != "SOURCE_READY":
         store.write_handoff(next_command=next_command, expected_output="a pinned source revision and inspectable config", blocker="Source revision/config could not be verified")
@@ -207,6 +274,32 @@ def _estimate(args: argparse.Namespace, store: StateStore) -> dict[str, Any]:
     else:
         store.write_handoff(next_command=next_command, expected_output="structural tests")
     return result
+
+
+def _profile_from_args(args: argparse.Namespace) -> Any:
+    configured = getattr(args, "profile", None) or getattr(args, "config", None)
+    if configured:
+        candidate = Path(str(configured))
+        if not candidate.exists() and not candidate.is_absolute():
+            candidate = Path(__file__).resolve().parents[2] / "configs" / str(configured)
+        if candidate.exists():
+            return load_config(candidate)
+        # Accept a profile name as shorthand for the checked-in config.
+        named = Path(__file__).resolve().parents[2] / "configs" / f"{configured}.yaml"
+        if named.exists():
+            return load_config(named)
+        raise FileNotFoundError(f"profile config does not exist: {configured}")
+    return load_config(Path(__file__).resolve().parents[2] / "configs" / "qwen38_p8s1_top2.yaml")
+
+
+def _source_dir_for_run(store: StateStore) -> Path:
+    local = store.run_dir / "source"
+    if (local / "model.safetensors.index.json").exists():
+        return local
+    canonical = Path("runs/20260815-030931-windows/source")
+    if (canonical / "model.safetensors.index.json").exists():
+        return canonical
+    raise FileNotFoundError("immutable local source snapshot is unavailable")
 
 
 def _download(args: argparse.Namespace, store: StateStore) -> dict[str, Any]:
@@ -283,11 +376,18 @@ def _pilot(args: argparse.Namespace, store: StateStore) -> dict[str, Any]:
         Path(__file__).resolve().parents[2] / "configs" / "qwen38_p16s1_top2.yaml",
         Path(__file__).resolve().parents[2] / "configs" / "qwen38_p8s1_top2.yaml",
     ]
-    if real and (store.run_dir / "source" / "model.safetensors.index.json").exists():
+    source_dir = None
+    try:
+        candidate = _source_dir_for_run(store)
+        source_dir = candidate if (candidate / "model.safetensors.index.json").exists() else None
+    except FileNotFoundError:
+        source_dir = None
+    if real and source_dir is not None:
         from .evaluation.pilot import run_real_layer_pilot
 
-        measured = run_real_layer_pilot(store.run_dir / "source", [load_config(path) for path in profile_paths])
-        result = {**measured, "real_layer": True, "next_exact_command": next_command}
+        measured = run_real_layer_pilot(source_dir, [load_config(path) for path in profile_paths])
+        state = store.load()
+        result = {**measured, "real_layer": True, "next_exact_command": next_command, "source_repository": "Qwen/Qwen3.8-27B", "source_revision": state.source_revision, "source_config_hash": state.source_config_hash, "source_index_hash": state.source_index_hash, "code_commit": "continuation", "seed": 17}
     else:
         result = {"status": "BLOCKED", "real_layer": False, "profiles": ["qwen38_p32s1_top2", "qwen38_p16s1_top2", "qwen38_p8s1_top2"], "message": "Real-layer pilot is gated on a verified local text checkpoint; synthetic structural tests are not evidence of model quality.", "next_exact_command": next_command}
     atomic_write_json(store.run_dir / "metrics" / "pilot.json", result)
@@ -300,23 +400,120 @@ def _pilot(args: argparse.Namespace, store: StateStore) -> dict[str, Any]:
     return result
 
 
+def _oracle_study(args: argparse.Namespace, store: StateStore) -> dict[str, Any]:
+    from .evaluation import run_oracle_ablation
+
+    try:
+        result = run_oracle_ablation(_source_dir_for_run(store), layer=args.layer or 0)
+        state = store.load()
+        result.update({"source_repository": "Qwen/Qwen3.8-27B", "source_revision": state.source_revision, "source_config_hash": state.source_config_hash, "source_index_hash": state.source_index_hash, "profile": "qwen38_p8s1_top2", "seed": 17, "code_commit": "continuation"})
+        atomic_write_json(store.run_dir / "metrics" / "oracle-ablation.json", result)
+        best = result.get("best_variant")
+        blocker = None if result.get("gate", {}).get("green") else "p8 oracle ceiling is red; bounded fallback or capacity change is required before router training"
+        next_command = f"d2m prepare-data --run-dir {args.run_dir} --corpus-manifest <approved-jsonl>"
+        result.update({"best_variant": best, "next_exact_command": next_command})
+        store.transition(current_phase="oracle", phase_status="pending" if blocker else "complete", active_blocker=blocker, next_exact_command=next_command, validation_results={"oracle": result})
+        store.write_handoff(next_command=next_command, expected_output="fixed calibration manifest before router training", blocker=blocker)
+    except (OSError, ValueError, TypeError, RuntimeError, KeyError) as exc:
+        result = {"status": "BLOCKED", "message": str(exc), "next_exact_command": f"d2m oracle-study --run-dir {args.run_dir} --layer {args.layer or 0}"}
+        store.transition(current_phase="oracle", phase_status="blocked", active_blocker=str(exc), next_exact_command=result["next_exact_command"], validation_results={"oracle": result})
+        store.write_handoff(next_command=result["next_exact_command"], expected_output="oracle ablation metrics", blocker=str(exc))
+    return result
+
+
 def _prepare_data(args: argparse.Namespace, store: StateStore) -> dict[str, Any]:
-    result = {"status": "DATA_PLAN_READY", "tokens": 100_000, "seed": 17, "holdout_seed": 29, "source": "local calibration corpus required", "artifact": str(store.run_dir / "capture" / "data-plan.json")}
-    atomic_write_json(store.run_dir / "capture" / "data-plan.json", result)
-    next_command = f"d2m capture --run-dir {args.run_dir}"
-    store.transition(current_phase="capture", phase_status="pending", next_exact_command=next_command, validation_results={"prepare_data": result})
-    store.write_handoff(next_command=next_command, expected_output="activation manifests from a supplied calibration corpus")
+    output = store.run_dir / "capture" / "data-plan.json"
+    try:
+        manifest = prepare_calibration_manifest(
+            args.corpus_manifest,
+            output,
+            train_tokens=args.train_tokens,
+            holdout_tokens=args.holdout_tokens,
+            seed=args.seed,
+            holdout_seed=args.holdout_seed,
+            sequence_length=args.sequence_length,
+            tokenizer_revision=args.tokenizer_revision,
+        )
+        state = store.load()
+        manifest["source_repository"] = "Qwen/Qwen3.8-27B"
+        manifest["source_revision"] = state.source_revision
+        manifest["source_config_hash"] = state.source_config_hash
+        manifest["source_index_hash"] = state.source_index_hash
+        manifest["code_commit"] = "continuation"
+        import hashlib
+
+        manifest["dataset_hash"] = hashlib.sha256(json.dumps({key: value for key, value in manifest.items() if key != "dataset_hash"}, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+        atomic_write_json(output, manifest)
+        result: dict[str, Any] = {"status": "DATA_READY", "artifact": str(output), "dataset_hash": manifest["dataset_hash"], "train_tokens": manifest["train_tokens"], "holdout_tokens": manifest["holdout_tokens"], "seed": args.seed, "holdout_seed": args.holdout_seed}
+        next_command = f"d2m capture --run-dir {args.run_dir} --layers 0 --dataset-manifest {output} --resume"
+        store.transition(current_phase="capture", phase_status="pending", next_exact_command=next_command, active_blocker=None, validation_results={"prepare_data": result})
+        store.write_handoff(next_command=next_command, expected_output="binary activation manifests from the fixed calibration corpus")
+    except (OSError, ValueError, TypeError, json.JSONDecodeError) as exc:
+        result = {"status": "BLOCKED", "artifact": str(output), "error": str(exc), "message": "A non-empty, disjoint calibration corpus manifest is required; no empty plan is accepted."}
+        next_command = f"d2m prepare-data --run-dir {args.run_dir} --corpus-manifest <approved-jsonl>"
+        store.transition(current_phase="capture", phase_status="blocked", next_exact_command=next_command, active_blocker=str(result["message"]), validation_results={"prepare_data": result})
+        store.write_handoff(next_command=next_command, expected_output="calibration manifest", blocker=str(result["message"]))
     return result
 
 
 def _capture(args: argparse.Namespace, store: StateStore) -> dict[str, Any]:
-    layer = args.layer if args.layer is not None else 0
-    result = capture_activations([], store.run_dir / "capture", layer=layer)
-    result.update({"status": "CAPTURE_EMPTY_PENDING", "message": "No corpus was supplied; empty capture is a manifest only."})
-    atomic_write_json(store.run_dir / "metrics" / f"capture-{layer:04d}.json", result)
-    next_command = f"d2m partition-layer --run-dir {args.run_dir} --layer {layer}"
-    store.transition(current_phase="capture", phase_status="pending", next_exact_command=next_command, validation_results={"capture": result})
-    store.write_handoff(next_command=next_command, expected_output="partition manifest", blocker="No calibration corpus supplied; capture is manifest-only")
+    manifest_path = Path(args.dataset_manifest)
+    if not manifest_path.exists():
+        result: dict[str, Any] = {"status": "BLOCKED", "message": f"dataset manifest does not exist: {manifest_path}"}
+        store.transition(current_phase="capture", phase_status="blocked", active_blocker=result["message"], next_exact_command=f"d2m capture --run-dir {args.run_dir} --layers {args.layers} --dataset-manifest <manifest>", validation_results={"capture": result})
+        store.write_handoff(next_command=store.load().next_exact_command, expected_output="binary activation shards", blocker=result["message"])
+        return result
+    payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+    if not isinstance(payload, dict) or payload.get("status") != "CALIBRATION_READY":
+        result = {"status": "BLOCKED", "message": "capture requires a CALIBRATION_READY manifest from prepare-data"}
+        store.transition(current_phase="capture", phase_status="blocked", active_blocker=result["message"], validation_results={"capture": result})
+        store.write_handoff(next_command=f"d2m prepare-data --run-dir {args.run_dir} --corpus-manifest <approved-jsonl>", expected_output="CALIBRATION_READY", blocker=result["message"])
+        return result
+    layers: list[int] = []
+    for part in str(args.layers).split(","):
+        part = part.strip()
+        if not part:
+            continue
+        if "-" in part:
+            start, stop = (int(item) for item in part.split("-", 1))
+            layers.extend(range(start, stop + 1))
+        else:
+            layers.append(int(part))
+    activation_files = payload.get("activation_files", {})
+    results: list[dict[str, Any]] = []
+    for layer in sorted(set(layers)):
+        source = activation_files.get(str(layer)) if isinstance(activation_files, dict) else None
+        if not source:
+            results.append({"status": "BLOCKED", "layer": layer, "message": "teacher capture requires a local activation input file or a supported teacher runtime; text-only metadata is not an activation"})
+            continue
+        source_path = Path(str(source))
+        if not source_path.is_absolute():
+            source_path = manifest_path.parent / source_path
+        if not source_path.exists():
+            results.append({"status": "BLOCKED", "layer": layer, "message": f"activation input missing: {source_path}"})
+            continue
+        try:
+            import numpy as np  # type: ignore
+
+            values = np.load(source_path, mmap_mode="r") if source_path.suffix == ".npy" else np.load(source_path)["mlp_input"]
+            captured = capture_activations(
+                [values],
+                store.run_dir / "capture",
+                layer=layer,
+                dtype=args.dtype,
+                shard_tokens=args.shard_tokens,
+                resume=args.resume,
+                metadata={"dataset_hash": payload.get("dataset_hash", ""), "source_revision": store.load().source_revision, "device_map": args.device_map},
+            )
+            results.append(captured)
+        except (OSError, ValueError, TypeError, KeyError, RuntimeError) as exc:
+            results.append({"status": "BLOCKED", "layer": layer, "message": str(exc)})
+    status = "CAPTURE_COMPLETE" if results and all(item.get("status") in {"CAPTURE_COMPLETE", "CAPTURE_RESUMED"} for item in results) else "BLOCKED"
+    result = {"status": status, "layers": results, "dataset_manifest": str(manifest_path), "message": None if status == "CAPTURE_COMPLETE" else "one or more layers have no validated binary activation capture"}
+    atomic_write_json(store.run_dir / "metrics" / "capture.json", result)
+    next_command = f"d2m partition-layer --run-dir {args.run_dir} --layer {layers[0] if layers else 0}"
+    store.transition(current_phase="capture", phase_status="pending" if status == "CAPTURE_COMPLETE" else "blocked", active_blocker=None if status == "CAPTURE_COMPLETE" else result["message"], next_exact_command=next_command, validation_results={"capture": result})
+    store.write_handoff(next_command=next_command, expected_output="validated partition manifest" if status == "CAPTURE_COMPLETE" else "teacher activation input files", blocker=None if status == "CAPTURE_COMPLETE" else result["message"])
     return result
 
 
@@ -334,27 +531,65 @@ def _partition_layer(args: argparse.Namespace, store: StateStore) -> dict[str, A
 
 
 def _train_layer(args: argparse.Namespace, store: StateStore) -> dict[str, Any]:
-    layer = args.layer if args.layer is not None else 0
+    from .checkpoint import validate_layer_checkpoint
+    from .training import train_real_layer
+
+    layer = args.layer
     path = store.run_dir / "layer-checkpoints" / f"layer-{layer:04d}.json"
+    profile = _profile_from_args(args)
     if path.exists() and not args.force:
-        return {"status": "LAYER_ALREADY_COMPLETE", "layer": layer, "path": str(path)}
-    payload = {"schema_version": 1, "layer": layer, "status": "synthetic-pending", "metrics": {"loss": None}, "source": "no activation target supplied"}
-    atomic_write_json(path, payload)
-    next_command = f"d2m train-layers --run-dir {args.run_dir}"
-    result = {"status": "LAYER_CHECKPOINT_PENDING", "layer": layer, "path": str(path), "message": "Placeholder is not a trained layer and cannot advance the quality gate.", "next_exact_command": next_command}
-    store.transition(current_phase="training", phase_status="pending", next_exact_command=next_command, validation_results={"train_layer": result})
-    store.write_handoff(next_command=next_command, expected_output="all trained layer checkpoints", blocker=str(result["message"]))
+        valid, errors, _ = validate_layer_checkpoint(path, expected_profile=profile.name, expected_layer=layer, require_quality=True)
+        if valid:
+            return {"status": "LAYER_ALREADY_COMPLETE", "layer": layer, "path": str(path)}
+        # Invalid metadata is never treated as progress; a forced rerun is the
+        # only way to replace it and no placeholder is written.
+        if not args.resume:
+            result = {"status": "BLOCKED", "layer": layer, "path": str(path), "message": "existing layer metadata is invalid; use --force to rerun", "errors": errors}
+            store.transition(current_phase="training", phase_status="blocked", active_blocker=result["message"], next_exact_command=f"d2m train-layer --run-dir {args.run_dir} --layer {layer} --profile {args.profile} --force", validation_results={"train_layer": result})
+            store.write_handoff(next_command=store.load().next_exact_command, expected_output="validated safetensors layer checkpoint", blocker=result["message"])
+            return result
+    activation_manifest = store.run_dir / "capture" / f"layer-{layer:04d}.json"
+    try:
+        result = train_real_layer(
+            source_dir=_source_dir_for_run(store),
+            activation_manifest=activation_manifest,
+            output_dir=store.run_dir / "layer-checkpoints",
+            layer=layer,
+            profile=profile,
+            seed=17,
+            source_revision=store.load().source_revision,
+            code_commit="continuation",
+        )
+        result["next_exact_command"] = f"d2m validate-layer --run-dir {args.run_dir} --layer {layer} --profile {args.profile}"
+        store.transition(current_phase="training", phase_status="pending" if result["status"] != "TRAINED_VALIDATED" else "complete", active_blocker=None if result["status"] == "TRAINED_VALIDATED" else "layer quality gate did not pass", next_exact_command=result["next_exact_command"], validation_results={"train_layer": result})
+        store.write_handoff(next_command=result["next_exact_command"], expected_output="validated layer metrics", blocker=None if result["status"] == "TRAINED_VALIDATED" else "layer quality gate did not pass")
+    except (OSError, ValueError, TypeError, RuntimeError, KeyError) as exc:
+        result = {"status": "BLOCKED", "layer": layer, "message": str(exc), "next_exact_command": f"d2m capture --run-dir {args.run_dir} --layers {layer} --dataset-manifest <manifest> --resume"}
+        store.transition(current_phase="training", phase_status="blocked", active_blocker=result["message"], next_exact_command=result["next_exact_command"], validation_results={"train_layer": result})
+        store.write_handoff(next_command=result["next_exact_command"], expected_output="validated binary activation capture", blocker=result["message"])
+    return result
+
+
+def _validate_layer(args: argparse.Namespace, store: StateStore) -> dict[str, Any]:
+    from .checkpoint import validate_layer_checkpoint
+
+    profile = _profile_from_args(args)
+    path = store.run_dir / "layer-checkpoints" / f"layer-{args.layer:04d}.json"
+    valid, errors, checkpoint = validate_layer_checkpoint(path, expected_profile=profile.name, expected_layer=args.layer, expected_source_revision=store.load().source_revision, require_quality=True)
+    result = {"status": "LAYER_VALIDATED" if valid else "BLOCKED", "layer": args.layer, "path": str(path), "errors": errors, "metrics": checkpoint.holdout_metrics if checkpoint else {}}
+    store.transition(current_phase="training", phase_status="pending" if not valid else "complete", active_blocker=None if valid else "; ".join(errors), validation_results={"validate_layer": result})
+    store.write_handoff(next_command=f"d2m train-layers --run-dir {args.run_dir} --profile {args.profile} --resume" if valid else f"d2m train-layer --run-dir {args.run_dir} --layer {args.layer} --profile {args.profile} --force", expected_output="next validated layer" if valid else "repaired layer checkpoint", blocker=None if valid else "; ".join(errors))
     return result
 
 
 def _train_layers(args: argparse.Namespace, store: StateStore) -> dict[str, Any]:
     queue = JobQueue(store.run_dir / "jobs.sqlite")
-    profile = load_config(args.config or str(Path(__file__).resolve().parents[2] / "configs" / "qwen38_p32s1_top2.yaml"))
+    profile = _profile_from_args(args)
     queue.enqueue_layers(list(range(profile.num_hidden_layers)))
     result = {"status": "QUEUE_READY", "profile": profile.name, "queue": queue.summary(), "message": "Layer workers require captured activations and a verified source checkpoint."}
     atomic_write_json(store.run_dir / "metrics" / "training-queue.json", result)
     queue.close()
-    next_command = f"d2m assemble --run-dir {args.run_dir}"
+    next_command = f"d2m assemble --run-dir {args.run_dir} --profile {args.profile} --strict"
     store.transition(current_phase="training", phase_status="pending", next_exact_command=next_command, validation_results={"train_layers": result})
     store.write_handoff(next_command=next_command, expected_output="complete trained layer checkpoints", blocker="Layer workers require captured activations and a verified source checkpoint")
     return result
@@ -362,12 +597,25 @@ def _train_layers(args: argparse.Namespace, store: StateStore) -> dict[str, Any]
 
 def _assemble(args: argparse.Namespace, store: StateStore) -> dict[str, Any]:
     paths = sorted((store.run_dir / "layer-checkpoints").glob("layer-*.json"))
-    profile = load_config(args.config or str(Path(__file__).resolve().parents[2] / "configs" / "qwen38_p32s1_top2.yaml"))
-    manifest = assemble_checkpoint(paths, store.run_dir / "artifacts" / "hf-moe", metadata={"profile": profile.name, "expected_layers": profile.num_hidden_layers})
-    result = {"status": "ASSEMBLY_READY" if manifest["complete"] else "BLOCKED", "manifest": str(store.run_dir / "artifacts" / "hf-moe" / "manifest.json"), "layers": len(paths)}
-    next_command = f"d2m evaluate --run-dir {args.run_dir}" if manifest["complete"] else f"d2m prepare-data --run-dir {args.run_dir}"
-    store.transition(current_phase="evaluation", phase_status="pending" if manifest["complete"] else "blocked", next_exact_command=next_command, validation_results={"assembly": result})
-    store.write_handoff(next_command=next_command, expected_output="real-model evaluation metrics" if manifest["complete"] else "calibration corpus and trained layer checkpoints", blocker=None if manifest["complete"] else "Not all layer checkpoints are trained and validated")
+    from .checkpoint import profile_fingerprint
+
+    profile = _profile_from_args(args)
+    state = store.load()
+    manifest = assemble_checkpoint(
+        paths,
+        store.run_dir / "artifacts" / "hf-moe",
+        metadata={
+            "profile": profile.name,
+            "profile_hash": profile_fingerprint(profile.as_dict()),
+            "source_revision": state.source_revision,
+            "expected_layers": profile.num_hidden_layers,
+            "strict": bool(args.strict),
+        },
+    )
+    result = {"status": "ASSEMBLY_READY" if manifest["complete"] else "BLOCKED", "manifest": str(store.run_dir / "artifacts" / "hf-moe" / "manifest.json"), "layers": len(paths), "errors": manifest.get("errors", [])}
+    next_command = f"d2m evaluate --run-dir {args.run_dir}" if manifest["complete"] else f"d2m train-layers --run-dir {args.run_dir} --profile {args.profile} --resume"
+    store.transition(current_phase="evaluation", phase_status="pending" if manifest["complete"] else "blocked", active_blocker=None if manifest["complete"] else "strict assembly rejected incomplete or invalid layer checkpoints", next_exact_command=next_command, validation_results={"assembly": result})
+    store.write_handoff(next_command=next_command, expected_output="real-model evaluation metrics" if manifest["complete"] else "validated safetensors checkpoints for every layer", blocker=None if manifest["complete"] else "strict assembly rejected incomplete or invalid layer checkpoints")
     return result
 
 
@@ -390,9 +638,28 @@ def _evaluate(args: argparse.Namespace, store: StateStore) -> dict[str, Any]:
 
 def _export(args: argparse.Namespace, store: StateStore) -> dict[str, Any]:
     path = store.run_dir / "artifacts" / "moe-f16.gguf"
+    result: dict[str, Any]
+    manifest_path = store.run_dir / "artifacts" / "hf-moe" / "manifest.json"
+    if not manifest_path.exists():
+        result = {"status": "BLOCKED", "path": str(path), "message": "GGUF export is gated on a validated real Hugging Face assembly; no structural smoke file is emitted."}
+        atomic_write_json(store.run_dir / "metrics" / "gguf.json", result)
+        store.transition(current_phase="export", phase_status="blocked", active_blocker=result["message"], next_exact_command=f"d2m assemble --run-dir {args.run_dir} --profile qwen38_p8s1_top2 --strict", validation_results={"gguf": result})
+        store.write_handoff(next_command=store.load().next_exact_command, expected_output="validated HF assembly before GGUF", blocker=result["message"])
+        return result
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    if not manifest.get("complete"):
+        result = {"status": "BLOCKED", "path": str(path), "message": "GGUF export is gated on a complete, reloaded real Hugging Face assembly; structural smoke output is not evidence."}
+        atomic_write_json(store.run_dir / "metrics" / "gguf.json", result)
+        store.transition(current_phase="export", phase_status="blocked", active_blocker=result["message"], next_exact_command=f"d2m assemble --run-dir {args.run_dir} --profile qwen38_p8s1_top2 --strict", validation_results={"gguf": result})
+        store.write_handoff(next_command=store.load().next_exact_command, expected_output="complete HF assembly before GGUF", blocker=result["message"])
+        return result
     if not path.exists():
-        write_tiny_gguf(path, metadata={"source": store.load().source_revision, "kind": "smoke"})
-    result = {"status": "GGUF_STRUCTURAL_READY", "path": str(path), "validation": validate_gguf(path)}
+        result = {"status": "BLOCKED", "path": str(path), "message": "A real llama.cpp converter is not configured for the custom target; no tiny substitute is created."}
+        atomic_write_json(store.run_dir / "metrics" / "gguf.json", result)
+        store.transition(current_phase="export", phase_status="blocked", active_blocker=result["message"], validation_results={"gguf": result})
+        store.write_handoff(next_command=f"d2m export-gguf --run-dir {args.run_dir}", expected_output="real-model GGUF converter", blocker=result["message"])
+        return result
+    result = {"status": "GGUF_READY", "path": str(path), "validation": validate_gguf(path)}
     atomic_write_json(store.run_dir / "metrics" / "gguf.json", result)
     next_command = f"d2m build-imatrix --run-dir {args.run_dir}"
     store.transition(current_phase="quantization", phase_status="pending", next_exact_command=next_command, validation_results={"gguf": result})
@@ -461,6 +728,25 @@ def _run(args: argparse.Namespace, store: StateStore) -> dict[str, Any]:
     state = store.load()
     if state.terminal_state in TERMINAL_STATES and args.resume:
         return {"status": "TERMINAL", "terminal_state": state.terminal_state, "message": "run is already terminal; inspect report before starting a new run"}
+    if args.resume and state.next_exact_command:
+        # BLOCKED is resumable.  Execute the durable next command when it is
+        # concrete; placeholder commands remain a truthful blocker.
+        command_text = state.next_exact_command.strip()
+        if "<" not in command_text and ">" not in command_text:
+            try:
+                tokens = shlex.split(command_text, posix=True)
+                if tokens and tokens[0] in {"d2m", "python", "python3"}:
+                    if tokens[0] == "d2m":
+                        tokens = tokens[1:]
+                    elif len(tokens) >= 3 and tokens[1] == "-m" and tokens[2] == "dense2moe.cli":
+                        tokens = tokens[3:]
+                    resumed_args = _parser().parse_args(tokens)
+                    if resumed_args.command != "run":
+                        resumed_store = _store(resumed_args)
+                        resumed_payload = HANDLERS[resumed_args.command](resumed_args, resumed_store)
+                        return {"status": "RESUMED", "next_command": command_text, "result": resumed_payload}
+            except (ValueError, OSError, RuntimeError, TypeError):
+                pass
     # One-phase orchestration: discovery is always safe to repeat, while the
     # source gate intentionally stops before any unverified model work.
     if not (store.run_dir / "environment.json").exists():
@@ -494,10 +780,12 @@ HANDLERS: dict[str, Callable[[argparse.Namespace, StateStore], dict[str, Any]]] 
     "extract-text-checkpoint": _extract,
     "test": _structural_smoke,
     "pilot": _pilot,
+    "oracle-study": _oracle_study,
     "prepare-data": _prepare_data,
     "capture": _capture,
     "partition-layer": _partition_layer,
     "train-layer": _train_layer,
+    "validate-layer": _validate_layer,
     "worker": _train_layer,
     "train-layers": _train_layers,
     "assemble": _assemble,

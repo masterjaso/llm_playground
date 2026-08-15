@@ -1,0 +1,136 @@
+{
+  "code_commit": "8efd4adc00b86dd8a48906354e53c4fc9b4dac6d",
+  "created_at": "2026-08-15T15:36:14.787258Z",
+  "inferences": [
+    "p8 capacity-preserving oracle is insufficient on representative layer-0 pilot",
+    "contribution-signature partition is the best tested bounded fallback"
+  ],
+  "measured_metrics": {
+    "oracle_ablation": [
+      {
+        "all_expert_reconstruction_mse": 1.3296730437366018e-20,
+        "expert_width": 2048,
+        "name": "contiguous_top2",
+        "oracle_cosine": 0.9577569961547852,
+        "oracle_normalized_mse": 0.6007022409093975,
+        "shared_width": 1024,
+        "top_k": 2
+      },
+      {
+        "all_expert_reconstruction_mse": 1.3296730437366018e-20,
+        "expert_width": 2048,
+        "name": "contiguous_top3_diagnostic",
+        "oracle_cosine": 0.966671884059906,
+        "oracle_normalized_mse": 0.6040498842152063,
+        "shared_width": 1024,
+        "top_k": 3
+      },
+      {
+        "all_expert_reconstruction_mse": 1.2627775581945033e-20,
+        "expert_width": 2048,
+        "name": "interleave_top2",
+        "oracle_cosine": 0.9498973488807678,
+        "oracle_normalized_mse": 0.6359064222579596,
+        "shared_width": 1024,
+        "top_k": 2
+      },
+      {
+        "all_expert_reconstruction_mse": 1.9841234002075688e-20,
+        "expert_width": 2048,
+        "name": "activation_magnitude_top2",
+        "oracle_cosine": 0.9735567569732666,
+        "oracle_normalized_mse": 0.4166747295965313,
+        "shared_width": 1024,
+        "top_k": 2
+      },
+      {
+        "all_expert_reconstruction_mse": 1.91999073022314e-20,
+        "expert_width": 2048,
+        "name": "contribution_signature_top2",
+        "oracle_cosine": 0.9838516712188721,
+        "oracle_normalized_mse": 0.27584055734895174,
+        "shared_width": 1024,
+        "top_k": 2
+      },
+      {
+        "all_expert_reconstruction_mse": 1.3480353224242853e-20,
+        "expert_width": 1920,
+        "name": "wider_shared_top2",
+        "oracle_cosine": 0.9640544652938843,
+        "oracle_normalized_mse": 0.5153543869452125,
+        "shared_width": 2048,
+        "top_k": 2
+      }
+    ],
+    "pilot": [
+      {
+        "all_expert_reconstruction_mse": 4.5130571372023476e-13,
+        "batch_size": 2,
+        "dense_mse": 0.0,
+        "initial_sparse_relative_mse": 0.7824452809132839,
+        "layer": 0,
+        "oracle_cosine": 0.8616143465042114,
+        "oracle_sparse_normalized_mse": 0.7502168320902833,
+        "profile": "qwen38_p32s1_top2",
+        "source_tensor_shard": "model-00001-of-00018.safetensors",
+        "status": "measured"
+      },
+      {
+        "all_expert_reconstruction_mse": 4.955861567478015e-13,
+        "batch_size": 2,
+        "dense_mse": 0.0,
+        "initial_sparse_relative_mse": 0.7211314691139838,
+        "layer": 0,
+        "oracle_cosine": 0.8957131505012512,
+        "oracle_sparse_normalized_mse": 0.6987244561695385,
+        "profile": "qwen38_p16s1_top2",
+        "source_tensor_shard": "model-00001-of-00018.safetensors",
+        "status": "measured"
+      },
+      {
+        "all_expert_reconstruction_mse": 5.052044936906808e-13,
+        "batch_size": 2,
+        "dense_mse": 0.0,
+        "initial_sparse_relative_mse": 0.6102052909291523,
+        "layer": 0,
+        "oracle_cosine": 0.9377316832542419,
+        "oracle_sparse_normalized_mse": 0.5849396727065247,
+        "profile": "qwen38_p8s1_top2",
+        "source_tensor_shard": "model-00001-of-00018.safetensors",
+        "status": "measured"
+      }
+    ]
+  },
+  "parent_run_id": "20260815-030931-windows",
+  "profile": "qwen38_p8s1_top2",
+  "profile_hash": "7be6462de369fe8633c03d08f14fcaa89b62dee3fc4bb740a399d526e95d335d",
+  "quality_gates": {
+    "all_expert_reconstruction_mse": {
+      "observed": 4.5130571372023476e-13,
+      "status": "green",
+      "threshold": 1e-08
+    },
+    "oracle_sparse_normalized_mse": {
+      "observed": 0.27584055734895174,
+      "status": "red",
+      "threshold_yellow": 0.1
+    },
+    "teacher_relative_quality": "not measured"
+  },
+  "run_id": "20260815-145505-windows-real-d2m",
+  "source_config_hash": "191e0af232104ed8b65258cf3fb2b842e288008baca7633c11b82a1ac7203aab",
+  "source_index_hash": "77042094076611b69791a610065f28b7013b8c621795fa86ddccc8bac7d1b9df",
+  "source_repository": "Qwen/Qwen3.8-27B",
+  "source_revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
+  "status": "RESEARCH_CANDIDATE",
+  "unresolved_risks": [
+    "no approved calibration corpus",
+    "no all-layer target checkpoint",
+    "no end-to-end quality benchmark"
+  ],
+  "verified_facts": [
+    "real source layer-0 tensors loaded read-only",
+    "all-expert reconstruction gate passes",
+    "strict tiny target save/reload passes"
+  ]
+}

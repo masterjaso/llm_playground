@@ -1,0 +1,52 @@
+{
+  "code_commit": "continuation",
+  "layer": 0,
+  "next_exact_command": "d2m prepare-data --run-dir runs/20260815-145505-windows-real-d2m",
+  "note": "untrained sparse error is a structural pilot, not a retained-quality claim",
+  "real_layer": true,
+  "results": [
+    {
+      "all_expert_reconstruction_mse": 4.5130571372023476e-13,
+      "batch_size": 2,
+      "dense_mse": 0.0,
+      "initial_sparse_relative_mse": 0.7824452809132839,
+      "layer": 0,
+      "oracle_cosine": 0.8616143465042114,
+      "oracle_sparse_normalized_mse": 0.7502168320902833,
+      "profile": "qwen38_p32s1_top2",
+      "source_tensor_shard": "model-00001-of-00018.safetensors",
+      "status": "measured"
+    },
+    {
+      "all_expert_reconstruction_mse": 4.955861567478015e-13,
+      "batch_size": 2,
+      "dense_mse": 0.0,
+      "initial_sparse_relative_mse": 0.7211314691139838,
+      "layer": 0,
+      "oracle_cosine": 0.8957131505012512,
+      "oracle_sparse_normalized_mse": 0.6987244561695385,
+      "profile": "qwen38_p16s1_top2",
+      "source_tensor_shard": "model-00001-of-00018.safetensors",
+      "status": "measured"
+    },
+    {
+      "all_expert_reconstruction_mse": 5.052044936906808e-13,
+      "batch_size": 2,
+      "dense_mse": 0.0,
+      "initial_sparse_relative_mse": 0.6102052909291523,
+      "layer": 0,
+      "oracle_cosine": 0.9377316832542419,
+      "oracle_sparse_normalized_mse": 0.5849396727065247,
+      "profile": "qwen38_p8s1_top2",
+      "source_tensor_shard": "model-00001-of-00018.safetensors",
+      "status": "measured"
+    }
+  ],
+  "seed": 17,
+  "source_config_hash": "191e0af232104ed8b65258cf3fb2b842e288008baca7633c11b82a1ac7203aab",
+  "source_dir": "runs/20260815-030931-windows/source",
+  "source_index_hash": "77042094076611b69791a610065f28b7013b8c621795fa86ddccc8bac7d1b9df",
+  "source_repository": "Qwen/Qwen3.8-27B",
+  "source_revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
+  "status": "PILOT_COMPLETE"
+}

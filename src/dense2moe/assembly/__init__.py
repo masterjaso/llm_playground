@@ -1,6 +1,5 @@
-"""Compatibility namespace for checkpoint assembly."""
+"""Authoritative checkpoint assembly implementation."""
 
-from assembly.checkpoint import assemble_checkpoint, target_state_dict_inventory
+from .checkpoint import assemble_checkpoint, target_state_dict_inventory
 
 __all__ = ["assemble_checkpoint", "target_state_dict_inventory"]
-

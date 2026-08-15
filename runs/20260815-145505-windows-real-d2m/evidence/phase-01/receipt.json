@@ -1,0 +1,36 @@
+{
+  "artifacts": {
+    "assembly_manifest": "runs/20260815-145505-windows-real-d2m/artifacts/hf-moe/manifest.json",
+    "fact_ledger": "runs/20260815-145505-windows-real-d2m/repository-fact-ledger.json",
+    "layer_schema": "src/dense2moe/checkpoint/layer.py",
+    "state": "runs/20260815-145505-windows-real-d2m/state.json"
+  },
+  "commands": [
+    "pytest -q tests/test_real_pipeline.py",
+    "d2m doctor (twice) with pinned source facts",
+    "d2m assemble --strict --profile qwen38_p8s1_top2"
+  ],
+  "created_at": "2026-08-15T15:24:23.370298Z",
+  "falsifier": "A regression test permits a BLOCKED early return, downgrades verified facts, or accepts synthetic-pending checkpoints.",
+  "git_commit": "8efd4adc00b86dd8a48906354e53c4fc9b4dac6d",
+  "hypothesis": "BLOCKED remains resumable, fact merges are monotonic, and placeholder metadata cannot become assembly-ready.",
+  "metrics": {
+    "binary_capture_resume_test": "pass",
+    "blocked_resume_test": "pass",
+    "fact_merge_test": "pass",
+    "placeholder_rejection_test": "pass"
+  },
+  "next_exact_command": "d2m pilot --run-dir runs/20260815-145505-windows-real-d2m --json",
+  "phase": "phase-01-control-plane-and-checkpoint-integrity",
+  "result": "PASS",
+  "validation_gate": {
+    "layer_status": "TRAINED_VALIDATED required",
+    "tensor_format": "safetensors",
+    "verified_precedence": [
+      "verified",
+      "measured",
+      "inferred",
+      "unknown"
+    ]
+  }
+}
