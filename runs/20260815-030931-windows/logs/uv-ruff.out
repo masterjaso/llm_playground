@@ -1,0 +1,1159 @@
+F401 [*] `json` imported but unused
+ --> src\assembly\checkpoint.py:6:8
+  |
+5 | import hashlib
+6 | import json
+  |        ^^^^
+7 | from pathlib import Path
+8 | from typing import Any, Iterable, Mapping
+  |
+help: Remove unused import: `json`
+  |
+5 | import hashlib
+  - import json
+6 | from pathlib import Path
+  |
+
+UP035 [*] Import from `collections.abc` instead: `Iterable`, `Mapping`
+  --> src\assembly\checkpoint.py:8:1
+   |
+ 6 | import json
+ 7 | from pathlib import Path
+ 8 | from typing import Any, Iterable, Mapping
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ 9 |
+10 | from dense2moe.state import atomic_write_json
+   |
+help: Import from `collections.abc`
+   |
+7  | from pathlib import Path
+   - from typing import Any, Iterable, Mapping
+8  + from typing import Any
+9  + from collections.abc import Iterable, Mapping
+10 |
+   |
+
+I001 [*] Import block is un-sorted or un-formatted
+ --> src\dense2moe\capture\__init__.py:3:1
+  |
+1 | """Deterministic activation capture manifests."""
+2 |
+3 | from .activations import capture_activations, activation_partition_deterministic
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+4 |
+5 | __all__ = ["capture_activations", "activation_partition_deterministic"]
+  |
+help: Organize imports
+  |
+2 |
+  - from .activations import capture_activations, activation_partition_deterministic
+3 + from .activations import activation_partition_deterministic, capture_activations
+4 |
+  |
+
+RUF022 [*] `__all__` is not sorted
+ --> src\dense2moe\capture\__init__.py:5:11
+  |
+3 | from .activations import capture_activations, activation_partition_deterministic
+4 |
+5 | __all__ = ["capture_activations", "activation_partition_deterministic"]
+  |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+help: Apply an isort-style sorting to `__all__`
+  |
+4 |
+  - __all__ = ["capture_activations", "activation_partition_deterministic"]
+5 + __all__ = ["activation_partition_deterministic", "capture_activations"]
+6 |
+  |
+
+UP035 [*] Import from `collections.abc` instead: `Iterable`
+ --> src\dense2moe\capture\activations.py:8:1
+  |
+6 | import json
+7 | from pathlib import Path
+8 | from typing import Any, Iterable
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+help: Import from `collections.abc`
+   |
+7  | from pathlib import Path
+   - from typing import Any, Iterable
+8  + from typing import Any
+9  + from collections.abc import Iterable
+10 |
+   |
+
+I001 [*] Import block is un-sorted or un-formatted
+ --> src\dense2moe\checkpoint\__init__.py:3:1
+  |
+1 |   """Checkpoint readers and text-only filtering."""
+2 |
+3 | / from .safetensors import SafetensorsSliceReader
+4 | | from .filter import filter_text_checkpoint
+5 | | from .layer import LayerCheckpoint, load_layer_checkpoint, save_layer_checkpoint
+  | |________________________________________________________________________________^
+6 |
+7 |   __all__ = ["SafetensorsSliceReader", "filter_text_checkpoint", "LayerCheckpoint", "load_layer_checkpoint", "save_layer_checkpoint"]
+  |
+help: Organize imports
+  |
+2 |
+  - from .safetensors import SafetensorsSliceReader
+3 | from .filter import filter_text_checkpoint
+4 | from .layer import LayerCheckpoint, load_layer_checkpoint, save_layer_checkpoint
+5 + from .safetensors import SafetensorsSliceReader
+6 |
+  |
+
+RUF022 [*] `__all__` is not sorted
+ --> src\dense2moe\checkpoint\__init__.py:7:11
+  |
+5 | from .layer import LayerCheckpoint, load_layer_checkpoint, save_layer_checkpoint
+6 |
+7 | __all__ = ["SafetensorsSliceReader", "filter_text_checkpoint", "LayerCheckpoint", "load_layer_checkpoint", "save_layer_checkpoint"]
+  |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+help: Apply an isort-style sorting to `__all__`
+  |
+6 |
+  - __all__ = ["SafetensorsSliceReader", "filter_text_checkpoint", "LayerCheckpoint", "load_layer_checkpoint", "save_layer_checkpoint"]
+7 + __all__ = ["LayerCheckpoint", "SafetensorsSliceReader", "filter_text_checkpoint", "load_layer_checkpoint", "save_layer_checkpoint"]
+  |
+
+UP035 [*] Import from `collections.abc` instead: `Iterable`
+ --> src\dense2moe\checkpoint\filter.py:7:1
+  |
+5 | import json
+6 | from pathlib import Path
+7 | from typing import Any, Iterable
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+8 |
+9 | from ..discovery.source import filter_text_tensor_names
+  |
+help: Import from `collections.abc`
+  |
+6 | from pathlib import Path
+  - from typing import Any, Iterable
+7 + from typing import Any
+8 + from collections.abc import Iterable
+9 |
+  |
+
+S112 `try`-`except`-`continue` detected, consider logging the exception
+  --> src\dense2moe\checkpoint\filter.py:35:9
+   |
+33 |               with SafetensorsSliceReader(path) as reader:
+34 |                   names.extend(reader.keys())
+35 | /         except Exception:
+36 | |             continue
+   | |____________________^
+37 |       selected = text_tensor_filter(names)
+38 |       manifest = {
+   |
+
+BLE001 Do not catch blind exception: `Exception`
+  --> src\dense2moe\checkpoint\filter.py:35:16
+   |
+33 |             with SafetensorsSliceReader(path) as reader:
+34 |                 names.extend(reader.keys())
+35 |         except Exception:
+   |                ^^^^^^^^^
+36 |             continue
+37 |     selected = text_tensor_filter(names)
+   |
+
+I001 [*] Import block is un-sorted or un-formatted
+  --> src\dense2moe\checkpoint\layer.py:3:1
+   |
+ 1 |   """JSON layer-checkpoint round trips for lightweight worker artifacts."""
+ 2 |
+ 3 | / from __future__ import annotations
+ 4 | |
+ 5 | | from dataclasses import dataclass
+ 6 | | import json
+ 7 | | from pathlib import Path
+ 8 | | from typing import Any, Mapping
+ 9 | |
+10 | | from ..state import atomic_write_json
+   | |_____________________________________^
+help: Organize imports
+  |
+4 |
+5 + import json
+6 | from dataclasses import dataclass
+  - import json
+7 | from pathlib import Path
+  |
+
+UP035 [*] Import from `collections.abc` instead: `Mapping`
+  --> src\dense2moe\checkpoint\layer.py:8:1
+   |
+ 6 | import json
+ 7 | from pathlib import Path
+ 8 | from typing import Any, Mapping
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ 9 |
+10 | from ..state import atomic_write_json
+   |
+help: Import from `collections.abc`
+   |
+7  | from pathlib import Path
+   - from typing import Any, Mapping
+8  + from typing import Any
+9  + from collections.abc import Mapping
+10 |
+   |
+
+F401 [*] `typing.Mapping` imported but unused
+  --> src\dense2moe\checkpoint\layer.py:8:25
+   |
+ 6 | import json
+ 7 | from pathlib import Path
+ 8 | from typing import Any, Mapping
+   |                         ^^^^^^^
+ 9 |
+10 | from ..state import atomic_write_json
+   |
+help: Remove unused import: `typing.Mapping`
+  |
+7 | from pathlib import Path
+  - from typing import Any, Mapping
+8 + from typing import Any
+9 |
+  |
+
+UP035 [*] Import from `collections.abc` instead: `Iterable`, `Sequence`
+ --> src\dense2moe\checkpoint\safetensors.py:7:1
+  |
+5 | from dataclasses import dataclass
+6 | from pathlib import Path
+7 | from typing import Any, Iterable, Sequence
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+help: Import from `collections.abc`
+  |
+6 | from pathlib import Path
+  - from typing import Any, Iterable, Sequence
+7 + from typing import Any
+8 + from collections.abc import Iterable, Sequence
+9 |
+  |
+
+F401 [*] `typing.Iterable` imported but unused
+ --> src\dense2moe\checkpoint\safetensors.py:7:25
+  |
+5 | from dataclasses import dataclass
+6 | from pathlib import Path
+7 | from typing import Any, Iterable, Sequence
+  |                         ^^^^^^^^
+help: Remove unused import
+  |
+6 | from pathlib import Path
+  - from typing import Any, Iterable, Sequence
+7 + from typing import Any
+8 |
+  |
+
+F401 [*] `typing.Sequence` imported but unused
+ --> src\dense2moe\checkpoint\safetensors.py:7:35
+  |
+5 | from dataclasses import dataclass
+6 | from pathlib import Path
+7 | from typing import Any, Iterable, Sequence
+  |                                   ^^^^^^^^
+help: Remove unused import
+  |
+6 | from pathlib import Path
+  - from typing import Any, Iterable, Sequence
+7 + from typing import Any
+8 |
+  |
+
+SIM118 Use `key in dict` instead of `key in dict.keys()`
+  --> src\dense2moe\checkpoint\safetensors.py:32:21
+   |
+30 |             with safe_open(str(self.path), framework="np") as handle:
+31 |                 infos: dict[str, TensorInfo] = {}
+32 |                 for name in handle.keys():
+   |                     ^^^^^^^^^^^^^^^^^^^^^
+33 |                     sliced = handle.get_slice(name)
+34 |                     shape = tuple(sliced.get_shape())
+   |
+help: Remove `.keys()`
+
+PYI034 `__enter__` methods in classes like `SafetensorsSliceReader` usually return `self` at runtime
+  --> src\dense2moe\checkpoint\safetensors.py:65:9
+   |
+63 |         return self.slice(name, slice(start, stop))
+64 |
+65 |     def __enter__(self) -> "SafetensorsSliceReader":
+   |         ^^^^^^^^^
+66 |         return self
+   |
+help: Use `Self` as return type
+
+UP037 [*] Remove quotes from type annotation
+  --> src\dense2moe\checkpoint\safetensors.py:65:28
+   |
+63 |         return self.slice(name, slice(start, stop))
+64 |
+65 |     def __enter__(self) -> "SafetensorsSliceReader":
+   |                            ^^^^^^^^^^^^^^^^^^^^^^^^
+66 |         return self
+   |
+help: Remove quotes
+   |
+64 |
+   -     def __enter__(self) -> "SafetensorsSliceReader":
+65 +     def __enter__(self) -> SafetensorsSliceReader:
+66 |         return self
+   |
+
+PYI036 [*] Star-args in `__exit__` should be annotated with `object`
+  --> src\dense2moe\checkpoint\safetensors.py:68:28
+   |
+66 |         return self
+67 |
+68 |     def __exit__(self, *_: Any) -> None:
+   |                            ^^^
+69 |         return None
+   |
+help: Annotate star-args with `object`
+   |
+67 |
+   -     def __exit__(self, *_: Any) -> None:
+68 +     def __exit__(self, *_: object) -> None:
+69 |         return None
+   |
+
+I001 [*] Import block is un-sorted or un-formatted
+  --> src\dense2moe\cli.py:8:1
+   |
+ 6 |   """
+ 7 |
+ 8 | / from __future__ import annotations
+ 9 | |
+10 | | import argparse
+11 | | from dataclasses import asdict
+12 | | import hashlib
+13 | | import json
+14 | | import os
+15 | | from pathlib import Path
+16 | | import shutil
+17 | | import subprocess
+18 | | import sys
+19 | | import time
+20 | | from typing import Any, Callable
+21 | |
+22 | | from .assembly import assemble_checkpoint, target_state_dict_inventory
+23 | | from .capture import capture_activations
+24 | | from .config import MoEProfile, load_config
+25 | | from .discovery.source import inspect_hub_source, inspect_local_source, verify_qwen_geometry
+26 | | from .estimates import estimate_resources
+27 | | from .evaluation import quality_gate
+28 | | from .export.gguf import validate_gguf, write_tiny_gguf
+29 | | from .hardware import collect_environment
+30 | | from .logging import read_jsonl
+31 | | from .partition import partition_indices
+32 | | from .scheduling import JobQueue
+33 | | from .state import StateStore, atomic_write_json, bootstrap_run, utc_now
+   | |________________________________________________________________________^
+help: Organize imports
+   |
+10 | import argparse
+   - from dataclasses import asdict
+11 | import hashlib
+12 | import json
+13 | import os
+   - from pathlib import Path
+14 | import shutil
+15 | import subprocess
+16 | import sys
+17 | import time
+18 + from dataclasses import asdict
+19 + from pathlib import Path
+20 | from typing import Any, Callable
+--------------------------------------------------------------------------------
+33 | from .state import StateStore, atomic_write_json, bootstrap_run, utc_now
+   -
+34 |
+   |
+
+F401 [*] `dataclasses.asdict` imported but unused
+  --> src\dense2moe\cli.py:11:25
+   |
+10 | import argparse
+11 | from dataclasses import asdict
+   |                         ^^^^^^
+12 | import hashlib
+13 | import json
+   |
+help: Remove unused import: `dataclasses.asdict`
+   |
+10 | import argparse
+   - from dataclasses import asdict
+11 | import hashlib
+   |
+
+F401 [*] `hashlib` imported but unused
+  --> src\dense2moe\cli.py:12:8
+   |
+10 | import argparse
+11 | from dataclasses import asdict
+12 | import hashlib
+   |        ^^^^^^^
+13 | import json
+14 | import os
+   |
+help: Remove unused import: `hashlib`
+   |
+11 | from dataclasses import asdict
+   - import hashlib
+12 | import json
+   |
+
+F401 [*] `os` imported but unused
+  --> src\dense2moe\cli.py:14:8
+   |
+12 | import hashlib
+13 | import json
+14 | import os
+   |        ^^
+15 | from pathlib import Path
+16 | import shutil
+   |
+help: Remove unused import: `os`
+   |
+13 | import json
+   - import os
+14 | from pathlib import Path
+   |
+
+F401 [*] `subprocess` imported but unused
+  --> src\dense2moe\cli.py:17:8
+   |
+15 | from pathlib import Path
+16 | import shutil
+17 | import subprocess
+   |        ^^^^^^^^^^
+18 | import sys
+19 | import time
+   |
+help: Remove unused import: `subprocess`
+   |
+16 | import shutil
+   - import subprocess
+17 | import sys
+   |
+
+F401 [*] `time` imported but unused
+  --> src\dense2moe\cli.py:19:8
+   |
+17 | import subprocess
+18 | import sys
+19 | import time
+   |        ^^^^
+20 | from typing import Any, Callable
+   |
+help: Remove unused import: `time`
+   |
+18 | import sys
+   - import time
+19 | from typing import Any, Callable
+   |
+
+UP035 [*] Import from `collections.abc` instead: `Callable`
+  --> src\dense2moe\cli.py:20:1
+   |
+18 | import sys
+19 | import time
+20 | from typing import Any, Callable
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+21 |
+22 | from .assembly import assemble_checkpoint, target_state_dict_inventory
+   |
+help: Import from `collections.abc`
+   |
+19 | import time
+   - from typing import Any, Callable
+20 + from typing import Any
+21 + from collections.abc import Callable
+22 |
+   |
+
+F401 [*] `.assembly.target_state_dict_inventory` imported but unused
+  --> src\dense2moe\cli.py:22:44
+   |
+20 | from typing import Any, Callable
+21 |
+22 | from .assembly import assemble_checkpoint, target_state_dict_inventory
+   |                                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+23 | from .capture import capture_activations
+24 | from .config import MoEProfile, load_config
+   |
+help: Remove unused import: `.assembly.target_state_dict_inventory`
+   |
+21 |
+   - from .assembly import assemble_checkpoint, target_state_dict_inventory
+22 + from .assembly import assemble_checkpoint
+23 | from .capture import capture_activations
+   |
+
+F401 [*] `.config.MoEProfile` imported but unused
+  --> src\dense2moe\cli.py:24:21
+   |
+22 | from .assembly import assemble_checkpoint, target_state_dict_inventory
+23 | from .capture import capture_activations
+24 | from .config import MoEProfile, load_config
+   |                     ^^^^^^^^^^
+25 | from .discovery.source import inspect_hub_source, inspect_local_source, verify_qwen_geometry
+26 | from .estimates import estimate_resources
+   |
+help: Remove unused import: `.config.MoEProfile`
+   |
+23 | from .capture import capture_activations
+   - from .config import MoEProfile, load_config
+24 + from .config import load_config
+25 | from .discovery.source import inspect_hub_source, inspect_local_source, verify_qwen_geometry
+   |
+
+BLE001 Do not catch blind exception: `Exception`
+   --> src\dense2moe\cli.py:192:16
+    |
+190 |             )
+191 |             result = {"status": "DOWNLOAD_COMPLETE", "destination": str(downloaded), "model": args.model, "revision": args.revision, …
+192 |         except Exception as exc:
+    |                ^^^^^^^^^
+193 |             result = {"status": "BLOCKED", "destination": str(target), "model": args.model, "revision": args.revision, "trust_remote_…
+194 |     atomic_write_json(store.run_dir / "download.json", result)
+    |
+
+F841 Local variable `indices` is assigned to but never used
+   --> src\dense2moe\cli.py:224:9
+    |
+222 |         weight_sums = np.sum(normalize_topk_weights(weights), axis=-1).tolist()
+223 |     except ImportError:
+224 |         indices, weights, weight_sums = [], [], []
+    |         ^^^^^^^
+225 |     next_command = f"d2m pilot --run-dir {args.run_dir} --config {args.config or 'configs/qwen38_p32s1_top2.yaml'}"
+226 |     result = {"status": "TESTS_GREEN", "profile": profile.name, "partition_exhaustive": len(plan.all_indices) == profile.dense_interm…
+    |
+help: Remove assignment to unused variable `indices`
+
+BLE001 Do not catch blind exception: `Exception`
+   --> src\dense2moe\cli.py:434:12
+    |
+432 |         _emit(payload, bool(args.json_output))
+433 |         return 0 if payload.get("status") not in {"BLOCKED", "FAILED"} else 2
+434 |     except Exception as exc:
+    |            ^^^^^^^^^
+435 |         payload = {"status": "FAILED", "error": str(exc), "command": args.command}
+436 |         _record(store, args, payload, ok=False)
+    |
+
+SIM210 Use `bool(...)` instead of `True if ... else False`
+   --> src\dense2moe\cli.py:437:24
+    |
+435 |         payload = {"status": "FAILED", "error": str(exc), "command": args.command}
+436 |         _record(store, args, payload, ok=False)
+437 |         _emit(payload, True if args.json_output else False)
+    |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+438 |         return 1
+    |
+help: Replace with `bool(...)
+
+I001 [*] Import block is un-sorted or un-formatted
+ --> src\dense2moe\config.py:3:1
+  |
+1 |   """Configuration and geometry validation."""
+2 |
+3 | / from __future__ import annotations
+4 | |
+5 | | from dataclasses import asdict, dataclass
+6 | | import json
+7 | | from pathlib import Path
+8 | | from typing import Any, Mapping
+  | |_______________________________^
+help: Organize imports
+  |
+4 |
+5 + import json
+6 | from dataclasses import asdict, dataclass
+  - import json
+7 | from pathlib import Path
+  |
+
+UP035 [*] Import from `collections.abc` instead: `Mapping`
+ --> src\dense2moe\config.py:8:1
+  |
+6 | import json
+7 | from pathlib import Path
+8 | from typing import Any, Mapping
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+help: Import from `collections.abc`
+   |
+7  | from pathlib import Path
+   - from typing import Any, Mapping
+8  + from typing import Any
+9  + from collections.abc import Mapping
+10 |
+   |
+
+UP037 [*] Remove quotes from type annotation
+   --> src\dense2moe\config.py:123:57
+    |
+122 |     @classmethod
+123 |     def from_mapping(cls, values: Mapping[str, Any]) -> "MoEProfile":
+    |                                                         ^^^^^^^^^^^^
+124 |         aliases = {
+125 |             "num_experts": "routed_experts",
+    |
+help: Remove quotes
+    |
+122 |     @classmethod
+    -     def from_mapping(cls, values: Mapping[str, Any]) -> "MoEProfile":
+123 +     def from_mapping(cls, values: Mapping[str, Any]) -> MoEProfile:
+124 |         aliases = {
+    |
+
+I001 [*] Import block is un-sorted or un-formatted
+ --> src\dense2moe\discovery\source.py:3:1
+  |
+1 |   """Pinned source-model inspection without remote-code execution."""
+2 |
+3 | / from __future__ import annotations
+4 | |
+5 | | from dataclasses import asdict, dataclass
+6 | | import hashlib
+7 | | import json
+8 | | from pathlib import Path
+9 | | from typing import Any, Iterable, Mapping
+  | |_________________________________________^
+help: Organize imports
+   |
+4  |
+   - from dataclasses import asdict, dataclass
+5  | import hashlib
+6  | import json
+7  + from dataclasses import asdict, dataclass
+8  | from pathlib import Path
+9  | from typing import Any, Iterable, Mapping
+   -
+10 |
+   |
+
+UP035 [*] Import from `collections.abc` instead: `Iterable`, `Mapping`
+ --> src\dense2moe\discovery\source.py:9:1
+  |
+7 | import json
+8 | from pathlib import Path
+9 | from typing import Any, Iterable, Mapping
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+help: Import from `collections.abc`
+   |
+8  | from pathlib import Path
+   - from typing import Any, Iterable, Mapping
+9  + from typing import Any
+10 + from collections.abc import Iterable, Mapping
+11 |
+   |
+
+S112 `try`-`except`-`continue` detected, consider logging the exception
+   --> src\dense2moe\discovery\source.py:112:9
+    |
+110 |               with safe_open(str(path), framework="numpy") as handle:
+111 |                   tensor_names.extend(handle.keys())
+112 | /         except Exception:
+113 | |             # A malformed or unavailable optional reader is evidence, not a
+114 | |             # reason to invent an inventory.
+115 | |             continue
+    | |____________________^
+116 |       text_names = filter_text_tensor_names(tensor_names)
+117 |       license_name = "unknown"
+    |
+
+BLE001 Do not catch blind exception: `Exception`
+   --> src\dense2moe\discovery\source.py:112:16
+    |
+110 |             with safe_open(str(path), framework="numpy") as handle:
+111 |                 tensor_names.extend(handle.keys())
+112 |         except Exception:
+    |                ^^^^^^^^^
+113 |             # A malformed or unavailable optional reader is evidence, not a
+114 |             # reason to invent an inventory.
+    |
+
+BLE001 Do not catch blind exception: `Exception`
+   --> src\dense2moe\discovery\source.py:149:16
+    |
+147 |             if isinstance(loaded, Mapping):
+148 |                 config = dict(loaded)
+149 |         except Exception as exc:
+    |                ^^^^^^^^^
+150 |             config = {"error": str(exc)}
+151 |         card = getattr(info, "cardData", None)
+    |
+
+BLE001 Do not catch blind exception: `Exception`
+   --> src\dense2moe\discovery\source.py:158:12
+    |
+156 |             license_name = str(card.get("license", "unknown"))
+157 |         return SourceManifest(model, resolved_revision, is_pinned_revision(resolved_revision), config, [], [], files, license_name)
+158 |     except Exception as exc:
+    |            ^^^^^^^^^
+159 |         return SourceManifest(model, revision, is_pinned_revision(revision), {"error": str(exc)}, [], [], [], "unknown")
+    |
+
+I001 [*] Import block is un-sorted or un-formatted
+ --> src\dense2moe\export\gguf.py:3:1
+  |
+1 |   """Minimal GGUF writer used for converter smoke tests and evidence manifests."""
+2 |
+3 | / from __future__ import annotations
+4 | |
+5 | | import hashlib
+6 | | import json
+7 | | from pathlib import Path
+8 | | import struct
+9 | | from typing import Any, Mapping
+  | |_______________________________^
+help: Organize imports
+   |
+6  | import json
+7  + import struct
+8  | from pathlib import Path
+   - import struct
+9  | from typing import Any, Mapping
+   -
+10 |
+   |
+
+UP035 [*] Import from `collections.abc` instead: `Mapping`
+ --> src\dense2moe\export\gguf.py:9:1
+  |
+7 | from pathlib import Path
+8 | import struct
+9 | from typing import Any, Mapping
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+help: Import from `collections.abc`
+   |
+8  | import struct
+   - from typing import Any, Mapping
+9  + from typing import Any
+10 + from collections.abc import Mapping
+11 |
+   |
+
+I001 [*] Import block is un-sorted or un-formatted
+  --> src\dense2moe\hardware.py:3:1
+   |
+ 1 |   """Windows-aware environment and accelerator discovery."""
+ 2 |
+ 3 | / from __future__ import annotations
+ 4 | |
+ 5 | | import importlib.util
+ 6 | | import os
+ 7 | | from pathlib import Path
+ 8 | | import platform
+ 9 | | import shutil
+10 | | import subprocess
+11 | | import sys
+12 | | from typing import Any, Sequence
+   | |________________________________^
+help: Organize imports
+   |
+6  | import os
+   - from pathlib import Path
+7  | import platform
+8  | import shutil
+9  | import subprocess
+10 | import sys
+11 + from pathlib import Path
+12 | from typing import Any, Sequence
+   |
+
+UP035 [*] Import from `collections.abc` instead: `Sequence`
+  --> src\dense2moe\hardware.py:12:1
+   |
+10 | import subprocess
+11 | import sys
+12 | from typing import Any, Sequence
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+help: Import from `collections.abc`
+   |
+11 | import sys
+   - from typing import Any, Sequence
+12 + from typing import Any
+13 + from collections.abc import Sequence
+14 |
+   |
+
+BLE001 Do not catch blind exception: `Exception`
+  --> src\dense2moe\hardware.py:73:24
+   |
+71 |                 except TypeError:  # older torch versions do not accept keyword flags
+72 |                     bf16_supported = bool(torch.cuda.is_bf16_supported(index))
+73 |                 except Exception:
+   |                        ^^^^^^^^^
+74 |                     bf16_supported = False
+75 |                 device_record: dict[str, Any] = {
+   |
+
+BLE001 Do not catch blind exception: `Exception`
+  --> src\dense2moe\hardware.py:90:28
+   |
+88 |                         torch.cuda.synchronize(index)
+89 |                         device_record[f"{dtype_name}_matmul"] = True
+90 |                     except Exception as exc:  # pragma: no cover - hardware dependent
+   |                            ^^^^^^^^^
+91 |                         device_record[f"{dtype_name}_matmul"] = False
+92 |                         device_record[f"{dtype_name}_error"] = str(exc)
+   |
+
+BLE001 Do not catch blind exception: `Exception`
+  --> src\dense2moe\hardware.py:97:12
+   |
+95 |         if result["cuda_available"]:
+96 |             result["peer_access"] = [[bool(torch.cuda.can_device_access_peer(i, j)) for j in range(torch.cuda.device_count())] for i i…
+97 |     except Exception as exc:  # pragma: no cover - optional dependency/hardware dependent
+   |            ^^^^^^^^^
+98 |         result["error"] = str(exc)
+99 |     return result
+   |
+
+UP035 [*] Import from `collections.abc` instead: `Mapping`
+ --> src\dense2moe\logging.py:9:1
+  |
+7 | import time
+8 | from pathlib import Path
+9 | from typing import Any, Mapping
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+help: Import from `collections.abc`
+   |
+8  | from pathlib import Path
+   - from typing import Any, Mapping
+9  + from typing import Any
+10 + from collections.abc import Mapping
+11 |
+   |
+
+RUF022 [*] `__all__` is not sorted
+ --> src\dense2moe\models\__init__.py:6:11
+  |
+4 | from .tiny import TinyDenseFFN, TinyMoE
+5 |
+6 | __all__ = ["normalize_topk_weights", "shared_gate_initialization", "topk_router", "TinyDenseFFN", "TinyMoE"]
+  |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+help: Apply an isort-style sorting to `__all__`
+  |
+5 |
+  - __all__ = ["normalize_topk_weights", "shared_gate_initialization", "topk_router", "TinyDenseFFN", "TinyMoE"]
+6 + __all__ = ["TinyDenseFFN", "TinyMoE", "normalize_topk_weights", "shared_gate_initialization", "topk_router"]
+7 |
+  |
+
+UP035 `typing.Tuple` is deprecated, use `tuple` instead
+ --> src\dense2moe\models\router.py:6:1
+  |
+5 | import math
+6 | from typing import Any, Tuple
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+UP006 [*] Use `tuple` instead of `Tuple` for type annotation
+  --> src\dense2moe\models\router.py:35:45
+   |
+35 | def topk_router(logits: Any, top_k: int) -> Tuple[Any, Any]:
+   |                                             ^^^^^
+36 |     """Return deterministic selected expert indices and normalized weights."""
+   |
+help: Replace with `tuple`
+   |
+34 |
+   - def topk_router(logits: Any, top_k: int) -> Tuple[Any, Any]:
+35 + def topk_router(logits: Any, top_k: int) -> tuple[Any, Any]:
+36 |     """Return deterministic selected expert indices and normalized weights."""
+   |
+
+I001 [*] Import block is un-sorted or un-formatted
+ --> src\dense2moe\partition\ffn.py:3:1
+  |
+1 |   """Capacity-preserving dense FFN partitioning."""
+2 |
+3 | / from __future__ import annotations
+4 | |
+5 | | from dataclasses import dataclass
+6 | | import hashlib
+7 | | from typing import Any, Iterable, Sequence
+  | |__________________________________________^
+help: Organize imports
+  |
+4 |
+5 + import hashlib
+6 | from dataclasses import dataclass
+  - import hashlib
+7 | from typing import Any, Iterable, Sequence
+  |
+
+UP035 [*] Import from `collections.abc` instead: `Iterable`, `Sequence`
+ --> src\dense2moe\partition\ffn.py:7:1
+  |
+5 | from dataclasses import dataclass
+6 | import hashlib
+7 | from typing import Any, Iterable, Sequence
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+help: Import from `collections.abc`
+  |
+6 | import hashlib
+  - from typing import Any, Iterable, Sequence
+7 + from typing import Any
+8 + from collections.abc import Iterable, Sequence
+9 |
+  |
+
+I001 [*] Import block is un-sorted or un-formatted
+  --> src\dense2moe\state.py:3:1
+   |
+ 1 |   """Durable run state, atomic artifact publication, and handoff generation."""
+ 2 |
+ 3 | / from __future__ import annotations
+ 4 | |
+ 5 | | from dataclasses import dataclass, field, asdict
+ 6 | | from datetime import datetime, timezone
+ 7 | | import json
+ 8 | | import os
+ 9 | | from pathlib import Path
+10 | | import shutil
+11 | | import tempfile
+12 | | from typing import Any, Mapping
+13 | |
+14 | | from .logging import append_jsonl
+   | |_________________________________^
+help: Organize imports
+   |
+4  |
+   - from dataclasses import dataclass, field, asdict
+   - from datetime import datetime, timezone
+5  | import json
+6  | import os
+   - from pathlib import Path
+7  | import shutil
+8  | import tempfile
+9  + from dataclasses import asdict, dataclass, field
+10 + from datetime import datetime, timezone
+11 + from pathlib import Path
+12 | from typing import Any, Mapping
+13 |
+14 | from .logging import append_jsonl
+   -
+15 |
+   |
+
+UP035 [*] Import from `collections.abc` instead: `Mapping`
+  --> src\dense2moe\state.py:12:1
+   |
+10 | import shutil
+11 | import tempfile
+12 | from typing import Any, Mapping
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+13 |
+14 | from .logging import append_jsonl
+   |
+help: Import from `collections.abc`
+   |
+11 | import tempfile
+   - from typing import Any, Mapping
+12 + from typing import Any
+13 + from collections.abc import Mapping
+14 |
+   |
+
+UP037 [*] Remove quotes from type annotation
+  --> src\dense2moe\state.py:43:34
+   |
+42 |     @classmethod
+43 |     def new(cls, run_id: str) -> "RunState":
+   |                                  ^^^^^^^^^^
+44 |         return cls(schema_version=SCHEMA_VERSION, run_id=run_id)
+   |
+help: Remove quotes
+   |
+42 |     @classmethod
+   -     def new(cls, run_id: str) -> "RunState":
+43 +     def new(cls, run_id: str) -> RunState:
+44 |         return cls(schema_version=SCHEMA_VERSION, run_id=run_id)
+   |
+
+UP037 [*] Remove quotes from type annotation
+  --> src\dense2moe\state.py:47:55
+   |
+46 |     @classmethod
+47 |     def from_dict(cls, payload: Mapping[str, Any]) -> "RunState":
+   |                                                       ^^^^^^^^^^
+48 |         data = dict(payload)
+49 |         data.setdefault("schema_version", SCHEMA_VERSION)
+   |
+help: Remove quotes
+   |
+46 |     @classmethod
+   -     def from_dict(cls, payload: Mapping[str, Any]) -> "RunState":
+47 +     def from_dict(cls, payload: Mapping[str, Any]) -> RunState:
+48 |         data = dict(payload)
+   |
+
+I001 [*] Import block is un-sorted or un-formatted
+  --> src\scheduling\queue.py:3:1
+   |
+ 1 |   """SQLite WAL job leasing with duplicate-lease protection."""
+ 2 |
+ 3 | / from __future__ import annotations
+ 4 | |
+ 5 | | from dataclasses import dataclass
+ 6 | | from datetime import datetime, timezone
+ 7 | | import sqlite3
+ 8 | | import time
+ 9 | | from pathlib import Path
+10 | | from typing import Any
+11 | | import uuid
+   | |___________^
+help: Organize imports
+   |
+4  |
+5  + import sqlite3
+6  + import time
+7  + import uuid
+8  | from dataclasses import dataclass
+9  | from datetime import datetime, timezone
+   - import sqlite3
+   - import time
+10 | from pathlib import Path
+11 | from typing import Any
+   - import uuid
+12 |
+   |
+
+F401 [*] `datetime.datetime` imported but unused
+ --> src\scheduling\queue.py:6:22
+  |
+5 | from dataclasses import dataclass
+6 | from datetime import datetime, timezone
+  |                      ^^^^^^^^
+7 | import sqlite3
+8 | import time
+  |
+help: Remove unused import
+  |
+5 | from dataclasses import dataclass
+  - from datetime import datetime, timezone
+6 | import sqlite3
+  |
+
+F401 [*] `datetime.timezone` imported but unused
+ --> src\scheduling\queue.py:6:32
+  |
+5 | from dataclasses import dataclass
+6 | from datetime import datetime, timezone
+  |                                ^^^^^^^^
+7 | import sqlite3
+8 | import time
+  |
+help: Remove unused import
+  |
+5 | from dataclasses import dataclass
+  - from datetime import datetime, timezone
+6 | import sqlite3
+  |
+
+UP035 [*] Import from `collections.abc` instead: `Callable`
+ --> src\training\worker.py:6:1
+  |
+5 | from dataclasses import dataclass, field
+6 | from typing import Any, Callable
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+help: Import from `collections.abc`
+  |
+5 | from dataclasses import dataclass, field
+  - from typing import Any, Callable
+6 + from typing import Any
+7 + from collections.abc import Callable
+8 |
+  |
+
+I001 [*] Import block is un-sorted or un-formatted
+  --> tests\test_core.py:1:1
+   |
+ 1 | / from __future__ import annotations
+ 2 | |
+ 3 | | import json
+ 4 | | from pathlib import Path
+ 5 | | import tempfile
+ 6 | | import unittest
+ 7 | |
+ 8 | | from dense2moe.assembly import target_state_dict_inventory
+ 9 | | from dense2moe.config import MoEProfile
+10 | | from dense2moe.evaluation import classify_metric
+11 | | from dense2moe.export.gguf import validate_gguf, write_tiny_gguf
+12 | | from dense2moe.models import TinyDenseFFN, TinyMoE, topk_router
+13 | | from dense2moe.partition import partition_indices, partition_ffn_weights, unpack_experts, pack_experts
+14 | | from dense2moe.scheduling import JobQueue
+15 | | from dense2moe.state import StateStore, atomic_artifact_publish
+16 | | from dense2moe.training import OOMBackoff, train_tiny_layer
+   | |___________________________________________________________^
+help: Organize imports
+   |
+3  | import json
+   - from pathlib import Path
+4  | import tempfile
+5  | import unittest
+6  + from pathlib import Path
+7  |
+--------------------------------------------------------------------------------
+12 | from dense2moe.models import TinyDenseFFN, TinyMoE, topk_router
+   - from dense2moe.partition import partition_indices, partition_ffn_weights, unpack_experts, pack_experts
+13 + from dense2moe.partition import (
+14 +     pack_experts,
+15 +     partition_ffn_weights,
+16 +     partition_indices,
+17 +     unpack_experts,
+18 + )
+19 | from dense2moe.scheduling import JobQueue
+   |
+
+I001 [*] Import block is un-sorted or un-formatted
+  --> tests\test_core.py:43:13
+   |
+41 |       def test_safetensors_slice_reader(self):
+42 |           try:
+43 | /             import numpy as np
+44 | |             from safetensors.numpy import save_file
+45 | |             from dense2moe.checkpoint import SafetensorsSliceReader
+   | |___________________________________________________________________^
+46 |           except ImportError:
+47 |               self.skipTest("optional numpy/safetensors not installed")
+   |
+help: Organize imports
+   |
+44 |             from safetensors.numpy import save_file
+45 +
+46 |             from dense2moe.checkpoint import SafetensorsSliceReader
+   |
+
+I001 [*] Import block is un-sorted or un-formatted
+   --> tests\test_core.py:126:9
+    |
+125 |     def test_layer_checkpoint_roundtrip(self):
+126 |         from dense2moe.checkpoint.layer import LayerCheckpoint, load_layer_checkpoint, save_layer_checkpoint
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+127 |
+128 |         path = self.root / "layer.json"
+    |
+help: Organize imports
+    |
+125 |     def test_layer_checkpoint_roundtrip(self):
+    -         from dense2moe.checkpoint.layer import LayerCheckpoint, load_layer_checkpoint, save_layer_checkpoint
+126 +         from dense2moe.checkpoint.layer import (
+127 +             LayerCheckpoint,
+128 +             load_layer_checkpoint,
+129 +             save_layer_checkpoint,
+130 +         )
+131 |
+    |
+
+Found 66 errors.
+[*] 50 fixable with the `--fix` option (4 hidden fixes can be enabled with the `--unsafe-fixes` option).

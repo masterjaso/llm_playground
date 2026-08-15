@@ -1,0 +1,10 @@
+{
+  "decision_register": "runs\\20260815-030931-windows\\decision-register.json",
+  "environment": "runs\\20260815-030931-windows\\environment.json",
+  "fact_ledger": "runs\\20260815-030931-windows\\repository-fact-ledger.json",
+  "next_exact_command": "d2m inspect-source --run-dir runs\\20260815-030931-windows --model Qwen/Qwen3.8-27B",
+  "status": "DISCOVERY_READY",
+  "torch_cuda": true,
+  "windows_native": true,
+  "wsl": false
+}

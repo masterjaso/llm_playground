@@ -1,0 +1,7 @@
+Using CPython 3.12.6 interpreter at: C:\Users\maste\AppData\Local\Programs\Python\Python312\python.exe
+Creating virtual environment at: .venv
+   Building dense2moe @ file:///C:/workplace/llm_playground
+      Built dense2moe @ file:///C:/workplace/llm_playground
+Prepared 1 package in 4.15s
+Installed 1 package in 56ms
+ + dense2moe==0.1.0 (from file:///C:/workplace/llm_playground)

@@ -1,0 +1,6 @@
+Collecting uv
+  Downloading uv-0.12.5-py3-none-win_amd64.whl.metadata (11 kB)
+Downloading uv-0.12.5-py3-none-win_amd64.whl (21.6 MB)
+   ---------------------------------------- 21.6/21.6 MB 5.0 MB/s eta 0:00:00
+Installing collected packages: uv
+Successfully installed uv-0.12.5
