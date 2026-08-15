@@ -66,15 +66,18 @@ def extract_text_checkpoint(source: str | Path, destination: str | Path) -> dict
     if not source_files:
         return filter_text_checkpoint(src, dst)
     writer: tuple[str, Any] | None = None
+    # Qwen checkpoints commonly contain BF16 tensors, which NumPy cannot
+    # materialize on all versions. Prefer the torch writer when available and
+    # retain NumPy as a CPU-only fallback for ordinary dtypes.
     try:
-        from safetensors.numpy import save_file as save_numpy  # type: ignore
+        from safetensors.torch import save_file as save_torch  # type: ignore
 
-        writer = ("np", save_numpy)
+        writer = ("pt", save_torch)
     except ImportError:
         try:
-            from safetensors.torch import save_file as save_torch  # type: ignore
+            from safetensors.numpy import save_file as save_numpy  # type: ignore
 
-            writer = ("pt", save_torch)
+            writer = ("np", save_numpy)
         except ImportError:
             writer = None
     if writer is None:

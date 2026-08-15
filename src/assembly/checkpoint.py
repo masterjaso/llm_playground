@@ -33,6 +33,15 @@ def assemble_checkpoint(layer_paths: Iterable[str | Path], destination: str | Pa
             raise FileNotFoundError(path)
         digest = hashlib.sha256(path.read_bytes()).hexdigest()
         layers.append({"path": str(path), "sha256": digest, "size": path.stat().st_size})
-    manifest = {"format": "dense2moe-manifest-v1", "layers": layers, "metadata": dict(metadata or {}), "complete": bool(layers)}
+    manifest_metadata = dict(metadata or {})
+    expected_layers = manifest_metadata.get("expected_layers")
+    complete = bool(layers)
+    if expected_layers is not None:
+        try:
+            expected = int(expected_layers)
+        except (TypeError, ValueError):
+            expected = -1
+        complete = complete and expected > 0 and len(layers) == expected
+    manifest = {"format": "dense2moe-manifest-v1", "layers": layers, "metadata": manifest_metadata, "complete": complete}
     atomic_write_json(dst / "manifest.json", manifest)
     return manifest

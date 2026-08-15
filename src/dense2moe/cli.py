@@ -88,6 +88,7 @@ def _doctor(args: argparse.Namespace, store: StateStore) -> dict[str, Any]:
     atomic_write_json(env_path, environment)
     system = environment.get("platform", {}).get("system", "unknown")
     torch_info = environment.get("torch", {})
+    nsp_skill = Path.cwd() / ".agents" / "skills" / "nsp-epic-execution" / "SKILL.md"
     facts = {
         "operating_system": {"status": "verified", "value": system},
         "wsl_status": {"status": "verified", "value": bool(environment.get("wsl", False)), "note": "native Windows run; WSL is not required"},
@@ -103,6 +104,7 @@ def _doctor(args: argparse.Namespace, store: StateStore) -> dict[str, Any]:
         "source_tensor_naming": {"status": "unknown"},
         "target_routing_semantics": {"status": "verified", "value": "top-k normalized weights"},
         "llama_cpp_support": {"status": "unknown"},
+        "nsp_epic_execution_skill": {"status": "verified" if nsp_skill.exists() else "absent", "path": str(nsp_skill), "note": "Required NSP skill was not fabricated when absent."},
     }
     ledger = _write_fact_ledger(store, facts)
     decision = {
@@ -119,8 +121,18 @@ def _doctor(args: argparse.Namespace, store: StateStore) -> dict[str, Any]:
     atomic_write_json(decision_path, decision)
     next_command = f"d2m inspect-source --run-dir {args.run_dir} --model {args.model}"
     result = {"status": "DISCOVERY_READY", "environment": str(env_path), "fact_ledger": str(ledger), "decision_register": str(decision_path), "windows_native": system == "Windows", "wsl": bool(environment.get("wsl", False)), "torch_cuda": bool(torch_info.get("cuda_available")), "next_exact_command": next_command}
-    store.transition(current_phase="discovery", phase_status="complete", last_successful_command="doctor", next_exact_command=next_command, validation_results={"doctor": result})
-    store.write_handoff(next_command=result["next_exact_command"], expected_output="source-manifest.json with verified config and revision")
+    current = store.load()
+    if current.last_successful_command in (None, "doctor") and current.current_phase == "discovery":
+        store.transition(current_phase="discovery", phase_status="complete", last_successful_command="doctor", next_exact_command=next_command, validation_results={"doctor": result})
+    else:
+        validations = dict(current.validation_results)
+        validations["doctor"] = result
+        store.transition(validation_results=validations)
+    store.write_prediction("discovery", {"expected_artifacts": ["environment.json", "repository-fact-ledger.json", "decision-register.json"], "expected_validation_results": ["DISCOVERY_READY"]}, "confirmed")
+    if current.last_successful_command in (None, "doctor") and current.current_phase == "discovery":
+        store.write_handoff(next_command=result["next_exact_command"], expected_output="source-manifest.json with verified config and revision")
+    else:
+        store.write_handoff(next_command=current.next_exact_command or result["next_exact_command"], expected_output="current phase artifact", blocker=current.active_blocker)
     return result
 
 
@@ -139,13 +151,21 @@ def _inspect_source(args: argparse.Namespace, store: StateStore) -> dict[str, An
         "source_revision": {"status": "verified" if manifest.revision_pinned else "unknown", "value": manifest.revision},
         "source_config_shape": {"status": "verified" if manifest.config and "error" not in manifest.config and verify_qwen_geometry(manifest.config).get("shape_verified") else "unknown", "value": verify_qwen_geometry(manifest.config) if manifest.config else {}},
         "source_tensor_naming": {"status": "verified" if manifest.text_tensor_names else "unknown", "value": len(manifest.text_tensor_names)},
+        "source_text_model_class": {"status": "verified" if manifest.config else "unknown", "value": verify_qwen_geometry(manifest.config).get("model_type") if manifest.config else None},
         "source_license": {"status": "verified" if manifest.license != "unknown" else "unknown", "value": manifest.license},
+        "target_moe_class": {"status": "unknown", "value": "requires native Transformers compatibility check"},
     })
     atomic_write_json(facts_path, facts)
+    decision_path = store.run_dir / "decision-register.json"
+    decisions: dict[str, Any] = json.loads(decision_path.read_text(encoding="utf-8")) if decision_path.exists() else {"schema_version": 1}
+    geometry = verify_qwen_geometry(manifest.config) if manifest.config else {}
+    decisions.update({"source_revision": manifest.revision, "source_text_model_class": geometry.get("model_type"), "source_geometry": geometry, "text_tensor_count": len(manifest.text_tensor_names), "target_moe_class": decisions.get("target_moe_class", "unknown")})
+    atomic_write_json(decision_path, decisions)
     status = "SOURCE_READY" if manifest.revision_pinned and manifest.config and "error" not in manifest.config else "SOURCE_DISCOVERY_INCOMPLETE"
     next_command = f"d2m estimate --run-dir {args.run_dir} --config {args.config or 'configs/qwen38_p32s1_top2.yaml'}"
     result = {"status": status, "source_manifest": str(path), "revision": manifest.revision, "revision_pinned": manifest.revision_pinned, "config_keys": sorted(manifest.config), "tensor_count": len(manifest.tensor_names), "text_tensor_count": len(manifest.text_tensor_names), "next_exact_command": next_command}
     store.transition(current_phase="source", phase_status="complete" if status == "SOURCE_READY" else "blocked", source_revision=manifest.revision, last_successful_command="inspect-source" if status == "SOURCE_READY" else store.load().last_successful_command, next_exact_command=next_command, validation_results={"source": result})
+    store.write_prediction("source", {"expected_artifacts": ["source-manifest.json"], "expected_observations": ["pinned revision", "verified text config geometry", "text tensor inventory"], "expected_validation_results": ["SOURCE_READY"]}, "confirmed" if status == "SOURCE_READY" else "scope-discovery")
     if status != "SOURCE_READY":
         store.write_handoff(next_command=next_command, expected_output="a pinned source revision and inspectable config", blocker="Source revision/config could not be verified")
     else:
@@ -155,16 +175,28 @@ def _inspect_source(args: argparse.Namespace, store: StateStore) -> dict[str, An
 
 def _estimate(args: argparse.Namespace, store: StateStore) -> dict[str, Any]:
     profile = load_config(args.config or str(Path(__file__).resolve().parents[2] / "configs" / "qwen38_p32s1_top2.yaml"))
-    estimate = estimate_resources(profile)
+    source_bytes: int | None = None
+    manifest_path = store.run_dir / "source-manifest.json"
+    if manifest_path.exists():
+        try:
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            sizes = [int(item.get("size", 0)) for item in manifest.get("files", []) if str(item.get("path", "")).endswith(".safetensors")]
+            if sizes and sum(sizes) > 0:
+                source_bytes = sum(sizes)
+        except (OSError, ValueError, TypeError):
+            source_bytes = None
+    estimate = estimate_resources(profile, source_bytes=source_bytes)
     path = store.run_dir / "estimates.json"
     atomic_write_json(path, {"profile": profile.as_dict(), "estimate": estimate.as_dict()})
     free = shutil.disk_usage(store.run_dir).free
     enough = free >= estimate.total_bytes
     next_command = f"d2m test --run-dir {args.run_dir}"
-    result = {"status": "ESTIMATE_READY" if enough else "BLOCKED", "estimate": str(path), "free_bytes": free, "required_bytes": estimate.total_bytes, "sufficient": enough, "profile": profile.name, "next_exact_command": next_command}
+    result = {"status": "ESTIMATE_READY" if enough else "BLOCKED", "estimate": str(path), "free_bytes": free, "source_bytes": source_bytes, "required_bytes": estimate.total_bytes, "sufficient": enough, "profile": profile.name, "next_exact_command": next_command}
     store.transition(selected_profile=profile.name, phase_status="complete" if enough else "blocked", current_phase="bootstrap", next_exact_command=next_command, validation_results={"estimate": result})
     if not enough:
         store.write_handoff(next_command=next_command, expected_output="structural tests", blocker="Insufficient free disk for conservative full-run estimate")
+    else:
+        store.write_handoff(next_command=next_command, expected_output="structural tests")
     return result
 
 
@@ -204,7 +236,13 @@ def _extract(args: argparse.Namespace, store: StateStore) -> dict[str, Any]:
         manifest = extract_text_checkpoint(args.source_dir, destination)
         result = {"status": "TEXT_CHECKPOINT_READY" if manifest.get("materialized") else "BLOCKED", "manifest": str(destination / "text-filter-manifest.json"), "tensor_count": len(manifest.get("text_tensor_names", [])), "materialized": bool(manifest.get("materialized", False))}
     atomic_write_json(store.run_dir / "extraction.json", result)
-    store.transition(current_phase="extraction", phase_status="complete" if result["status"] != "BLOCKED" else "blocked", next_exact_command=f"d2m test --run-dir {args.run_dir}", validation_results={"extraction": result})
+    next_command = f"d2m test --run-dir {args.run_dir}"
+    store.transition(current_phase="extraction", phase_status="complete" if result["status"] != "BLOCKED" else "blocked", next_exact_command=next_command, validation_results={"extraction": result})
+    store.write_prediction("extraction", {"expected_artifacts": ["text-checkpoint/model.safetensors.index.json", "text-filter-manifest.json"], "expected_validation_results": ["TEXT_CHECKPOINT_READY"]}, "confirmed" if result["status"] != "BLOCKED" else "counterexample")
+    if result["status"] == "BLOCKED":
+        store.write_handoff(next_command=next_command, expected_output="text-checkpoint manifest", blocker=str(result.get("message", "Text checkpoint extraction failed")))
+    else:
+        store.write_handoff(next_command=next_command, expected_output="structural smoke evidence")
     return result
 
 
@@ -231,18 +269,34 @@ def _pilot(args: argparse.Namespace, store: StateStore) -> dict[str, Any]:
     source = store.run_dir / "source-manifest.json"
     real = source.exists() and bool(json.loads(source.read_text(encoding="utf-8")).get("text_tensor_names"))
     next_command = f"d2m prepare-data --run-dir {args.run_dir}"
-    result = {"status": "PILOT_REQUIRED" if real else "BLOCKED", "real_layer": real, "profiles": ["qwen38_p32s1_top2", "qwen38_p16s1_top2", "qwen38_p8s1_top2"], "message": "Real-layer pilot is gated on a verified text checkpoint; synthetic structural tests are not evidence of model quality.", "next_exact_command": next_command}
+    profile_paths = [
+        Path(__file__).resolve().parents[2] / "configs" / "qwen38_p32s1_top2.yaml",
+        Path(__file__).resolve().parents[2] / "configs" / "qwen38_p16s1_top2.yaml",
+        Path(__file__).resolve().parents[2] / "configs" / "qwen38_p8s1_top2.yaml",
+    ]
+    if real and (store.run_dir / "source" / "model.safetensors.index.json").exists():
+        from .evaluation.pilot import run_real_layer_pilot
+
+        measured = run_real_layer_pilot(store.run_dir / "source", [load_config(path) for path in profile_paths])
+        result = {**measured, "real_layer": True, "next_exact_command": next_command}
+    else:
+        result = {"status": "BLOCKED", "real_layer": False, "profiles": ["qwen38_p32s1_top2", "qwen38_p16s1_top2", "qwen38_p8s1_top2"], "message": "Real-layer pilot is gated on a verified local text checkpoint; synthetic structural tests are not evidence of model quality.", "next_exact_command": next_command}
     atomic_write_json(store.run_dir / "metrics" / "pilot.json", result)
-    store.transition(current_phase="pilot", phase_status="pending" if real else "blocked", next_exact_command=next_command, validation_results={"pilot": result})
-    if not real:
+    store.transition(current_phase="pilot", phase_status="pending" if result.get("status") == "PILOT_COMPLETE" else "blocked", last_successful_command="pilot" if result.get("status") == "PILOT_COMPLETE" else store.load().last_successful_command, next_exact_command=next_command, validation_results={"pilot": result})
+    store.write_prediction("pilot", {"expected_artifacts": ["metrics/pilot.json"], "expected_validation_results": ["PILOT_COMPLETE"]}, "confirmed" if result.get("status") == "PILOT_COMPLETE" else "counterexample")
+    if result.get("status") != "PILOT_COMPLETE":
         store.write_handoff(next_command=next_command, expected_output="calibration data", blocker="No verified local text checkpoint for a real-layer pilot")
+    else:
+        store.write_handoff(next_command=next_command, expected_output="calibration data; untrained sparse error is not a quality claim")
     return result
 
 
 def _prepare_data(args: argparse.Namespace, store: StateStore) -> dict[str, Any]:
     result = {"status": "DATA_PLAN_READY", "tokens": 100_000, "seed": 17, "holdout_seed": 29, "source": "local calibration corpus required", "artifact": str(store.run_dir / "capture" / "data-plan.json")}
     atomic_write_json(store.run_dir / "capture" / "data-plan.json", result)
-    store.transition(current_phase="capture", phase_status="pending", next_exact_command=f"d2m capture --run-dir {args.run_dir}", validation_results={"prepare_data": result})
+    next_command = f"d2m capture --run-dir {args.run_dir}"
+    store.transition(current_phase="capture", phase_status="pending", next_exact_command=next_command, validation_results={"prepare_data": result})
+    store.write_handoff(next_command=next_command, expected_output="activation manifests from a supplied calibration corpus")
     return result
 
 
@@ -251,7 +305,9 @@ def _capture(args: argparse.Namespace, store: StateStore) -> dict[str, Any]:
     result = capture_activations([], store.run_dir / "capture", layer=layer)
     result.update({"status": "CAPTURE_EMPTY_PENDING", "message": "No corpus was supplied; empty capture is a manifest only."})
     atomic_write_json(store.run_dir / "metrics" / f"capture-{layer:04d}.json", result)
-    store.transition(current_phase="capture", phase_status="pending", next_exact_command=f"d2m partition-layer --run-dir {args.run_dir} --layer {layer}", validation_results={"capture": result})
+    next_command = f"d2m partition-layer --run-dir {args.run_dir} --layer {layer}"
+    store.transition(current_phase="capture", phase_status="pending", next_exact_command=next_command, validation_results={"capture": result})
+    store.write_handoff(next_command=next_command, expected_output="partition manifest", blocker="No calibration corpus supplied; capture is manifest-only")
     return result
 
 
@@ -261,8 +317,10 @@ def _partition_layer(args: argparse.Namespace, store: StateStore) -> dict[str, A
     plan = partition_indices(profile.dense_intermediate_size, profile.routed_experts, profile.expert_intermediate_size, profile.shared_intermediate_size)
     path = store.run_dir / "partitions" / f"layer-{layer:04d}.json"
     atomic_write_json(path, plan.as_dict())
-    result = {"status": "PARTITION_READY", "layer": layer, "path": str(path), "capacity": plan.total_capacity}
-    store.transition(current_phase="training", phase_status="pending", next_exact_command=f"d2m train-layer --run-dir {args.run_dir} --layer {layer}", validation_results={"partition": result})
+    next_command = f"d2m train-layer --run-dir {args.run_dir} --layer {layer}"
+    result = {"status": "PARTITION_READY", "layer": layer, "path": str(path), "capacity": plan.total_capacity, "next_exact_command": next_command}
+    store.transition(current_phase="training", phase_status="pending", next_exact_command=next_command, validation_results={"partition": result})
+    store.write_handoff(next_command=next_command, expected_output="trained layer checkpoint")
     return result
 
 
@@ -273,8 +331,10 @@ def _train_layer(args: argparse.Namespace, store: StateStore) -> dict[str, Any]:
         return {"status": "LAYER_ALREADY_COMPLETE", "layer": layer, "path": str(path)}
     payload = {"schema_version": 1, "layer": layer, "status": "synthetic-pending", "metrics": {"loss": None}, "source": "no activation target supplied"}
     atomic_write_json(path, payload)
-    result = {"status": "LAYER_CHECKPOINT_PENDING", "layer": layer, "path": str(path), "message": "Placeholder is not a trained layer and cannot advance the quality gate."}
-    store.transition(current_phase="training", phase_status="pending", next_exact_command=f"d2m train-layers --run-dir {args.run_dir}", validation_results={"train_layer": result})
+    next_command = f"d2m train-layers --run-dir {args.run_dir}"
+    result = {"status": "LAYER_CHECKPOINT_PENDING", "layer": layer, "path": str(path), "message": "Placeholder is not a trained layer and cannot advance the quality gate.", "next_exact_command": next_command}
+    store.transition(current_phase="training", phase_status="pending", next_exact_command=next_command, validation_results={"train_layer": result})
+    store.write_handoff(next_command=next_command, expected_output="all trained layer checkpoints", blocker=str(result["message"]))
     return result
 
 
@@ -285,14 +345,20 @@ def _train_layers(args: argparse.Namespace, store: StateStore) -> dict[str, Any]
     result = {"status": "QUEUE_READY", "profile": profile.name, "queue": queue.summary(), "message": "Layer workers require captured activations and a verified source checkpoint."}
     atomic_write_json(store.run_dir / "metrics" / "training-queue.json", result)
     queue.close()
+    next_command = f"d2m assemble --run-dir {args.run_dir}"
+    store.transition(current_phase="training", phase_status="pending", next_exact_command=next_command, validation_results={"train_layers": result})
+    store.write_handoff(next_command=next_command, expected_output="complete trained layer checkpoints", blocker="Layer workers require captured activations and a verified source checkpoint")
     return result
 
 
 def _assemble(args: argparse.Namespace, store: StateStore) -> dict[str, Any]:
     paths = sorted((store.run_dir / "layer-checkpoints").glob("layer-*.json"))
-    manifest = assemble_checkpoint(paths, store.run_dir / "artifacts" / "hf-moe", metadata={"profile": store.load().selected_profile})
+    profile = load_config(args.config or str(Path(__file__).resolve().parents[2] / "configs" / "qwen38_p32s1_top2.yaml"))
+    manifest = assemble_checkpoint(paths, store.run_dir / "artifacts" / "hf-moe", metadata={"profile": profile.name, "expected_layers": profile.num_hidden_layers})
     result = {"status": "ASSEMBLY_READY" if manifest["complete"] else "BLOCKED", "manifest": str(store.run_dir / "artifacts" / "hf-moe" / "manifest.json"), "layers": len(paths)}
-    store.transition(current_phase="evaluation", phase_status="pending" if manifest["complete"] else "blocked", next_exact_command=f"d2m evaluate --run-dir {args.run_dir}", validation_results={"assembly": result})
+    next_command = f"d2m evaluate --run-dir {args.run_dir}"
+    store.transition(current_phase="evaluation", phase_status="pending" if manifest["complete"] else "blocked", next_exact_command=next_command, validation_results={"assembly": result})
+    store.write_handoff(next_command=next_command, expected_output="real-model evaluation metrics", blocker=None if manifest["complete"] else "Not all layer checkpoints are trained and validated")
     return result
 
 
@@ -305,9 +371,11 @@ def _repair(args: argparse.Namespace, store: StateStore) -> dict[str, Any]:
 def _evaluate(args: argparse.Namespace, store: StateStore) -> dict[str, Any]:
     metrics = {"layer_loss": 0.0, "router_collapse": 1.0}
     gate = quality_gate(metrics, {"layer_loss": {"green": 0.01, "yellow": 0.1, "lower_is_better": True}, "router_collapse": {"green": 0.9, "yellow": 0.5, "lower_is_better": False}})
-    result = {"status": "EVALUATION_GREEN" if gate["overall"] == "green" else "EVALUATION_PENDING", "gate": gate, "message": "Synthetic metrics are not substituted for a real-model quality result."}
+    result = {"status": "EVALUATION_PENDING", "gate": gate, "message": "Synthetic metrics are not substituted for a real-model quality result."}
     atomic_write_json(store.run_dir / "metrics" / "evaluation.json", result)
-    store.transition(current_phase="export", phase_status="pending", next_exact_command=f"d2m export-gguf --run-dir {args.run_dir}", validation_results={"evaluation": result})
+    next_command = f"d2m export-gguf --run-dir {args.run_dir}"
+    store.transition(current_phase="export", phase_status="pending", next_exact_command=next_command, validation_results={"evaluation": result})
+    store.write_handoff(next_command=next_command, expected_output="validated high-precision GGUF", blocker=str(result["message"]))
     return result
 
 
@@ -317,7 +385,9 @@ def _export(args: argparse.Namespace, store: StateStore) -> dict[str, Any]:
         write_tiny_gguf(path, metadata={"source": store.load().source_revision, "kind": "smoke"})
     result = {"status": "GGUF_STRUCTURAL_READY", "path": str(path), "validation": validate_gguf(path)}
     atomic_write_json(store.run_dir / "metrics" / "gguf.json", result)
-    store.transition(current_phase="quantization", phase_status="pending", next_exact_command=f"d2m build-imatrix --run-dir {args.run_dir}", validation_results={"gguf": result})
+    next_command = f"d2m build-imatrix --run-dir {args.run_dir}"
+    store.transition(current_phase="quantization", phase_status="pending", next_exact_command=next_command, validation_results={"gguf": result})
+    store.write_handoff(next_command=next_command, expected_output="expert-covering importance matrix", blocker="GGUF is structural smoke output; no assembled model was exported")
     return result
 
 
@@ -325,7 +395,9 @@ def _imatrix(args: argparse.Namespace, store: StateStore) -> dict[str, Any]:
     path = store.run_dir / "artifacts" / "imatrix.json"
     result = {"status": "IMATRIX_PENDING", "path": str(path), "expert_coverage": {}, "message": "Calibration corpus is required to build an expert-covering imatrix."}
     atomic_write_json(path, result)
-    store.transition(next_exact_command=f"d2m quantize --run-dir {args.run_dir} --type {args.type}", validation_results={"imatrix": result})
+    next_command = f"d2m quantize --run-dir {args.run_dir} --type {args.type}"
+    store.transition(next_exact_command=next_command, validation_results={"imatrix": result})
+    store.write_handoff(next_command=next_command, expected_output="validated Q4_K_M artifact", blocker=str(result["message"]))
     return result
 
 
@@ -333,12 +405,14 @@ def _quantize(args: argparse.Namespace, store: StateStore) -> dict[str, Any]:
     path = store.run_dir / "artifacts" / f"moe-{args.type.lower()}.gguf"
     result = {"status": "QUANTIZATION_PENDING", "path": str(path), "type": args.type, "message": "Quantization is gated on a validated high-precision GGUF and imatrix."}
     atomic_write_json(store.run_dir / "metrics" / "quantization.json", result)
+    store.write_handoff(next_command=f"d2m benchmark --run-dir {args.run_dir}", expected_output="dense-vs-MoE benchmark", blocker=result["message"])
     return result
 
 
 def _benchmark(args: argparse.Namespace, store: StateStore) -> dict[str, Any]:
     result = {"status": "BENCHMARK_PENDING", "message": "Requires dense and MoE GGUF artifacts on the same Windows runtime."}
     atomic_write_json(store.run_dir / "metrics" / "benchmark.json", result)
+    store.write_handoff(next_command=f"d2m report --run-dir {args.run_dir} --json", expected_output="final report", blocker=result["message"])
     return result
 
 
