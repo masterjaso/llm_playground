@@ -1,0 +1,15 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+env/
+runs/*/source/
+runs/*/text-checkpoint/
+runs/*/artifacts/*.gguf
+runs/*/artifacts/*.gguf.json
+runs/*/capture/*.json
+*.publishing
+

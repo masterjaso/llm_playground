@@ -1,0 +1,41 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dense2moe"
+version = "0.1.0"
+description = "Resumable dense-to-MoE checkpoint conversion control plane"
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [{name = "dense2moe contributors"}]
+dependencies = []
+
+[project.optional-dependencies]
+runtime = [
+  "numpy>=1.24",
+  "pyyaml>=6.0",
+  "psutil>=5.9",
+  "safetensors>=0.4",
+  "huggingface-hub>=0.23",
+]
+ml = ["torch>=2.3", "transformers>=4.45", "accelerate>=0.33"]
+dev = ["pytest>=8", "ruff>=0.6", "mypy>=1.10"]
+
+[project.scripts]
+d2m = "dense2moe.cli:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+

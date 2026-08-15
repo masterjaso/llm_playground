@@ -1,0 +1,12 @@
+name: qwen38_p32s1_top2
+model: Qwen/Qwen3.8-27B
+revision: main
+hidden_size: 5120
+dense_intermediate_size: 17408
+num_hidden_layers: 64
+routed_experts: 32
+expert_intermediate_size: 512
+shared_intermediate_size: 1024
+top_k: 2
+dtype: bfloat16
+
