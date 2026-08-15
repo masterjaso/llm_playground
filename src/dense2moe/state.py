@@ -46,6 +46,7 @@ class RunState:
     parent_run_id: str | None = None
     source_config_hash: str | None = None
     source_index_hash: str | None = None
+    code_commit: str | None = None
 
     @classmethod
     def new(cls, run_id: str) -> RunState:

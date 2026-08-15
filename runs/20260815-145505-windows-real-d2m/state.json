@@ -9,6 +9,7 @@
     "manifest": "runs/20260815-145505-windows-real-d2m/artifacts/hf-moe/manifest.json",
     "source_manifest": "runs/20260815-145505-windows-real-d2m/source-manifest.json"
   },
+  "code_commit": "a4675b319eba1e4cb87dcb2fe3aeaec220657ee0",
   "current_phase": "calibration",
   "last_successful_command": "oracle-study",
   "next_exact_command": "d2m prepare-data --run-dir runs/20260815-145505-windows-real-d2m --corpus-manifest <approved-jsonl>",

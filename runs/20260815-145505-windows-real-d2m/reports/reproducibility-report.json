@@ -3,7 +3,7 @@
     "source_config_hash": "191e0af232104ed8b65258cf3fb2b842e288008baca7633c11b82a1ac7203aab",
     "source_index_hash": "77042094076611b69791a610065f28b7013b8c621795fa86ddccc8bac7d1b9df"
   },
-  "code_commit": "8efd4adc00b86dd8a48906354e53c4fc9b4dac6d",
+  "code_commit": "a4675b319eba1e4cb87dcb2fe3aeaec220657ee0",
   "commands": [
     "uv sync --extra runtime --extra dev",
     "uv run --extra runtime --extra dev pytest -q",

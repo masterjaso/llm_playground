@@ -1,5 +1,5 @@
 {
-  "code_commit": "continuation",
+  "code_commit": "a4675b319eba1e4cb87dcb2fe3aeaec220657ee0",
   "layer": 0,
   "next_exact_command": "d2m prepare-data --run-dir runs/20260815-145505-windows-real-d2m",
   "note": "untrained sparse error is a structural pilot, not a retained-quality claim",

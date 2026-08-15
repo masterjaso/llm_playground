@@ -1,6 +1,6 @@
 {
   "best_variant": "contribution_signature_top2",
-  "code_commit": "continuation",
+  "code_commit": "a4675b319eba1e4cb87dcb2fe3aeaec220657ee0",
   "gate": {
     "green": false,
     "yellow": false
