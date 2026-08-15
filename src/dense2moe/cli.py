@@ -17,9 +17,9 @@ from pathlib import Path
 from typing import Any
 
 from .assembly import assemble_checkpoint
-from .capture import capture_activations
+from .capture import capture_activations, capture_text_teacher_activations
 from .config import load_config
-from .data import prepare_calibration_manifest
+from .data import prepare_calibration_manifest, write_corpus_receipt
 from .discovery.source import inspect_hub_source, inspect_local_source, verify_qwen_geometry
 from .estimates import estimate_resources
 from .evaluation import quality_gate
@@ -27,6 +27,7 @@ from .export.gguf import validate_gguf
 from .hardware import collect_environment
 from .logging import read_jsonl
 from .partition import partition_indices
+from .provenance import current_git_commit
 from .scheduling import JobQueue
 from .state import StateStore, atomic_write_json, bootstrap_run, merge_fact_ledgers, utc_now
 
@@ -54,6 +55,9 @@ def _parser() -> argparse.ArgumentParser:
         command.add_argument("--force", action="store_true")
         command.add_argument("--execute", action="store_true", help="perform network/download work explicitly requested")
 
+    spike = base("full-model-spike")
+    spike.add_argument("--seed", type=int, default=17)
+
     prepare = base("prepare-data")
     prepare.add_argument("--corpus-manifest", required=True)
     prepare.add_argument("--train-tokens", type=int, default=131_072)
@@ -63,13 +67,28 @@ def _parser() -> argparse.ArgumentParser:
     prepare.add_argument("--sequence-length", type=int, default=2048)
     prepare.add_argument("--output-format", choices=("json", "jsonl"), default="json")
     prepare.add_argument("--tokenizer-revision", default="declared-by-input")
+    prepare.add_argument("--tokenizer-path", help="local tokenizer directory in the pinned source snapshot")
+    prepare.add_argument("--source-snapshot", help="local pinned source snapshot containing the tokenizer")
+    prepare.add_argument("--add-special-tokens", action="store_true", help="include tokenizer BOS/EOS special tokens")
+    prepare.add_argument("--receipt-output", help="machine-readable corpus receipt destination")
+    prepare.add_argument("--require-domain", dest="required_domains", action="append", default=[], help="require a domain in the selected corpus (repeatable)")
+    prepare.add_argument("--allow-legacy-token-counts", action="store_true", help="explicitly allow non-scientific declared token counts")
 
     capture = base("capture")
-    capture.add_argument("--layers", default="0", help="comma-separated layer IDs or ranges")
+    capture.add_argument("--layers", default="0,16,32,48,63", help="comma-separated layer IDs or ranges")
     capture.add_argument("--dataset-manifest", required=True)
     capture.add_argument("--shard-tokens", type=int, default=8192)
-    capture.add_argument("--dtype", default="float32")
-    capture.add_argument("--device-map", default="cpu")
+    capture.add_argument("--dtype", default="float16")
+    capture.add_argument("--device-map", default="auto")
+    capture.add_argument("--device", default=None, help="single-device override when device-map is not used")
+    capture.add_argument("--source-dir", default=None, help="local pinned Transformers teacher snapshot")
+    capture.add_argument("--source-revision", default=None, help="immutable source snapshot commit SHA")
+    capture.add_argument("--split", choices=("train", "holdout", "both"), default="both")
+    capture.add_argument("--microbatch", type=int, default=1)
+    capture.add_argument("--compute-dtype", default="bfloat16")
+    capture.add_argument("--max-memory", default=None, help="optional comma-separated device=budget entries")
+    capture.add_argument("--offload-folder", default=None)
+    capture.add_argument("--hook-threshold", type=float, default=1e-7)
     capture.add_argument("--resume", action="store_true")
 
     train_layer = base("train-layer")
@@ -78,6 +97,8 @@ def _parser() -> argparse.ArgumentParser:
     train_layer.add_argument("--epochs", type=int, default=1)
     train_layer.add_argument("--microbatch", type=int, default=1)
     train_layer.add_argument("--learning-rate", type=float, default=1e-3)
+    train_layer.add_argument("--device", default="cpu")
+    train_layer.add_argument("--partition", default=None, help="selected partition artifact; required for real training")
     train_layer.add_argument("--resume", action="store_true")
     train_layer.add_argument("--force", action="store_true")
 
@@ -136,6 +157,8 @@ def _write_fact_ledger(store: StateStore, facts: dict[str, Any]) -> Path:
 
 
 def _record(store: StateStore, args: argparse.Namespace, payload: Any, *, ok: bool = True) -> Any:
+    if isinstance(payload, dict):
+        payload["code_commit"] = current_git_commit()
     store.record_command(args.command, argv=sys.argv[1:], ok=ok, result=payload)
     if isinstance(payload, dict):
         state = store.load()
@@ -210,7 +233,9 @@ def _inspect_source(args: argparse.Namespace, store: StateStore) -> dict[str, An
     else:
         manifest = inspect_hub_source(args.model, revision=args.revision)
     path = store.run_dir / "source-manifest.json"
-    atomic_write_json(path, manifest.as_dict())
+    manifest_payload = manifest.as_dict()
+    manifest_payload["code_commit"] = current_git_commit()
+    atomic_write_json(path, manifest_payload)
     facts_path = store.run_dir / "repository-fact-ledger.json"
     facts: dict[str, Any] = json.loads(facts_path.read_text(encoding="utf-8")) if facts_path.exists() else {"schema_version": 1, "facts": {}}
     observed_facts = {
@@ -387,9 +412,9 @@ def _pilot(args: argparse.Namespace, store: StateStore) -> dict[str, Any]:
 
         measured = run_real_layer_pilot(source_dir, [load_config(path) for path in profile_paths])
         state = store.load()
-        result = {**measured, "real_layer": True, "next_exact_command": next_command, "source_repository": "Qwen/Qwen3.8-27B", "source_revision": state.source_revision, "source_config_hash": state.source_config_hash, "source_index_hash": state.source_index_hash, "code_commit": "continuation", "seed": 17}
+        result = {**measured, "real_layer": True, "next_exact_command": next_command, "source_repository": "Qwen/Qwen3.8-27B", "source_revision": state.source_revision, "source_config_hash": state.source_config_hash, "source_index_hash": state.source_index_hash, "code_commit": current_git_commit(), "seed": 17}
     else:
-        result = {"status": "BLOCKED", "real_layer": False, "profiles": ["qwen38_p32s1_top2", "qwen38_p16s1_top2", "qwen38_p8s1_top2"], "message": "Real-layer pilot is gated on a verified local text checkpoint; synthetic structural tests are not evidence of model quality.", "next_exact_command": next_command}
+        result = {"status": "BLOCKED", "real_layer": False, "profiles": ["qwen38_p32s1_top2", "qwen38_p16s1_top2", "qwen38_p8s1_top2"], "message": "Real-layer pilot is gated on a verified local text checkpoint; synthetic structural tests are not evidence of model quality.", "next_exact_command": next_command, "code_commit": current_git_commit()}
     atomic_write_json(store.run_dir / "metrics" / "pilot.json", result)
     store.transition(current_phase="pilot", phase_status="pending" if result.get("status") == "PILOT_COMPLETE" else "blocked", last_successful_command="pilot" if result.get("status") == "PILOT_COMPLETE" else store.load().last_successful_command, next_exact_command=next_command, validation_results={"pilot": result})
     store.write_prediction("pilot", {"expected_artifacts": ["metrics/pilot.json"], "expected_validation_results": ["PILOT_COMPLETE"]}, "confirmed" if result.get("status") == "PILOT_COMPLETE" else "counterexample")
@@ -406,7 +431,7 @@ def _oracle_study(args: argparse.Namespace, store: StateStore) -> dict[str, Any]
     try:
         result = run_oracle_ablation(_source_dir_for_run(store), layer=args.layer or 0)
         state = store.load()
-        result.update({"source_repository": "Qwen/Qwen3.8-27B", "source_revision": state.source_revision, "source_config_hash": state.source_config_hash, "source_index_hash": state.source_index_hash, "profile": "qwen38_p8s1_top2", "seed": 17, "code_commit": "continuation"})
+        result.update({"source_repository": "Qwen/Qwen3.8-27B", "source_revision": state.source_revision, "source_config_hash": state.source_config_hash, "source_index_hash": state.source_index_hash, "profile": "qwen38_p8s1_top2", "seed": 17, "code_commit": current_git_commit()})
         atomic_write_json(store.run_dir / "metrics" / "oracle-ablation.json", result)
         best = result.get("best_variant")
         blocker = None if result.get("gate", {}).get("green") else "p8 oracle ceiling is red; bounded fallback or capacity change is required before router training"
@@ -415,7 +440,7 @@ def _oracle_study(args: argparse.Namespace, store: StateStore) -> dict[str, Any]
         store.transition(current_phase="oracle", phase_status="pending" if blocker else "complete", active_blocker=blocker, next_exact_command=next_command, validation_results={"oracle": result})
         store.write_handoff(next_command=next_command, expected_output="fixed calibration manifest before router training", blocker=blocker)
     except (OSError, ValueError, TypeError, RuntimeError, KeyError) as exc:
-        result = {"status": "BLOCKED", "message": str(exc), "next_exact_command": f"d2m oracle-study --run-dir {args.run_dir} --layer {args.layer or 0}"}
+        result = {"status": "BLOCKED", "message": str(exc), "next_exact_command": f"d2m oracle-study --run-dir {args.run_dir} --layer {args.layer or 0}", "code_commit": current_git_commit()}
         store.transition(current_phase="oracle", phase_status="blocked", active_blocker=str(exc), next_exact_command=result["next_exact_command"], validation_results={"oracle": result})
         store.write_handoff(next_command=result["next_exact_command"], expected_output="oracle ablation metrics", blocker=str(exc))
     return result
@@ -433,18 +458,25 @@ def _prepare_data(args: argparse.Namespace, store: StateStore) -> dict[str, Any]
             holdout_seed=args.holdout_seed,
             sequence_length=args.sequence_length,
             tokenizer_revision=args.tokenizer_revision,
+            tokenizer_path=args.tokenizer_path,
+            source_snapshot=args.source_snapshot,
+            add_special_tokens=args.add_special_tokens,
+            receipt_output=args.receipt_output,
+            required_domains=args.required_domains,
+            allow_legacy_token_counts=args.allow_legacy_token_counts,
         )
         state = store.load()
         manifest["source_repository"] = "Qwen/Qwen3.8-27B"
         manifest["source_revision"] = state.source_revision
         manifest["source_config_hash"] = state.source_config_hash
         manifest["source_index_hash"] = state.source_index_hash
-        manifest["code_commit"] = "continuation"
+        manifest["code_commit"] = current_git_commit()
         import hashlib
 
-        manifest["dataset_hash"] = hashlib.sha256(json.dumps({key: value for key, value in manifest.items() if key != "dataset_hash"}, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+        manifest["dataset_hash"] = hashlib.sha256(json.dumps({key: value for key, value in manifest.items() if key not in {"dataset_hash", "receipt_path"}}, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
         atomic_write_json(output, manifest)
-        result: dict[str, Any] = {"status": "DATA_READY", "artifact": str(output), "dataset_hash": manifest["dataset_hash"], "train_tokens": manifest["train_tokens"], "holdout_tokens": manifest["holdout_tokens"], "seed": args.seed, "holdout_seed": args.holdout_seed}
+        receipt = write_corpus_receipt(manifest, output, output=manifest.get("receipt_path"))
+        result: dict[str, Any] = {"status": "DATA_READY", "artifact": str(output), "receipt": str(manifest.get("receipt_path", output.with_name("corpus-receipt.json"))), "dataset_hash": manifest["dataset_hash"], "train_tokens": manifest["train_tokens"], "holdout_tokens": manifest["holdout_tokens"], "seed": args.seed, "holdout_seed": args.holdout_seed, "tokenizer_revision": manifest.get("tokenizer_revision"), "tokenizer_files_sha256": manifest.get("tokenizer", {}).get("files_sha256"), "verified_sources": len(manifest.get("sources", [])), "receipt_dataset_sha256": receipt.get("manifest", {}).get("dataset_hash")}
         next_command = f"d2m capture --run-dir {args.run_dir} --layers 0 --dataset-manifest {output} --resume"
         store.transition(current_phase="capture", phase_status="pending", next_exact_command=next_command, active_blocker=None, validation_results={"prepare_data": result})
         store.write_handoff(next_command=next_command, expected_output="binary activation manifests from the fixed calibration corpus")
@@ -453,6 +485,26 @@ def _prepare_data(args: argparse.Namespace, store: StateStore) -> dict[str, Any]
         next_command = f"d2m prepare-data --run-dir {args.run_dir} --corpus-manifest <approved-jsonl>"
         store.transition(current_phase="capture", phase_status="blocked", next_exact_command=next_command, active_blocker=str(result["message"]), validation_results={"prepare_data": result})
         store.write_handoff(next_command=next_command, expected_output="calibration manifest", blocker=str(result["message"]))
+    return result
+
+
+def _parse_max_memory(value: str | None) -> dict[Any, Any] | None:
+    if not value:
+        return None
+    try:
+        parsed = json.loads(value)
+        if isinstance(parsed, dict):
+            return {int(key) if str(key).isdigit() else str(key): item for key, item in parsed.items()}
+    except (TypeError, ValueError, json.JSONDecodeError):
+        pass
+    result: dict[Any, Any] = {}
+    for entry in value.split(","):
+        if "=" not in entry:
+            raise ValueError("--max-memory entries must use device=budget")
+        key, budget = (item.strip() for item in entry.split("=", 1))
+        if not key or not budget:
+            raise ValueError("--max-memory entries must use device=budget")
+        result[int(key) if key.isdigit() else key] = budget
     return result
 
 
@@ -481,35 +533,84 @@ def _capture(args: argparse.Namespace, store: StateStore) -> dict[str, Any]:
             layers.append(int(part))
     activation_files = payload.get("activation_files", {})
     results: list[dict[str, Any]] = []
-    for layer in sorted(set(layers)):
-        source = activation_files.get(str(layer)) if isinstance(activation_files, dict) else None
-        if not source:
-            results.append({"status": "BLOCKED", "layer": layer, "message": "teacher capture requires a local activation input file or a supported teacher runtime; text-only metadata is not an activation"})
-            continue
-        source_path = Path(str(source))
-        if not source_path.is_absolute():
-            source_path = manifest_path.parent / source_path
-        if not source_path.exists():
-            results.append({"status": "BLOCKED", "layer": layer, "message": f"activation input missing: {source_path}"})
-            continue
-        try:
-            import numpy as np  # type: ignore
+    state = store.load()
+    native_result: dict[str, Any] | None = None
 
-            values = np.load(source_path, mmap_mode="r") if source_path.suffix == ".npy" else np.load(source_path)["mlp_input"]
-            captured = capture_activations(
-                [values],
+    # Native capture is the authoritative path whenever a source snapshot is
+    # requested, and the default when the dataset contains no legacy binary
+    # activation input.  A legacy input file remains available only for
+    # compatibility with already-materialized evidence; it is never described
+    # as a text-to-teacher capture.
+    source_dir = Path(args.source_dir) if args.source_dir else store.run_dir / "source"
+    if args.source_dir or source_dir.is_dir() or not isinstance(activation_files, dict) or not activation_files:
+        try:
+            native_result = capture_text_teacher_activations(
+                manifest_path,
+                source_dir,
                 store.run_dir / "capture",
-                layer=layer,
-                dtype=args.dtype,
+                layers=layers,
+                source_revision=str(args.source_revision or state.source_revision or ""),
+                split=args.split,
                 shard_tokens=args.shard_tokens,
+                dtype=args.dtype,
+                microbatch=args.microbatch,
+                device_map=args.device_map,
+                device=args.device,
+                compute_dtype=args.compute_dtype,
+                max_memory=_parse_max_memory(args.max_memory),
+                offload_folder=args.offload_folder,
                 resume=args.resume,
-                metadata={"dataset_hash": payload.get("dataset_hash", ""), "source_revision": store.load().source_revision, "device_map": args.device_map},
+                hook_threshold=args.hook_threshold,
             )
-            results.append(captured)
-        except (OSError, ValueError, TypeError, KeyError, RuntimeError) as exc:
-            results.append({"status": "BLOCKED", "layer": layer, "message": str(exc)})
+        except (OSError, TypeError, ValueError, RuntimeError) as exc:
+            native_result = {"status": "BLOCKED", "blocker_code": "CAPTURE_ARGUMENT_INVALID", "message": str(exc), "layers": layers, "resumable": True}
+        if native_result.get("status") == "BLOCKED":
+            results.append(native_result)
+        elif isinstance(native_result.get("layers"), list):
+            results.extend(native_result["layers"])
+    else:
+        # Compatibility branch for prior runs that explicitly recorded local
+        # activation files.  The metadata makes this distinction visible.
+        for layer in sorted(set(layers)):
+            source = activation_files.get(str(layer))
+            if not source:
+                results.append({"status": "BLOCKED", "layer": layer, "message": "no native teacher snapshot or legacy activation input was supplied"})
+                continue
+            source_path = Path(str(source))
+            if not source_path.is_absolute():
+                source_path = manifest_path.parent / source_path
+            if not source_path.exists():
+                results.append({"status": "BLOCKED", "layer": layer, "message": f"activation input missing: {source_path}"})
+                continue
+            try:
+                import numpy as np  # type: ignore
+
+                values = np.load(source_path, mmap_mode="r") if source_path.suffix == ".npy" else np.load(source_path)["mlp_input"]
+                captured = capture_activations(
+                    [values],
+                    store.run_dir / "capture",
+                    layer=layer,
+                    dtype=args.dtype,
+                    shard_tokens=args.shard_tokens,
+                    resume=args.resume,
+                    metadata={"dataset_hash": payload.get("dataset_hash", ""), "source_revision": state.source_revision, "device_map": args.device_map, "capture_kind": "legacy_binary_input"},
+                )
+                results.append(captured)
+            except (OSError, ValueError, TypeError, KeyError, RuntimeError) as exc:
+                results.append({"status": "BLOCKED", "layer": layer, "message": str(exc)})
     status = "CAPTURE_COMPLETE" if results and all(item.get("status") in {"CAPTURE_COMPLETE", "CAPTURE_RESUMED"} for item in results) else "BLOCKED"
-    result = {"status": status, "layers": results, "dataset_manifest": str(manifest_path), "message": None if status == "CAPTURE_COMPLETE" else "one or more layers have no validated binary activation capture"}
+    result = {
+        "status": status,
+        "layers": results,
+        "dataset_manifest": str(manifest_path),
+        "capture_mode": "native_teacher" if native_result is not None else "legacy_binary_input",
+        "hook_verification": native_result.get("hook_verification", []) if native_result is not None else [],
+        "resource_metrics": native_result.get("resource_metrics", {}) if native_result is not None else {},
+        "source_snapshot": native_result.get("source_snapshot") if native_result is not None else None,
+        "source_revision": native_result.get("source_revision", state.source_revision) if native_result is not None else state.source_revision,
+        "code_commit": current_git_commit(),
+        "message": None if status == "CAPTURE_COMPLETE" else "one or more layers have no validated binary activation capture",
+    }
     atomic_write_json(store.run_dir / "metrics" / "capture.json", result)
     next_command = f"d2m partition-layer --run-dir {args.run_dir} --layer {layers[0] if layers else 0}"
     store.transition(current_phase="capture", phase_status="pending" if status == "CAPTURE_COMPLETE" else "blocked", active_blocker=None if status == "CAPTURE_COMPLETE" else result["message"], next_exact_command=next_command, validation_results={"capture": result})
@@ -558,7 +659,12 @@ def _train_layer(args: argparse.Namespace, store: StateStore) -> dict[str, Any]:
             profile=profile,
             seed=17,
             source_revision=store.load().source_revision,
-            code_commit="continuation",
+            code_commit=current_git_commit(),
+            partition_path=args.partition or store.run_dir / "partitions" / f"layer-{layer:04d}.json",
+            epochs=args.epochs,
+            microbatch=args.microbatch,
+            learning_rate=args.learning_rate,
+            device=args.device,
         )
         result["next_exact_command"] = f"d2m validate-layer --run-dir {args.run_dir} --layer {layer} --profile {args.profile}"
         store.transition(current_phase="training", phase_status="pending" if result["status"] != "TRAINED_VALIDATED" else "complete", active_blocker=None if result["status"] == "TRAINED_VALIDATED" else "layer quality gate did not pass", next_exact_command=result["next_exact_command"], validation_results={"train_layer": result})
@@ -708,9 +814,29 @@ def _report(args: argparse.Namespace, store: StateStore) -> dict[str, Any]:
     }
     state.artifact_paths.update({key: str(path) for key, path in known_artifacts.items() if path.exists()})
     store.save(state)
-    report = {"run_id": state.run_id, "terminal_state": state.terminal_state, "phase": state.current_phase, "phase_status": state.phase_status, "last_successful_command": state.last_successful_command, "next_exact_command": state.next_exact_command, "blocker": state.active_blocker, "artifacts": state.artifact_paths, "validation": state.validation_results}
+    report = {"run_id": state.run_id, "terminal_state": state.terminal_state, "phase": state.current_phase, "phase_status": state.phase_status, "last_successful_command": state.last_successful_command, "next_exact_command": state.next_exact_command, "blocker": state.active_blocker, "artifacts": state.artifact_paths, "validation": state.validation_results, "code_commit": current_git_commit()}
     atomic_write_json(store.run_dir / "reports" / "final-report.json", report)
     return report
+
+
+def _full_model_spike(args: argparse.Namespace, store: StateStore) -> dict[str, Any]:
+    """Prove strict save/reload and generation before any full conversion."""
+
+    from .models.full_text import run_full_model_spike
+
+    destination = store.run_dir / "artifacts" / "hf-moe" / "full-model-spike"
+    result = run_full_model_spike(destination, seed=args.seed)
+    result.update({"code_commit": current_git_commit(), "run_id": store.run_id, "parent_run_id": store.load().parent_run_id})
+    atomic_write_json(store.run_dir / "reports" / "full-model-spike.json", result)
+    next_command = f"d2m report --run-dir {args.run_dir} --json"
+    if result.get("status") == "FULL_MODEL_RELOAD_GREEN":
+        store.transition(current_phase="runtime", phase_status="complete", last_successful_command="full-model-spike", active_blocker=None, next_exact_command=next_command, validation_results={"full_model_spike": result})
+        store.write_handoff(next_command=next_command, expected_output="full-model-spike.json and final report")
+    else:
+        message = "full-model save/reload spike failed strict logits or generation comparison"
+        store.transition(current_phase="runtime", phase_status="blocked", active_blocker=message, next_exact_command=f"d2m full-model-spike --run-dir {args.run_dir} --seed {args.seed}", validation_results={"full_model_spike": result})
+        store.write_handoff(next_command=store.load().next_exact_command, expected_output="strict reloadable tiny text target", blocker=message)
+    return result
 
 
 def _status(args: argparse.Namespace, store: StateStore) -> dict[str, Any]:
@@ -796,6 +922,7 @@ HANDLERS: dict[str, Callable[[argparse.Namespace, StateStore], dict[str, Any]]] 
     "quantize": _quantize,
     "benchmark": _benchmark,
     "report": _report,
+    "full-model-spike": _full_model_spike,
     "status": _status,
     "run": _run,
 }

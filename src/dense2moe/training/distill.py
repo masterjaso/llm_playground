@@ -15,6 +15,7 @@ from ..checkpoint.layer import (
 )
 from ..config import MoEProfile
 from ..partition import oracle_topk, swiglu_contributions
+from ..provenance import current_git_commit
 
 
 def _source_mlp(source_dir: Path, layer: int) -> tuple[Any, Any, Any, str, str]:
@@ -76,12 +77,46 @@ def train_real_layer(
     layer: int,
     profile: MoEProfile,
     seed: int = 17,
-    code_commit: str = "unknown",
+    code_commit: str | None = None,
     source_revision: str | None = None,
+    partition_path: str | Path | None = None,
+    epochs: int = 1,
+    microbatch: int = 1,
+    learning_rate: float = 1e-3,
+    device: str = "cpu",
 ) -> dict[str, Any]:
-    """Produce a real partitioned layer artifact and fixed holdout metrics."""
+    """Produce a real layer artifact with actual staged PyTorch optimization.
+
+    The historical NumPy router-only implementation remains below as a source
+    compatibility reference, but all new callers must provide the selected
+    partition artifact and use :func:`train_torch_layer`.
+    """
+
+    if partition_path is None:
+        raise ValueError("partition_path is required; training may not silently reconstruct a contiguous partition")
+    from .torch_distill import train_torch_layer
+
+    return train_torch_layer(
+        source_dir=source_dir,
+        activation_manifest=activation_manifest,
+        output_dir=output_dir,
+        layer=layer,
+        profile=profile,
+        partition_path=partition_path,
+        epochs=epochs,
+        microbatch=microbatch,
+        learning_rate=learning_rate,
+        device=device,
+        seed=seed,
+        source_revision=source_revision,
+        code_commit=code_commit,
+    )
 
     import numpy as np  # type: ignore
+
+    recorded_commit = current_git_commit()
+    if code_commit is not None and code_commit != recorded_commit:
+        raise ValueError("code_commit must match the current git commit")
 
     from ..capture import iter_activation_shards
 
@@ -160,10 +195,10 @@ def train_real_layer(
         holdout_metrics={"normalized_mse": mse / norm, "cosine": cosine, "all_expert_mse": float(np.mean((((shared[split:] if len(holdout_x) else shared[:split]) + (routed[split:] if len(holdout_x) else routed[:split]).sum(axis=1)) - target) ** 2)), "oracle_normalized_mse": oracle_norm},
         router_metrics={"load_cv": load_cv, "dead_experts": dead, "oracle_regret": max(0.0, (mse / norm) - oracle_norm), "selected_counts": loads.tolist()},
         quality_gate={"overall": gate_overall, "thresholds_version": "initial-2026-08-15", "metrics": {"normalized_mse": mse / norm, "cosine": cosine, "load_cv": load_cv, "dead_experts": dead}},
-        code_commit=code_commit,
+        code_commit=recorded_commit,
     )
     save_layer_checkpoint(checkpoint, metadata_path)
-    return {"status": "TRAINED_VALIDATED" if gate_overall != "red" else "VALIDATION_FAILED", "layer": layer, "metadata": str(metadata_path), "tensor_file": str(tensor_path), "holdout_metrics": checkpoint.holdout_metrics, "router_metrics": checkpoint.router_metrics, "quality_gate": checkpoint.quality_gate}
+    return {"status": "TRAINED_VALIDATED" if gate_overall != "red" else "VALIDATION_FAILED", "layer": layer, "metadata": str(metadata_path), "tensor_file": str(tensor_path), "holdout_metrics": checkpoint.holdout_metrics, "router_metrics": checkpoint.router_metrics, "quality_gate": checkpoint.quality_gate, "code_commit": recorded_commit}
 
 
 __all__ = ["train_real_layer"]

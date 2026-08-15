@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import subprocess
 import tempfile
 import unittest
 from pathlib import Path
@@ -17,10 +18,23 @@ from dense2moe.checkpoint import (
     validate_layer_checkpoint,
 )
 from dense2moe.models import DenseSwiGLU, Qwen35SwiGLUMoE
+from dense2moe.provenance import current_git_commit
 from dense2moe.state import StateStore, merge_fact_ledgers
 
 
 class RealContractTests(unittest.TestCase):
+    def test_new_receipts_use_current_git_commit(self) -> None:
+        commit = current_git_commit()
+        expected = subprocess.check_output(
+            ["git", "rev-parse", "HEAD"],
+            cwd=Path(__file__).resolve().parents[1],
+            text=True,
+        ).strip()
+        self.assertEqual(commit, expected)
+        with tempfile.TemporaryDirectory() as tmp:
+            store = StateStore(Path(tmp) / "run")
+            self.assertEqual(store.load().code_commit, commit)
+
     def test_blocked_state_resumes_and_clears(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             store = StateStore(Path(tmp) / "run")
@@ -41,6 +55,7 @@ class RealContractTests(unittest.TestCase):
             values = np.arange(30, dtype=np.float32).reshape(10, 3)
             first = capture_activations([values], tmp, layer=0, shard_tokens=4, metadata={"dataset_hash": "d"})
             self.assertEqual(first["status"], "CAPTURE_COMPLETE")
+            self.assertEqual(first["code_commit"], current_git_commit())
             self.assertTrue(all(item["path"].endswith(".safetensors") for item in first["shards"]))
             self.assertNotIn("values", json.loads((Path(tmp) / "layer-0000.json").read_text()))
             second = capture_activations([values], tmp, layer=0, shard_tokens=4, resume=True, metadata={"dataset_hash": "d"})
@@ -67,13 +82,21 @@ class RealContractTests(unittest.TestCase):
                 save_layer_checkpoint(LayerCheckpoint(layer, "p8", status="synthetic-pending"), checkpoints / f"layer-{layer:04d}.json")
             manifest = assemble_checkpoint(sorted(checkpoints.glob("*.json")), root / "assembled", metadata={"profile": "p8", "expected_layers": 4})
             self.assertFalse(manifest["complete"])
+            self.assertEqual(manifest["code_commit"], current_git_commit())
             self.assertTrue(any("status" in error for error in manifest["errors"]))
 
     def test_real_layer_schema_requires_hash_and_finite_tensors(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             tensors_path, inventory, digest = publish_tensor_artifact({"x": np.ones((2, 3), dtype=np.float32)}, root / "x.safetensors")
-            metadata = LayerCheckpoint(0, "p8", status="TRAINED_VALIDATED", profile_hash=profile_fingerprint("p8"), source_revision="rev", source_config_hash="config", source_index_hash="index", dataset_hash="dataset", partition_hash="partition", tensor_file=tensors_path.name, tensor_sha256=digest, tensor_inventory=inventory, quality_gate={"overall": "green"}, code_commit="test")
+            metadata = LayerCheckpoint(0, "p8", status="TRAINED_VALIDATED", profile_hash=profile_fingerprint("p8"), source_revision="rev", source_config_hash="config", source_index_hash="index", dataset_hash="dataset", partition_hash="partition", tensor_file=tensors_path.name, tensor_sha256=digest, tensor_inventory=inventory, quality_gate={"overall": "green"}, code_commit=current_git_commit())
             path = save_layer_checkpoint(metadata, root / "layer-0000.json")
             valid, errors, _ = validate_layer_checkpoint(path, expected_profile="p8", expected_source_revision="rev")
             self.assertTrue(valid, errors)
+
+    def test_validated_layer_rejects_placeholder_provenance(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp, self.assertRaises(ValueError):
+            save_layer_checkpoint(
+                LayerCheckpoint(0, "p8", status="TRAINED_VALIDATED", code_commit="unknown"),
+                Path(tmp) / "layer-0000.json",
+            )

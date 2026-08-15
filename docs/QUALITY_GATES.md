@@ -17,3 +17,17 @@ Thresholds are fixed for the initial p8/top-2 experiments.
 
 Synthetic fixtures validate software contracts only.  They are labelled in
 reports and cannot satisfy the real-model quality gates.
+
+The historical layer-0 Gaussian-input pilot and ablation are classified as
+`RANDOM_INPUT_FROZEN_SLICE_DIAGNOSTIC`.  They preserve useful regression
+evidence, but are not eligible for these gates, are not teacher-activation
+measurements, and must not be interpreted as a hard ceiling on a trainable
+student.  Real activation reports must identify the frozen simplex,
+non-negative, and train-fit global-scale methods separately.
+
+The `trainable_student_proxy` interpretation is intentionally separate: a
+trained student is constrained by the distillation data and fixed split, the
+expert parameterization/shared capacity, router expressivity and load
+balancing, and the available optimization, memory, and convergence budget.
+Those constraints—not the unchanged frozen slices alone—determine whether a
+jointly trained MoE can improve on a frozen-slice diagnostic.

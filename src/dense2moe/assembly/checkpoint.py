@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any
 
 from ..checkpoint.layer import load_layer_checkpoint, validate_layer_checkpoint
+from ..provenance import current_git_commit
 from ..state import atomic_write_json
 
 
@@ -80,6 +81,8 @@ def assemble_checkpoint(
     dst = Path(destination)
     dst.mkdir(parents=True, exist_ok=True)
     manifest_metadata = dict(metadata or {})
+    manifest_commit = current_git_commit()
+    manifest_metadata["code_commit"] = manifest_commit
     expected_layers_raw = manifest_metadata.get("expected_layers")
     try:
         expected_layers = int(expected_layers_raw) if expected_layers_raw is not None else None
@@ -163,6 +166,7 @@ def assemble_checkpoint(
         "errors": errors,
         "layers": layers,
         "metadata": manifest_metadata,
+        "code_commit": manifest_commit,
         "strict": True,
     }
     atomic_write_json(dst / "manifest.json", manifest)

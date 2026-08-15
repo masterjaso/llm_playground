@@ -10,15 +10,18 @@ from __future__ import annotations
 import hashlib
 import json
 import math
+import re
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from ..provenance import current_git_commit
 from ..state import atomic_write_json
 
 LAYER_SCHEMA_VERSION = 2
+_GIT_COMMIT_PATTERN = re.compile(r"^[0-9a-f]{40}$")
 
 
 def _now() -> str:
@@ -67,7 +70,7 @@ class LayerCheckpoint:
     quality_gate: dict[str, Any] = field(default_factory=dict)
     created_at: str = ""
     updated_at: str = ""
-    code_commit: str = "unknown"
+    code_commit: str = field(default_factory=current_git_commit)
 
     def as_dict(self) -> dict[str, Any]:
         now = _now()
@@ -131,13 +134,21 @@ def _metadata_to_checkpoint(payload: Mapping[str, Any]) -> LayerCheckpoint:
         quality_gate=dict(payload.get("quality_gate", {})),
         created_at=str(payload.get("created_at", "")),
         updated_at=str(payload.get("updated_at", "")),
-        code_commit=str(payload.get("code_commit", "unknown")),
+        # Missing provenance must remain invalid rather than being silently
+        # attributed to the code currently loading an old artifact.
+        code_commit=str(payload.get("code_commit", "")),
     )
 
 
 def save_layer_checkpoint(checkpoint: LayerCheckpoint, path: str | Path) -> Path:
     """Write metadata only; real workers must publish a tensor artifact too."""
 
+    if checkpoint.status == "TRAINED_VALIDATED":
+        commit = str(checkpoint.code_commit)
+        if not _GIT_COMMIT_PATTERN.fullmatch(commit):
+            raise ValueError("validated layer checkpoint requires a full git commit provenance")
+        if commit != current_git_commit():
+            raise ValueError("validated layer checkpoint provenance does not match current git commit")
     target = Path(path)
     atomic_write_json(target, checkpoint.as_dict())
     return target
@@ -212,8 +223,8 @@ def validate_layer_checkpoint(
     for field_name in ("profile_hash", "source_revision", "source_config_hash", "source_index_hash", "dataset_hash", "partition_hash"):
         if not getattr(checkpoint, field_name):
             errors.append(f"missing {field_name}")
-    if not checkpoint.code_commit or checkpoint.code_commit == "unknown":
-        errors.append("missing code_commit")
+    if not _GIT_COMMIT_PATTERN.fullmatch(str(checkpoint.code_commit)):
+        errors.append("missing or invalid code_commit")
     if not checkpoint.tensor_inventory:
         errors.append("missing tensor inventory")
     if expected_layer is not None and checkpoint.layer != expected_layer:

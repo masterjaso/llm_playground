@@ -14,6 +14,7 @@ from collections.abc import Iterable, Iterator, Mapping
 from pathlib import Path
 from typing import Any
 
+from ..provenance import current_git_commit
 from ..state import atomic_write_json
 
 
@@ -116,6 +117,8 @@ def capture_activation_shards(
     shard_tokens: int = 8192,
     dtype: str = "float32",
     resume: bool = False,
+    split: str | None = None,
+    manifest_name: str | None = None,
     metadata: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Capture an iterable into atomic binary shards and a manifest."""
@@ -128,13 +131,29 @@ def capture_activation_shards(
         raise RuntimeError("numpy is required for activation capture") from exc
     dst = Path(destination)
     dst.mkdir(parents=True, exist_ok=True)
-    manifest_path = dst / f"layer-{layer:04d}.json"
+    manifest_path = dst / (manifest_name or f"layer-{layer:04d}.json")
+    if manifest_path.suffix.lower() != ".json":
+        raise ValueError("manifest_name must use the .json suffix")
+    shard_stem = manifest_path.stem
     if resume:
         previous = _valid_existing(manifest_path)
-        if previous is not None:
+        same_split = split is None or previous is not None and previous.get("split") == split
+        expected_dataset = (metadata or {}).get("dataset_hash")
+        same_dataset = not expected_dataset or previous is not None and previous.get("dataset_hash") == expected_dataset
+        if previous is not None and same_split and same_dataset:
             return {**previous, "status": "CAPTURE_RESUMED"}
-    buffers: list[Any] = []
-    rows = 0
+        if manifest_path.exists():
+            return {
+                "status": "CAPTURE_BLOCKED",
+                "layer": layer,
+                "count": 0,
+                "code_commit": current_git_commit(),
+                "message": "resume refused to overwrite an invalid or different split/dataset activation manifest",
+            }
+    pending: Any | None = None
+    artifact_commit = current_git_commit()
+    shard_metadata = dict(metadata or {})
+    shard_metadata["code_commit"] = artifact_commit
     shards: list[dict[str, Any]] = []
     shard_index = 0
     for item in activations:
@@ -143,23 +162,20 @@ def capture_activation_shards(
             values = values.reshape(1, -1)
         if values.ndim != 2:
             raise ValueError("activation items must be rank-1 or rank-2")
-        buffers.append(values)
-        rows += int(values.shape[0])
-        while rows >= shard_tokens:
-            merged = np.concatenate(buffers, axis=0)
-            chunk, remainder = merged[:shard_tokens], merged[shard_tokens:]
-            tensor_path = dst / f"layer-{layer:04d}-shard-{shard_index:05d}.safetensors"
-            shard = _write_shard(chunk, tensor_path, layer=layer, shard_index=shard_index, metadata=metadata)
+        pending = values if pending is None else np.concatenate((pending, values), axis=0)
+        while pending.shape[0] >= shard_tokens:
+            chunk = pending[:shard_tokens]
+            pending = pending[shard_tokens:]
+            tensor_path = dst / f"{shard_stem}-shard-{shard_index:05d}.safetensors"
+            shard = _write_shard(chunk, tensor_path, layer=layer, shard_index=shard_index, metadata=shard_metadata)
             shards.append(shard)
             shard_index += 1
-            buffers = [remainder] if len(remainder) else []
-            rows = int(remainder.shape[0]) if len(remainder) else 0
-    if buffers:
-        merged = np.concatenate(buffers, axis=0)
-        tensor_path = dst / f"layer-{layer:04d}-shard-{shard_index:05d}.safetensors"
-        shards.append(_write_shard(merged, tensor_path, layer=layer, shard_index=shard_index, metadata=metadata))
+    if pending is not None and pending.shape[0] > 0:
+        merged = pending
+        tensor_path = dst / f"{shard_stem}-shard-{shard_index:05d}.safetensors"
+        shards.append(_write_shard(merged, tensor_path, layer=layer, shard_index=shard_index, metadata=shard_metadata))
     if not shards:
-        return {"status": "CAPTURE_BLOCKED", "layer": layer, "count": 0, "message": "activation iterable is empty; no binary artifact was created"}
+        return {"status": "CAPTURE_BLOCKED", "layer": layer, "count": 0, "code_commit": artifact_commit, "message": "activation iterable is empty; no binary artifact was created"}
     manifest = {
         "schema_version": 2,
         "status": "CAPTURE_COMPLETE",
@@ -168,8 +184,15 @@ def capture_activation_shards(
         "count": sum(int(item["count"]) for item in shards),
         "shard_tokens": shard_tokens,
         "shards": shards,
+        "split": split,
+        "metadata": dict(metadata or {}),
+        "capture_kind": (metadata or {}).get("capture_kind", "mlp_input"),
+        "hook_path": (metadata or {}).get("hook_path"),
+        "source_snapshot": (metadata or {}).get("source_snapshot"),
+        "tokenizer_revision": (metadata or {}).get("tokenizer_revision"),
         "dataset_hash": (metadata or {}).get("dataset_hash", ""),
-        "source_revision": (metadata or {}).get("source_revision", "unknown"),
+        "source_revision": (metadata or {}).get("source_revision"),
+        "code_commit": artifact_commit,
     }
     atomic_write_json(manifest_path, manifest)
     return manifest
@@ -183,6 +206,8 @@ def capture_activations(
     dtype: str = "float32",
     shard_tokens: int = 8192,
     resume: bool = False,
+    split: str | None = None,
+    manifest_name: str | None = None,
     metadata: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Backward-compatible wrapper around :func:`capture_activation_shards`."""
@@ -194,14 +219,18 @@ def capture_activations(
         shard_tokens=shard_tokens,
         dtype=dtype,
         resume=resume,
+        split=split,
+        manifest_name=manifest_name,
         metadata=metadata,
     )
 
 
-def iter_activation_shards(manifest_path: str | Path) -> Iterator[Any]:
+def iter_activation_shards(manifest_path: str | Path, *, expected_split: str | None = None) -> Iterator[Any]:
     """Yield binary MLP-input tensors from a validated capture manifest."""
 
     manifest = json.loads(Path(manifest_path).read_text(encoding="utf-8"))
+    if expected_split is not None and manifest.get("split") != expected_split:
+        raise ValueError(f"activation manifest split mismatch: expected {expected_split!r}, got {manifest.get('split')!r}")
     try:
         import numpy as np  # type: ignore
         from safetensors import safe_open  # type: ignore

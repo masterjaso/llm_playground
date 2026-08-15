@@ -7,7 +7,8 @@ from typing import Any
 
 from ..config import MoEProfile
 from ..partition import partition_indices
-from ..partition.oracle import oracle_topk
+from ..partition.oracle import frozen_slice_simplex_oracle
+from ..provenance import current_git_commit
 
 
 def run_real_layer_pilot(source_dir: str | Path, profiles: list[MoEProfile], *, layer: int = 0, batch_size: int = 2, seed: int = 17) -> dict[str, Any]:
@@ -18,6 +19,7 @@ def run_real_layer_pilot(source_dir: str | Path, profiles: list[MoEProfile], *, 
     sparse output as a quality result.
     """
 
+    artifact_commit = current_git_commit()
     try:
         import torch  # type: ignore
     except ImportError:
@@ -26,11 +28,11 @@ def run_real_layer_pilot(source_dir: str | Path, profiles: list[MoEProfile], *, 
         import torch.nn.functional as F  # type: ignore
         from safetensors import safe_open  # type: ignore
     except ImportError as exc:
-        return {"status": "BLOCKED", "reason": f"optional ML reader unavailable: {exc}"}
+        return {"status": "BLOCKED", "reason": f"optional ML reader unavailable: {exc}", "code_commit": artifact_commit}
     source = Path(source_dir)
     index_path = source / "model.safetensors.index.json"
     if not index_path.exists():
-        return {"status": "BLOCKED", "reason": "safetensors index is missing"}
+        return {"status": "BLOCKED", "reason": "safetensors index is missing", "code_commit": artifact_commit}
     import json
 
     index = json.loads(index_path.read_text(encoding="utf-8"))
@@ -38,7 +40,7 @@ def run_real_layer_pilot(source_dir: str | Path, profiles: list[MoEProfile], *, 
     names = {key: value for key, value in index.get("weight_map", {}).items() if key.startswith(prefix)}
     required = {"down_proj.weight", "gate_proj.weight", "up_proj.weight"}
     if {key[len(prefix) :] for key in names} != required:
-        return {"status": "BLOCKED", "reason": "layer MLP tensor inventory is incomplete", "found": sorted(names)}
+        return {"status": "BLOCKED", "reason": "layer MLP tensor inventory is incomplete", "found": sorted(names), "code_commit": artifact_commit}
     tensors: dict[str, torch.Tensor] = {}
     for short_name, shard in ((key[len(prefix) :], value) for key, value in names.items()):
         with safe_open(str(source / shard), framework="pt", device="cpu") as handle:
@@ -70,9 +72,18 @@ def run_real_layer_pilot(source_dir: str | Path, profiles: list[MoEProfile], *, 
         for group in routed[: profile.top_k]:
             sparse_output = sparse_output + dense_hidden[:, list(group)] @ tensors["down_proj.weight"][:, list(group)].T / profile.top_k
         relative_mse = float(torch.mean((sparse_output - dense_output).square()).item() / dense_norm)
-        oracle = oracle_topk(shared_output.detach().cpu().numpy(), torch.stack(routed_outputs, dim=1).detach().cpu().numpy(), dense_output.detach().cpu().numpy(), top_k=profile.top_k)
-        results.append({"profile": profile.name, "status": "measured", "layer": layer, "batch_size": batch_size, "dense_mse": 0.0, "all_expert_reconstruction_mse": exact_error, "initial_sparse_relative_mse": relative_mse, "oracle_sparse_normalized_mse": float(oracle["normalized_mse"]), "oracle_cosine": float(oracle["cosine"]), "source_tensor_shard": next(iter(names.values()))})
-    return {"status": "PILOT_COMPLETE", "source_dir": str(source), "layer": layer, "results": results, "note": "untrained sparse error is a structural pilot, not a retained-quality claim"}
+        oracle = frozen_slice_simplex_oracle(shared_output.detach().cpu().numpy(), torch.stack(routed_outputs, dim=1).detach().cpu().numpy(), dense_output.detach().cpu().numpy(), top_k=profile.top_k)
+        results.append({"profile": profile.name, "status": "measured", "classification": "RANDOM_INPUT_FROZEN_SLICE_DIAGNOSTIC", "layer": layer, "batch_size": batch_size, "dense_mse": 0.0, "all_expert_reconstruction_mse": exact_error, "initial_sparse_relative_mse": relative_mse, "oracle_sparse_normalized_mse": float(oracle["normalized_mse"]), "oracle_cosine": float(oracle["cosine"]), "source_tensor_shard": next(iter(names.values()))})
+    return {
+        "status": "PILOT_COMPLETE",
+        "classification": "RANDOM_INPUT_FROZEN_SLICE_DIAGNOSTIC",
+        "quality_gate_eligible": False,
+        "source_dir": str(source),
+        "layer": layer,
+        "results": results,
+        "code_commit": artifact_commit,
+        "note": "historical random-input frozen-slice diagnostic; not a retained-quality claim or trainable-MoE ceiling",
+    }
 
 
 def _run_numpy_pilot(source_dir: str | Path, profiles: list[MoEProfile], *, layer: int, batch_size: int, seed: int) -> dict[str, Any]:
@@ -80,19 +91,21 @@ def _run_numpy_pilot(source_dir: str | Path, profiles: list[MoEProfile], *, laye
 
     import json
 
+    artifact_commit = current_git_commit()
+
     import numpy as np  # type: ignore
     from safetensors import safe_open  # type: ignore
 
     source = Path(source_dir)
     index_path = source / "model.safetensors.index.json"
     if not index_path.exists():
-        return {"status": "BLOCKED", "reason": "safetensors index is missing"}
+        return {"status": "BLOCKED", "reason": "safetensors index is missing", "code_commit": artifact_commit}
     index = json.loads(index_path.read_text(encoding="utf-8"))
     prefix = f"model.language_model.layers.{layer}.mlp."
     names = {key[len(prefix) :]: value for key, value in index.get("weight_map", {}).items() if key.startswith(prefix)}
     required = {"down_proj.weight", "gate_proj.weight", "up_proj.weight"}
     if set(names) != required:
-        return {"status": "BLOCKED", "reason": "layer MLP tensor inventory is incomplete", "found": sorted(names)}
+        return {"status": "BLOCKED", "reason": "layer MLP tensor inventory is incomplete", "found": sorted(names), "code_commit": artifact_commit}
     tensors: dict[str, Any] = {}
     for short_name, shard in names.items():
         with safe_open(str(source / shard), framework="numpy") as handle:
@@ -105,7 +118,7 @@ def _run_numpy_pilot(source_dir: str | Path, profiles: list[MoEProfile], *, laye
     dense_hidden = (gate_values / (1.0 + np.exp(-gate_values))) * (inputs @ tensors["up_proj.weight"].T)
     dense_output = dense_hidden @ tensors["down_proj.weight"].T
     dense_norm = float(np.mean(dense_output**2)) + 1e-12
-    from ..partition import oracle_topk, partition_indices, swiglu_contributions
+    from ..partition import frozen_slice_simplex_oracle, partition_indices, swiglu_contributions
 
     results: list[dict[str, Any]] = []
     for profile in profiles:
@@ -115,7 +128,7 @@ def _run_numpy_pilot(source_dir: str | Path, profiles: list[MoEProfile], *, laye
         plan = partition_indices(profile.dense_intermediate_size, profile.routed_experts, profile.expert_intermediate_size, profile.shared_intermediate_size)
         shared, routed = swiglu_contributions(inputs, tensors["gate_proj.weight"], tensors["up_proj.weight"], tensors["down_proj.weight"], plan)
         all_output = shared + routed.sum(axis=1)
-        oracle = oracle_topk(shared, routed, dense_output, top_k=profile.top_k)
+        oracle = frozen_slice_simplex_oracle(shared, routed, dense_output, top_k=profile.top_k)
         sparse_ids = np.tile(np.arange(profile.top_k), (batch_size, 1))
         sparse_output = shared.copy()
         for token in range(batch_size):
@@ -124,6 +137,7 @@ def _run_numpy_pilot(source_dir: str | Path, profiles: list[MoEProfile], *, laye
         results.append({
             "profile": profile.name,
             "status": "measured",
+            "classification": "RANDOM_INPUT_FROZEN_SLICE_DIAGNOSTIC",
             "layer": layer,
             "batch_size": batch_size,
             "dense_mse": 0.0,
@@ -134,13 +148,24 @@ def _run_numpy_pilot(source_dir: str | Path, profiles: list[MoEProfile], *, laye
             "source_tensor_shard": next(iter(names.values())),
             "backend": "numpy-safetensors",
         })
-    return {"status": "PILOT_COMPLETE", "source_dir": str(source), "layer": layer, "results": results, "note": "real source-weight structural/oracle pilot; not a retained-quality claim"}
+    return {
+        "status": "PILOT_COMPLETE",
+        "classification": "RANDOM_INPUT_FROZEN_SLICE_DIAGNOSTIC",
+        "quality_gate_eligible": False,
+        "source_dir": str(source),
+        "layer": layer,
+        "results": results,
+        "code_commit": artifact_commit,
+        "note": "historical random-input frozen-slice diagnostic; not a retained-quality claim or trainable-MoE ceiling",
+    }
 
 
 def run_oracle_ablation(source_dir: str | Path, *, layer: int = 0, batch_size: int = 8, seed: int = 17) -> dict[str, Any]:
     """Run the bounded p8 oracle fallback matrix on one immutable real layer."""
 
     import json
+
+    artifact_commit = current_git_commit()
 
     import numpy as np  # type: ignore
     from safetensors import safe_open  # type: ignore
@@ -160,12 +185,12 @@ def run_oracle_ablation(source_dir: str | Path, *, layer: int = 0, batch_size: i
     gate_values = inputs @ values["gate_proj.weight"].T
     dense_hidden = (gate_values / (1.0 + np.exp(-gate_values))) * (inputs @ values["up_proj.weight"].T)
     target = dense_hidden @ values["down_proj.weight"].T
-    from ..partition import oracle_topk, partition_indices, swiglu_contributions
+    from ..partition import frozen_slice_simplex_oracle, partition_indices, swiglu_contributions
 
     def evaluate(name: str, plan: Any, top_k: int) -> dict[str, Any]:
         shared, routed = swiglu_contributions(inputs, values["gate_proj.weight"], values["up_proj.weight"], values["down_proj.weight"], plan)
-        oracle = oracle_topk(shared, routed, target, top_k=top_k)
-        return {"name": name, "top_k": top_k, "shared_width": plan.shared_intermediate_size, "expert_width": plan.expert_intermediate_size, "oracle_normalized_mse": float(oracle["normalized_mse"]), "oracle_cosine": float(oracle["cosine"]), "all_expert_reconstruction_mse": float(np.mean((shared + routed.sum(axis=1) - target) ** 2))}
+        oracle = frozen_slice_simplex_oracle(shared, routed, target, top_k=top_k)
+        return {"name": name, "top_k": top_k, "classification": "RANDOM_INPUT_FROZEN_SLICE_DIAGNOSTIC", "shared_width": plan.shared_intermediate_size, "expert_width": plan.expert_intermediate_size, "oracle_normalized_mse": float(oracle["normalized_mse"]), "oracle_cosine": float(oracle["cosine"]), "all_expert_reconstruction_mse": float(np.mean((shared + routed.sum(axis=1) - target) ** 2))}
 
     base = partition_indices(dense_size, 8, 2048, 1024)
     activation_scores = np.mean(np.abs(gate_values), axis=0)
@@ -179,4 +204,19 @@ def run_oracle_ablation(source_dir: str | Path, *, layer: int = 0, batch_size: i
         evaluate("wider_shared_top2", partition_indices(dense_size, 8, 1920, 2048), 2),
     ]
     best = min(variants, key=lambda item: item["oracle_normalized_mse"])
-    return {"status": "ORACLE_ABLATION_COMPLETE", "source_dir": str(source), "layer": layer, "variants": variants, "best_variant": best["name"], "gate": {"green": best["oracle_normalized_mse"] <= 0.05, "yellow": best["oracle_normalized_mse"] <= 0.10}, "note": "bounded real-layer oracle ceiling; router training is not justified when the oracle is red"}
+    return {
+        "status": "ORACLE_ABLATION_COMPLETE",
+        "classification": "RANDOM_INPUT_FROZEN_SLICE_DIAGNOSTIC",
+        "quality_gate_eligible": False,
+        "source_dir": str(source),
+        "layer": layer,
+        "variants": variants,
+        "best_variant": best["name"],
+        "gate": {
+            "green": best["oracle_normalized_mse"] <= 0.05,
+            "yellow": best["oracle_normalized_mse"] <= 0.10,
+            "applies_to": "historical diagnostic only",
+        },
+        "code_commit": artifact_commit,
+        "note": "historical random-input frozen-slice diagnostic; do not treat as a trainable-MoE ceiling or architecture gate",
+    }

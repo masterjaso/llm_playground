@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Any
 
 from .logging import append_jsonl
+from .provenance import current_git_commit
 
 SCHEMA_VERSION = 2
 
@@ -50,7 +51,7 @@ class RunState:
 
     @classmethod
     def new(cls, run_id: str) -> RunState:
-        return cls(schema_version=SCHEMA_VERSION, run_id=run_id)
+        return cls(schema_version=SCHEMA_VERSION, run_id=run_id, code_commit=current_git_commit())
 
     @classmethod
     def from_dict(cls, payload: Mapping[str, Any]) -> RunState:
@@ -92,6 +93,10 @@ class StateStore:
         return RunState.from_dict(json.loads(self.state_path.read_text(encoding="utf-8")))
 
     def save(self, state: RunState) -> None:
+        # Every newly written state receipt identifies the code that wrote it.
+        # This intentionally updates active continuation state only when it is
+        # saved; historical run files are never rewritten by this module.
+        state.code_commit = current_git_commit()
         state.timestamps["updated"] = utc_now()
         payload = json.dumps(state.as_dict(), indent=2, sort_keys=True, default=str) + "\n"
         self.run_dir.mkdir(parents=True, exist_ok=True)
@@ -127,13 +132,16 @@ class StateStore:
         return state
 
     def record_command(self, command: str, *, argv: list[str] | None = None, ok: bool = True, result: Any = None) -> None:
-        append_jsonl(self.commands_path, {"command": command, "argv": argv or [], "ok": ok, "result": result})
+        append_jsonl(
+            self.commands_path,
+            {"command": command, "argv": argv or [], "ok": ok, "result": result, "code_commit": current_git_commit()},
+        )
 
     def record_event(self, event: str, **details: Any) -> None:
-        append_jsonl(self.events_path, {"event": event, **details})
+        append_jsonl(self.events_path, {"event": event, **details, "code_commit": current_git_commit()})
 
     def write_prediction(self, phase: str, contract: Mapping[str, Any], result: str | None = None) -> Path:
-        payload = {"phase": phase, "contract": dict(contract), "result": result, "timestamp": utc_now()}
+        payload = {"phase": phase, "contract": dict(contract), "result": result, "timestamp": utc_now(), "code_commit": current_git_commit()}
         path = self.run_dir / "predictions" / f"{phase}.json"
         atomic_write_json(path, payload)
         state = self.load()
@@ -166,6 +174,7 @@ class StateStore:
             f"- Active blocker: `{blocker or 'none'}`",
             f"- Exact next command: `{next_command}`",
             f"- Expected output: {expected_output or 'see state.json and the latest event log'}",
+            f"- Code commit: `{current_git_commit()}`",
             f"- Relevant log: `{self.run_dir / 'events.jsonl'}`",
             f"- Resume command: `d2m run --run-dir {self.run_dir} --resume`",
             "",
