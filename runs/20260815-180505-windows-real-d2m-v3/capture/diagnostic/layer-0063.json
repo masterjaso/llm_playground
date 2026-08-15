@@ -1,5 +1,5 @@
 {
-  "capture_code_commit": "6617130b4dcd14ea462d4c358ae70c7807d631e4",
+  "capture_code_commit": "d49036da2bf5f04f5524c043d932423039a793ff",
   "dataset_hash": "46b278a85b4cb31a8fe659be2dd146bd9206eb491268220e25440981d06c0a03",
   "diagnostic_only": true,
   "dtype": "float16",
@@ -23,6 +23,8 @@
     "threshold": 1e-07
   },
   "layer": 63,
+  "max_batch_tokens": null,
+  "microbatch": 1,
   "schema_version": 1,
   "source_revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
   "source_snapshot": "runs\\20260815-030931-windows\\source",

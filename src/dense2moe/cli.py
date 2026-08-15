@@ -690,7 +690,11 @@ def _capture(args: argparse.Namespace, store: StateStore) -> dict[str, Any]:
                 results.append(captured)
             except (OSError, ValueError, TypeError, KeyError, RuntimeError) as exc:
                 results.append({"status": "BLOCKED", "layer": layer, "message": str(exc)})
-    status = "CAPTURE_COMPLETE" if results and all(item.get("status") in {"CAPTURE_COMPLETE", "CAPTURE_RESUMED"} for item in results) else "BLOCKED"
+    capture_complete = bool(results) and all(
+        item.get("status") in {"CAPTURE_COMPLETE", "CAPTURE_RESUMED"} for item in results
+    )
+    status = "CAPTURE_DIAGNOSTIC_COMPLETE" if capture_complete and args.diagnostic_only else ("CAPTURE_COMPLETE" if capture_complete else "BLOCKED")
+    full_capture = status == "CAPTURE_COMPLETE"
     result = {
         "status": status,
         "layers": results,
@@ -701,12 +705,36 @@ def _capture(args: argparse.Namespace, store: StateStore) -> dict[str, Any]:
         "source_snapshot": native_result.get("source_snapshot") if native_result is not None else None,
         "source_revision": native_result.get("source_revision", state.source_revision) if native_result is not None else state.source_revision,
         "code_commit": current_git_commit(),
-        "message": None if status == "CAPTURE_COMPLETE" else "one or more layers have no validated binary activation capture",
+        "diagnostic_only": bool(args.diagnostic_only),
+        "quality_gate_eligible": full_capture,
+        "message": (
+            None
+            if full_capture
+            else (
+                "diagnostic-only subset; required non-diagnostic full corpus is not a quality artifact"
+                if status == "CAPTURE_DIAGNOSTIC_COMPLETE"
+                else "one or more layers have no validated binary activation capture"
+            )
+        ),
     }
     atomic_write_json(store.run_dir / "metrics" / "capture.json", result)
-    next_command = f"d2m partition-layer --run-dir {args.run_dir} --layer {layers[0] if layers else 0}"
-    store.transition(current_phase="capture", phase_status="pending" if status == "CAPTURE_COMPLETE" else "blocked", active_blocker=None if status == "CAPTURE_COMPLETE" else result["message"], next_exact_command=next_command, validation_results={"capture": result})
-    store.write_handoff(next_command=next_command, expected_output="validated partition manifest" if status == "CAPTURE_COMPLETE" else "teacher activation input files", blocker=None if status == "CAPTURE_COMPLETE" else result["message"])
+    next_command = (
+        f"d2m partition-layer --run-dir {args.run_dir} --layer {layers[0] if layers else 0}"
+        if full_capture
+        else f"d2m capture --run-dir {args.run_dir} --layers {args.layers} --dataset-manifest {args.dataset_manifest} --resume"
+    )
+    store.transition(
+        current_phase="capture",
+        phase_status="pending" if full_capture else "blocked",
+        active_blocker=None if full_capture else result["message"],
+        next_exact_command=next_command,
+        validation_results={"capture": result},
+    )
+    store.write_handoff(
+        next_command=next_command,
+        expected_output="validated partition manifest" if full_capture else "validated non-diagnostic teacher activation input files",
+        blocker=None if full_capture else result["message"],
+    )
     return result
 
 

@@ -1,6 +1,6 @@
 {
   "classification": "RANDOM_INPUT_FROZEN_SLICE_DIAGNOSTIC",
-  "code_commit": "6617130b4dcd14ea462d4c358ae70c7807d631e4",
+  "code_commit": "d49036da2bf5f04f5524c043d932423039a793ff",
   "layer": 0,
   "next_exact_command": "d2m prepare-data --run-dir runs\\20260815-180505-windows-real-d2m-v3",
   "note": "historical random-input frozen-slice diagnostic; not a retained-quality claim or trainable-MoE ceiling",

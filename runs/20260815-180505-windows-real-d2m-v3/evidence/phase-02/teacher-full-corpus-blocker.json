@@ -2,7 +2,7 @@
   "schema_version": 1,
   "run_id": "20260815-180505-windows-real-d2m-v3",
   "parent_run_id": "20260815-162258-windows-real-d2m-v2",
-  "code_commit": "6617130b4dcd14ea462d4c358ae70c7807d631e4",
+  "code_commit": "d49036da2bf5f04f5524c043d932423039a793ff",
   "status": "BLOCKED",
   "blocker_code": "TEACHER_FULL_CORPUS_THROUGHPUT_RESOURCE",
   "resumable": true,
@@ -23,7 +23,7 @@
       "status": "CAPTURE_COMPLETE",
       "tokens": 1176,
       "teacher_forward_count": 1,
-      "tokens_per_second": 19.228178558205617,
+      "tokens_per_second": 14.241964155200753,
       "manifest": "runs/20260815-180505-windows-real-d2m-v3/capture/diagnostic/layer-0000-holdout.json",
       "hook_verification": "all five selected MLP hooks verified; normalized MSE 0.0"
     },

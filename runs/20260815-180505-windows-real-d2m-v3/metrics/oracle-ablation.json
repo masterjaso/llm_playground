@@ -2,7 +2,7 @@
   "activation_manifest": "runs\\20260815-180505-windows-real-d2m-v3\\capture\\diagnostic\\layer-0000-holdout.json",
   "best_variant": "output_contribution_top2",
   "classification": "REAL_TEACHER_ACTIVATION_HOLDOUT",
-  "code_commit": "6617130b4dcd14ea462d4c358ae70c7807d631e4",
+  "code_commit": "d49036da2bf5f04f5524c043d932423039a793ff",
   "dataset_hash": "46b278a85b4cb31a8fe659be2dd146bd9206eb491268220e25440981d06c0a03",
   "gate": {
     "applies_to": "real teacher activation holdout",

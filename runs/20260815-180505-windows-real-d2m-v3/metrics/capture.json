@@ -1,28 +1,798 @@
 {
   "capture_mode": "native_teacher",
-  "code_commit": "6617130b4dcd14ea462d4c358ae70c7807d631e4",
+  "code_commit": "d49036da2bf5f04f5524c043d932423039a793ff",
   "dataset_manifest": "runs\\20260815-180505-windows-real-d2m-v3\\capture\\data-plan.json",
-  "hook_verification": [],
-  "layers": [
+  "hook_verification": [
     {
-      "blocker_code": "TEACHER_CAPTURE_FAILED",
-      "code_commit": "6617130b4dcd14ea462d4c358ae70c7807d631e4",
-      "dataset_manifest": "runs\\20260815-180505-windows-real-d2m-v3\\capture\\data-plan.json",
-      "layers": [
-        0,
-        16,
-        32,
-        48,
-        63
-      ],
-      "message": "native teacher capture failed before a validated result was produced: CUDA out of memory. Tried to allocate 2.16 GiB. GPU 1 has a total capacity of 15.93 GiB of which 953.97 MiB is free. Of the allocated memory 11.45 GiB is allocated by PyTorch, and 2.25 GiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://docs.pytorch.org/docs/stable/notes/cuda.html#optimizing-memory-usage-with-pytorch-cuda-alloc-conf)",
-      "resumable": true,
-      "status": "BLOCKED"
+      "cosine": 0.9999998807907104,
+      "formula": "down_proj(silu(gate_proj(x)) * up_proj(x))",
+      "layer": 0,
+      "message": null,
+      "module_path": "model.layers.0.mlp",
+      "normalized_mse": 0.0,
+      "status": "HOOK_VERIFIED",
+      "threshold": 1e-07
+    },
+    {
+      "cosine": 1.0,
+      "formula": "down_proj(silu(gate_proj(x)) * up_proj(x))",
+      "layer": 16,
+      "message": null,
+      "module_path": "model.layers.16.mlp",
+      "normalized_mse": 0.0,
+      "status": "HOOK_VERIFIED",
+      "threshold": 1e-07
+    },
+    {
+      "cosine": 0.9999999403953552,
+      "formula": "down_proj(silu(gate_proj(x)) * up_proj(x))",
+      "layer": 32,
+      "message": null,
+      "module_path": "model.layers.32.mlp",
+      "normalized_mse": 0.0,
+      "status": "HOOK_VERIFIED",
+      "threshold": 1e-07
+    },
+    {
+      "cosine": 0.9999998807907104,
+      "formula": "down_proj(silu(gate_proj(x)) * up_proj(x))",
+      "layer": 48,
+      "message": null,
+      "module_path": "model.layers.48.mlp",
+      "normalized_mse": 0.0,
+      "status": "HOOK_VERIFIED",
+      "threshold": 1e-07
+    },
+    {
+      "cosine": 1.0,
+      "formula": "down_proj(silu(gate_proj(x)) * up_proj(x))",
+      "layer": 63,
+      "message": null,
+      "module_path": "model.layers.63.mlp",
+      "normalized_mse": 0.0,
+      "status": "HOOK_VERIFIED",
+      "threshold": 1e-07
     }
   ],
-  "message": "one or more layers have no validated binary activation capture",
-  "resource_metrics": {},
+  "layers": [
+    {
+      "capture_kind": "diagnostic_real_teacher_mlp_input",
+      "code_commit": "d49036da2bf5f04f5524c043d932423039a793ff",
+      "count": 1176,
+      "dataset_hash": "46b278a85b4cb31a8fe659be2dd146bd9206eb491268220e25440981d06c0a03",
+      "dtype": "float16",
+      "hook_path": "model.layers.0.mlp",
+      "layer": 0,
+      "metadata": {
+        "bos_eos_handling": "per-record manifest add_special_tokens flag",
+        "capture_kind": "diagnostic_real_teacher_mlp_input",
+        "dataset_hash": "46b278a85b4cb31a8fe659be2dd146bd9206eb491268220e25440981d06c0a03",
+        "device_map": "auto",
+        "diagnostic_only": true,
+        "fanout_layers": [
+          0,
+          16,
+          32,
+          48,
+          63
+        ],
+        "hook_path": "model.layers.0.mlp",
+        "hook_verification": {
+          "cosine": 0.9999998807907104,
+          "formula": "down_proj(silu(gate_proj(x)) * up_proj(x))",
+          "layer": 0,
+          "message": null,
+          "module_path": "model.layers.0.mlp",
+          "normalized_mse": 0.0,
+          "status": "HOOK_VERIFIED",
+          "threshold": 1e-07
+        },
+        "max_batch_tokens": null,
+        "microbatch": 1,
+        "sequence_length": 2048,
+        "source_revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
+        "source_snapshot": "runs\\20260815-030931-windows\\source",
+        "split": "holdout",
+        "split_content_sha256": "912bbecf19e052389f7e16c4217b07977318561b5405f2106739c0f22e407e56",
+        "split_ids_sha256": "00dfd2cd4b9a425b5ba4d7019cbeaa77a015d53d8b1a8780c33b89dd63d553e6",
+        "split_record_count": 1,
+        "split_token_count": 1176,
+        "teacher_forward_contract": "one forward per microbatch",
+        "tokenizer_file_hashes": {
+          "merges.txt": "a9d356d7bdf1ef4949e3e748e95b8e10ad9d4e2e838eddc38a0a7b6b94d1db8d",
+          "tokenizer.json": "0997f410c57a1f4e53b09e4be8f4a172d90edd9564368fb0847030937229b9f3",
+          "tokenizer_config.json": "b11349aafa7cdc6a320767cf7ceb29ed82f7eda5d65e8e0819e76f0ce947bf27",
+          "vocab.json": "ce99b4cb2983d118806ce0a8b777a35b093e2000a503ebde25853284c9dfa003"
+        },
+        "tokenizer_revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0"
+      },
+      "schema_version": 2,
+      "shard_tokens": 8192,
+      "shards": [
+        {
+          "count": 1176,
+          "dtype": "float16",
+          "format": "safetensors",
+          "layer": 0,
+          "metadata": {
+            "bos_eos_handling": "per-record manifest add_special_tokens flag",
+            "capture_kind": "diagnostic_real_teacher_mlp_input",
+            "dataset_hash": "46b278a85b4cb31a8fe659be2dd146bd9206eb491268220e25440981d06c0a03",
+            "device_map": "auto",
+            "diagnostic_only": true,
+            "fanout_layers": [
+              0,
+              16,
+              32,
+              48,
+              63
+            ],
+            "hook_path": "model.layers.0.mlp",
+            "hook_verification": {
+              "cosine": 0.9999998807907104,
+              "formula": "down_proj(silu(gate_proj(x)) * up_proj(x))",
+              "layer": 0,
+              "message": null,
+              "module_path": "model.layers.0.mlp",
+              "normalized_mse": 0.0,
+              "status": "HOOK_VERIFIED",
+              "threshold": 1e-07
+            },
+            "max_batch_tokens": null,
+            "microbatch": 1,
+            "sequence_length": 2048,
+            "source_revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
+            "source_snapshot": "runs\\20260815-030931-windows\\source",
+            "split": "holdout",
+            "split_content_sha256": "912bbecf19e052389f7e16c4217b07977318561b5405f2106739c0f22e407e56",
+            "split_ids_sha256": "00dfd2cd4b9a425b5ba4d7019cbeaa77a015d53d8b1a8780c33b89dd63d553e6",
+            "split_record_count": 1,
+            "split_token_count": 1176,
+            "teacher_forward_contract": "one forward per microbatch",
+            "tokenizer_file_hashes": {
+              "merges.txt": "a9d356d7bdf1ef4949e3e748e95b8e10ad9d4e2e838eddc38a0a7b6b94d1db8d",
+              "tokenizer.json": "0997f410c57a1f4e53b09e4be8f4a172d90edd9564368fb0847030937229b9f3",
+              "tokenizer_config.json": "b11349aafa7cdc6a320767cf7ceb29ed82f7eda5d65e8e0819e76f0ce947bf27",
+              "vocab.json": "ce99b4cb2983d118806ce0a8b777a35b093e2000a503ebde25853284c9dfa003"
+            },
+            "tokenizer_revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0"
+          },
+          "path": "runs\\20260815-180505-windows-real-d2m-v3\\capture\\diagnostic\\layer-0000-holdout-shard-00000.safetensors",
+          "sha256": "5d4f7dd728dc3975d2a57c280350a8c9c7473324badc54109caeb5d9dd40381b",
+          "shape": [
+            1176,
+            5120
+          ],
+          "shard_index": 0,
+          "tensor": "mlp_input"
+        }
+      ],
+      "source_revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
+      "source_snapshot": "runs\\20260815-030931-windows\\source",
+      "split": "holdout",
+      "status": "CAPTURE_COMPLETE",
+      "tokenizer_revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0"
+    },
+    {
+      "capture_kind": "diagnostic_real_teacher_mlp_input",
+      "code_commit": "d49036da2bf5f04f5524c043d932423039a793ff",
+      "count": 1176,
+      "dataset_hash": "46b278a85b4cb31a8fe659be2dd146bd9206eb491268220e25440981d06c0a03",
+      "dtype": "float16",
+      "hook_path": "model.layers.16.mlp",
+      "layer": 16,
+      "metadata": {
+        "bos_eos_handling": "per-record manifest add_special_tokens flag",
+        "capture_kind": "diagnostic_real_teacher_mlp_input",
+        "dataset_hash": "46b278a85b4cb31a8fe659be2dd146bd9206eb491268220e25440981d06c0a03",
+        "device_map": "auto",
+        "diagnostic_only": true,
+        "fanout_layers": [
+          0,
+          16,
+          32,
+          48,
+          63
+        ],
+        "hook_path": "model.layers.16.mlp",
+        "hook_verification": {
+          "cosine": 1.0,
+          "formula": "down_proj(silu(gate_proj(x)) * up_proj(x))",
+          "layer": 16,
+          "message": null,
+          "module_path": "model.layers.16.mlp",
+          "normalized_mse": 0.0,
+          "status": "HOOK_VERIFIED",
+          "threshold": 1e-07
+        },
+        "max_batch_tokens": null,
+        "microbatch": 1,
+        "sequence_length": 2048,
+        "source_revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
+        "source_snapshot": "runs\\20260815-030931-windows\\source",
+        "split": "holdout",
+        "split_content_sha256": "912bbecf19e052389f7e16c4217b07977318561b5405f2106739c0f22e407e56",
+        "split_ids_sha256": "00dfd2cd4b9a425b5ba4d7019cbeaa77a015d53d8b1a8780c33b89dd63d553e6",
+        "split_record_count": 1,
+        "split_token_count": 1176,
+        "teacher_forward_contract": "one forward per microbatch",
+        "tokenizer_file_hashes": {
+          "merges.txt": "a9d356d7bdf1ef4949e3e748e95b8e10ad9d4e2e838eddc38a0a7b6b94d1db8d",
+          "tokenizer.json": "0997f410c57a1f4e53b09e4be8f4a172d90edd9564368fb0847030937229b9f3",
+          "tokenizer_config.json": "b11349aafa7cdc6a320767cf7ceb29ed82f7eda5d65e8e0819e76f0ce947bf27",
+          "vocab.json": "ce99b4cb2983d118806ce0a8b777a35b093e2000a503ebde25853284c9dfa003"
+        },
+        "tokenizer_revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0"
+      },
+      "schema_version": 2,
+      "shard_tokens": 8192,
+      "shards": [
+        {
+          "count": 1176,
+          "dtype": "float16",
+          "format": "safetensors",
+          "layer": 16,
+          "metadata": {
+            "bos_eos_handling": "per-record manifest add_special_tokens flag",
+            "capture_kind": "diagnostic_real_teacher_mlp_input",
+            "dataset_hash": "46b278a85b4cb31a8fe659be2dd146bd9206eb491268220e25440981d06c0a03",
+            "device_map": "auto",
+            "diagnostic_only": true,
+            "fanout_layers": [
+              0,
+              16,
+              32,
+              48,
+              63
+            ],
+            "hook_path": "model.layers.16.mlp",
+            "hook_verification": {
+              "cosine": 1.0,
+              "formula": "down_proj(silu(gate_proj(x)) * up_proj(x))",
+              "layer": 16,
+              "message": null,
+              "module_path": "model.layers.16.mlp",
+              "normalized_mse": 0.0,
+              "status": "HOOK_VERIFIED",
+              "threshold": 1e-07
+            },
+            "max_batch_tokens": null,
+            "microbatch": 1,
+            "sequence_length": 2048,
+            "source_revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
+            "source_snapshot": "runs\\20260815-030931-windows\\source",
+            "split": "holdout",
+            "split_content_sha256": "912bbecf19e052389f7e16c4217b07977318561b5405f2106739c0f22e407e56",
+            "split_ids_sha256": "00dfd2cd4b9a425b5ba4d7019cbeaa77a015d53d8b1a8780c33b89dd63d553e6",
+            "split_record_count": 1,
+            "split_token_count": 1176,
+            "teacher_forward_contract": "one forward per microbatch",
+            "tokenizer_file_hashes": {
+              "merges.txt": "a9d356d7bdf1ef4949e3e748e95b8e10ad9d4e2e838eddc38a0a7b6b94d1db8d",
+              "tokenizer.json": "0997f410c57a1f4e53b09e4be8f4a172d90edd9564368fb0847030937229b9f3",
+              "tokenizer_config.json": "b11349aafa7cdc6a320767cf7ceb29ed82f7eda5d65e8e0819e76f0ce947bf27",
+              "vocab.json": "ce99b4cb2983d118806ce0a8b777a35b093e2000a503ebde25853284c9dfa003"
+            },
+            "tokenizer_revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0"
+          },
+          "path": "runs\\20260815-180505-windows-real-d2m-v3\\capture\\diagnostic\\layer-0016-holdout-shard-00000.safetensors",
+          "sha256": "443c4dbe0f4e478868fc2d9794fc2c0e4bdf7b3a93308d168b8e9ea37aa5027d",
+          "shape": [
+            1176,
+            5120
+          ],
+          "shard_index": 0,
+          "tensor": "mlp_input"
+        }
+      ],
+      "source_revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
+      "source_snapshot": "runs\\20260815-030931-windows\\source",
+      "split": "holdout",
+      "status": "CAPTURE_COMPLETE",
+      "tokenizer_revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0"
+    },
+    {
+      "capture_kind": "diagnostic_real_teacher_mlp_input",
+      "code_commit": "d49036da2bf5f04f5524c043d932423039a793ff",
+      "count": 1176,
+      "dataset_hash": "46b278a85b4cb31a8fe659be2dd146bd9206eb491268220e25440981d06c0a03",
+      "dtype": "float16",
+      "hook_path": "model.layers.32.mlp",
+      "layer": 32,
+      "metadata": {
+        "bos_eos_handling": "per-record manifest add_special_tokens flag",
+        "capture_kind": "diagnostic_real_teacher_mlp_input",
+        "dataset_hash": "46b278a85b4cb31a8fe659be2dd146bd9206eb491268220e25440981d06c0a03",
+        "device_map": "auto",
+        "diagnostic_only": true,
+        "fanout_layers": [
+          0,
+          16,
+          32,
+          48,
+          63
+        ],
+        "hook_path": "model.layers.32.mlp",
+        "hook_verification": {
+          "cosine": 0.9999999403953552,
+          "formula": "down_proj(silu(gate_proj(x)) * up_proj(x))",
+          "layer": 32,
+          "message": null,
+          "module_path": "model.layers.32.mlp",
+          "normalized_mse": 0.0,
+          "status": "HOOK_VERIFIED",
+          "threshold": 1e-07
+        },
+        "max_batch_tokens": null,
+        "microbatch": 1,
+        "sequence_length": 2048,
+        "source_revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
+        "source_snapshot": "runs\\20260815-030931-windows\\source",
+        "split": "holdout",
+        "split_content_sha256": "912bbecf19e052389f7e16c4217b07977318561b5405f2106739c0f22e407e56",
+        "split_ids_sha256": "00dfd2cd4b9a425b5ba4d7019cbeaa77a015d53d8b1a8780c33b89dd63d553e6",
+        "split_record_count": 1,
+        "split_token_count": 1176,
+        "teacher_forward_contract": "one forward per microbatch",
+        "tokenizer_file_hashes": {
+          "merges.txt": "a9d356d7bdf1ef4949e3e748e95b8e10ad9d4e2e838eddc38a0a7b6b94d1db8d",
+          "tokenizer.json": "0997f410c57a1f4e53b09e4be8f4a172d90edd9564368fb0847030937229b9f3",
+          "tokenizer_config.json": "b11349aafa7cdc6a320767cf7ceb29ed82f7eda5d65e8e0819e76f0ce947bf27",
+          "vocab.json": "ce99b4cb2983d118806ce0a8b777a35b093e2000a503ebde25853284c9dfa003"
+        },
+        "tokenizer_revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0"
+      },
+      "schema_version": 2,
+      "shard_tokens": 8192,
+      "shards": [
+        {
+          "count": 1176,
+          "dtype": "float16",
+          "format": "safetensors",
+          "layer": 32,
+          "metadata": {
+            "bos_eos_handling": "per-record manifest add_special_tokens flag",
+            "capture_kind": "diagnostic_real_teacher_mlp_input",
+            "dataset_hash": "46b278a85b4cb31a8fe659be2dd146bd9206eb491268220e25440981d06c0a03",
+            "device_map": "auto",
+            "diagnostic_only": true,
+            "fanout_layers": [
+              0,
+              16,
+              32,
+              48,
+              63
+            ],
+            "hook_path": "model.layers.32.mlp",
+            "hook_verification": {
+              "cosine": 0.9999999403953552,
+              "formula": "down_proj(silu(gate_proj(x)) * up_proj(x))",
+              "layer": 32,
+              "message": null,
+              "module_path": "model.layers.32.mlp",
+              "normalized_mse": 0.0,
+              "status": "HOOK_VERIFIED",
+              "threshold": 1e-07
+            },
+            "max_batch_tokens": null,
+            "microbatch": 1,
+            "sequence_length": 2048,
+            "source_revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
+            "source_snapshot": "runs\\20260815-030931-windows\\source",
+            "split": "holdout",
+            "split_content_sha256": "912bbecf19e052389f7e16c4217b07977318561b5405f2106739c0f22e407e56",
+            "split_ids_sha256": "00dfd2cd4b9a425b5ba4d7019cbeaa77a015d53d8b1a8780c33b89dd63d553e6",
+            "split_record_count": 1,
+            "split_token_count": 1176,
+            "teacher_forward_contract": "one forward per microbatch",
+            "tokenizer_file_hashes": {
+              "merges.txt": "a9d356d7bdf1ef4949e3e748e95b8e10ad9d4e2e838eddc38a0a7b6b94d1db8d",
+              "tokenizer.json": "0997f410c57a1f4e53b09e4be8f4a172d90edd9564368fb0847030937229b9f3",
+              "tokenizer_config.json": "b11349aafa7cdc6a320767cf7ceb29ed82f7eda5d65e8e0819e76f0ce947bf27",
+              "vocab.json": "ce99b4cb2983d118806ce0a8b777a35b093e2000a503ebde25853284c9dfa003"
+            },
+            "tokenizer_revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0"
+          },
+          "path": "runs\\20260815-180505-windows-real-d2m-v3\\capture\\diagnostic\\layer-0032-holdout-shard-00000.safetensors",
+          "sha256": "2ede383b8e01acf69ddc32c627631c2272b83033aed7503f772b8ea38fc63ead",
+          "shape": [
+            1176,
+            5120
+          ],
+          "shard_index": 0,
+          "tensor": "mlp_input"
+        }
+      ],
+      "source_revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
+      "source_snapshot": "runs\\20260815-030931-windows\\source",
+      "split": "holdout",
+      "status": "CAPTURE_COMPLETE",
+      "tokenizer_revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0"
+    },
+    {
+      "capture_kind": "diagnostic_real_teacher_mlp_input",
+      "code_commit": "d49036da2bf5f04f5524c043d932423039a793ff",
+      "count": 1176,
+      "dataset_hash": "46b278a85b4cb31a8fe659be2dd146bd9206eb491268220e25440981d06c0a03",
+      "dtype": "float16",
+      "hook_path": "model.layers.48.mlp",
+      "layer": 48,
+      "metadata": {
+        "bos_eos_handling": "per-record manifest add_special_tokens flag",
+        "capture_kind": "diagnostic_real_teacher_mlp_input",
+        "dataset_hash": "46b278a85b4cb31a8fe659be2dd146bd9206eb491268220e25440981d06c0a03",
+        "device_map": "auto",
+        "diagnostic_only": true,
+        "fanout_layers": [
+          0,
+          16,
+          32,
+          48,
+          63
+        ],
+        "hook_path": "model.layers.48.mlp",
+        "hook_verification": {
+          "cosine": 0.9999998807907104,
+          "formula": "down_proj(silu(gate_proj(x)) * up_proj(x))",
+          "layer": 48,
+          "message": null,
+          "module_path": "model.layers.48.mlp",
+          "normalized_mse": 0.0,
+          "status": "HOOK_VERIFIED",
+          "threshold": 1e-07
+        },
+        "max_batch_tokens": null,
+        "microbatch": 1,
+        "sequence_length": 2048,
+        "source_revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
+        "source_snapshot": "runs\\20260815-030931-windows\\source",
+        "split": "holdout",
+        "split_content_sha256": "912bbecf19e052389f7e16c4217b07977318561b5405f2106739c0f22e407e56",
+        "split_ids_sha256": "00dfd2cd4b9a425b5ba4d7019cbeaa77a015d53d8b1a8780c33b89dd63d553e6",
+        "split_record_count": 1,
+        "split_token_count": 1176,
+        "teacher_forward_contract": "one forward per microbatch",
+        "tokenizer_file_hashes": {
+          "merges.txt": "a9d356d7bdf1ef4949e3e748e95b8e10ad9d4e2e838eddc38a0a7b6b94d1db8d",
+          "tokenizer.json": "0997f410c57a1f4e53b09e4be8f4a172d90edd9564368fb0847030937229b9f3",
+          "tokenizer_config.json": "b11349aafa7cdc6a320767cf7ceb29ed82f7eda5d65e8e0819e76f0ce947bf27",
+          "vocab.json": "ce99b4cb2983d118806ce0a8b777a35b093e2000a503ebde25853284c9dfa003"
+        },
+        "tokenizer_revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0"
+      },
+      "schema_version": 2,
+      "shard_tokens": 8192,
+      "shards": [
+        {
+          "count": 1176,
+          "dtype": "float16",
+          "format": "safetensors",
+          "layer": 48,
+          "metadata": {
+            "bos_eos_handling": "per-record manifest add_special_tokens flag",
+            "capture_kind": "diagnostic_real_teacher_mlp_input",
+            "dataset_hash": "46b278a85b4cb31a8fe659be2dd146bd9206eb491268220e25440981d06c0a03",
+            "device_map": "auto",
+            "diagnostic_only": true,
+            "fanout_layers": [
+              0,
+              16,
+              32,
+              48,
+              63
+            ],
+            "hook_path": "model.layers.48.mlp",
+            "hook_verification": {
+              "cosine": 0.9999998807907104,
+              "formula": "down_proj(silu(gate_proj(x)) * up_proj(x))",
+              "layer": 48,
+              "message": null,
+              "module_path": "model.layers.48.mlp",
+              "normalized_mse": 0.0,
+              "status": "HOOK_VERIFIED",
+              "threshold": 1e-07
+            },
+            "max_batch_tokens": null,
+            "microbatch": 1,
+            "sequence_length": 2048,
+            "source_revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
+            "source_snapshot": "runs\\20260815-030931-windows\\source",
+            "split": "holdout",
+            "split_content_sha256": "912bbecf19e052389f7e16c4217b07977318561b5405f2106739c0f22e407e56",
+            "split_ids_sha256": "00dfd2cd4b9a425b5ba4d7019cbeaa77a015d53d8b1a8780c33b89dd63d553e6",
+            "split_record_count": 1,
+            "split_token_count": 1176,
+            "teacher_forward_contract": "one forward per microbatch",
+            "tokenizer_file_hashes": {
+              "merges.txt": "a9d356d7bdf1ef4949e3e748e95b8e10ad9d4e2e838eddc38a0a7b6b94d1db8d",
+              "tokenizer.json": "0997f410c57a1f4e53b09e4be8f4a172d90edd9564368fb0847030937229b9f3",
+              "tokenizer_config.json": "b11349aafa7cdc6a320767cf7ceb29ed82f7eda5d65e8e0819e76f0ce947bf27",
+              "vocab.json": "ce99b4cb2983d118806ce0a8b777a35b093e2000a503ebde25853284c9dfa003"
+            },
+            "tokenizer_revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0"
+          },
+          "path": "runs\\20260815-180505-windows-real-d2m-v3\\capture\\diagnostic\\layer-0048-holdout-shard-00000.safetensors",
+          "sha256": "e6f056591fbf868e036f7423989b4a29cc1ec33cd0f514a684d516e54d1cfca1",
+          "shape": [
+            1176,
+            5120
+          ],
+          "shard_index": 0,
+          "tensor": "mlp_input"
+        }
+      ],
+      "source_revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
+      "source_snapshot": "runs\\20260815-030931-windows\\source",
+      "split": "holdout",
+      "status": "CAPTURE_COMPLETE",
+      "tokenizer_revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0"
+    },
+    {
+      "capture_kind": "diagnostic_real_teacher_mlp_input",
+      "code_commit": "d49036da2bf5f04f5524c043d932423039a793ff",
+      "count": 1176,
+      "dataset_hash": "46b278a85b4cb31a8fe659be2dd146bd9206eb491268220e25440981d06c0a03",
+      "dtype": "float16",
+      "hook_path": "model.layers.63.mlp",
+      "layer": 63,
+      "metadata": {
+        "bos_eos_handling": "per-record manifest add_special_tokens flag",
+        "capture_kind": "diagnostic_real_teacher_mlp_input",
+        "dataset_hash": "46b278a85b4cb31a8fe659be2dd146bd9206eb491268220e25440981d06c0a03",
+        "device_map": "auto",
+        "diagnostic_only": true,
+        "fanout_layers": [
+          0,
+          16,
+          32,
+          48,
+          63
+        ],
+        "hook_path": "model.layers.63.mlp",
+        "hook_verification": {
+          "cosine": 1.0,
+          "formula": "down_proj(silu(gate_proj(x)) * up_proj(x))",
+          "layer": 63,
+          "message": null,
+          "module_path": "model.layers.63.mlp",
+          "normalized_mse": 0.0,
+          "status": "HOOK_VERIFIED",
+          "threshold": 1e-07
+        },
+        "max_batch_tokens": null,
+        "microbatch": 1,
+        "sequence_length": 2048,
+        "source_revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
+        "source_snapshot": "runs\\20260815-030931-windows\\source",
+        "split": "holdout",
+        "split_content_sha256": "912bbecf19e052389f7e16c4217b07977318561b5405f2106739c0f22e407e56",
+        "split_ids_sha256": "00dfd2cd4b9a425b5ba4d7019cbeaa77a015d53d8b1a8780c33b89dd63d553e6",
+        "split_record_count": 1,
+        "split_token_count": 1176,
+        "teacher_forward_contract": "one forward per microbatch",
+        "tokenizer_file_hashes": {
+          "merges.txt": "a9d356d7bdf1ef4949e3e748e95b8e10ad9d4e2e838eddc38a0a7b6b94d1db8d",
+          "tokenizer.json": "0997f410c57a1f4e53b09e4be8f4a172d90edd9564368fb0847030937229b9f3",
+          "tokenizer_config.json": "b11349aafa7cdc6a320767cf7ceb29ed82f7eda5d65e8e0819e76f0ce947bf27",
+          "vocab.json": "ce99b4cb2983d118806ce0a8b777a35b093e2000a503ebde25853284c9dfa003"
+        },
+        "tokenizer_revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0"
+      },
+      "schema_version": 2,
+      "shard_tokens": 8192,
+      "shards": [
+        {
+          "count": 1176,
+          "dtype": "float16",
+          "format": "safetensors",
+          "layer": 63,
+          "metadata": {
+            "bos_eos_handling": "per-record manifest add_special_tokens flag",
+            "capture_kind": "diagnostic_real_teacher_mlp_input",
+            "dataset_hash": "46b278a85b4cb31a8fe659be2dd146bd9206eb491268220e25440981d06c0a03",
+            "device_map": "auto",
+            "diagnostic_only": true,
+            "fanout_layers": [
+              0,
+              16,
+              32,
+              48,
+              63
+            ],
+            "hook_path": "model.layers.63.mlp",
+            "hook_verification": {
+              "cosine": 1.0,
+              "formula": "down_proj(silu(gate_proj(x)) * up_proj(x))",
+              "layer": 63,
+              "message": null,
+              "module_path": "model.layers.63.mlp",
+              "normalized_mse": 0.0,
+              "status": "HOOK_VERIFIED",
+              "threshold": 1e-07
+            },
+            "max_batch_tokens": null,
+            "microbatch": 1,
+            "sequence_length": 2048,
+            "source_revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
+            "source_snapshot": "runs\\20260815-030931-windows\\source",
+            "split": "holdout",
+            "split_content_sha256": "912bbecf19e052389f7e16c4217b07977318561b5405f2106739c0f22e407e56",
+            "split_ids_sha256": "00dfd2cd4b9a425b5ba4d7019cbeaa77a015d53d8b1a8780c33b89dd63d553e6",
+            "split_record_count": 1,
+            "split_token_count": 1176,
+            "teacher_forward_contract": "one forward per microbatch",
+            "tokenizer_file_hashes": {
+              "merges.txt": "a9d356d7bdf1ef4949e3e748e95b8e10ad9d4e2e838eddc38a0a7b6b94d1db8d",
+              "tokenizer.json": "0997f410c57a1f4e53b09e4be8f4a172d90edd9564368fb0847030937229b9f3",
+              "tokenizer_config.json": "b11349aafa7cdc6a320767cf7ceb29ed82f7eda5d65e8e0819e76f0ce947bf27",
+              "vocab.json": "ce99b4cb2983d118806ce0a8b777a35b093e2000a503ebde25853284c9dfa003"
+            },
+            "tokenizer_revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0"
+          },
+          "path": "runs\\20260815-180505-windows-real-d2m-v3\\capture\\diagnostic\\layer-0063-holdout-shard-00000.safetensors",
+          "sha256": "a613372f0aeb724e003427e729b61f346aac3fbb238a4e68676069c3f2910e76",
+          "shape": [
+            1176,
+            5120
+          ],
+          "shard_index": 0,
+          "tensor": "mlp_input"
+        }
+      ],
+      "source_revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
+      "source_snapshot": "runs\\20260815-030931-windows\\source",
+      "split": "holdout",
+      "status": "CAPTURE_COMPLETE",
+      "tokenizer_revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0"
+    }
+  ],
+  "message": null,
+  "resource_metrics": {
+    "elapsed_seconds": 82.57288019999396,
+    "peak_gpu_vram_bytes": {
+      "0": 5801111552,
+      "1": 14269531136
+    },
+    "peak_host_rss_bytes": 11360710656,
+    "teacher_load": {
+      "disable_mmap": false,
+      "estimated_weight_bytes": 55563006776,
+      "hf_device_map": {
+        "lm_head": "disk",
+        "model.embed_tokens": 0,
+        "model.layers.0": 1,
+        "model.layers.1": 1,
+        "model.layers.10": 1,
+        "model.layers.11": 1,
+        "model.layers.12": 1,
+        "model.layers.13": 1,
+        "model.layers.14": 1,
+        "model.layers.15": 1,
+        "model.layers.16": 1,
+        "model.layers.17": 1,
+        "model.layers.18": "cpu",
+        "model.layers.19": "cpu",
+        "model.layers.2": 1,
+        "model.layers.20": "cpu",
+        "model.layers.21": "cpu",
+        "model.layers.22": "cpu",
+        "model.layers.23": "cpu",
+        "model.layers.24": "cpu",
+        "model.layers.25": "cpu",
+        "model.layers.26": "cpu",
+        "model.layers.27": "cpu",
+        "model.layers.28": "cpu",
+        "model.layers.29": "disk",
+        "model.layers.3": 1,
+        "model.layers.30": "disk",
+        "model.layers.31": "disk",
+        "model.layers.32": "disk",
+        "model.layers.33": "disk",
+        "model.layers.34": "disk",
+        "model.layers.35": "disk",
+        "model.layers.36": "disk",
+        "model.layers.37": "disk",
+        "model.layers.38": "disk",
+        "model.layers.39": "disk",
+        "model.layers.4": 1,
+        "model.layers.40": "disk",
+        "model.layers.41": "disk",
+        "model.layers.42": "disk",
+        "model.layers.43": "disk",
+        "model.layers.44": "disk",
+        "model.layers.45": "disk",
+        "model.layers.46": "disk",
+        "model.layers.47": "disk",
+        "model.layers.48": "disk",
+        "model.layers.49": "disk",
+        "model.layers.5": 1,
+        "model.layers.50": "disk",
+        "model.layers.51": "disk",
+        "model.layers.52": "disk",
+        "model.layers.53": "disk",
+        "model.layers.54": "disk",
+        "model.layers.55": "disk",
+        "model.layers.56": "disk",
+        "model.layers.57": "disk",
+        "model.layers.58": "disk",
+        "model.layers.59": "disk",
+        "model.layers.6": 1,
+        "model.layers.60": "disk",
+        "model.layers.61": "disk",
+        "model.layers.62": "disk",
+        "model.layers.63": "disk",
+        "model.layers.7": 1,
+        "model.layers.8": 1,
+        "model.layers.9": 1,
+        "model.norm": "disk",
+        "model.rotary_emb": "disk"
+      },
+      "live_resources_before_load": {
+        "gpus": [
+          {
+            "allocated": 0,
+            "bf16_supported": true,
+            "compute_capability": [
+              8,
+              9
+            ],
+            "free_memory": 7451181056,
+            "index": 0,
+            "name": "NVIDIA GeForce RTX 4060",
+            "reserved": 0,
+            "total_memory": 8585216000,
+            "uuid": "750f2411-a4ee-0f5a-40d0-9bef4e9143dc"
+          },
+          {
+            "allocated": 0,
+            "bf16_supported": true,
+            "compute_capability": [
+              12,
+              0
+            ],
+            "free_memory": 15908995072,
+            "index": 1,
+            "name": "NVIDIA GeForce RTX 5060 Ti",
+            "reserved": 0,
+            "total_memory": 17102864384,
+            "uuid": "49db48ba-f49e-6bf4-1d37-0eef00b47376"
+          }
+        ],
+        "host": {
+          "available": 24404525056,
+          "percent": 64.0,
+          "swap_free": 16796938240,
+          "swap_total": 26135359488,
+          "total": 67767750656
+        },
+        "host_available": 24404525056,
+        "offload_disk": {
+          "free": 340614344704,
+          "path": "C:\\workplace\\llm_playground\\.offload\\20260815-180505-windows-real-d2m-v3",
+          "total": 999137734656
+        }
+      },
+      "load_seconds": 81.72294189996319,
+      "max_memory": {
+        "0": 5303697408,
+        "1": 13761511424,
+        "cpu": 11311341568
+      },
+      "offload_folder": "C:\\workplace\\llm_playground\\.offload\\20260815-180505-windows-real-d2m-v3",
+      "parameter_bytes_by_device": {
+        "cuda:0": 2542796800,
+        "cuda:1": 13709691008,
+        "meta": 37539509120
+      },
+      "safetensors_backend": "pread"
+    },
+    "tokens": 1176,
+    "tokens_per_second": 14.241964155200753
+  },
   "source_revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
-  "source_snapshot": null,
-  "status": "BLOCKED"
+  "source_snapshot": "runs\\20260815-030931-windows\\source",
+  "status": "CAPTURE_DIAGNOSTIC_COMPLETE",
+  "diagnostic_only": true,
+  "quality_gate_eligible": false,
+  "message": "diagnostic-only subset; required non-diagnostic full corpus is blocked by TEACHER_FULL_CORPUS_THROUGHPUT_RESOURCE"
 }
