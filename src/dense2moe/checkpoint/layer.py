@@ -212,6 +212,8 @@ def validate_layer_checkpoint(
     for field_name in ("profile_hash", "source_revision", "source_config_hash", "source_index_hash", "dataset_hash", "partition_hash"):
         if not getattr(checkpoint, field_name):
             errors.append(f"missing {field_name}")
+    if not checkpoint.code_commit or checkpoint.code_commit == "unknown":
+        errors.append("missing code_commit")
     if not checkpoint.tensor_inventory:
         errors.append("missing tensor inventory")
     if expected_layer is not None and checkpoint.layer != expected_layer:
