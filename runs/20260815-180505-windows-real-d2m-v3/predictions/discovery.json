@@ -1,0 +1,16 @@
+{
+  "code_commit": "6617130b4dcd14ea462d4c358ae70c7807d631e4",
+  "contract": {
+    "expected_artifacts": [
+      "environment.json",
+      "repository-fact-ledger.json",
+      "decision-register.json"
+    ],
+    "expected_validation_results": [
+      "DISCOVERY_READY"
+    ]
+  },
+  "phase": "discovery",
+  "result": "confirmed",
+  "timestamp": "2026-08-15T18:05:22.668749Z"
+}

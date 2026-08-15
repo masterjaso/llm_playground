@@ -32,6 +32,7 @@ from .scheduling import JobQueue
 from .state import StateStore, atomic_write_json, bootstrap_run, merge_fact_ledgers, utc_now
 
 TERMINAL_STATES = {"SUCCEEDED", "RESEARCH_CANDIDATE", "FAILED_SAFELY"}
+DEFAULT_V3_PARENT_RUN_ID = "20260815-162258-windows-real-d2m-v2"
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -40,6 +41,11 @@ def _parser() -> argparse.ArgumentParser:
     def base(name: str) -> argparse.ArgumentParser:
         command = sub.add_parser(name)
         command.add_argument("--run-dir", required=True)
+        command.add_argument(
+            "--parent-run-id",
+            default=None,
+            help="explicit parent run for a newly bootstrapped run (never rewrites an existing state)",
+        )
         command.add_argument("--json", action="store_true", dest="json_output")
         return command
 
@@ -85,11 +91,17 @@ def _parser() -> argparse.ArgumentParser:
     capture.add_argument("--source-revision", default=None, help="immutable source snapshot commit SHA")
     capture.add_argument("--split", choices=("train", "holdout", "both"), default="both")
     capture.add_argument("--microbatch", type=int, default=1)
+    capture.add_argument("--max-batch-tokens", type=int, default=None, help="optional padded-token budget per teacher forward")
     capture.add_argument("--compute-dtype", default="bfloat16")
     capture.add_argument("--max-memory", default=None, help="optional comma-separated device=budget entries")
     capture.add_argument("--offload-folder", default=None)
     capture.add_argument("--hook-threshold", type=float, default=1e-7)
     capture.add_argument("--resume", action="store_true")
+    capture.add_argument("--max-examples", type=int, default=None, help="deterministic bounded example count for diagnostic-only capture")
+    capture.add_argument("--diagnostic-only", action="store_true", help="write smoke evidence under capture/diagnostic and never treat it as quality evidence")
+
+    for command in (sub.choices["oracle-study"],):
+        command.add_argument("--activation-manifest", help="aggregate or split activation manifest for real oracle evidence")
 
     train_layer = base("train-layer")
     train_layer.add_argument("--layer", type=int, required=True)
@@ -138,7 +150,13 @@ def _emit(payload: Any, json_output: bool) -> None:
 
 
 def _store(args: argparse.Namespace) -> StateStore:
-    return bootstrap_run(args.run_dir, parent_run_id="20260815-030931-windows")
+    run_path = Path(args.run_dir)
+    # Existing run state is authoritative and must never be rewritten.  New
+    # V3 runs receive an explicit parent from the command line, or the pinned
+    # V2 parent as the safe default; the historical V1 parent is intentionally
+    # no longer hardcoded here.
+    parent = getattr(args, "parent_run_id", None) or DEFAULT_V3_PARENT_RUN_ID
+    return bootstrap_run(run_path, parent_run_id=parent)
 
 
 def _write_fact_ledger(store: StateStore, facts: dict[str, Any]) -> Path:
@@ -321,9 +339,30 @@ def _source_dir_for_run(store: StateStore) -> Path:
     local = store.run_dir / "source"
     if (local / "model.safetensors.index.json").exists():
         return local
-    canonical = Path("runs/20260815-030931-windows/source")
-    if (canonical / "model.safetensors.index.json").exists():
-        return canonical
+    repository_root = Path(__file__).resolve().parents[2]
+    # Resolve immutable source snapshots through the declared parent chain.
+    # This keeps V3 children reproducible without mutating or copying the
+    # large historical source directory.
+    seen: set[str] = set()
+    current = store.load().parent_run_id
+    while current and current not in seen:
+        seen.add(current)
+        candidate = repository_root / "runs" / current / "source"
+        if (candidate / "model.safetensors.index.json").exists():
+            return candidate
+        state_path = repository_root / "runs" / current / "state.json"
+        metadata_path = repository_root / "runs" / current / "metadata.json"
+        parent_value: Any = None
+        for path in (state_path, metadata_path):
+            if path.exists():
+                try:
+                    payload = json.loads(path.read_text(encoding="utf-8"))
+                    parent_value = payload.get("parent_run_id")
+                    if parent_value:
+                        break
+                except (OSError, ValueError, TypeError, json.JSONDecodeError):
+                    continue
+        current = str(parent_value) if parent_value else None
     raise FileNotFoundError("immutable local source snapshot is unavailable")
 
 
@@ -429,7 +468,16 @@ def _oracle_study(args: argparse.Namespace, store: StateStore) -> dict[str, Any]
     from .evaluation import run_oracle_ablation
 
     try:
-        result = run_oracle_ablation(_source_dir_for_run(store), layer=args.layer or 0)
+        activation_manifest = getattr(args, "activation_manifest", None)
+        if activation_manifest is None:
+            candidate = store.run_dir / "capture" / f"layer-{args.layer or 0:04d}.json"
+            if candidate.exists():
+                activation_manifest = candidate
+        result = run_oracle_ablation(
+            _source_dir_for_run(store),
+            layer=args.layer or 0,
+            activation_manifest=activation_manifest,
+        )
         state = store.load()
         result.update({"source_repository": "Qwen/Qwen3.8-27B", "source_revision": state.source_revision, "source_config_hash": state.source_config_hash, "source_index_hash": state.source_index_hash, "profile": "qwen38_p8s1_top2", "seed": 17, "code_commit": current_git_commit()})
         atomic_write_json(store.run_dir / "metrics" / "oracle-ablation.json", result)
@@ -473,7 +521,47 @@ def _prepare_data(args: argparse.Namespace, store: StateStore) -> dict[str, Any]
         manifest["code_commit"] = current_git_commit()
         import hashlib
 
-        manifest["dataset_hash"] = hashlib.sha256(json.dumps({key: value for key, value in manifest.items() if key not in {"dataset_hash", "receipt_path"}}, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+        # V3 preserves the V2 scientific corpus identity.  The V2 manifest is
+        # an immutable identity anchor; current code commit and Windows path
+        # spelling remain provenance fields but cannot change the dataset hash.
+        hash_basis = json.loads(json.dumps(manifest))
+        parent_id = state.parent_run_id
+        parent_manifest = (
+            Path(__file__).resolve().parents[2]
+            / "runs"
+            / str(parent_id)
+            / "capture"
+            / "data-plan.json"
+            if parent_id
+            else None
+        )
+        anchor_commit = None
+        anchor_hash = None
+        if parent_manifest is not None and parent_manifest.exists():
+            try:
+                parent_payload = json.loads(parent_manifest.read_text(encoding="utf-8"))
+                if parent_payload.get("dataset_hash") == "46b278a85b4cb31a8fe659be2dd146bd9206eb491268220e25440981d06c0a03":
+                    anchor_commit = str(parent_payload.get("code_commit", "")) or None
+                    anchor_hash = str(parent_payload.get("dataset_hash"))
+            except (OSError, ValueError, TypeError, json.JSONDecodeError):
+                anchor_commit = None
+        if anchor_commit:
+            hash_basis["code_commit"] = anchor_commit
+        tokenizer_basis = hash_basis.get("tokenizer")
+        if isinstance(tokenizer_basis, dict) and isinstance(tokenizer_basis.get("source_snapshot"), str):
+            tokenizer_basis["source_snapshot"] = tokenizer_basis["source_snapshot"].replace("\\", "/")
+        hash_basis.pop("dataset_hash", None)
+        hash_basis.pop("receipt_path", None)
+        manifest["dataset_hash"] = hashlib.sha256(json.dumps(hash_basis, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+        if anchor_hash and manifest["dataset_hash"] != anchor_hash:
+            raise ValueError(
+                "V2 corpus identity mismatch after Windows path normalization; refuse to continue"
+            )
+        manifest["dataset_hash_basis"] = {
+            "parent_run_id": parent_id,
+            "anchor_code_commit": anchor_commit,
+            "path_normalization": "repository-relative POSIX paths",
+        }
         atomic_write_json(output, manifest)
         receipt = write_corpus_receipt(manifest, output, output=manifest.get("receipt_path"))
         result: dict[str, Any] = {"status": "DATA_READY", "artifact": str(output), "receipt": str(manifest.get("receipt_path", output.with_name("corpus-receipt.json"))), "dataset_hash": manifest["dataset_hash"], "train_tokens": manifest["train_tokens"], "holdout_tokens": manifest["holdout_tokens"], "seed": args.seed, "holdout_seed": args.holdout_seed, "tokenizer_revision": manifest.get("tokenizer_revision"), "tokenizer_files_sha256": manifest.get("tokenizer", {}).get("files_sha256"), "verified_sources": len(manifest.get("sources", [])), "receipt_dataset_sha256": receipt.get("manifest", {}).get("dataset_hash")}
@@ -547,7 +635,7 @@ def _capture(args: argparse.Namespace, store: StateStore) -> dict[str, Any]:
             native_result = capture_text_teacher_activations(
                 manifest_path,
                 source_dir,
-                store.run_dir / "capture",
+                store.run_dir / "capture" / ("diagnostic" if args.diagnostic_only else ""),
                 layers=layers,
                 source_revision=str(args.source_revision or state.source_revision or ""),
                 split=args.split,
@@ -558,9 +646,13 @@ def _capture(args: argparse.Namespace, store: StateStore) -> dict[str, Any]:
                 device=args.device,
                 compute_dtype=args.compute_dtype,
                 max_memory=_parse_max_memory(args.max_memory),
-                offload_folder=args.offload_folder,
+                offload_folder=args.offload_folder
+                or (Path(__file__).resolve().parents[2] / ".offload" / store.run_id),
                 resume=args.resume,
                 hook_threshold=args.hook_threshold,
+                max_examples=args.max_examples,
+                diagnostic_only=args.diagnostic_only,
+                max_batch_tokens=args.max_batch_tokens,
             )
         except (OSError, TypeError, ValueError, RuntimeError) as exc:
             native_result = {"status": "BLOCKED", "blocker_code": "CAPTURE_ARGUMENT_INVALID", "message": str(exc), "layers": layers, "resumable": True}

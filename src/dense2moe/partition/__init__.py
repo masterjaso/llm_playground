@@ -3,6 +3,7 @@
 from .ffn import (
     ActivationPartitioner,
     PartitionPlan,
+    balanced_signature_partition,
     pack_experts,
     partition_ffn_weights,
     partition_indices,
@@ -22,6 +23,7 @@ from .oracle import (
 __all__ = [
     "ActivationPartitioner",
     "PartitionPlan",
+    "balanced_signature_partition",
     "frozen_slice_positive_oracle",
     "frozen_slice_scaled_router_oracle",
     "frozen_slice_simplex_oracle",

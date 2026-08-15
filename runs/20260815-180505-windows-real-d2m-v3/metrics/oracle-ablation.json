@@ -1,0 +1,97 @@
+{
+  "activation_manifest": "runs\\20260815-180505-windows-real-d2m-v3\\capture\\diagnostic\\layer-0000-holdout.json",
+  "best_variant": "output_contribution_top2",
+  "classification": "REAL_TEACHER_ACTIVATION_HOLDOUT",
+  "code_commit": "6617130b4dcd14ea462d4c358ae70c7807d631e4",
+  "dataset_hash": "46b278a85b4cb31a8fe659be2dd146bd9206eb491268220e25440981d06c0a03",
+  "gate": {
+    "applies_to": "real teacher activation holdout",
+    "green": false,
+    "yellow": true
+  },
+  "holdout_tokens": 1176,
+  "layer": 0,
+  "profile": "qwen38_p8s1_top2",
+  "quality_gate_eligible": true,
+  "seed": 17,
+  "source_config_hash": "191e0af232104ed8b65258cf3fb2b842e288008baca7633c11b82a1ac7203aab",
+  "source_dir": "C:\\workplace\\llm_playground\\runs\\20260815-030931-windows\\source",
+  "source_index_hash": "77042094076611b69791a610065f28b7013b8c621795fa86ddccc8bac7d1b9df",
+  "source_repository": "Qwen/Qwen3.8-27B",
+  "source_revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
+  "status": "REAL_ACTIVATION_ORACLE_COMPLETE",
+  "variants": [
+    {
+      "active_capacity_limitation": 0.4882871097749283,
+      "coefficient_error": 6.975848528076035,
+      "expert_width": 2048,
+      "name": "contiguous_top2",
+      "partition_error": 7.947500040211512e-18,
+      "partition_strategy": "contiguous",
+      "positive": {
+        "cosine": 0.8817684386912609,
+        "normalized_mse": 0.15873939423405384
+      },
+      "selection_error": 0.00028488057277317177,
+      "shared_width": 1024,
+      "simplex": {
+        "cosine": 0.8290762408828827,
+        "normalized_mse": 0.4882871097749283
+      }
+    },
+    {
+      "active_capacity_limitation": 0.48065120743200757,
+      "coefficient_error": 7.574435587278258,
+      "expert_width": 2048,
+      "name": "interleave_top2",
+      "partition_error": 5.55839960647217e-17,
+      "partition_strategy": "interleave",
+      "positive": {
+        "cosine": 0.873213409277323,
+        "normalized_mse": 0.16674978363874346
+      },
+      "selection_error": 0.0002804255703994783,
+      "shared_width": 1024,
+      "simplex": {
+        "cosine": 0.8187893859183715,
+        "normalized_mse": 0.48065120743200757
+      }
+    },
+    {
+      "active_capacity_limitation": 0.19943572153351707,
+      "coefficient_error": 5.662045502127268,
+      "expert_width": 2048,
+      "name": "activation_magnitude_top2",
+      "partition_error": 7.490158827848088e-17,
+      "partition_strategy": "activation_magnitude",
+      "positive": {
+        "cosine": 0.9402664799935988,
+        "normalized_mse": 0.07395158494707135
+      },
+      "selection_error": 0.00011635646619483298,
+      "shared_width": 1024,
+      "simplex": {
+        "cosine": 0.89351904184565,
+        "normalized_mse": 0.19943572153351707
+      }
+    },
+    {
+      "active_capacity_limitation": 0.19210266776637275,
+      "coefficient_error": 5.121677373990819,
+      "expert_width": 2048,
+      "name": "output_contribution_top2",
+      "partition_error": 7.562277727606381e-17,
+      "partition_strategy": "output_contribution",
+      "positive": {
+        "cosine": 0.9431331756047985,
+        "normalized_mse": 0.07050548461739511
+      },
+      "selection_error": 0.0001120781542846057,
+      "shared_width": 1024,
+      "simplex": {
+        "cosine": 0.8985871520494623,
+        "normalized_mse": 0.19210266776637275
+      }
+    }
+  ]
+}

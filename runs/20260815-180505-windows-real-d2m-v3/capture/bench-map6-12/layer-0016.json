@@ -1,0 +1,40 @@
+{
+  "capture_code_commit": "6617130b4dcd14ea462d4c358ae70c7807d631e4",
+  "dataset_hash": "46b278a85b4cb31a8fe659be2dd146bd9206eb491268220e25440981d06c0a03",
+  "diagnostic_only": true,
+  "dtype": "float16",
+  "fanout_layers": [
+    0,
+    16,
+    32,
+    48,
+    63
+  ],
+  "holdout_manifest": "pending",
+  "hook_path": "model.layers.16.mlp",
+  "hook_verification": {
+    "cosine": 1.0,
+    "formula": "down_proj(silu(gate_proj(x)) * up_proj(x))",
+    "layer": 16,
+    "message": null,
+    "module_path": "model.layers.16.mlp",
+    "normalized_mse": 0.0,
+    "status": "HOOK_VERIFIED",
+    "threshold": 1e-07
+  },
+  "layer": 16,
+  "max_batch_tokens": null,
+  "microbatch": 1,
+  "schema_version": 1,
+  "source_revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
+  "source_snapshot": "runs\\20260815-030931-windows\\source",
+  "status": "CAPTURE_COMPLETE",
+  "teacher_forward_contract": "one forward per microbatch",
+  "tokenizer_hash": {
+    "merges.txt": "a9d356d7bdf1ef4949e3e748e95b8e10ad9d4e2e838eddc38a0a7b6b94d1db8d",
+    "tokenizer.json": "0997f410c57a1f4e53b09e4be8f4a172d90edd9564368fb0847030937229b9f3",
+    "tokenizer_config.json": "b11349aafa7cdc6a320767cf7ceb29ed82f7eda5d65e8e0819e76f0ce947bf27",
+    "vocab.json": "ce99b4cb2983d118806ce0a8b777a35b093e2000a503ebde25853284c9dfa003"
+  },
+  "train_manifest": "layer-0016-train.json"
+}

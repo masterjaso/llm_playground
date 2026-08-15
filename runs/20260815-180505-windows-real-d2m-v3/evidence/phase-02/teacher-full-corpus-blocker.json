@@ -1,0 +1,93 @@
+{
+  "schema_version": 1,
+  "run_id": "20260815-180505-windows-real-d2m-v3",
+  "parent_run_id": "20260815-162258-windows-real-d2m-v2",
+  "code_commit": "6617130b4dcd14ea462d4c358ae70c7807d631e4",
+  "status": "BLOCKED",
+  "blocker_code": "TEACHER_FULL_CORPUS_THROUGHPUT_RESOURCE",
+  "resumable": true,
+  "quality_claim": false,
+  "scope": {
+    "source_repository": "Qwen/Qwen3.8-27B",
+    "source_revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
+    "source_snapshot": "runs/20260815-030931-windows/source",
+    "dataset_manifest": "runs/20260815-180505-windows-real-d2m-v3/capture/data-plan.json",
+    "dataset_hash": "46b278a85b4cb31a8fe659be2dd146bd9206eb491268220e25440981d06c0a03",
+    "selected_layers": [0, 16, 32, 48, 63],
+    "expected_train_tokens": 131508,
+    "expected_holdout_tokens": 16598
+  },
+  "validated_successes": [
+    {
+      "name": "one_record_holdout_fanout",
+      "status": "CAPTURE_COMPLETE",
+      "tokens": 1176,
+      "teacher_forward_count": 1,
+      "tokens_per_second": 19.228178558205617,
+      "manifest": "runs/20260815-180505-windows-real-d2m-v3/capture/diagnostic/layer-0000-holdout.json",
+      "hook_verification": "all five selected MLP hooks verified; normalized MSE 0.0"
+    },
+    {
+      "name": "bounded_holdout_probe",
+      "status": "CAPTURE_COMPLETE",
+      "tokens": 3480,
+      "teacher_forward_count": 4,
+      "microbatch": 4,
+      "observed_tokens_per_second": 12.7,
+      "manifest": "runs/20260815-180505-windows-real-d2m-v3/capture/bench-mb4/layer-0000-holdout.json",
+      "diagnostic_only": true
+    },
+    {
+      "name": "bounded_train_probe_microbatch_2",
+      "status": "CAPTURE_COMPLETE",
+      "tokens": 2263,
+      "teacher_forward_count": 2,
+      "microbatch": 2,
+      "observed_tokens_per_second": 13.9,
+      "manifest": "runs/20260815-180505-windows-real-d2m-v3/capture/bench-train-mb2/layer-0000-train.json",
+      "diagnostic_only": true
+    }
+  ],
+  "failed_or_interrupted_attempts": [
+    {
+      "name": "full_both_splits_microbatch_4_explicit_map",
+      "device_map": "0=4GiB,1=9GiB,cpu=12GiB",
+      "microbatch": 4,
+      "status": "BLOCKED",
+      "reason": "CUDA out of memory on device 1 while allocating 2.16 GiB",
+      "evidence": "commands.jsonl capture entry at 2026-08-15T18:43:32Z"
+    },
+    {
+      "name": "full_both_splits_bounded_tokens",
+      "device_map": "0=3GiB,1=7GiB,cpu=12GiB",
+      "microbatch": 2,
+      "max_batch_tokens": 2048,
+      "status": "INTERRUPTED",
+      "reason": "first long train record did not produce a validated full-corpus manifest within the bounded observation window; no root capture manifest was accepted",
+      "diagnostic_artifacts": "runs/20260815-180505-windows-real-d2m-v3/capture/bench-train-mb2"
+    },
+    {
+      "name": "full_both_splits_high_vram_probe",
+      "device_map": "0=6GiB,1=12GiB,cpu=12GiB",
+      "status": "INTERRUPTED",
+      "reason": "disk/CPU offload dominated and no validated full-corpus result was returned within the bounded observation window"
+    }
+  ],
+  "environment_constraints": {
+    "gpus": [
+      {"index": 0, "name": "NVIDIA GeForce RTX 4060", "total_bytes": 8585216000, "bf16_supported": true},
+      {"index": 1, "name": "NVIDIA GeForce RTX 5060 Ti", "total_bytes": 17102864384, "bf16_supported": true}
+    ],
+    "host_total_bytes": 67767750656,
+    "pagefile_current_allocation_bytes": 26116000000,
+    "pagefile_resize": "Access denied without administrative privileges",
+    "teacher_weight_bytes": 55563006776,
+    "safetensors_backend": "pread required on native Windows after mmap raised WinError 1455"
+  },
+  "next_exact_command": "d2m capture --run-dir runs\\20260815-180505-windows-real-d2m-v3 --parent-run-id 20260815-162258-windows-real-d2m-v2 --layers 0,16,32,48,63 --dataset-manifest runs\\20260815-180505-windows-real-d2m-v3\\capture\\data-plan.json --source-dir runs\\20260815-030931-windows\\source --source-revision 1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0 --split both --microbatch 1 --max-batch-tokens 1024 --dtype float16 --compute-dtype bfloat16 --device-map auto --resume --json",
+  "remediation": [
+    "Run on a machine with materially larger combined VRAM and/or RAM/pagefile, or enlarge the Windows pagefile with administrative privileges.",
+    "Resume from the existing data-plan; do not substitute synthetic or random activations for the missing real corpus.",
+    "Only after every selected layer has a non-diagnostic validated train and holdout manifest may training, assembly, and final evaluation proceed."
+  ]
+}

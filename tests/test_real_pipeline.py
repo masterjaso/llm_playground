@@ -19,7 +19,7 @@ from dense2moe.checkpoint import (
 )
 from dense2moe.models import DenseSwiGLU, Qwen35SwiGLUMoE
 from dense2moe.provenance import current_git_commit
-from dense2moe.state import StateStore, merge_fact_ledgers
+from dense2moe.state import StateStore, bootstrap_run, merge_fact_ledgers
 
 
 class RealContractTests(unittest.TestCase):
@@ -34,6 +34,15 @@ class RealContractTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             store = StateStore(Path(tmp) / "run")
             self.assertEqual(store.load().code_commit, commit)
+
+    def test_new_run_records_explicit_v3_parent_without_touching_existing_state(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            run = Path(tmp) / "20260815-v3"
+            store = bootstrap_run(run, parent_run_id="20260815-v2")
+            self.assertEqual(store.load().parent_run_id, "20260815-v2")
+            store.transition(active_blocker="test blocker")
+            same = bootstrap_run(run, parent_run_id="different-parent")
+            self.assertEqual(same.load().parent_run_id, "20260815-v2")
 
     def test_blocked_state_resumes_and_clears(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

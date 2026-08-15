@@ -485,6 +485,26 @@ def _relative_locator(source_file: Path, base_dir: Path) -> str:
         return os.path.abspath(source_file)
 
 
+def _canonical_repo_path(path: str | Path) -> str:
+    """Return a separator- and output-location-stable provenance path.
+
+    Corpus identity is scientific content, not the spelling of a Windows
+    drive path.  Repository-local sources are represented relative to the
+    checkout using POSIX separators.  External fixtures retain a compact
+    forward-slash path for human provenance, while their content hash remains
+    the authoritative identity component.
+    """
+
+    candidate = Path(path)
+    repository = Path(__file__).resolve().parents[2]
+    try:
+        return candidate.resolve().relative_to(repository).as_posix()
+    except ValueError:
+        if not candidate.is_absolute():
+            return candidate.as_posix()
+        return candidate.as_posix()
+
+
 def _resolve_record_value(record: Mapping[str, Any], *, base_dir: Path) -> tuple[str, Path, dict[str, Any]]:
     source_file = _source_path(record.get("source_file"), base_dir)
     source_index = int(record.get("source_record_index", 0))
@@ -860,7 +880,7 @@ def prepare_calibration_manifest(
 
     output_path = Path(output)
     source_descriptor = {
-        "path": str(source),
+        "path": _canonical_repo_path(source),
         "sha256": sha256_file(source),
         "format": source.suffix.lower().lstrip("."),
     }
@@ -891,7 +911,7 @@ def prepare_calibration_manifest(
         "domains": sorted(observed),
         "required_domains": sorted(required),
         "resolvability": {
-            "base_dir": str(source.parent),
+            "base_dir": _canonical_repo_path(source.parent),
             "locator_fields": ["source_file", "source_record_index", "source_record_id"],
             "verification": ["source_file_sha256", "content_sha256", "normalized_content_sha256", "token_count"],
             "text_embedded": False,

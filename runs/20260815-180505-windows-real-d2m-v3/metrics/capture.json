@@ -1,0 +1,28 @@
+{
+  "capture_mode": "native_teacher",
+  "code_commit": "6617130b4dcd14ea462d4c358ae70c7807d631e4",
+  "dataset_manifest": "runs\\20260815-180505-windows-real-d2m-v3\\capture\\data-plan.json",
+  "hook_verification": [],
+  "layers": [
+    {
+      "blocker_code": "TEACHER_CAPTURE_FAILED",
+      "code_commit": "6617130b4dcd14ea462d4c358ae70c7807d631e4",
+      "dataset_manifest": "runs\\20260815-180505-windows-real-d2m-v3\\capture\\data-plan.json",
+      "layers": [
+        0,
+        16,
+        32,
+        48,
+        63
+      ],
+      "message": "native teacher capture failed before a validated result was produced: CUDA out of memory. Tried to allocate 2.16 GiB. GPU 1 has a total capacity of 15.93 GiB of which 953.97 MiB is free. Of the allocated memory 11.45 GiB is allocated by PyTorch, and 2.25 GiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://docs.pytorch.org/docs/stable/notes/cuda.html#optimizing-memory-usage-with-pytorch-cuda-alloc-conf)",
+      "resumable": true,
+      "status": "BLOCKED"
+    }
+  ],
+  "message": "one or more layers have no validated binary activation capture",
+  "resource_metrics": {},
+  "source_revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
+  "source_snapshot": null,
+  "status": "BLOCKED"
+}

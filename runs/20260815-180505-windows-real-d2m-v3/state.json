@@ -1,0 +1,45 @@
+{
+  "active_blocker": "TEACHER_FULL_CORPUS_THROUGHPUT_RESOURCE: no validated non-diagnostic full-corpus activation manifest was produced",
+  "artifact_paths": {
+    "artifact": "runs\\20260815-180505-windows-real-d2m-v3\\capture\\data-plan.json",
+    "decision_register": "runs\\20260815-180505-windows-real-d2m-v3\\decision-register.json",
+    "environment": "runs\\20260815-180505-windows-real-d2m-v3\\environment.json",
+    "fact_ledger": "runs\\20260815-180505-windows-real-d2m-v3\\repository-fact-ledger.json",
+    "path": "runs\\20260815-180505-windows-real-d2m-v3\\partitions\\layer-0000.json",
+    "source_manifest": "runs\\20260815-180505-windows-real-d2m-v3\\source-manifest.json"
+  },
+  "code_commit": "6617130b4dcd14ea462d4c358ae70c7807d631e4",
+  "current_phase": "capture",
+  "last_successful_command": "pilot",
+  "next_exact_command": "d2m capture --run-dir runs\\20260815-180505-windows-real-d2m-v3 --parent-run-id 20260815-162258-windows-real-d2m-v2 --layers 0,16,32,48,63 --dataset-manifest runs\\20260815-180505-windows-real-d2m-v3\\capture\\data-plan.json --source-dir runs\\20260815-030931-windows\\source --source-revision 1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0 --split both --microbatch 1 --max-batch-tokens 1024 --dtype float16 --compute-dtype bfloat16 --device-map auto --resume --json",
+  "parent_run_id": "20260815-162258-windows-real-d2m-v2",
+  "phase_status": "blocked",
+  "prediction_contract": {
+    "expected_artifacts": [
+      "metrics/pilot.json"
+    ],
+    "expected_validation_results": [
+      "PILOT_COMPLETE"
+    ]
+  },
+  "retry_counts": {},
+  "run_id": "20260815-180505-windows-real-d2m-v3",
+  "schema_version": 2,
+  "selected_profile": null,
+  "source_config_hash": "191e0af232104ed8b65258cf3fb2b842e288008baca7633c11b82a1ac7203aab",
+  "source_index_hash": "77042094076611b69791a610065f28b7013b8c621795fa86ddccc8bac7d1b9df",
+  "source_revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
+  "terminal_state": "BLOCKED",
+  "timestamps": {
+    "created": "2026-08-15T18:05:19.846202Z",
+    "updated": "2026-08-15T19:47:29.803672Z"
+  },
+  "validation_results": {
+    "train_layer": {
+      "layer": 0,
+      "message": "[Errno 2] No such file or directory: 'runs\\\\20260815-180505-windows-real-d2m-v3\\\\capture\\\\layer-0000.json'",
+      "next_exact_command": "d2m capture --run-dir runs\\20260815-180505-windows-real-d2m-v3 --layers 0 --dataset-manifest <manifest> --resume",
+      "status": "BLOCKED"
+    }
+  }
+}

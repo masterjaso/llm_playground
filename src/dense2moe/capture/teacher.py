@@ -20,6 +20,7 @@ import re
 import time
 import unicodedata
 from collections.abc import Iterator, Mapping, Sequence
+from contextlib import contextmanager
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
@@ -30,7 +31,8 @@ except ImportError:  # pragma: no cover - Windows has no resource module.
     resource = None  # type: ignore[assignment]
 
 from ..provenance import current_git_commit
-from .activations import capture_activation_shards
+from ..state import atomic_write_json
+from .activations import capture_multi_layer_activation_shards
 
 PINNED_REVISION_RE = re.compile(r"^[0-9a-f]{40}$", re.IGNORECASE)
 REPRESENTATIVE_LAYERS = (0, 16, 32, 48, 63)
@@ -220,6 +222,154 @@ def _snapshot_weight_bytes(snapshot: Path) -> int | None:
         return None
 
 
+def discover_torch_devices(torch: Any | None = None) -> list[dict[str, Any]]:
+    """Discover CUDA devices from PyTorch, never from assumed ``nvidia-smi`` IDs."""
+
+    if torch is None:
+        try:
+            import torch as torch_module  # type: ignore
+        except ImportError:
+            return []
+        torch = torch_module
+    if not bool(torch.cuda.is_available()):
+        return []
+    devices: list[dict[str, Any]] = []
+    for index in range(int(torch.cuda.device_count())):
+        with torch.cuda.device(index):
+            props = torch.cuda.get_device_properties(index)
+            free, total = torch.cuda.mem_get_info(index)
+            try:
+                bf16 = bool(torch.cuda.is_bf16_supported())
+            except (OSError, RuntimeError, TypeError, ValueError):
+                bf16 = False
+            devices.append(
+                {
+                    "index": index,
+                    "name": str(props.name),
+                    "uuid": str(getattr(props, "uuid", "")) or None,
+                    "total_memory": int(total or props.total_memory),
+                    "free_memory": int(free),
+                    "compute_capability": [int(props.major), int(props.minor)],
+                    "bf16_supported": bf16,
+                    "allocated": int(torch.cuda.memory_allocated(index)),
+                    "reserved": int(torch.cuda.memory_reserved(index)),
+                }
+            )
+    return devices
+
+
+def live_resource_snapshot(torch: Any | None = None, *, offload_folder: str | Path | None = None) -> dict[str, Any]:
+    """Capture live RAM, page-file, GPU, and offload-disk capacity."""
+
+    result: dict[str, Any] = {"host_available": _available_host_memory()}
+    try:
+        import psutil  # type: ignore
+
+        memory = psutil.virtual_memory()
+        swap = psutil.swap_memory()
+        result["host"] = {
+            "available": int(memory.available),
+            "total": int(memory.total),
+            "percent": float(memory.percent),
+            "swap_total": int(swap.total),
+            "swap_free": int(swap.free),
+        }
+    except ImportError:
+        pass
+    result["gpus"] = discover_torch_devices(torch)
+    if offload_folder is not None:
+        try:
+            usage = os.statvfs(str(Path(offload_folder).parent))
+            result["offload_disk"] = {
+                "path": str(offload_folder),
+                "free": int(usage.f_bavail * usage.f_frsize),
+                "total": int(usage.f_blocks * usage.f_frsize),
+            }
+        except (AttributeError, OSError, ValueError):
+            try:
+                import shutil
+
+                disk = shutil.disk_usage(Path(offload_folder).parent)
+                result["offload_disk"] = {
+                    "path": str(offload_folder),
+                    "free": int(disk.free),
+                    "total": int(disk.total),
+                }
+            except (OSError, ValueError):
+                result["offload_disk"] = {"path": str(offload_folder)}
+    return result
+
+
+def resource_aware_max_memory(
+    torch: Any | None = None,
+    *,
+    gpu_headroom_bytes: int = 2 * 1024**3,
+    cpu_headroom_bytes: int = 12 * 1024**3,
+    cpu_fraction: float = 0.65,
+) -> dict[Any, Any]:
+    """Build an Accelerate ``max_memory`` map from live free resources."""
+
+    snapshot = live_resource_snapshot(torch)
+    limits: dict[Any, Any] = {}
+    for device in snapshot.get("gpus", []):
+        free = max(0, int(device["free_memory"]) - gpu_headroom_bytes)
+        if free:
+            limits[int(device["index"])] = free
+    available = int(snapshot.get("host_available") or snapshot.get("host", {}).get("available", 0))
+    cpu_limit = max(0, min(int(available * cpu_fraction), available - cpu_headroom_bytes))
+    if cpu_limit:
+        limits["cpu"] = cpu_limit
+    return limits
+
+
+@contextmanager
+def _windows_pread_safetensors() -> Iterator[None]:
+    """Use safetensors pread instead of Windows section-backed mmap.
+
+    ``safe_open(..., backend="mmap")`` can fail with WinError 1455 while
+    opening a large sharded checkpoint because Windows accounts mapped
+    sections against the system commit/pagefile.  ``pread`` preserves lazy
+    per-tensor reads without reserving the whole shard's address space.  The
+    patch is scoped to the native load and restored immediately afterwards.
+    """
+
+    if os.name != "nt":
+        yield
+        return
+    modules: list[Any] = []
+    try:
+        from transformers import modeling_utils  # type: ignore
+
+        modules.append(modeling_utils)
+    except ImportError:
+        pass
+    try:
+        from transformers import modeling_layers  # type: ignore
+
+        modules.append(modeling_layers)
+    except ImportError:
+        pass
+    originals: list[tuple[Any, Any]] = []
+    for module in modules:
+        original = getattr(module, "safe_open", None)
+        if original is None:
+            continue
+
+        def _pread_safe_open(*args: Any, _original: Any = original, **kwargs: Any) -> Any:
+            updated = dict(kwargs)
+            if updated.get("backend") in {None, "mmap"}:
+                updated["backend"] = "pread"
+            return _original(*args, **updated)
+
+        originals.append((module, original))
+        module.safe_open = _pread_safe_open
+    try:
+        yield
+    finally:
+        for module, original in originals:
+            module.safe_open = original
+
+
 def load_native_teacher(
     source_snapshot: str | Path,
     revision: str,
@@ -257,7 +407,9 @@ def load_native_teacher(
             source_snapshot=str(snapshot),
             source_revision=revision,
         ) from exc
+    started = time.perf_counter()
     estimated_bytes = _snapshot_weight_bytes(snapshot)
+    load_resources = live_resource_snapshot(torch, offload_folder=offload_folder)
     # The bundled runtime in this workspace is CPU-only.  Loading a 27B
     # safetensor snapshot into CPU memory when its files exceed available RAM
     # would turn a resumable scientific blocker into an OOM kill.  Refuse
@@ -277,6 +429,10 @@ def load_native_teacher(
             device_map=device_map,
             remediation="install a CUDA-enabled PyTorch build or provide a multi-device/offload runtime, then resume capture",
         )
+    if max_memory is None and device_map == "auto" and bool(torch.cuda.is_available()):
+        discovered_limits = resource_aware_max_memory(torch)
+        if discovered_limits:
+            max_memory = discovered_limits
     kwargs: dict[str, Any] = {
         "revision": revision,
         "local_files_only": True,
@@ -293,6 +449,18 @@ def load_native_teacher(
         kwargs["max_memory"] = dict(max_memory)
     if offload_folder is not None:
         kwargs["offload_folder"] = str(offload_folder)
+        kwargs["offload_state_dict"] = True
+        kwargs["use_safetensors"] = True
+    # Windows' section-backed safetensors mmap can fail with WinError 1455
+    # (the system paging file is too small) even when the physical RAM and
+    # GPU/offload budgets are otherwise sufficient.  Transformers exposes a
+    # supported ``disable_mmap`` path which reads one shard at a time through
+    # safetensors.torch.load; keep that path explicit in the native Windows
+    # receipt instead of silently retrying with a different checkpoint.
+    if os.name == "nt":
+        # Keep the lazy safetensors path enabled; the scoped pread patch below
+        # avoids both mmap commit pressure and whole-shard RAM materialization.
+        kwargs["disable_mmap"] = False
     # low_cpu_mem_usage is useful for the 27B snapshot but requires accelerate.
     try:
         import accelerate  # type: ignore  # noqa: F401
@@ -301,22 +469,42 @@ def load_native_teacher(
     except ImportError:
         pass
     try:
-        try:
-            model = AutoModelForCausalLM.from_pretrained(str(snapshot), **kwargs)
-        except (OSError, RuntimeError, TypeError, ValueError) as causal_exc:
-            # Qwen3.5 snapshots may advertise the multimodal conditional-
-            # generation class rather than a plain causal-LM class.  Keep the
-            # same pinned/local/no-remote-code kwargs for the fallback.
+        with _windows_pread_safetensors():
             try:
-                from transformers import AutoModelForConditionalGeneration  # type: ignore
+                model = AutoModelForCausalLM.from_pretrained(str(snapshot), **kwargs)
+            except (OSError, RuntimeError, TypeError, ValueError) as causal_exc:
+                # Qwen3.5 snapshots may advertise the multimodal conditional-
+                # generation class rather than a plain causal-LM class.  Keep the
+                # same pinned/local/no-remote-code kwargs for the fallback.
+                try:
+                    from transformers import AutoModelForConditionalGeneration  # type: ignore
 
-                model = AutoModelForConditionalGeneration.from_pretrained(str(snapshot), **kwargs)
-            except (ImportError, OSError, RuntimeError, TypeError, ValueError):
-                raise causal_exc
+                    model = AutoModelForConditionalGeneration.from_pretrained(str(snapshot), **kwargs)
+                except (ImportError, OSError, RuntimeError, TypeError, ValueError):
+                    raise causal_exc
         loaded_model: Any = model
         loaded_model.eval()
         if device and not kwargs.get("device_map"):
             loaded_model.to(device)
+        parameter_bytes: dict[str, int] = {}
+        try:
+            for name, parameter in loaded_model.named_parameters():
+                device_name = str(parameter.device)
+                parameter_bytes[device_name] = parameter_bytes.get(device_name, 0) + int(parameter.numel() * parameter.element_size())
+        except (AttributeError, RuntimeError, TypeError):
+            parameter_bytes = {}
+        load_metrics = {
+            "load_seconds": time.perf_counter() - started,
+            "estimated_weight_bytes": estimated_bytes,
+            "live_resources_before_load": load_resources,
+            "max_memory": {str(key): value for key, value in (max_memory or {}).items()},
+            "hf_device_map": dict(getattr(loaded_model, "hf_device_map", {}) or {}),
+            "parameter_bytes_by_device": parameter_bytes,
+            "offload_folder": str(offload_folder) if offload_folder is not None else None,
+            "disable_mmap": bool(kwargs.get("disable_mmap", False)),
+            "safetensors_backend": "pread" if os.name == "nt" else "default",
+        }
+        loaded_model._d2m_load_metrics = load_metrics
         return loaded_model
     except (OSError, RuntimeError, TypeError, ValueError) as exc:
         raise TeacherCaptureBlocked(
@@ -325,6 +513,7 @@ def load_native_teacher(
             source_snapshot=str(snapshot),
             source_revision=revision,
             device_map=device_map,
+            live_resources=load_resources,
         ) from exc
 
 
@@ -441,10 +630,10 @@ def verify_mlp_reconstruction(
         normalized_mse = float(torch.mean(difference * difference).div(denominator).detach().cpu())
         flattened_predicted = predicted_f.reshape(-1)
         flattened_target = target_f.reshape(-1)
-        cosine = float(
-            torch.dot(flattened_predicted, flattened_target)
-            / (torch.linalg.vector_norm(flattened_predicted) * torch.linalg.vector_norm(flattened_target)).clamp_min(torch.finfo(torch.float32).eps)
-        )
+        cosine_tensor = torch.dot(flattened_predicted, flattened_target) / (
+            torch.linalg.vector_norm(flattened_predicted) * torch.linalg.vector_norm(flattened_target)
+        ).clamp_min(torch.finfo(torch.float32).eps)
+        cosine = float(cosine_tensor.detach().cpu())
         status = "HOOK_VERIFIED" if normalized_mse <= threshold else "HOOK_BLOCKED"
         return HookVerification(status, layer, module_path, normalized_mse, cosine, threshold, formula, None if status == "HOOK_VERIFIED" else "MLP reconstruction exceeds the numerical equivalence gate")
     except TeacherCaptureBlocked:
@@ -772,9 +961,31 @@ def _capture_forward(
     return filtered, filtered_outputs
 
 
-def _batches(items: Sequence[TokenizedExample], microbatch: int) -> Iterator[Sequence[TokenizedExample]]:
-    for start in range(0, len(items), microbatch):
-        yield items[start : start + microbatch]
+def _batches(
+    items: Sequence[TokenizedExample],
+    microbatch: int,
+    max_batch_tokens: int | None = None,
+) -> Iterator[Sequence[TokenizedExample]]:
+    """Yield bounded batches without padding pathological long examples together."""
+
+    pending: list[TokenizedExample] = []
+    pending_width = 0
+    for item in items:
+        item_width = len(item.input_ids)
+        exceeds_count = len(pending) >= microbatch
+        exceeds_tokens = bool(
+            pending
+            and max_batch_tokens is not None
+            and max(pending_width, item_width) * (len(pending) + 1) > max_batch_tokens
+        )
+        if pending and (exceeds_count or exceeds_tokens):
+            yield tuple(pending)
+            pending = []
+            pending_width = 0
+        pending.append(item)
+        pending_width = max(pending_width, item_width)
+    if pending:
+        yield tuple(pending)
 
 
 def _resource_metrics(start: float, token_count: int, model: Any) -> dict[str, Any]:
@@ -799,9 +1010,15 @@ def _resource_metrics(start: float, token_count: int, model: Any) -> dict[str, A
         import torch  # type: ignore
 
         if torch.cuda.is_available():
-            result["peak_gpu_vram_bytes"] = int(torch.cuda.max_memory_allocated())
+            result["peak_gpu_vram_bytes"] = {
+                str(index): int(torch.cuda.max_memory_allocated(index))
+                for index in range(torch.cuda.device_count())
+            }
     except ImportError:
         pass
+    load_metrics = getattr(model, "_d2m_load_metrics", None)
+    if isinstance(load_metrics, Mapping):
+        result["teacher_load"] = dict(load_metrics)
     del model
     return result
 
@@ -831,6 +1048,9 @@ def capture_text_teacher_activations(
     hook_threshold: float = 1e-7,
     tokenizer: Any | None = None,
     model: Any | None = None,
+    max_examples: int | None = None,
+    diagnostic_only: bool = False,
+    max_batch_tokens: int | None = None,
 ) -> dict[str, Any]:
     """Capture fixed corpus text through a native teacher into split shards."""
 
@@ -839,6 +1059,10 @@ def capture_text_teacher_activations(
         raise ValueError("layers must contain at least one non-negative layer")
     if microbatch <= 0 or shard_tokens <= 0:
         raise ValueError("microbatch and shard_tokens must be positive")
+    if max_examples is not None and max_examples <= 0:
+        raise ValueError("max_examples must be positive when supplied")
+    if max_batch_tokens is not None and max_batch_tokens <= 0:
+        raise ValueError("max_batch_tokens must be positive when supplied")
     if not is_pinned_source_revision(source_revision):
         return _blocked_from_exception(TeacherCaptureBlocked("SOURCE_REVISION_UNPINNED", "native teacher capture requires a 40-character immutable source revision", source_revision=source_revision), manifest=dataset_manifest, layers=selected_layers)
     if isinstance(split, str):
@@ -852,6 +1076,8 @@ def capture_text_teacher_activations(
         if not isinstance(manifest_payload, Mapping) or manifest_payload.get("status") != "CALIBRATION_READY":
             raise TeacherCaptureBlocked("DATASET_MANIFEST_NOT_READY", "native teacher capture requires a CALIBRATION_READY dataset manifest")
         fixed_records = {item: resolve_corpus_records(dataset_manifest, item) for item in splits}
+        if max_examples is not None:
+            fixed_records = {item: records[:max_examples] for item, records in fixed_records.items()}
         if "train" in fixed_records and "holdout" in fixed_records:
             train_ids = {str(item.get("id")) for item in fixed_records["train"]}
             holdout_ids = {str(item.get("id")) for item in fixed_records["holdout"]}
@@ -875,57 +1101,149 @@ def capture_text_teacher_activations(
         module_paths = {layer: records[layer][0] for layer in selected_layers}
         verification: list[dict[str, Any]] = []
         first_example = next(iter(tokenized.values()))[0]
+        # Verify every requested hook from one diagnostic forward.  This also
+        # proves the layer fan-out map is valid before the expensive corpus
+        # pass begins.
+        verified_inputs, verified_outputs = _capture_forward(
+            model,
+            module_map,
+            [first_example],
+            collect_outputs=True,
+        )
+        verification_by_layer: dict[int, dict[str, Any]] = {}
         for layer in selected_layers:
-            captured, outputs = _capture_forward(model, {layer: module_map[layer]}, [first_example], collect_outputs=True)
-            result = verify_mlp_reconstruction(module_map[layer], captured[layer], outputs[layer], layer=layer, module_path=module_paths[layer], threshold=hook_threshold)
-            verification.append(result.as_dict())
-            if result.status != "HOOK_VERIFIED":
-                raise TeacherCaptureBlocked("MLP_HOOK_VERIFICATION_FAILED", result.message or "MLP hook verification failed", layer=layer, verification=result.as_dict())
+            check = verify_mlp_reconstruction(
+                module_map[layer],
+                verified_inputs[layer],
+                verified_outputs[layer],
+                layer=layer,
+                module_path=module_paths[layer],
+                threshold=hook_threshold,
+            )
+            verification_by_layer[layer] = check.as_dict()
+            verification.append(check.as_dict())
+            if check.status != "HOOK_VERIFIED":
+                raise TeacherCaptureBlocked(
+                    "MLP_HOOK_VERIFICATION_FAILED",
+                    check.message or "MLP hook verification failed",
+                    layer=layer,
+                    verification=check.as_dict(),
+                )
         layer_results: list[dict[str, Any]] = []
+        aggregate_by_layer: dict[int, dict[str, Any]] = {layer: {} for layer in selected_layers}
         started = time.perf_counter()
+        teacher_forward_count = 0
+        verification_forward_count = 1
         for split_name in splits:
-            split_meta = fixed_split_metadata(fixed_records[split_name], split=split_name, tokenizer_revision=str(manifest_payload.get("tokenizer_revision") or source_revision), tokenizer_hashes=tokenizer_hashes)
+            split_meta = fixed_split_metadata(
+                fixed_records[split_name],
+                split=split_name,
+                tokenizer_revision=str(manifest_payload.get("tokenizer_revision") or source_revision),
+                tokenizer_hashes=tokenizer_hashes,
+            )
             split_token_count = sum(len(item.input_ids) for item in tokenized[split_name])
-            for layer in selected_layers:
-                def activation_stream(layer_id: int = layer, split_id: str = split_name) -> Iterator[Any]:
-                    for batch in _batches(tokenized[split_id], microbatch):
-                        captured, _ = _capture_forward(model, {layer_id: module_map[layer_id]}, batch)
-                        yield captured[layer_id].detach().to("cpu").float().numpy()
 
-                metadata = {
+            def fanout_batches(split_id: str = split_name) -> Iterator[Mapping[int, Any]]:
+                nonlocal teacher_forward_count
+                for batch in _batches(tokenized[split_id], microbatch, max_batch_tokens):
+                    # This is the only teacher invocation for the input
+                    # microbatch.  All selected MLP hooks are serviced from
+                    # this forward and copied to CPU by the shard writer.
+                    captured, _ = _capture_forward(model, module_map, batch)
+                    teacher_forward_count += 1
+                    yield {
+                        layer: captured[layer].detach().to("cpu").float().numpy()
+                        for layer in selected_layers
+                    }
+
+            metadata_by_layer: dict[int, dict[str, Any]] = {}
+            for layer in selected_layers:
+                metadata_by_layer[layer] = {
                     **split_meta,
                     "dataset_hash": manifest_payload.get("dataset_hash", ""),
                     "source_revision": source_revision,
                     "source_snapshot": str(Path(source_snapshot)),
                     "hook_path": module_paths[layer],
-                    "hook_verification": verification[selected_layers.index(layer)],
+                    "hook_verification": verification_by_layer[layer],
                     "sequence_length": manifest_sequence_length,
                     "microbatch": microbatch,
+                    "max_batch_tokens": max_batch_tokens,
                     "device_map": device_map,
-                    "capture_kind": "native_teacher_mlp_input",
+                    "capture_kind": "diagnostic_real_teacher_mlp_input" if diagnostic_only else "native_teacher_mlp_input",
                     "split_token_count": split_token_count,
+                    "fanout_layers": selected_layers,
+                    "teacher_forward_contract": "one forward per microbatch",
+                    "diagnostic_only": diagnostic_only,
                 }
-                captured_manifest = capture_activation_shards(
-                    activation_stream(),
-                    destination,
-                    layer=layer,
-                    split=split_name,
-                    manifest_name=f"layer-{layer:04d}-{split_name}.json",
-                    shard_tokens=shard_tokens,
-                    dtype=dtype,
-                    resume=resume,
-                    metadata=metadata,
-                )
+            split_manifests = capture_multi_layer_activation_shards(
+                fanout_batches(),
+                destination,
+                layers=selected_layers,
+                split=split_name,
+                shard_tokens=shard_tokens,
+                dtype=dtype,
+                resume=resume,
+                manifest_names={layer: f"layer-{layer:04d}-{split_name}.json" for layer in selected_layers},
+                metadata=metadata_by_layer,
+            )
+            for layer, captured_manifest in split_manifests.items():
                 layer_results.append(captured_manifest)
+                aggregate_by_layer[layer][f"{split_name}_manifest"] = f"layer-{layer:04d}-{split_name}.json"
+
+        # Publish small aggregate manifests after split shards are durable.
+        # They contain no activation payload and make the fixed train/holdout
+        # relationship explicit to the streaming trainer.
+        aggregate_paths: list[str] = []
+        for layer in selected_layers:
+            aggregate = {
+                "schema_version": 1,
+                "status": "CAPTURE_COMPLETE" if all(
+                    aggregate_by_layer[layer].get(f"{name}_manifest") for name in splits
+                ) else "CAPTURE_PARTIAL",
+                "layer": layer,
+                "train_manifest": aggregate_by_layer[layer].get("train_manifest", "pending"),
+                "holdout_manifest": aggregate_by_layer[layer].get("holdout_manifest", "pending"),
+                "dataset_hash": manifest_payload.get("dataset_hash", ""),
+                "tokenizer_hash": tokenizer_hashes,
+                "source_revision": source_revision,
+                "source_snapshot": str(Path(source_snapshot)),
+                "hook_path": module_paths[layer],
+                "hook_verification": verification_by_layer[layer],
+                "dtype": dtype,
+                "capture_code_commit": current_git_commit(),
+                "fanout_layers": selected_layers,
+                "microbatch": microbatch,
+                "max_batch_tokens": max_batch_tokens,
+                "teacher_forward_contract": "one forward per microbatch",
+                "diagnostic_only": diagnostic_only,
+            }
+            aggregate_path = Path(destination) / f"layer-{layer:04d}.json"
+            # Split-only diagnostic runs may intentionally omit one side; do
+            # not overwrite a valid aggregate on resume with a weaker record.
+            if not aggregate_path.exists() or aggregate["status"] == "CAPTURE_COMPLETE":
+                atomic_write_json(aggregate_path, aggregate)
+            aggregate_paths.append(str(aggregate_path))
         total_tokens = sum(sum(len(item.input_ids) for item in tokenized[name]) for name in splits)
         return {
             "status": "CAPTURE_COMPLETE" if all(item.get("status") in {"CAPTURE_COMPLETE", "CAPTURE_RESUMED"} for item in layer_results) else "BLOCKED",
+            "diagnostic_only": diagnostic_only,
             "layers": layer_results,
+            "aggregate_manifests": aggregate_paths,
             "dataset_manifest": str(dataset_manifest),
             "source_snapshot": str(source_snapshot),
             "source_revision": source_revision,
             "module_paths": module_paths,
             "hook_verification": verification,
+            "teacher_forward_count": teacher_forward_count,
+            "verification_forward_count": verification_forward_count,
+            "expected_capture_forward_count": sum(
+                (len(list(_batches(tokenized[name], microbatch, max_batch_tokens))) for name in splits),
+            ),
+            "fanout": {
+                "layers": selected_layers,
+                "single_forward_per_microbatch": True,
+                "teacher_forward_count_excludes_verification": True,
+            },
             "split_names": list(splits),
             "resource_metrics": _resource_metrics(started, total_tokens, model),
             "resumable": True,
@@ -954,11 +1272,14 @@ __all__ = [
     "capture_text_teacher_activations",
     "discover_mlp_modules",
     "discover_mlp_paths",
+    "discover_torch_devices",
     "fixed_split_metadata",
     "is_pinned_source_revision",
+    "live_resource_snapshot",
     "load_native_teacher",
     "load_pinned_tokenizer",
     "resolve_corpus_records",
+    "resource_aware_max_memory",
     "snapshot_tokenizer_hashes",
     "tokenize_corpus_records",
     "validate_mlp_hook",

@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import Any
 
+from ..capture import iter_activation_shards
 from ..config import MoEProfile
-from ..partition import partition_indices
+from ..partition import partition_indices, swiglu_contributions
 from ..partition.oracle import frozen_slice_simplex_oracle
 from ..provenance import current_git_commit
 
@@ -160,8 +162,186 @@ def _run_numpy_pilot(source_dir: str | Path, profiles: list[MoEProfile], *, laye
     }
 
 
-def run_oracle_ablation(source_dir: str | Path, *, layer: int = 0, batch_size: int = 8, seed: int = 17) -> dict[str, Any]:
-    """Run the bounded p8 oracle fallback matrix on one immutable real layer."""
+def _vectorized_top2_oracle(shared: Any, routed: Any, target: Any, *, positive: bool = False) -> dict[str, Any]:
+    """Fast exact top-2 frozen oracle for a bounded real-activation array."""
+
+    import numpy as np  # type: ignore
+
+    shared_values = np.asarray(shared, dtype=np.float64)
+    routed_values = np.asarray(routed, dtype=np.float64)
+    target_values = np.asarray(target, dtype=np.float64)
+    goal = target_values - shared_values
+    tokens, experts, _width = routed_values.shape
+    best_error = np.full(tokens, np.inf, dtype=np.float64)
+    best_ids = np.zeros((tokens, 2), dtype=np.int64)
+    best_weights = np.zeros((tokens, 2), dtype=np.float64)
+    for first in range(experts):
+        a = routed_values[:, first]
+        for second in range(first + 1, experts):
+            b = routed_values[:, second]
+            if positive:
+                aa = np.sum(a * a, axis=1)
+                bb = np.sum(b * b, axis=1)
+                ab = np.sum(a * b, axis=1)
+                ag = np.sum(a * goal, axis=1)
+                bg = np.sum(b * goal, axis=1)
+                det = aa * bb - ab * ab
+                wa = np.divide(ag * bb - bg * ab, det, out=np.zeros_like(det), where=np.abs(det) > 1e-20)
+                wb = np.divide(bg * aa - ag * ab, det, out=np.zeros_like(det), where=np.abs(det) > 1e-20)
+                candidates = [
+                    (np.maximum(wa, 0.0), np.maximum(wb, 0.0), (wa >= 0.0) & (wb >= 0.0)),
+                    (np.maximum(ag / np.maximum(aa, 1e-20), 0.0), np.zeros(tokens), np.ones(tokens, dtype=bool)),
+                    (np.zeros(tokens), np.maximum(bg / np.maximum(bb, 1e-20), 0.0), np.ones(tokens, dtype=bool)),
+                    (np.zeros(tokens), np.zeros(tokens), np.ones(tokens, dtype=bool)),
+                ]
+            else:
+                direction = a - b
+                denominator = np.sum(direction * direction, axis=1)
+                alpha = np.divide(
+                    np.sum(direction * (goal - b), axis=1),
+                    denominator,
+                    out=np.full(tokens, 0.5, dtype=np.float64),
+                    where=denominator > 1e-20,
+                )
+                alpha = np.clip(alpha, 0.0, 1.0)
+                candidates = [(alpha, 1.0 - alpha, np.ones(tokens, dtype=bool))]
+            for weight_a, weight_b, valid in candidates:
+                prediction = weight_a[:, None] * a + weight_b[:, None] * b
+                error = np.mean((prediction - goal) ** 2, axis=1)
+                error = np.where(valid, error, np.inf)
+                better = error < best_error
+                best_error[better] = error[better]
+                best_ids[better, 0] = first
+                best_ids[better, 1] = second
+                best_weights[better, 0] = weight_a[better]
+                best_weights[better, 1] = weight_b[better]
+    reconstruction = shared_values + np.take_along_axis(routed_values, best_ids[:, :, None], axis=1)[:, 0] * best_weights[:, 0, None] + np.take_along_axis(routed_values, best_ids[:, :, None], axis=1)[:, 1] * best_weights[:, 1, None]
+    mse = float(np.mean((reconstruction - target_values) ** 2))
+    norm = float(np.mean(target_values**2)) + 1e-12
+    cosine = float(np.mean(np.sum(reconstruction * target_values, axis=1) / (np.linalg.norm(reconstruction, axis=1) * np.linalg.norm(target_values, axis=1) + 1e-12)))
+    return {
+        "indices": best_ids,
+        "weights": best_weights,
+        "reconstruction": reconstruction,
+        "mse": mse,
+        "normalized_mse": mse / norm,
+        "cosine": cosine,
+        "selection_error": float(np.mean(best_error)),
+        "coefficient_error": float(np.mean((best_weights.sum(axis=1) - 1.0) ** 2)) if positive else 0.0,
+    }
+
+
+def _run_real_activation_oracle(
+    source_dir: Path,
+    activation_manifest: Path,
+    *,
+    layer: int,
+    seed: int,
+) -> dict[str, Any]:
+    """Evaluate p8 alternatives on actual fixed holdout MLP inputs."""
+
+    import numpy as np  # type: ignore
+    from safetensors import safe_open  # type: ignore
+    try:
+        import torch  # type: ignore
+    except ImportError as exc:
+        raise ValueError("real activation oracle requires PyTorch to decode the pinned bfloat16 teacher weights") from exc
+
+    manifest_payload = json.loads(activation_manifest.read_text(encoding="utf-8"))
+    if manifest_payload.get("split") not in {"holdout", "both"}:
+        reference = manifest_payload.get("holdout_manifest")
+        if not reference or reference == "pending":
+            raise ValueError("real oracle study requires an explicit holdout activation manifest")
+        holdout_manifest = activation_manifest.parent / str(reference)
+    else:
+        holdout_manifest = activation_manifest
+    inputs = np.concatenate(list(iter_activation_shards(holdout_manifest, expected_split="holdout")), axis=0)
+    index = json.loads((source_dir / "model.safetensors.index.json").read_text(encoding="utf-8"))
+    prefix = f"model.language_model.layers.{layer}.mlp."
+    names = {key[len(prefix) :]: shard for key, shard in index["weight_map"].items() if key.startswith(prefix)}
+    required = {"gate_proj.weight", "up_proj.weight", "down_proj.weight"}
+    if set(names) != required:
+        raise ValueError(f"layer {layer} source MLP inventory is incomplete")
+    values: dict[str, Any] = {}
+    for name, shard in names.items():
+        with safe_open(str(source_dir / shard), framework="pt", device="cpu") as handle:
+            values[name] = torch.as_tensor(handle.get_tensor(prefix + name)).float().numpy()
+    dense_hidden = (inputs @ values["gate_proj.weight"].T)
+    dense_hidden = (dense_hidden / (1.0 + np.exp(-dense_hidden))) * (inputs @ values["up_proj.weight"].T)
+    target = dense_hidden @ values["down_proj.weight"].T
+    dense_size = int(values["gate_proj.weight"].shape[0])
+    variants: list[dict[str, Any]] = []
+    for strategy, kwargs in (
+        ("contiguous", {}),
+        ("interleave", {}),
+        ("activation_magnitude", {"scores": np.mean(np.abs(dense_hidden), axis=0)}),
+        # |h[t,n] * W[o,n]| separates over tokens and output dimensions;
+        # compute the same mean without materializing a 1176 x 17408 x 5120
+        # temporary (which would exceed 390 GiB for this layer).
+        (
+            "output_contribution",
+            {
+                "scores": np.mean(np.abs(dense_hidden), axis=0)
+                * np.mean(np.abs(values["down_proj.weight"]), axis=0)
+            },
+        ),
+    ):
+        plan = partition_indices(dense_size, 8, 2048, 1024, strategy=strategy, **kwargs)
+        shared, routed = swiglu_contributions(
+            inputs,
+            values["gate_proj.weight"],
+            values["up_proj.weight"],
+            values["down_proj.weight"],
+            plan,
+        )
+        simplex = _vectorized_top2_oracle(shared, routed, target)
+        positive = _vectorized_top2_oracle(shared, routed, target, positive=True)
+        variants.append({
+            "name": f"{strategy}_top2",
+            "partition_strategy": strategy,
+            "shared_width": plan.shared_intermediate_size,
+            "expert_width": plan.expert_intermediate_size,
+            "simplex": {"normalized_mse": simplex["normalized_mse"], "cosine": simplex["cosine"]},
+            "positive": {"normalized_mse": positive["normalized_mse"], "cosine": positive["cosine"]},
+            "selection_error": simplex["selection_error"],
+            "coefficient_error": positive["coefficient_error"],
+            "partition_error": float(np.mean((shared + routed.sum(axis=1) - target) ** 2)),
+            "active_capacity_limitation": float(simplex["normalized_mse"]),
+        })
+    best = min(variants, key=lambda item: item["positive"]["normalized_mse"])
+    return {
+        "status": "REAL_ACTIVATION_ORACLE_COMPLETE",
+        "classification": "REAL_TEACHER_ACTIVATION_HOLDOUT",
+        "quality_gate_eligible": True,
+        "source_dir": str(source_dir),
+        "activation_manifest": str(holdout_manifest),
+        "dataset_hash": manifest_payload.get("dataset_hash", ""),
+        "layer": layer,
+        "holdout_tokens": int(inputs.shape[0]),
+        "variants": variants,
+        "best_variant": best["name"],
+        "gate": {
+            "green": best["positive"]["normalized_mse"] <= 0.05,
+            "yellow": best["positive"]["normalized_mse"] <= 0.10,
+            "applies_to": "real teacher activation holdout",
+        },
+        "seed": seed,
+        "code_commit": current_git_commit(),
+    }
+
+
+def run_oracle_ablation(
+    source_dir: str | Path,
+    *,
+    layer: int = 0,
+    batch_size: int = 8,
+    seed: int = 17,
+    activation_manifest: str | Path | None = None,
+) -> dict[str, Any]:
+    """Run real-activation p8 study, falling back only to historical diagnostics."""
+
+    if activation_manifest is not None:
+        return _run_real_activation_oracle(Path(source_dir), Path(activation_manifest), layer=layer, seed=seed)
 
     import json
 

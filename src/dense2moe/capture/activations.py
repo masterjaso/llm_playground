@@ -36,6 +36,24 @@ def _sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
+def _resolve_manifest_path(raw: str | Path, metadata_path: Path) -> Path:
+    """Resolve both run-relative and workspace-relative artifact locators."""
+
+    value = str(raw)
+    if os.sep != "\\" and "\\" in value:
+        value = value.replace("\\", "/")
+    candidate = Path(value)
+    if candidate.is_absolute():
+        return candidate
+    local = metadata_path.parent / candidate
+    if local.exists():
+        return local
+    workspace = Path.cwd() / candidate
+    if workspace.exists():
+        return workspace
+    return local
+
+
 def _write_shard(array: Any, path: Path, *, layer: int, shard_index: int, metadata: Mapping[str, Any] | None = None) -> dict[str, Any]:
     try:
         import numpy as np  # type: ignore
@@ -79,9 +97,7 @@ def _valid_existing(metadata_path: Path) -> dict[str, Any] | None:
         from safetensors import safe_open  # type: ignore
         if isinstance(payload.get("shards"), list):
             for shard in payload["shards"]:
-                tensor_path = Path(str(shard["path"]))
-                if not tensor_path.is_absolute():
-                    tensor_path = metadata_path.parent / tensor_path
+                tensor_path = _resolve_manifest_path(str(shard["path"]), metadata_path)
                 if not tensor_path.exists() or shard.get("sha256") != _sha256(tensor_path):
                     return None
                 with safe_open(str(tensor_path), framework="numpy") as handle:
@@ -92,9 +108,7 @@ def _valid_existing(metadata_path: Path) -> dict[str, Any] | None:
                 if shape != list(shard.get("shape", [])):
                     return None
             return {**payload, "resumed": True}
-        tensor_path = Path(str(payload["path"]))
-        if not tensor_path.is_absolute():
-            tensor_path = metadata_path.parent / tensor_path
+        tensor_path = _resolve_manifest_path(str(payload["path"]), metadata_path)
         if payload.get("format") != "safetensors" or not tensor_path.exists() or payload.get("sha256") != _sha256(tensor_path):
             return None
         with safe_open(str(tensor_path), framework="numpy") as handle:
@@ -198,6 +212,179 @@ def capture_activation_shards(
     return manifest
 
 
+class _StreamingShardWriter:
+    """Bounded per-layer writer used by a single-forward fan-out capture."""
+
+    def __init__(
+        self,
+        destination: Path,
+        *,
+        layer: int,
+        shard_tokens: int,
+        dtype: str,
+        split: str | None,
+        manifest_name: str,
+        resume: bool,
+        metadata: Mapping[str, Any] | None,
+    ) -> None:
+        self.destination = destination
+        self.layer = layer
+        self.shard_tokens = shard_tokens
+        self.dtype = dtype
+        self.split = split
+        self.manifest_path = destination / manifest_name
+        self.metadata = dict(metadata or {})
+        self.artifact_commit = current_git_commit()
+        self.shards: list[dict[str, Any]] = []
+        self.pending: Any | None = None
+        self.shard_index = 0
+        self.resumed_manifest: dict[str, Any] | None = None
+        if resume:
+            previous = _valid_existing(self.manifest_path)
+            same_split = previous is not None and (split is None or previous.get("split") == split)
+            expected_dataset = self.metadata.get("dataset_hash")
+            same_dataset = previous is not None and (
+                not expected_dataset or previous.get("dataset_hash") == expected_dataset
+            )
+            if previous is not None and same_split and same_dataset:
+                self.resumed_manifest = previous
+            elif self.manifest_path.exists():
+                raise ValueError(
+                    "resume refused to overwrite an invalid or different split/dataset activation manifest"
+                )
+        destination.mkdir(parents=True, exist_ok=True)
+
+    @property
+    def complete(self) -> bool:
+        return self.resumed_manifest is not None
+
+    def append(self, values: Any) -> None:
+        if self.complete:
+            return
+        import numpy as np  # type: ignore
+
+        array = np.asarray(values, dtype=self.dtype)
+        if array.ndim == 1:
+            array = array.reshape(1, -1)
+        if array.ndim != 2:
+            raise ValueError("activation items must be rank-1 or rank-2")
+        if not np.isfinite(array).all():
+            raise ValueError("activation shard contains NaN or Inf")
+        self.pending = array if self.pending is None else np.concatenate((self.pending, array), axis=0)
+        while self.pending.shape[0] >= self.shard_tokens:
+            chunk = self.pending[: self.shard_tokens]
+            self.pending = self.pending[self.shard_tokens :]
+            path = self.destination / f"{self.manifest_path.stem}-shard-{self.shard_index:05d}.safetensors"
+            self.shards.append(
+                _write_shard(
+                    chunk,
+                    path,
+                    layer=self.layer,
+                    shard_index=self.shard_index,
+                    metadata={**self.metadata, "split": self.split},
+                )
+            )
+            self.shard_index += 1
+
+    def finish(self) -> dict[str, Any]:
+        previous = self.resumed_manifest
+        if previous is not None:
+            return {**previous, "status": "CAPTURE_RESUMED"}
+        if self.pending is not None and self.pending.shape[0] > 0:
+            path = self.destination / f"{self.manifest_path.stem}-shard-{self.shard_index:05d}.safetensors"
+            self.shards.append(
+                _write_shard(
+                    self.pending,
+                    path,
+                    layer=self.layer,
+                    shard_index=self.shard_index,
+                    metadata={**self.metadata, "split": self.split},
+                )
+            )
+            self.pending = None
+        if not self.shards:
+            return {
+                "status": "CAPTURE_BLOCKED",
+                "layer": self.layer,
+                "count": 0,
+                "code_commit": self.artifact_commit,
+                "message": "activation iterable is empty; no binary artifact was created",
+            }
+        manifest = {
+            "schema_version": 2,
+            "status": "CAPTURE_COMPLETE",
+            "layer": self.layer,
+            "dtype": self.dtype,
+            "count": sum(int(item["count"]) for item in self.shards),
+            "shard_tokens": self.shard_tokens,
+            "shards": self.shards,
+            "split": self.split,
+            "metadata": dict(self.metadata),
+            "capture_kind": self.metadata.get("capture_kind", "mlp_input"),
+            "hook_path": self.metadata.get("hook_path"),
+            "source_snapshot": self.metadata.get("source_snapshot"),
+            "tokenizer_revision": self.metadata.get("tokenizer_revision"),
+            "dataset_hash": self.metadata.get("dataset_hash", ""),
+            "source_revision": self.metadata.get("source_revision"),
+            "code_commit": self.artifact_commit,
+        }
+        atomic_write_json(self.manifest_path, manifest)
+        return manifest
+
+
+def capture_multi_layer_activation_shards(
+    batches: Iterable[Mapping[int, Any]],
+    destination: str | Path,
+    *,
+    layers: Iterable[int],
+    shard_tokens: int = 8192,
+    dtype: str = "float32",
+    resume: bool = False,
+    split: str | None = None,
+    manifest_names: Mapping[int, str] | None = None,
+    metadata: Mapping[int, Mapping[str, Any]] | None = None,
+) -> dict[int, dict[str, Any]]:
+    """Write all selected layer streams from one forward-pass iterator.
+
+    The iterator yields a mapping for each input microbatch.  Each layer owns
+    an independent bounded pending buffer and shard manifest, so no complete
+    corpus activation tensor is retained in memory and one slow layer cannot
+    overwrite another layer's receipt.
+    """
+
+    selected = sorted({int(layer) for layer in layers})
+    if not selected:
+        raise ValueError("layers must contain at least one layer")
+    if shard_tokens <= 0:
+        raise ValueError("shard_tokens must be positive")
+    root = Path(destination)
+    names = manifest_names or {}
+    details = metadata or {}
+    writers: dict[int, _StreamingShardWriter] = {}
+    for layer in selected:
+        writers[layer] = _StreamingShardWriter(
+            root,
+            layer=layer,
+            shard_tokens=shard_tokens,
+            dtype=dtype,
+            split=split,
+            manifest_name=str(names.get(layer, f"layer-{layer:04d}-{split or 'capture'}.json")),
+            resume=resume,
+            metadata=details.get(layer),
+        )
+    seen = False
+    for batch in batches:
+        seen = True
+        for layer, writer in writers.items():
+            if layer not in batch:
+                raise ValueError(f"fan-out batch is missing requested layer {layer}")
+            writer.append(batch[layer])
+    results = {layer: writer.finish() for layer, writer in writers.items()}
+    if not seen:
+        return results
+    return results
+
+
 def capture_activations(
     activations: Iterable[Any],
     destination: str | Path,
@@ -237,9 +424,7 @@ def iter_activation_shards(manifest_path: str | Path, *, expected_split: str | N
     except ImportError as exc:
         raise RuntimeError("numpy and safetensors are required") from exc
     for shard in manifest.get("shards", []):
-        path = Path(str(shard["path"]))
-        if not path.is_absolute():
-            path = Path(manifest_path).parent / path
+        path = _resolve_manifest_path(str(shard["path"]), Path(manifest_path))
         if _sha256(path) != shard.get("sha256"):
             raise ValueError(f"activation shard hash mismatch: {path}")
         with safe_open(str(path), framework="numpy") as handle:
