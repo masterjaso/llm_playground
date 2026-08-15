@@ -99,6 +99,8 @@ def _parser() -> argparse.ArgumentParser:
     capture.add_argument("--resume", action="store_true")
     capture.add_argument("--max-examples", type=int, default=None, help="deterministic bounded example count for diagnostic-only capture")
     capture.add_argument("--diagnostic-only", action="store_true", help="write smoke evidence under capture/diagnostic and never treat it as quality evidence")
+    capture.add_argument("--text-only", action="store_true", help="load an exact text-backbone view of the pinned multimodal snapshot")
+    capture.add_argument("--text-only-view", default=None, help="metadata-only text-backbone view directory (created when --text-only is set)")
 
     for command in (sub.choices["oracle-study"],):
         command.add_argument("--activation-manifest", help="aggregate or split activation manifest for real oracle evidence")
@@ -632,6 +634,17 @@ def _capture(args: argparse.Namespace, store: StateStore) -> dict[str, Any]:
     source_dir = Path(args.source_dir) if args.source_dir else store.run_dir / "source"
     if args.source_dir or source_dir.is_dir() or not isinstance(activation_files, dict) or not activation_files:
         try:
+            text_only_view = None
+            text_only_key_mapping = None
+            if args.text_only:
+                from .capture import prepare_text_only_snapshot_view
+
+                view_info = prepare_text_only_snapshot_view(
+                    source_dir,
+                    args.text_only_view or (store.run_dir / "teacher-text-only"),
+                )
+                text_only_view = view_info["view"]
+                text_only_key_mapping = view_info["key_mapping"]
             native_result = capture_text_teacher_activations(
                 manifest_path,
                 source_dir,
@@ -653,6 +666,8 @@ def _capture(args: argparse.Namespace, store: StateStore) -> dict[str, Any]:
                 max_examples=args.max_examples,
                 diagnostic_only=args.diagnostic_only,
                 max_batch_tokens=args.max_batch_tokens,
+                text_only_view=text_only_view,
+                text_only_key_mapping=text_only_key_mapping,
             )
         except (OSError, TypeError, ValueError, RuntimeError) as exc:
             native_result = {"status": "BLOCKED", "blocker_code": "CAPTURE_ARGUMENT_INVALID", "message": str(exc), "layers": layers, "resumable": True}
@@ -690,11 +705,38 @@ def _capture(args: argparse.Namespace, store: StateStore) -> dict[str, Any]:
                 results.append(captured)
             except (OSError, ValueError, TypeError, KeyError, RuntimeError) as exc:
                 results.append({"status": "BLOCKED", "layer": layer, "message": str(exc)})
+    split_names = ("train", "holdout") if args.split == "both" else (str(args.split),)
     capture_complete = bool(results) and all(
         item.get("status") in {"CAPTURE_COMPLETE", "CAPTURE_RESUMED"} for item in results
     )
-    status = "CAPTURE_DIAGNOSTIC_COMPLETE" if capture_complete and args.diagnostic_only else ("CAPTURE_COMPLETE" if capture_complete else "BLOCKED")
-    full_capture = status == "CAPTURE_COMPLETE"
+    # A successful holdout-only run is valuable gate evidence, but it is not a
+    # full capture.  Determine full-corpus completion from both durable split
+    # manifests rather than from the status of only the split requested in the
+    # current invocation.
+    both_splits_materialized = False
+    if not args.diagnostic_only:
+        both_splits_materialized = True
+        for layer in sorted(set(layers)):
+            for split_name in ("train", "holdout"):
+                split_path = store.run_dir / "capture" / f"layer-{layer:04d}-{split_name}.json"
+                try:
+                    split_payload = json.loads(split_path.read_text(encoding="utf-8"))
+                except (OSError, TypeError, ValueError, json.JSONDecodeError):
+                    both_splits_materialized = False
+                    continue
+                if split_payload.get("status") not in {"CAPTURE_COMPLETE", "CAPTURE_RESUMED"}:
+                    both_splits_materialized = False
+    full_capture = capture_complete and both_splits_materialized
+    if args.diagnostic_only and capture_complete:
+        status = "CAPTURE_DIAGNOSTIC_COMPLETE"
+    elif full_capture:
+        status = "CAPTURE_COMPLETE"
+    elif capture_complete and "holdout" in split_names:
+        status = "CAPTURE_HOLDOUT_COMPLETE"
+    elif capture_complete:
+        status = "CAPTURE_SPLIT_COMPLETE"
+    else:
+        status = "BLOCKED"
     result = {
         "status": status,
         "layers": results,
@@ -706,34 +748,44 @@ def _capture(args: argparse.Namespace, store: StateStore) -> dict[str, Any]:
         "source_revision": native_result.get("source_revision", state.source_revision) if native_result is not None else state.source_revision,
         "code_commit": current_git_commit(),
         "diagnostic_only": bool(args.diagnostic_only),
-        "quality_gate_eligible": full_capture,
+        "quality_gate_eligible": bool(capture_complete and not args.diagnostic_only and "holdout" in split_names),
         "message": (
             None
             if full_capture
             else (
                 "diagnostic-only subset; required non-diagnostic full corpus is not a quality artifact"
                 if status == "CAPTURE_DIAGNOSTIC_COMPLETE"
-                else "one or more layers have no validated binary activation capture"
+                else (
+                    "holdout capture complete; required train split remains to be captured"
+                    if status == "CAPTURE_HOLDOUT_COMPLETE"
+                    else (
+                        "requested capture split complete; companion split remains required"
+                        if status == "CAPTURE_SPLIT_COMPLETE"
+                        else "one or more layers have no validated binary activation capture"
+                    )
+                )
             )
         ),
     }
     atomic_write_json(store.run_dir / "metrics" / "capture.json", result)
-    next_command = (
-        f"d2m partition-layer --run-dir {args.run_dir} --layer {layers[0] if layers else 0}"
-        if full_capture
-        else f"d2m capture --run-dir {args.run_dir} --layers {args.layers} --dataset-manifest {args.dataset_manifest} --resume"
-    )
+    if full_capture:
+        next_command = f"d2m partition-layer --run-dir {args.run_dir} --layer {layers[0] if layers else 0}"
+    elif status == "CAPTURE_HOLDOUT_COMPLETE":
+        next_command = f"d2m capture --run-dir {args.run_dir} --layers {args.layers} --dataset-manifest {args.dataset_manifest} --split train --resume"
+    else:
+        next_command = f"d2m capture --run-dir {args.run_dir} --layers {args.layers} --dataset-manifest {args.dataset_manifest} --resume"
+    phase_pending = status in {"CAPTURE_COMPLETE", "CAPTURE_HOLDOUT_COMPLETE", "CAPTURE_SPLIT_COMPLETE"}
     store.transition(
         current_phase="capture",
-        phase_status="pending" if full_capture else "blocked",
-        active_blocker=None if full_capture else result["message"],
+        phase_status="pending" if phase_pending else "blocked",
+        active_blocker=None if phase_pending else result["message"],
         next_exact_command=next_command,
         validation_results={"capture": result},
     )
     store.write_handoff(
         next_command=next_command,
         expected_output="validated partition manifest" if full_capture else "validated non-diagnostic teacher activation input files",
-        blocker=None if full_capture else result["message"],
+        blocker=None if phase_pending else result["message"],
     )
     return result
 

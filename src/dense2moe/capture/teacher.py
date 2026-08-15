@@ -222,6 +222,90 @@ def _snapshot_weight_bytes(snapshot: Path) -> int | None:
         return None
 
 
+def prepare_text_only_snapshot_view(source_snapshot: str | Path, destination: str | Path) -> dict[str, Any]:
+    """Create a metadata-only text-backbone view of a multimodal snapshot.
+
+    The view contains no copied weights.  Its filtered safetensors index points
+    back to the immutable source shards using relative paths, while exact
+    ``model.language_model.*`` names are mapped to the native
+    ``Qwen3_5ForCausalLM`` names.  This lets Transformers dispatch only the
+    text model without mutating or reserializing the pinned source.
+    """
+
+    source = Path(source_snapshot)
+    target = Path(destination)
+    config_path = source / "config.json"
+    index_path = source / "model.safetensors.index.json"
+    if not source.is_dir() or not config_path.is_file() or not index_path.is_file():
+        raise TeacherCaptureBlocked(
+            "TEXT_ONLY_SOURCE_INVALID",
+            "text-only view requires config.json and model.safetensors.index.json in the pinned source snapshot",
+            source_snapshot=str(source),
+        )
+    try:
+        source_config = json.loads(config_path.read_text(encoding="utf-8"))
+        source_index = json.loads(index_path.read_text(encoding="utf-8"))
+    except (OSError, TypeError, ValueError, json.JSONDecodeError) as exc:
+        raise TeacherCaptureBlocked("TEXT_ONLY_SOURCE_INVALID", f"text-only source metadata could not be read: {exc}") from exc
+    text_config = source_config.get("text_config")
+    weight_map = source_index.get("weight_map")
+    if not isinstance(text_config, Mapping) or not isinstance(weight_map, Mapping):
+        raise TeacherCaptureBlocked("TEXT_ONLY_SOURCE_INVALID", "source metadata does not contain a text_config and weight_map")
+    filtered_map: dict[str, str] = {}
+    key_mapping: dict[str, str] = {}
+    source_shards: set[str] = set()
+    for raw_name, raw_shard in weight_map.items():
+        name = str(raw_name)
+        shard = str(raw_shard)
+        if name.startswith("model.language_model."):
+            target_name = "model." + name[len("model.language_model.") :]
+            source_shards.add(shard)
+        elif name == "lm_head.weight":
+            target_name = name
+            source_shards.add(shard)
+        else:
+            continue
+        shard_path = source / shard
+        if not shard_path.is_file():
+            raise TeacherCaptureBlocked(
+                "TEXT_ONLY_SOURCE_INVALID",
+                f"text-only index references a missing source shard: {shard_path}",
+                source_snapshot=str(source),
+            )
+        relative_shard = os.path.relpath(shard_path, target).replace("\\", "/")
+        filtered_map[target_name] = relative_shard
+        if name != target_name:
+            key_mapping[name] = target_name
+    if not filtered_map:
+        raise TeacherCaptureBlocked("TEXT_ONLY_SOURCE_INVALID", "no text-backbone tensors were found in the pinned source index")
+    target.mkdir(parents=True, exist_ok=True)
+    config_payload = dict(text_config)
+    config_payload["model_type"] = "qwen3_5_text"
+    config_payload["architectures"] = ["Qwen3_5ForCausalLM"]
+    config_payload["d2m_source_snapshot"] = str(source)
+    config_payload["d2m_text_only_view"] = True
+    atomic_write_json(target / "config.json", config_payload)
+    index_payload = {
+        "metadata": {
+            "d2m_text_only_view": True,
+            "source_snapshot": str(source),
+            "source_shard_count": len(source_shards),
+            "source_tensor_count": len(weight_map),
+            "text_tensor_count": len(filtered_map),
+        },
+        "weight_map": filtered_map,
+    }
+    atomic_write_json(target / "model.safetensors.index.json", index_payload)
+    return {
+        "view": str(target),
+        "source_snapshot": str(source),
+        "source_tensor_count": len(weight_map),
+        "text_tensor_count": len(filtered_map),
+        "source_shard_count": len(source_shards),
+        "key_mapping": key_mapping,
+    }
+
+
 def discover_torch_devices(torch: Any | None = None) -> list[dict[str, Any]]:
     """Discover CUDA devices from PyTorch, never from assumed ``nvidia-smi`` IDs."""
 
@@ -349,6 +433,15 @@ def _windows_pread_safetensors() -> Iterator[None]:
         modules.append(modeling_layers)
     except ImportError:
         pass
+    # Accelerate imports ``safe_open`` into its offload module at import time;
+    # patch that alias as well, otherwise disk-offloaded text-only weights can
+    # still take the Windows section-backed mmap path.
+    try:
+        from accelerate.utils import offload as accelerate_offload  # type: ignore
+
+        modules.append(accelerate_offload)
+    except ImportError:
+        pass
     originals: list[tuple[Any, Any]] = []
     for module in modules:
         original = getattr(module, "safe_open", None)
@@ -370,6 +463,59 @@ def _windows_pread_safetensors() -> Iterator[None]:
             module.safe_open = original
 
 
+@contextmanager
+def _text_only_offload_key_mapping(model: Any) -> Iterator[None]:
+    """Temporarily map native text names to source multimodal shard names.
+
+    The Transformers ``key_mapping`` load option correctly places the
+    multimodal ``model.language_model.*`` tensors into a text-only model, but
+    Accelerate's disk-offload index retains the model-side names.  The source
+    safetensor shards necessarily contain the original names.  Rewrite only
+    the transient ``weight_name`` lookup while the loaded model executes; no
+    checkpoint or index is mutated on disk.
+    """
+
+    mapping = getattr(model, "_d2m_text_only_key_mapping", None)
+    if not isinstance(mapping, Mapping) or not mapping:
+        yield
+        return
+    try:
+        from accelerate.utils import offload as accelerate_offload  # type: ignore
+
+        loader_type = accelerate_offload.OffloadedWeightsLoader
+    except (ImportError, AttributeError):
+        yield
+        return
+    original_getitem = loader_type.__getitem__
+    reverse_mapping = {str(target): str(source) for source, target in mapping.items()}
+
+    def _mapped_getitem(loader: Any, key: str) -> Any:
+        source_key = reverse_mapping.get(str(key))
+        if source_key is None:
+            return original_getitem(loader, key)
+        index = getattr(loader, "index", None)
+        if not isinstance(index, Mapping):
+            return original_getitem(loader, key)
+        info = index.get(key)
+        if not isinstance(info, Mapping) or info.get("safetensors_file") is None:
+            return original_getitem(loader, key)
+        patched_info = dict(info)
+        patched_info["weight_name"] = source_key
+        patched_index = dict(index)
+        patched_index[key] = patched_info
+        loader.index = patched_index
+        try:
+            return original_getitem(loader, key)
+        finally:
+            loader.index = index
+
+    loader_type.__getitem__ = _mapped_getitem
+    try:
+        yield
+    finally:
+        loader_type.__getitem__ = original_getitem
+
+
 def load_native_teacher(
     source_snapshot: str | Path,
     revision: str,
@@ -379,6 +525,8 @@ def load_native_teacher(
     compute_dtype: str | None = "bfloat16",
     max_memory: Mapping[Any, Any] | None = None,
     offload_folder: str | Path | None = None,
+    text_only_view: str | Path | None = None,
+    text_only_key_mapping: Mapping[str, str] | None = None,
 ) -> Any:
     """Load the native Transformers teacher without network or remote code."""
 
@@ -407,8 +555,13 @@ def load_native_teacher(
             source_snapshot=str(snapshot),
             source_revision=revision,
         ) from exc
+    load_snapshot = Path(text_only_view) if text_only_view is not None else snapshot
+    if text_only_view is not None and not load_snapshot.is_dir():
+        raise TeacherCaptureBlocked("TEXT_ONLY_VIEW_MISSING", f"text-only snapshot view is unavailable: {load_snapshot}")
+    if text_only_view is not None and not text_only_key_mapping:
+        raise TeacherCaptureBlocked("TEXT_ONLY_MAPPING_MISSING", "text-only teacher loading requires an explicit source-to-text key mapping")
     started = time.perf_counter()
-    estimated_bytes = _snapshot_weight_bytes(snapshot)
+    estimated_bytes = _snapshot_weight_bytes(load_snapshot)
     load_resources = live_resource_snapshot(torch, offload_folder=offload_folder)
     # The bundled runtime in this workspace is CPU-only.  Loading a 27B
     # safetensor snapshot into CPU memory when its files exceed available RAM
@@ -438,6 +591,14 @@ def load_native_teacher(
         "local_files_only": True,
         "trust_remote_code": False,
     }
+    if text_only_view is not None:
+        try:
+            from transformers import AutoConfig  # type: ignore
+
+            kwargs["config"] = AutoConfig.from_pretrained(str(load_snapshot), local_files_only=True, trust_remote_code=False)
+        except (ImportError, OSError, RuntimeError, TypeError, ValueError) as exc:
+            raise TeacherCaptureBlocked("TEXT_ONLY_CONFIG_FAILED", f"text-only teacher config could not be loaded: {exc}") from exc
+        kwargs["key_mapping"] = dict(text_only_key_mapping or {})
     dtype = _torch_dtype(torch, compute_dtype)
     if dtype is not None:
         kwargs["torch_dtype"] = dtype
@@ -469,10 +630,18 @@ def load_native_teacher(
     except ImportError:
         pass
     try:
+        model: Any
         with _windows_pread_safetensors():
             try:
-                model = AutoModelForCausalLM.from_pretrained(str(snapshot), **kwargs)
+                if text_only_view is not None:
+                    from transformers import Qwen3_5ForCausalLM  # type: ignore
+
+                    model = Qwen3_5ForCausalLM.from_pretrained(str(load_snapshot), **kwargs)
+                else:
+                    model = AutoModelForCausalLM.from_pretrained(str(snapshot), **kwargs)
             except (OSError, RuntimeError, TypeError, ValueError) as causal_exc:
+                if text_only_view is not None:
+                    raise
                 # Qwen3.5 snapshots may advertise the multimodal conditional-
                 # generation class rather than a plain causal-LM class.  Keep the
                 # same pinned/local/no-remote-code kwargs for the fallback.
@@ -504,7 +673,11 @@ def load_native_teacher(
             "disable_mmap": bool(kwargs.get("disable_mmap", False)),
             "safetensors_backend": "pread" if os.name == "nt" else "default",
         }
+        load_metrics["teacher_kind"] = "text_only" if text_only_view is not None else "multimodal_native"
+        load_metrics["load_snapshot"] = str(load_snapshot)
         loaded_model._d2m_load_metrics = load_metrics
+        if text_only_view is not None:
+            loaded_model._d2m_text_only_key_mapping = dict(text_only_key_mapping or {})
         return loaded_model
     except (OSError, RuntimeError, TypeError, ValueError) as exc:
         raise TeacherCaptureBlocked(
@@ -937,7 +1110,7 @@ def _capture_forward(
 
             handles.append(module.register_forward_hook(output_hook))
     try:
-        with torch.inference_mode():
+        with torch.inference_mode(), _text_only_offload_key_mapping(model):
             _forward_model(model, input_ids, attention_mask)
     finally:
         for handle in handles:
@@ -1051,6 +1224,8 @@ def capture_text_teacher_activations(
     max_examples: int | None = None,
     diagnostic_only: bool = False,
     max_batch_tokens: int | None = None,
+    text_only_view: str | Path | None = None,
+    text_only_key_mapping: Mapping[str, str] | None = None,
 ) -> dict[str, Any]:
     """Capture fixed corpus text through a native teacher into split shards."""
 
@@ -1092,7 +1267,17 @@ def capture_text_teacher_activations(
         manifest_sequence_length = int(sequence_length or manifest_payload.get("sequence_length", 2048))
         tokenized = {item: tokenize_corpus_records(fixed_records[item], tokenizer, split=item, sequence_length=manifest_sequence_length) for item in splits}
         if model is None:
-            model = load_native_teacher(snapshot, source_revision, device_map=device_map, device=device, compute_dtype=compute_dtype, max_memory=max_memory, offload_folder=offload_folder)
+            model = load_native_teacher(
+                snapshot,
+                source_revision,
+                device_map=device_map,
+                device=device,
+                compute_dtype=compute_dtype,
+                max_memory=max_memory,
+                offload_folder=offload_folder,
+                text_only_view=text_only_view,
+                text_only_key_mapping=text_only_key_mapping,
+            )
         records = _discover_mlp_records(model, _model_layer_count(model))
         missing = [layer for layer in selected_layers if layer not in records]
         if missing:
@@ -1112,14 +1297,15 @@ def capture_text_teacher_activations(
         )
         verification_by_layer: dict[int, dict[str, Any]] = {}
         for layer in selected_layers:
-            check = verify_mlp_reconstruction(
-                module_map[layer],
-                verified_inputs[layer],
-                verified_outputs[layer],
-                layer=layer,
-                module_path=module_paths[layer],
-                threshold=hook_threshold,
-            )
+            with _text_only_offload_key_mapping(model):
+                check = verify_mlp_reconstruction(
+                    module_map[layer],
+                    verified_inputs[layer],
+                    verified_outputs[layer],
+                    layer=layer,
+                    module_path=module_paths[layer],
+                    threshold=hook_threshold,
+                )
             verification_by_layer[layer] = check.as_dict()
             verification.append(check.as_dict())
             if check.status != "HOOK_VERIFIED":
@@ -1232,6 +1418,8 @@ def capture_text_teacher_activations(
             "dataset_manifest": str(dataset_manifest),
             "source_snapshot": str(source_snapshot),
             "source_revision": source_revision,
+            "teacher_kind": "text_only" if text_only_view is not None else "multimodal_native",
+            "text_only_view": str(text_only_view) if text_only_view is not None else None,
             "module_paths": module_paths,
             "hook_verification": verification,
             "teacher_forward_count": teacher_forward_count,
@@ -1278,6 +1466,7 @@ __all__ = [
     "live_resource_snapshot",
     "load_native_teacher",
     "load_pinned_tokenizer",
+    "prepare_text_only_snapshot_view",
     "resolve_corpus_records",
     "resource_aware_max_memory",
     "snapshot_tokenizer_hashes",
