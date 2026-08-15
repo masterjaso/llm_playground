@@ -365,9 +365,9 @@ def _assemble(args: argparse.Namespace, store: StateStore) -> dict[str, Any]:
     profile = load_config(args.config or str(Path(__file__).resolve().parents[2] / "configs" / "qwen38_p32s1_top2.yaml"))
     manifest = assemble_checkpoint(paths, store.run_dir / "artifacts" / "hf-moe", metadata={"profile": profile.name, "expected_layers": profile.num_hidden_layers})
     result = {"status": "ASSEMBLY_READY" if manifest["complete"] else "BLOCKED", "manifest": str(store.run_dir / "artifacts" / "hf-moe" / "manifest.json"), "layers": len(paths)}
-    next_command = f"d2m evaluate --run-dir {args.run_dir}"
+    next_command = f"d2m evaluate --run-dir {args.run_dir}" if manifest["complete"] else f"d2m prepare-data --run-dir {args.run_dir}"
     store.transition(current_phase="evaluation", phase_status="pending" if manifest["complete"] else "blocked", next_exact_command=next_command, validation_results={"assembly": result})
-    store.write_handoff(next_command=next_command, expected_output="real-model evaluation metrics", blocker=None if manifest["complete"] else "Not all layer checkpoints are trained and validated")
+    store.write_handoff(next_command=next_command, expected_output="real-model evaluation metrics" if manifest["complete"] else "calibration corpus and trained layer checkpoints", blocker=None if manifest["complete"] else "Not all layer checkpoints are trained and validated")
     return result
 
 
