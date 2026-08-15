@@ -209,6 +209,11 @@ def validate_layer_checkpoint(
         errors.append("legacy schema")
     if checkpoint.status != "TRAINED_VALIDATED":
         errors.append(f"status is {checkpoint.status!r}")
+    for field_name in ("profile_hash", "source_revision", "source_config_hash", "source_index_hash", "dataset_hash", "partition_hash"):
+        if not getattr(checkpoint, field_name):
+            errors.append(f"missing {field_name}")
+    if not checkpoint.tensor_inventory:
+        errors.append("missing tensor inventory")
     if expected_layer is not None and checkpoint.layer != expected_layer:
         errors.append("layer mismatch")
     if expected_profile and checkpoint.profile != expected_profile:

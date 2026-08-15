@@ -73,7 +73,7 @@ class RealContractTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             tensors_path, inventory, digest = publish_tensor_artifact({"x": np.ones((2, 3), dtype=np.float32)}, root / "x.safetensors")
-            metadata = LayerCheckpoint(0, "p8", status="TRAINED_VALIDATED", profile_hash=profile_fingerprint("p8"), source_revision="rev", tensor_file=tensors_path.name, tensor_sha256=digest, tensor_inventory=inventory, quality_gate={"overall": "green"})
+            metadata = LayerCheckpoint(0, "p8", status="TRAINED_VALIDATED", profile_hash=profile_fingerprint("p8"), source_revision="rev", source_config_hash="config", source_index_hash="index", dataset_hash="dataset", partition_hash="partition", tensor_file=tensors_path.name, tensor_sha256=digest, tensor_inventory=inventory, quality_gate={"overall": "green"}, code_commit="test")
             path = save_layer_checkpoint(metadata, root / "layer-0000.json")
             valid, errors, _ = validate_layer_checkpoint(path, expected_profile="p8", expected_source_revision="rev")
             self.assertTrue(valid, errors)
