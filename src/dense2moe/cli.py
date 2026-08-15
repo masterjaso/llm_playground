@@ -78,6 +78,15 @@ def _write_fact_ledger(store: StateStore, facts: dict[str, Any]) -> Path:
 
 def _record(store: StateStore, args: argparse.Namespace, payload: Any, *, ok: bool = True) -> Any:
     store.record_command(args.command, argv=sys.argv[1:], ok=ok, result=payload)
+    if isinstance(payload, dict):
+        state = store.load()
+        artifacts = dict(state.artifact_paths)
+        for key in ("environment", "fact_ledger", "decision_register", "source_manifest", "estimate", "artifact", "manifest", "path"):
+            value = payload.get(key)
+            if isinstance(value, str) and value:
+                artifacts[key] = value
+        if artifacts != state.artifact_paths:
+            store.transition(artifact_paths=artifacts)
     return payload
 
 
@@ -420,7 +429,18 @@ def _report(args: argparse.Namespace, store: StateStore) -> dict[str, Any]:
     state = store.load()
     if state.terminal_state not in TERMINAL_STATES:
         state.terminal_state = "BLOCKED" if state.active_blocker else None
-        store.save(state)
+    known_artifacts = {
+        "environment": store.run_dir / "environment.json",
+        "fact_ledger": store.run_dir / "repository-fact-ledger.json",
+        "decision_register": store.run_dir / "decision-register.json",
+        "source_manifest": store.run_dir / "source-manifest.json",
+        "text_checkpoint_manifest": store.run_dir / "text-checkpoint" / "text-filter-manifest.json",
+        "pilot_metrics": store.run_dir / "metrics" / "pilot.json",
+        "training_queue": store.run_dir / "metrics" / "training-queue.json",
+        "assembly_manifest": store.run_dir / "artifacts" / "hf-moe" / "manifest.json",
+    }
+    state.artifact_paths.update({key: str(path) for key, path in known_artifacts.items() if path.exists()})
+    store.save(state)
     report = {"run_id": state.run_id, "terminal_state": state.terminal_state, "phase": state.current_phase, "phase_status": state.phase_status, "last_successful_command": state.last_successful_command, "next_exact_command": state.next_exact_command, "blocker": state.active_blocker, "artifacts": state.artifact_paths, "validation": state.validation_results}
     atomic_write_json(store.run_dir / "reports" / "final-report.json", report)
     return report
