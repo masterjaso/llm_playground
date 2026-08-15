@@ -2,7 +2,7 @@
   "schema_version": 1,
   "run_id": "20260815-180505-windows-real-d2m-v3",
   "parent_run_id": "20260815-162258-windows-real-d2m-v2",
-  "code_commit": "d49036da2bf5f04f5524c043d932423039a793ff",
+  "code_commit": "7e7b260fb4736cb8eac7411f21a8a4a38f265645",
   "status": "BLOCKED",
   "blocker_code": "TEACHER_FULL_CORPUS_THROUGHPUT_RESOURCE",
   "resumable": true,
@@ -46,6 +46,37 @@
       "observed_tokens_per_second": 13.9,
       "manifest": "runs/20260815-180505-windows-real-d2m-v3/capture/bench-train-mb2/layer-0000-train.json",
       "diagnostic_only": true
+    },
+    {
+      "name": "text_only_representative_diagnostic",
+      "status": "CAPTURE_COMPLETE",
+      "probe_code_commit": "59d017bab97c0477dfb5d313b7d8d6a38f3159d3",
+      "implementation_commit": "7e7b260fb4736cb8eac7411f21a8a4a38f265645",
+      "tokens": 1176,
+      "teacher_forward_count": 1,
+      "tokens_per_second": 19.975644321958683,
+      "teacher_kind": "text_only",
+      "text_tensor_count": 851,
+      "source_tensor_count": 1199,
+      "manifest": "runs/20260815-180505-windows-real-d2m-v3/capture/text-only-diagnostic-v3/layer-0000-holdout.json",
+      "equivalence": {
+        "selected_mlp_inputs": {
+          "layers": [0, 16, 32, 48, 63],
+          "array_equal": true,
+          "max_abs": 0.0,
+          "normalized_mse": 0.0,
+          "cosine": 1.0
+        },
+        "selected_hidden_states_and_logits": {
+          "tokens": 32,
+          "hidden_state_cosine_min": 0.9998730151301357,
+          "hidden_state_max_abs_max": 3.0,
+          "logit_cosine": 0.9999586745119122,
+          "logit_max_abs": 0.4375,
+          "tolerance_basis": "measured BF16 bounded comparison; source values remain BF16 and no teacher quantization was used"
+        }
+      },
+      "diagnostic_only": true
     }
   ],
   "failed_or_interrupted_attempts": [
@@ -71,6 +102,35 @@
       "device_map": "0=6GiB,1=12GiB,cpu=12GiB",
       "status": "INTERRUPTED",
       "reason": "disk/CPU offload dominated and no validated full-corpus result was returned within the bounded observation window"
+    },
+    {
+      "name": "full_holdout_text_only_microbatch_1",
+      "teacher_kind": "text_only",
+      "split": "holdout",
+      "microbatch": 1,
+      "max_batch_tokens": 1024,
+      "status": "INTERRUPTED",
+      "reason": "approximately 30-minute bounded throughput window completed without a durable 8192-token shard; no quality manifest was accepted",
+      "artifact_scope": "no activation artifact produced"
+    },
+    {
+      "name": "full_holdout_text_only_microbatch_4",
+      "teacher_kind": "text_only",
+      "split": "holdout",
+      "microbatch": 4,
+      "max_batch_tokens": 8192,
+      "status": "INTERRUPTED",
+      "reason": "native Windows process terminated during the repeated model load before any activation manifest was returned",
+      "exit_code": "0xC000013A",
+      "artifact_scope": "no activation artifact produced"
+    },
+    {
+      "name": "text_only_postcommit_repeat_diagnostic",
+      "teacher_kind": "text_only",
+      "status": "CRASHED",
+      "reason": "Windows native process terminated during a repeated 851-weight diagnostic load before forward validation",
+      "exit_code": "0xC0000005",
+      "artifact_scope": "no artifact accepted; prior validated diagnostic remains the only equivalence evidence"
     }
   ],
   "environment_constraints": {
@@ -84,7 +144,7 @@
     "teacher_weight_bytes": 55563006776,
     "safetensors_backend": "pread required on native Windows after mmap raised WinError 1455"
   },
-  "next_exact_command": "d2m capture --run-dir runs\\20260815-180505-windows-real-d2m-v3 --parent-run-id 20260815-162258-windows-real-d2m-v2 --layers 0,16,32,48,63 --dataset-manifest runs\\20260815-180505-windows-real-d2m-v3\\capture\\data-plan.json --source-dir runs\\20260815-030931-windows\\source --source-revision 1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0 --split both --microbatch 1 --max-batch-tokens 1024 --dtype float16 --compute-dtype bfloat16 --device-map auto --resume --json",
+  "next_exact_command": "d2m capture --run-dir runs\\20260815-180505-windows-real-d2m-v3 --parent-run-id 20260815-162258-windows-real-d2m-v2 --layers 0,16,32,48,63 --dataset-manifest runs\\20260815-180505-windows-real-d2m-v3\\capture\\data-plan.json --source-dir runs\\20260815-030931-windows\\source --source-revision 1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0 --split holdout --microbatch 4 --max-batch-tokens 8192 --dtype float16 --compute-dtype bfloat16 --device-map auto --text-only --text-only-view runs\\20260815-180505-windows-real-d2m-v3\\teacher-text-only --offload-folder .offload\\20260815-180505-windows-real-d2m-v3-holdout-text-mb4 --resume --json",
   "remediation": [
     "Run on a machine with materially larger combined VRAM and/or RAM/pagefile, or enlarge the Windows pagefile with administrative privileges.",
     "Resume from the existing data-plan; do not substitute synthetic or random activations for the missing real corpus.",

@@ -9,9 +9,9 @@
     "source_manifest": "runs/20260815-180505-windows-real-d2m-v3/source-manifest.json"
   },
   "blocker": "TEACHER_FULL_CORPUS_THROUGHPUT_RESOURCE: no validated non-diagnostic full-corpus activation manifest was produced",
-  "code_commit": "d49036da2bf5f04f5524c043d932423039a793ff",
+  "code_commit": "7e7b260fb4736cb8eac7411f21a8a4a38f265645",
   "last_successful_command": "pilot",
-  "next_exact_command": "d2m capture --run-dir runs\\20260815-180505-windows-real-d2m-v3 --parent-run-id 20260815-162258-windows-real-d2m-v2 --layers 0,16,32,48,63 --dataset-manifest runs\\20260815-180505-windows-real-d2m-v3\\capture\\data-plan.json --source-dir runs\\20260815-030931-windows\\source --source-revision 1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0 --split both --microbatch 1 --max-batch-tokens 1024 --dtype float16 --compute-dtype bfloat16 --device-map auto --resume --json",
+  "next_exact_command": "d2m capture --run-dir runs\\20260815-180505-windows-real-d2m-v3 --parent-run-id 20260815-162258-windows-real-d2m-v2 --layers 0,16,32,48,63 --dataset-manifest runs\\20260815-180505-windows-real-d2m-v3\\capture\\data-plan.json --source-dir runs\\20260815-030931-windows\\source --source-revision 1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0 --split holdout --microbatch 4 --max-batch-tokens 8192 --dtype float16 --compute-dtype bfloat16 --device-map auto --text-only --text-only-view runs\\20260815-180505-windows-real-d2m-v3\\teacher-text-only --offload-folder .offload\\20260815-180505-windows-real-d2m-v3-holdout-text-mb4 --resume --json",
   "phase": "capture",
   "phase_status": "blocked",
   "run_id": "20260815-180505-windows-real-d2m-v3",
@@ -23,12 +23,27 @@
       "message": "no validated non-diagnostic full-corpus activation manifest was produced",
       "status": "BLOCKED"
     },
+    "full_capture_attempts": {
+      "evidence": "runs/20260815-180505-windows-real-d2m-v3/evidence/phase-02/teacher-full-corpus-blocker.json",
+      "microbatch_1_no_durable_shard": true,
+      "microbatch_4_load_interrupted": true,
+      "status": "BLOCKED"
+    },
     "partition": {
       "capacity": 17408,
       "layer": 0,
       "next_exact_command": "d2m train-layer --run-dir runs\\20260815-180505-windows-real-d2m-v3 --layer 0",
       "path": "runs\\20260815-180505-windows-real-d2m-v3\\partitions\\layer-0000.json",
       "status": "PARTITION_READY"
+    },
+    "text_only_equivalence": {
+      "diagnostic_manifest": "runs/20260815-180505-windows-real-d2m-v3/capture/text-only-diagnostic-v3/layer-0000-holdout.json",
+      "diagnostic_only": true,
+      "final_logit_cosine": 0.9999586745119122,
+      "quality_gate_eligible": false,
+      "selected_hidden_state_cosine_min": 0.9998730151301357,
+      "selected_mlp_inputs_array_equal": true,
+      "status": "TEXT_ONLY_EQUIVALENCE_COMPLETE"
     }
   }
 }
