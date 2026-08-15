@@ -1,0 +1,30 @@
+{
+  "capture_mode": "native_teacher",
+  "code_commit": "d2e612c44728335c636ec4bbb537f55752b7909e",
+  "dataset_manifest": "runs/20260815-162258-windows-real-d2m-v2/capture/data-plan.json",
+  "hook_verification": [],
+  "layers": [
+    {
+      "available_host_memory_bytes": 39266910208,
+      "blocker_code": "TEACHER_RESOURCE_INSUFFICIENT",
+      "code_commit": "d2e612c44728335c636ec4bbb537f55752b7909e",
+      "dataset_manifest": "runs/20260815-162258-windows-real-d2m-v2/capture/data-plan.json",
+      "device_map": "cpu",
+      "estimated_weight_bytes": 55563006776,
+      "layers": [
+        0
+      ],
+      "message": "native teacher snapshot exceeds safe available host memory for the installed CPU-only runtime",
+      "remediation": "install a CUDA-enabled PyTorch build or provide a multi-device/offload runtime, then resume capture",
+      "resumable": true,
+      "source_revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
+      "source_snapshot": "runs/20260815-030931-windows/source",
+      "status": "BLOCKED"
+    }
+  ],
+  "message": "one or more layers have no validated binary activation capture",
+  "resource_metrics": {},
+  "source_revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
+  "source_snapshot": "runs/20260815-030931-windows/source",
+  "status": "BLOCKED"
+}

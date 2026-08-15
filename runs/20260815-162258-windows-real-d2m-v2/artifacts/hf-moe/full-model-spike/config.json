@@ -1,0 +1,246 @@
+{
+  "architectures": [
+    "qwen3_5_text_tiny_moe_v1"
+  ],
+  "model_type": "qwen3_5_text",
+  "state_dict_inventory": {
+    "embed_tokens.weight": {
+      "dtype": "torch.float32",
+      "shape": [
+        97,
+        32
+      ]
+    },
+    "layers.0.attention.weight": {
+      "dtype": "torch.float32",
+      "shape": [
+        32,
+        32
+      ]
+    },
+    "layers.0.input_layernorm.bias": {
+      "dtype": "torch.float32",
+      "shape": [
+        32
+      ]
+    },
+    "layers.0.input_layernorm.weight": {
+      "dtype": "torch.float32",
+      "shape": [
+        32
+      ]
+    },
+    "layers.0.mlp.expert_down_proj.0.weight": {
+      "dtype": "torch.float32",
+      "shape": [
+        32,
+        12
+      ]
+    },
+    "layers.0.mlp.expert_down_proj.1.weight": {
+      "dtype": "torch.float32",
+      "shape": [
+        32,
+        12
+      ]
+    },
+    "layers.0.mlp.expert_down_proj.2.weight": {
+      "dtype": "torch.float32",
+      "shape": [
+        32,
+        12
+      ]
+    },
+    "layers.0.mlp.expert_down_proj.3.weight": {
+      "dtype": "torch.float32",
+      "shape": [
+        32,
+        12
+      ]
+    },
+    "layers.0.mlp.expert_gate_proj.0.weight": {
+      "dtype": "torch.float32",
+      "shape": [
+        12,
+        32
+      ]
+    },
+    "layers.0.mlp.expert_gate_proj.1.weight": {
+      "dtype": "torch.float32",
+      "shape": [
+        12,
+        32
+      ]
+    },
+    "layers.0.mlp.expert_gate_proj.2.weight": {
+      "dtype": "torch.float32",
+      "shape": [
+        12,
+        32
+      ]
+    },
+    "layers.0.mlp.expert_gate_proj.3.weight": {
+      "dtype": "torch.float32",
+      "shape": [
+        12,
+        32
+      ]
+    },
+    "layers.0.mlp.expert_scales": {
+      "dtype": "torch.float32",
+      "shape": [
+        4
+      ]
+    },
+    "layers.0.mlp.expert_up_proj.0.weight": {
+      "dtype": "torch.float32",
+      "shape": [
+        12,
+        32
+      ]
+    },
+    "layers.0.mlp.expert_up_proj.1.weight": {
+      "dtype": "torch.float32",
+      "shape": [
+        12,
+        32
+      ]
+    },
+    "layers.0.mlp.expert_up_proj.2.weight": {
+      "dtype": "torch.float32",
+      "shape": [
+        12,
+        32
+      ]
+    },
+    "layers.0.mlp.expert_up_proj.3.weight": {
+      "dtype": "torch.float32",
+      "shape": [
+        12,
+        32
+      ]
+    },
+    "layers.0.mlp.router.weight": {
+      "dtype": "torch.float32",
+      "shape": [
+        4,
+        32
+      ]
+    },
+    "layers.0.mlp.shared_down_proj.weight": {
+      "dtype": "torch.float32",
+      "shape": [
+        32,
+        16
+      ]
+    },
+    "layers.0.mlp.shared_gate_proj.weight": {
+      "dtype": "torch.float32",
+      "shape": [
+        16,
+        32
+      ]
+    },
+    "layers.0.mlp.shared_up_proj.weight": {
+      "dtype": "torch.float32",
+      "shape": [
+        16,
+        32
+      ]
+    },
+    "layers.0.post_attention_layernorm.bias": {
+      "dtype": "torch.float32",
+      "shape": [
+        32
+      ]
+    },
+    "layers.0.post_attention_layernorm.weight": {
+      "dtype": "torch.float32",
+      "shape": [
+        32
+      ]
+    },
+    "layers.1.attention.weight": {
+      "dtype": "torch.float32",
+      "shape": [
+        32,
+        32
+      ]
+    },
+    "layers.1.input_layernorm.bias": {
+      "dtype": "torch.float32",
+      "shape": [
+        32
+      ]
+    },
+    "layers.1.input_layernorm.weight": {
+      "dtype": "torch.float32",
+      "shape": [
+        32
+      ]
+    },
+    "layers.1.mlp.down_proj.weight": {
+      "dtype": "torch.float32",
+      "shape": [
+        32,
+        64
+      ]
+    },
+    "layers.1.mlp.gate_proj.weight": {
+      "dtype": "torch.float32",
+      "shape": [
+        64,
+        32
+      ]
+    },
+    "layers.1.mlp.up_proj.weight": {
+      "dtype": "torch.float32",
+      "shape": [
+        64,
+        32
+      ]
+    },
+    "layers.1.post_attention_layernorm.bias": {
+      "dtype": "torch.float32",
+      "shape": [
+        32
+      ]
+    },
+    "layers.1.post_attention_layernorm.weight": {
+      "dtype": "torch.float32",
+      "shape": [
+        32
+      ]
+    },
+    "lm_head.weight": {
+      "dtype": "torch.float32",
+      "shape": [
+        97,
+        32
+      ]
+    },
+    "norm.bias": {
+      "dtype": "torch.float32",
+      "shape": [
+        32
+      ]
+    },
+    "norm.weight": {
+      "dtype": "torch.float32",
+      "shape": [
+        32
+      ]
+    }
+  },
+  "tiny_config": {
+    "hidden_size": 32,
+    "intermediate_size": 64,
+    "moe_layer": 0,
+    "num_hidden_layers": 2,
+    "routed_experts": 4,
+    "shared_intermediate_size": 16,
+    "top_k": 2,
+    "vocab_size": 97
+  },
+  "torch_version": "2.13.0+cpu"
+}

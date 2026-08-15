@@ -1,0 +1,12 @@
+{
+  "code_commit": "d2e612c44728335c636ec4bbb537f55752b7909e",
+  "holdout_records": 76,
+  "holdout_tokens": 16598,
+  "ids_sha256": "af8b9cd1f23df91af92f46d5f70e4ed5708399b831a7180cfb509f5adff4f220",
+  "manifest": "runs/20260815-162258-windows-real-d2m-v2/capture/data-plan.json",
+  "records": 538,
+  "status": "CORPUS_VERIFIED",
+  "tokenizer_revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
+  "train_records": 462,
+  "train_tokens": 131508
+}

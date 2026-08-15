@@ -1,0 +1,20 @@
+{
+  "architecture": "qwen3_5_text_tiny_moe_v1",
+  "config": {
+    "hidden_size": 32,
+    "intermediate_size": 64,
+    "moe_layer": 0,
+    "num_hidden_layers": 2,
+    "routed_experts": 4,
+    "shared_intermediate_size": 16,
+    "top_k": 2,
+    "vocab_size": 97
+  },
+  "generation_equal": true,
+  "max_logit_delta": 0.0,
+  "path": "runs/20260815-162258-windows-real-d2m-v2/artifacts/hf-moe/full-model-spike",
+  "seed": 17,
+  "status": "FULL_MODEL_RELOAD_GREEN",
+  "strict_tensor_inventory": true,
+  "tensor_count": 34
+}
