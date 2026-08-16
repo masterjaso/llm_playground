@@ -4,10 +4,10 @@
     "falsifier": "layer-streaming cannot reproduce the known native/text-only diagnostic",
     "reason": "teacher correctness is established; failure is whole-model residency/throughput",
     "production_objective": ">=70% active dense-FFN reduction with strongest achievable quality",
-    "current_research_path": "independent_positive residual_oracle_routing_holdout_confirmation_then_angular_generalization_investigation_before_representative_replay",
+    "current_research_path": "p16_top4_selector_generalization_blocked_after_exact_holdout_capacity_confirmation",
     "replay_gate": "PAUSED_NO_GREEN_GE70_CANDIDATE"
   },
-  "code_commit": "4272fc26df6e232373868284b6ae84b7d3b5419b",
+  "code_commit": "bb0beeaf6823c383886d020c68e894b33226b00a",
   "created": "2026-08-15T22:46:52.495949Z",
   "dataset_hash": "46b278a85b4cb31a8fe659be2dd146bd9206eb491268220e25440981d06c0a03",
   "default_profile": "qwen38_p16s1_top4",
@@ -156,5 +156,42 @@
   "text_tensor_count": 851,
   "trust_remote_code": false,
   "use_powershell": true,
-  "windows_native": true
+  "windows_native": true,
+  "takeover_extension": {
+    "status": "HIGH_SPARSITY_RESEARCH_COMPLETE_REPLAY_BLOCKED",
+    "code_commit": "bb0beeaf6823c383886d020c68e894b33226b00a",
+    "report": "reports/p16-top4-research-synthesis.json",
+    "best_ge70_validation": {
+      "profile": "qwen38_p16s1_top4",
+      "checkpoint": "layer-checkpoints/clean-validation/p16-top4-refined-course-correction-continue",
+      "normalized_mse": 0.022887117509033616,
+      "cosine": 0.9815988321788609,
+      "dead_experts": 0,
+      "load_cv": 0.44209580869297127
+    },
+    "best_ge70_holdout": {
+      "normalized_mse": 0.02723947770674348,
+      "cosine": 0.977043557273349,
+      "dead_experts": 0,
+      "load_cv": 0.47126541816094275,
+      "strict_reload": true,
+      "green": false
+    },
+    "exact_holdout_oracle": {
+      "cosine": 0.9821853987034983,
+      "bounded_cosine": 0.9821237200268034,
+      "student_vs_exact_topk_recall": 0.8346939390287986,
+      "decision": "capacity_sufficient_selector_generalization_blocker"
+    },
+    "rejected_variants": [
+      "shared1152_top4_promotion",
+      "fit_shared_scale",
+      "low_rank_silu_hidden128_listwise_and_set_margin",
+      "low_rank_silu_hidden128_joint_course",
+      "low_rank_silu_hidden512_joint_course",
+      "differentiable_soft_topk_surrogate"
+    ],
+    "replay_gate": "BLOCKED_NO_GREEN_GE70_CANDIDATE",
+    "next_work": "FIT/validation-only selector generalization research; no holdout tuning"
+  }
 }

@@ -1,0 +1,82 @@
+{
+  "schema_version": 1,
+  "status": "HIGH_SPARSITY_RESEARCH_COMPLETE_REPLAY_BLOCKED",
+  "classification": "TRUE_FIT_VALIDATION_HOLDOUT_PROTOCOL",
+  "source": {
+    "model": "Qwen/Qwen3.8-27B",
+    "revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
+    "hidden_size": 5120,
+    "dense_ffn_width": 17408,
+    "layers": 64
+  },
+  "split_contract": {
+    "fit_rows": 115124,
+    "validation_rows": 16384,
+    "validation_identity_hash": "5a7739c753dae98698a8c1a22c6a10409230f0750b33cfc9631594f16d8b8e1c",
+    "holdout_rows": 16598,
+    "holdout_policy": "opened only for post-selection finalist confirmation and a post-failure exact capacity diagnostic; never used for optimizer updates"
+  },
+  "product_geometry": {
+    "profile": "qwen38_p16s1_top4",
+    "routed_experts": 16,
+    "expert_width": 1024,
+    "shared_width": 1024,
+    "top_k": 4,
+    "active_width": 5120,
+    "active_ffn_reduction": 0.7058823529411764,
+    "routing_mode": "independent_positive"
+  },
+  "finalist": {
+    "checkpoint": "layer-checkpoints/clean-validation/p16-top4-refined-course-correction-continue",
+    "code_commit": "d9f6119f6059accc11f678f269961f0075ed3781",
+    "validation": {
+      "normalized_mse": 0.022887117509033616,
+      "cosine": 0.9815988321788609,
+      "dead_experts": 0,
+      "load_cv": 0.44209580869297127,
+      "strict_reload": true
+    },
+    "holdout": {
+      "normalized_mse": 0.02723947770674348,
+      "cosine": 0.977043557273349,
+      "dead_experts": 0,
+      "load_cv": 0.47126541816094275,
+      "strict_reload": true,
+      "green": false
+    }
+  },
+  "capacity_diagnostic": {
+    "report": "reports/p16-top4-refined-course-correction-holdout-exact-oracle.json",
+    "exact_oracle_holdout_cosine": 0.9821853987034983,
+    "bounded_oracle_holdout_cosine": 0.9821237200268034,
+    "exact_oracle_holdout_nmse": 0.015444574875615973,
+    "student_vs_exact_holdout_topk_recall": 0.8346939390287986,
+    "student_vs_exact_holdout_mean_jaccard": 0.763058085024587,
+    "decision": "capacity_sufficient_selector_generalization_blocker"
+  },
+  "falsified_variants": [
+    {"variant": "shared1152_top4_promotion", "decision": "reject_promoted_topology", "report": "reports/p16-top4-shared1152-promotion-oracle.json"},
+    {"variant": "fit_shared_scale", "decision": "reject_shared_scale_variant", "report": "reports/p16-top4-shared-scale-oracle.json"},
+    {"variant": "low_rank_silu_hidden128_listwise", "validation_cosine": 0.974850854370743, "decision": "no_selector_gain", "report": "reports/p16-top4-nonlinear-listwise-training.json"},
+    {"variant": "exact_set_margin_soft_balance", "validation_cosine": 0.974850854370743, "decision": "no_selector_gain", "report": "reports/p16-top4-nonlinear-set-margin-training.json"},
+    {"variant": "low_rank_silu_hidden128_joint_course", "validation_cosine": 0.9784838818013668, "decision": "below_validation_gate", "report": "reports/p16-top4-nonlinear-course-correction.json"},
+    {"variant": "low_rank_silu_hidden512_joint_course", "validation_selection": "initialization_only_at_0.9815969308838248", "decision": "training_regressed", "report": "reports/p16-top4-nonlinear-hidden512-course.json"},
+    {"variant": "differentiable_soft_topk_surrogate", "validation_cosine": 0.9815988321788609, "decision": "unchanged_warm_start_selected", "report": "reports/p16-top4-soft-surrogate-router.json"}
+  ],
+  "replay_gate": {
+    "status": "BLOCKED",
+    "reason": "the best >=70% candidate fails holdout cosine >=0.98 even though the exact holdout oracle clears it",
+    "representative_layer_replay_started": false,
+    "full_64_layer_replay_started": false,
+    "next_work": "develop a selector with stronger cross-domain generalization using FIT only, or explicitly revisit the product quality/reduction tradeoff; do not tune on the holdout"
+  },
+  "provenance": {
+    "current_code_commit_at_synthesis": "bb0beeaf6823c383886d020c68e894b33226b00a",
+    "reports": [
+      "reports/p16-top4-refined-course-correction-continuation.json",
+      "reports/p16-top4-refined-course-correction-holdout-confirmation.json",
+      "reports/p16-top4-refined-course-correction-holdout-exact-oracle.json",
+      "reports/p16-top4-refined-course-correction-validation-exact-oracle.json"
+    ]
+  }
+}

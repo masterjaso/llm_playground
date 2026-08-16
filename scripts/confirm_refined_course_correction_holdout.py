@@ -13,7 +13,11 @@ import torch
 from dense2moe.config import load_config
 from dense2moe.models.torch_moe import TorchQwen35SwiGLUMoE
 from dense2moe.provenance import current_git_commit
-from dense2moe.training.torch_distill import ActivationShardDataset, _plan_from_path, _stream_metrics
+from dense2moe.training.torch_distill import (
+    ActivationShardDataset,
+    _plan_from_path,
+    _stream_metrics,
+)
 
 try:
     from scripts.run_exact_p16_oracle import _load_dense_mlp

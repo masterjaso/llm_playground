@@ -17,7 +17,6 @@ from dense2moe.config import load_config
 from dense2moe.provenance import current_git_commit
 from dense2moe.training.torch_distill import train_torch_layer
 
-
 DEFAULT_RUN = Path("runs/20260815-184644-windows-real-d2m-v4-streaming")
 DEFAULT_SOURCE = Path("runs/20260815-030931-windows/source")
 

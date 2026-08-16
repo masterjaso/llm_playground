@@ -11,10 +11,10 @@
     "fact_ledger": "runs\\20260815-184644-windows-real-d2m-v4-streaming\\repository-fact-ledger.json",
     "source_manifest": "runs\\20260815-184644-windows-real-d2m-v4-streaming\\source-manifest.json"
   },
-  "code_commit": "4272fc26df6e232373868284b6ae84b7d3b5419b",
-  "current_phase": "high-sparsity-routing-course-correction",
-  "last_successful_command": "confirm_high_sparsity_candidate.py",
-  "next_exact_command": "investigate holdout angular generalization before any representative replay",
+  "code_commit": "bb0beeaf6823c383886d020c68e894b33226b00a",
+  "current_phase": "selector-generalization-blocked",
+  "last_successful_command": "confirm_refined_course_correction_holdout.py",
+  "next_exact_command": "FIT/validation-only selector generalization research; no holdout tuning or replay",
   "parent_run_id": "20260815-180505-windows-real-d2m-v3",
   "phase_status": "quality_gate_not_met_replay_paused",
   "prediction_contract": {
@@ -277,5 +277,34 @@
         }
       }
     }
+  },
+  "takeover_extension": {
+    "status": "HIGH_SPARSITY_RESEARCH_COMPLETE_REPLAY_BLOCKED",
+    "code_commit": "bb0beeaf6823c383886d020c68e894b33226b00a",
+    "current_phase": "selector-generalization-blocked",
+    "last_successful_command": "confirm_refined_course_correction_holdout.py",
+    "best_ge70_checkpoint": "layer-checkpoints/clean-validation/p16-top4-refined-course-correction-continue",
+    "best_ge70_validation": {
+      "normalized_mse": 0.022887117509033616,
+      "cosine": 0.9815988321788609,
+      "dead_experts": 0,
+      "load_cv": 0.44209580869297127
+    },
+    "best_ge70_holdout": {
+      "normalized_mse": 0.02723947770674348,
+      "cosine": 0.977043557273349,
+      "dead_experts": 0,
+      "load_cv": 0.47126541816094275,
+      "strict_reload": true,
+      "green": false
+    },
+    "exact_holdout_oracle": {
+      "cosine": 0.9821853987034983,
+      "bounded_cosine": 0.9821237200268034,
+      "student_vs_exact_topk_recall": 0.8346939390287986,
+      "decision": "capacity_sufficient_selector_generalization_blocker"
+    },
+    "replay_gate": "BLOCKED_NO_GREEN_CANDIDATE",
+    "next_exact_command": "FIT/validation-only selector generalization research; no holdout tuning or replay"
   }
 }
