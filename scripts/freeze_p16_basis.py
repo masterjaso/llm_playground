@@ -48,7 +48,10 @@ def main() -> None:
         raise ValueError("basis tensor SHA-256 does not match checkpoint metadata")
     partition_payload = json.loads(partition_path.read_text(encoding="utf-8"))
     canonical_plan = partition_payload.get("plan", partition_payload)
-    plan_hash = hashlib.sha256(json.dumps(canonical_plan, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+    # Layer checkpoints historically hash ``plan.as_dict()`` with sorted JSON
+    # keys and default separators.  Reproduce that exact recipe so the freeze
+    # receipt can be checked against the checkpoint metadata byte-for-byte.
+    plan_hash = hashlib.sha256(json.dumps(canonical_plan, sort_keys=True).encode()).hexdigest()
     recorded_plan_hash = str(metadata.get("partition_hash", ""))
     if plan_hash != recorded_plan_hash:
         raise ValueError("basis partition canonical hash does not match checkpoint metadata")
