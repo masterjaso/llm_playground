@@ -228,7 +228,10 @@ class _Heartbeat:
 def run(args: argparse.Namespace) -> dict[str, Any]:
     run_dir = Path(args.run_dir)
     fresh_dir = Path(args.fresh_dir)
-    activation_manifest = fresh_dir / "capture/layer-0000.json"
+    # The fresh capture intentionally has no aggregate train/holdout wrapper:
+    # this selector-only run consumes the explicit train manifest and keeps
+    # the separately frozen A/B receipt out of the activation loader.
+    activation_manifest = fresh_dir / "capture/layer-0000-train.json"
     data_plan_path = fresh_dir / "capture/fresh-selector-data-plan.json"
     ab_path = fresh_dir / "capture/fresh-selector-validation-ab.json"
     data_plan = json.loads(data_plan_path.read_text(encoding="utf-8"))
