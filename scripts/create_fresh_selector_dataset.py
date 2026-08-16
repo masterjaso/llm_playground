@@ -49,6 +49,13 @@ DEFAULT_SOURCES: tuple[dict[str, str], ...] = (
         "rationale": "New public-domain long-form prose for distribution-shift coverage.",
     },
     {
+        "name": "Project Gutenberg Shakespeare",
+        "url": "https://www.gutenberg.org/cache/epub/100/pg100.txt",
+        "domain": "general",
+        "license": "Public Domain",
+        "rationale": "Additional public-domain dramatic prose and dialogue from a distinct book.",
+    },
+    {
         "name": "CPython asyncio documentation",
         "url": "https://raw.githubusercontent.com/python/cpython/main/Doc/library/asyncio.rst",
         "domain": "code",
@@ -217,7 +224,7 @@ def main() -> None:
     parser.add_argument("--source-snapshot", type=Path, required=True)
     parser.add_argument("--source-revision", required=True)
     parser.add_argument("--historical-corpus", type=Path, default=Path("data/public_v2/corpus.jsonl"))
-    parser.add_argument("--train-tokens", type=int, default=600_000)
+    parser.add_argument("--train-tokens", type=int, default=350_000)
     parser.add_argument("--holdout-tokens", type=int, default=16_384)
     parser.add_argument("--validation-a-count", type=int, default=16_384)
     parser.add_argument("--validation-b-count", type=int, default=32_768)
