@@ -439,6 +439,8 @@ def _evaluate_profile(
     search_method: str | None = None,
     top_ks: Iterable[int],
     split_name: str,
+    beam_width: int = 4,
+    pool_size: int | None = None,
 ) -> list[dict[str, Any]]:
     import torch
 
@@ -475,7 +477,15 @@ def _evaluate_profile(
             if exact:
                 route = _exact_topk(shared, routed, target, k, simplex=simplex)
             elif search_method == "beam":
-                route = _residual_correlation_beam_topk(shared, routed, target, k, simplex=simplex)
+                route = _residual_correlation_beam_topk(
+                    shared,
+                    routed,
+                    target,
+                    k,
+                    simplex=simplex,
+                    beam_width=beam_width,
+                    pool_size=pool_size,
+                )
             else:
                 route = _norm_ranked_topk(shared, routed, target, k, simplex=simplex)
             item["elapsed_seconds"] += time.perf_counter() - tic
@@ -523,6 +533,8 @@ def _evaluate_profile(
             "top_k": item["top_k"],
             "formulation": item["formulation"],
             "selection_method": item["selection_method"],
+            "beam_width": int(beam_width) if search_method == "beam" and not exact else None,
+            "candidate_pool_size": int(pool_size) if search_method == "beam" and pool_size is not None and not exact else None,
             "tokens": tokens,
             "normalized_mse": item["error_sum"] / max(item["target_norm_sum"], 1e-12),
             "cosine": item["cosine_sum"] / tokens,

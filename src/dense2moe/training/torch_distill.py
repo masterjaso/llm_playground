@@ -5,7 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
-from collections.abc import Iterator
+from collections.abc import Iterator, Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
@@ -150,6 +150,38 @@ class ActivationShardDataset:
             for start in range(0, int(shard.shape[0]), size):
                 yield shard[start : start + size]
 
+    def iter_selected_batches(self, indices: Sequence[int], microbatch: int | None = None) -> Iterator[Any]:
+        """Yield a deterministic global-row subset without materializing it.
+
+        The indices are global positions in this explicit split manifest.  A
+        caller records the selection hash in its checkpoint so architecture
+        selection cannot silently drift to a different development subset.
+        """
+
+        size = int(microbatch or self.microbatch)
+        if size <= 0:
+            raise ValueError("microbatch must be positive")
+        selected = sorted({int(index) for index in indices})
+        if any(index < 0 or index >= self.count for index in selected):
+            raise IndexError(f"selected activation row is outside {self.split} split: count={self.count}")
+        wanted = set(selected)
+        cursor = 0
+        manifest = self._resolved_manifest_path()
+        for shard in iter_activation_shards(manifest, expected_split=self.split):
+            shard_count = int(shard.shape[0])
+            local = [index - cursor for index in selected if cursor <= index < cursor + shard_count]
+            if local:
+                values = shard[local]
+                for start in range(0, int(values.shape[0]), size):
+                    yield values[start : start + size]
+            cursor += shard_count
+        if cursor != self.count:
+            raise ValueError(f"activation manifest count mismatch for {self.manifest_path}: {cursor} != {self.count}")
+        # Keep the local set alive through the generator body so a malformed
+        # manifest cannot make this check look vacuously successful.
+        if len(wanted) != len(selected):  # pragma: no cover - sorted set invariant
+            raise ValueError("selected activation rows are not unique")
+
     def __iter__(self) -> Iterator[Any]:
         return self.iter_batches()
 
@@ -236,8 +268,9 @@ def _stream_metrics(
     down: Any,
     microbatch: int,
     device: str,
+    selected_indices: Sequence[int] | None = None,
 ) -> dict[str, Any]:
-    """Evaluate holdout metrics without materializing the split."""
+    """Evaluate one explicit split, optionally restricted to global rows."""
 
     import numpy as np  # type: ignore
     import torch
@@ -254,7 +287,8 @@ def _stream_metrics(
     loads = np.zeros(model.routed_experts, dtype=np.float64)
     entropy_sum = 0.0
     with torch.inference_mode():
-        for values in dataset.iter_batches(microbatch):
+        batches = dataset.iter_batches(microbatch) if selected_indices is None else dataset.iter_selected_batches(selected_indices, microbatch)
+        for values in batches:
             inputs = torch.as_tensor(values, dtype=torch.float32, device=device)
             target = _dense_target_torch(inputs, gate_device, up_device, down_device)
             prediction, info = model(inputs, return_router=True)
@@ -291,6 +325,8 @@ def _stream_metrics(
         "router_entropy": entropy_sum / token_count,
         "token_count": token_count,
         "streaming": True,
+        "split": dataset.split,
+        "selected_count": int(len(selected_indices)) if selected_indices is not None else token_count,
     }
 
 
@@ -309,13 +345,49 @@ def _oracle_indices_for_batch(
     return oracle_topk(shared, routed, target, top_k=top_k)["indices"]
 
 
-def _enable_router_parameters(model: TorchQwen35SwiGLUMoE) -> None:
-    """Enable selection and independent-positive amplitude router parameters."""
+def _enable_router_parameters(
+    model: TorchQwen35SwiGLUMoE,
+    *,
+    train_selection: bool = True,
+    train_amplitude: bool = True,
+) -> None:
+    """Enable independently controlled selection/amplitude router parameters."""
 
-    model.router.weight.requires_grad = True
+    model.router.weight.requires_grad = bool(train_selection)
     if model.routing_mode == "independent_positive":
-        model.amplitude_router.weight.requires_grad = True
-        model.amplitude_router.bias.requires_grad = True
+        model.amplitude_router.weight.requires_grad = bool(train_amplitude)
+        model.amplitude_router.bias.requires_grad = bool(train_amplitude)
+
+
+def _optimizer_parameter_groups(
+    model: TorchQwen35SwiGLUMoE,
+    *,
+    learning_rate: float,
+    learning_rates: Mapping[str, float] | None,
+) -> list[dict[str, Any]]:
+    """Build named parameter groups so router/scale/expert LRs can differ."""
+
+    overrides = {str(name): float(value) for name, value in (learning_rates or {}).items()}
+    groups: list[tuple[str, list[Any]]] = [
+        ("selection_router", [model.router.weight]),
+        ("amplitude_router", list(model.amplitude_router.parameters()) if model.routing_mode == "independent_positive" else []),
+        ("expert_scales", [model.expert_scales]),
+        (
+            "experts",
+            [parameter for module in (*model.expert_gate_proj, *model.expert_up_proj, *model.expert_down_proj) for parameter in module.parameters()],
+        ),
+    ]
+    output: list[dict[str, Any]] = []
+    for name, parameters in groups:
+        enabled = [parameter for parameter in parameters if parameter.requires_grad]
+        if enabled:
+            rate = overrides.get(name, float(learning_rate))
+            if rate <= 0:
+                raise ValueError(f"learning rate for {name} must be positive")
+            output.append({"params": enabled, "lr": rate, "group": name})
+    if not output:
+        raise ValueError("training stage has no enabled parameters")
+    return output
 
 
 def _train_stage_streaming(
@@ -334,6 +406,9 @@ def _train_stage_streaming(
     device: str,
     stage: str,
     use_oracle_targets: bool = False,
+    train_selection_router: bool = True,
+    train_amplitude_router: bool = True,
+    learning_rates: Mapping[str, float] | None = None,
 ) -> dict[str, Any]:
     """Train one stage while reading only bounded activation batches."""
 
@@ -341,7 +416,7 @@ def _train_stage_streaming(
 
     for parameter in model.parameters():
         parameter.requires_grad = False
-    _enable_router_parameters(model)
+    _enable_router_parameters(model, train_selection=train_selection_router, train_amplitude=train_amplitude_router)
     if train_scales:
         model.expert_scales.requires_grad = True
     if train_experts:
@@ -349,10 +424,11 @@ def _train_stage_streaming(
             for parameter in module.parameters():
                 parameter.requires_grad = True
     model.to(device)
-    parameters = [parameter for parameter in model.parameters() if parameter.requires_grad]
-    if epochs <= 0 or not parameters:
+    parameter_groups = _optimizer_parameter_groups(model, learning_rate=learning_rate, learning_rates=learning_rates)
+    if epochs <= 0:
         return {"stage": stage, "epochs": 0, "updates": 0, "loss": None, "streaming": True}
-    optimizer = torch.optim.AdamW(parameters, lr=learning_rate)
+    parameters = [parameter for group in parameter_groups for parameter in group["params"]]
+    optimizer = torch.optim.AdamW(parameter_groups)
     gate_device = gate.to(device)
     up_device = up.to(device)
     down_device = down.to(device)
@@ -407,6 +483,9 @@ def _train_stage_streaming(
         "loss": last_loss,
         "streaming": True,
         "epoch": epoch + 1,
+        "train_selection_router": train_selection_router,
+        "train_amplitude_router": train_amplitude_router,
+        "learning_rates": {group["group"]: group["lr"] for group in parameter_groups},
     }
 
 
@@ -492,8 +571,17 @@ def train_torch_layer(
     seed: int = 17,
     source_revision: str | None = None,
     code_commit: str | None = None,
+    stage_schedule: Sequence[Mapping[str, Any]] | None = None,
+    selection_indices: Sequence[int] | None = None,
+    evaluate_holdout: bool = True,
 ) -> dict[str, Any]:
-    """Run router, scale, and joint stages against fixed split activations."""
+    """Run a configurable staged distillation schedule against fixed splits.
+
+    The default schedule is kept identical to the original three-stage path.
+    A caller may provide a bounded sequence of stage mappings to compare
+    router warm-up, router/scale transitions, frozen-router expert adaptation,
+    and joint fine-tuning without changing the activation or holdout contract.
+    """
 
     import torch
     from safetensors import safe_open  # type: ignore
@@ -525,6 +613,19 @@ def train_torch_layer(
         dataset_hash = train_dataset.dataset_hash
     if holdout_dataset.dataset_hash != dataset_hash:
         raise ValueError("train and holdout activation manifests have different dataset_hash values")
+    if selection_indices is None:
+        selection_rows: tuple[int, ...] | None = None
+    else:
+        selection_rows = tuple(sorted({int(index) for index in selection_indices}))
+        if not selection_rows:
+            raise ValueError("selection_indices must contain at least one train row")
+        if selection_rows[0] < 0 or selection_rows[-1] >= train_dataset.count:
+            raise IndexError(f"selection_indices must be within the train split [0, {train_dataset.count})")
+    selection_hash = (
+        hashlib.sha256("\n".join(str(index) for index in selection_rows).encode()).hexdigest()
+        if selection_rows is not None
+        else None
+    )
     plan = _plan_from_path(Path(partition_path))
     if plan.dense_intermediate_size != int(values["gate_proj.weight"].shape[0]):
         raise ValueError("selected partition does not match source dense width")
@@ -569,26 +670,68 @@ def train_torch_layer(
         warmup_solution = torch.linalg.lstsq(warmup_inputs, warmup_targets).solution.T
         model.router.weight.copy_(warmup_solution.to(dtype=model.router.weight.dtype))
     del warmup_values, warmup_inputs, warmup_contributions, warmup_labels, warmup_targets, warmup_solution
-    initial = _stream_metrics(
+    initial_selection = _stream_metrics(
         model,
-        holdout_dataset,
+        train_dataset,
         gate=gate_tensor,
         up=up_tensor,
         down=down_tensor,
         microbatch=microbatch,
         device=device,
+        selected_indices=selection_rows,
     )
     stages: list[dict[str, Any]] = []
     stage_metrics: list[dict[str, Any]] = []
-    best_state: dict[str, Any] | None = None
-    best_metric = float(initial["normalized_mse"])
+    # Always retain the initialized checkpoint as a candidate.  This makes
+    # every schedule stage an explicitly best-checkpoint comparison rather
+    # than returning a later regression when no stage improves development NMSE.
+    best_state: dict[str, Any] = {key: value.detach().cpu().clone() for key, value in model.state_dict().items()}
+    best_metric = float(initial_selection["normalized_mse"])
     best_stage = "initialized"
-    stage_specs = (
-        ("router_warm_start", False, False, True),
-        ("router_plus_scale", True, False, False),
-        ("joint_expert_router", True, True, False),
-    )
-    for stage_name, train_scales, train_experts, use_oracle in stage_specs:
+    if stage_schedule is None:
+        raw_schedule: Sequence[Mapping[str, Any]] = (
+            {"name": "router_warm_start", "epochs": epochs, "train_scales": False, "train_experts": False, "use_oracle_targets": True},
+            {"name": "router_plus_scale", "epochs": epochs, "train_scales": True, "train_experts": False, "use_oracle_targets": False},
+            {"name": "joint_expert_router", "epochs": epochs, "train_scales": True, "train_experts": True, "use_oracle_targets": False},
+        )
+    else:
+        if isinstance(stage_schedule, (str, bytes)) or not isinstance(stage_schedule, Sequence) or not stage_schedule:
+            raise ValueError("stage_schedule must be a non-empty sequence of mappings")
+        raw_schedule = stage_schedule
+    normalized_schedule: list[dict[str, Any]] = []
+    for index, raw_stage in enumerate(raw_schedule):
+        if not isinstance(raw_stage, Mapping):
+            raise TypeError(f"stage_schedule[{index}] must be a mapping")
+        stage_name = str(raw_stage.get("name", raw_stage.get("stage", f"stage_{index}")))
+        if not stage_name:
+            raise ValueError(f"stage_schedule[{index}] has an empty name")
+        stage_epochs = int(raw_stage.get("epochs", epochs))
+        if stage_epochs < 0:
+            raise ValueError(f"stage_schedule[{index}] epochs must be non-negative")
+        stage_learning_rate = float(raw_stage.get("learning_rate", learning_rate))
+        if stage_learning_rate <= 0:
+            raise ValueError(f"stage_schedule[{index}] learning_rate must be positive")
+        raw_rates = raw_stage.get("learning_rates")
+        if raw_rates is not None and not isinstance(raw_rates, Mapping):
+            raise TypeError(f"stage_schedule[{index}].learning_rates must be a mapping")
+        rates = {str(name): float(value) for name, value in (raw_rates or {}).items()}
+        if any(value <= 0 for value in rates.values()):
+            raise ValueError(f"stage_schedule[{index}].learning_rates values must be positive")
+        normalized_schedule.append(
+            {
+                "name": stage_name,
+                "epochs": stage_epochs,
+                "train_scales": bool(raw_stage.get("train_scales", False)),
+                "train_experts": bool(raw_stage.get("train_experts", False)),
+                "use_oracle_targets": bool(raw_stage.get("use_oracle_targets", False)),
+                "train_selection_router": bool(raw_stage.get("train_selection_router", True)),
+                "train_amplitude_router": bool(raw_stage.get("train_amplitude_router", True)),
+                "learning_rate": stage_learning_rate,
+                "learning_rates": rates,
+            }
+        )
+    for stage_spec in normalized_schedule:
+        stage_name = str(stage_spec["name"])
         stage_result = _train_stage_streaming(
             model,
             train_dataset,
@@ -596,17 +739,47 @@ def train_torch_layer(
             up=up_tensor,
             down=down_tensor,
             plan=plan,
-            epochs=epochs,
+            epochs=int(stage_spec["epochs"]),
             microbatch=microbatch,
-            learning_rate=learning_rate,
-            train_scales=train_scales,
-            train_experts=train_experts,
+            learning_rate=float(stage_spec["learning_rate"]),
+            train_scales=bool(stage_spec["train_scales"]),
+            train_experts=bool(stage_spec["train_experts"]),
             device=device,
             stage=stage_name,
-            use_oracle_targets=use_oracle,
+            use_oracle_targets=bool(stage_spec["use_oracle_targets"]),
+            train_selection_router=bool(stage_spec["train_selection_router"]),
+            train_amplitude_router=bool(stage_spec["train_amplitude_router"]),
+            learning_rates=stage_spec["learning_rates"],
         )
         stages.append(stage_result)
         measured = _stream_metrics(
+            model,
+            train_dataset,
+            gate=gate_tensor,
+            up=up_tensor,
+            down=down_tensor,
+            microbatch=microbatch,
+            device=device,
+            selected_indices=selection_rows,
+        )
+        stage_metrics.append({"stage": stage_name, **measured})
+        if float(measured["normalized_mse"]) < best_metric:
+            best_metric = float(measured["normalized_mse"])
+            best_stage = stage_name
+            best_state = {key: value.detach().cpu().clone() for key, value in model.state_dict().items()}
+    model.load_state_dict(best_state, strict=True)
+    final_selection = _stream_metrics(
+        model,
+        train_dataset,
+        gate=gate_tensor,
+        up=up_tensor,
+        down=down_tensor,
+        microbatch=microbatch,
+        device=device,
+        selected_indices=selection_rows,
+    )
+    if evaluate_holdout:
+        trained = _stream_metrics(
             model,
             holdout_dataset,
             gate=gate_tensor,
@@ -615,35 +788,35 @@ def train_torch_layer(
             microbatch=microbatch,
             device=device,
         )
-        stage_metrics.append({"stage": stage_name, **measured})
-        if float(measured["normalized_mse"]) < best_metric:
-            best_metric = float(measured["normalized_mse"])
-            best_stage = stage_name
-            best_state = {key: value.detach().cpu().clone() for key, value in model.state_dict().items()}
-    if best_state is not None:
-        model.load_state_dict(best_state, strict=True)
-    trained = _stream_metrics(
-        model,
-        holdout_dataset,
-        gate=gate_tensor,
-        up=up_tensor,
-        down=down_tensor,
-        microbatch=microbatch,
-        device=device,
-    )
+        holdout_status = "full_holdout_confirmation"
+    else:
+        trained = {
+            "status": "DEFERRED_UNTIL_FINALIST_CONFIRMATION",
+            "split": "holdout",
+            "normalized_mse": None,
+            "cosine": None,
+            "selected_counts": [],
+            "dead_experts": None,
+            "load_cv": None,
+            "streaming": True,
+        }
+        holdout_status = "deferred"
     # The dense all-expert reconstruction is analytically exact by construction;
     # retain the explicit zero target as a diagnostic rather than pretending it
     # is a sparse quality result.
     oracle_holdout = {"normalized_mse": None, "cosine": None, "streaming": True, "status": "bounded-oracle-summary-pending"}
+    gate_metrics = trained if evaluate_holdout else final_selection
     gate_overall = (
         "green"
-        if trained["normalized_mse"] <= 0.05 and trained["cosine"] >= 0.98 and trained["dead_experts"] == 0 and trained["load_cv"] <= 0.50
+        if gate_metrics["normalized_mse"] <= 0.05 and gate_metrics["cosine"] >= 0.98 and gate_metrics["dead_experts"] == 0 and gate_metrics["load_cv"] <= 0.50
         else "research-candidate"
-        if trained["normalized_mse"] <= 0.10 and trained["cosine"] >= 0.95
+        if gate_metrics["normalized_mse"] <= 0.10 and gate_metrics["cosine"] >= 0.95
         else "red"
     )
     if epochs == 0:
         status = "INITIALIZED_UNTRAINED"
+    elif not evaluate_holdout:
+        status = "TRAINED_DEV_SELECTED" if gate_overall in {"green", "research-candidate"} else "VALIDATION_DEFERRED"
     elif gate_overall == "green":
         status = "TRAINED_VALIDATED"
     elif gate_overall == "research-candidate":
@@ -678,9 +851,14 @@ def train_torch_layer(
             "loss_version": "torch-distill-v1",
             "loss_coefficients": {"mse": 1.0, "cosine": 0.05, "load_balance": 0.05, "router_z_loss": 0.001},
             "routing_mode": profile.routing_mode,
+            "stage_schedule": normalized_schedule,
             "stages": stages,
-            "stage_holdout_metrics": stage_metrics,
-            "best_holdout_stage": best_stage,
+            "stage_selection_metrics": stage_metrics,
+            "best_selection_stage": best_stage,
+            "selection_split": "train_dev_subset" if selection_rows is not None else "train_split",
+            "selection_indices_hash": selection_hash,
+            "selection_count": int(len(selection_rows)) if selection_rows is not None else train_dataset.count,
+            "holdout_evaluation": holdout_status,
             "streaming_dataset": {
                 "train_manifest": train_dataset.manifest_path.as_posix(),
                 "holdout_manifest": holdout_dataset.manifest_path.as_posix(),
@@ -694,15 +872,15 @@ def train_torch_layer(
         tensor_file=tensor_path.name,
         tensor_sha256=tensor_hash,
         tensor_inventory=inventory,
-        train_metrics={"initial_holdout": initial, "oracle_holdout": oracle_holdout, "all_expert_reconstruction_mse": 0.0},
+        train_metrics={"initial_selection": initial_selection, "final_selection": final_selection, "oracle_holdout": oracle_holdout, "all_expert_reconstruction_mse": 0.0},
         holdout_metrics=trained,
-        router_metrics={"load_cv": trained["load_cv"], "dead_experts": trained["dead_experts"], "selected_counts": trained["selected_counts"], "actual_improvement": float(initial["normalized_mse"] - trained["normalized_mse"])},
-        quality_gate={"overall": gate_overall if epochs > 0 else "untrained", "thresholds_version": "initial-2026-08-15", "metrics": trained},
+        router_metrics={"load_cv": gate_metrics["load_cv"], "dead_experts": gate_metrics["dead_experts"], "selected_counts": gate_metrics["selected_counts"], "actual_improvement": float(initial_selection["normalized_mse"] - gate_metrics["normalized_mse"]) if gate_metrics["normalized_mse"] is not None else None},
+        quality_gate={"overall": gate_overall if epochs > 0 else "untrained", "thresholds_version": "initial-2026-08-15", "evaluation_scope": "full_holdout" if evaluate_holdout else "train_dev_selection", "metrics": gate_metrics},
         code_commit=recorded_commit,
     )
     metadata_path = output / f"layer-{layer:04d}.json"
     save_layer_checkpoint(checkpoint, metadata_path)
-    return {"status": status, "layer": layer, "metadata": str(metadata_path), "tensor_file": str(tensor_path), "holdout_metrics": trained, "initial_holdout": initial, "oracle_holdout": oracle_holdout, "training_config": checkpoint.training_config, "code_commit": recorded_commit}
+    return {"status": status, "layer": layer, "metadata": str(metadata_path), "tensor_file": str(tensor_path), "holdout_metrics": trained, "initial_selection": initial_selection, "final_selection": final_selection, "oracle_holdout": oracle_holdout, "training_config": checkpoint.training_config, "code_commit": recorded_commit}
 
 
 __all__ = ["load_fixed_activation_splits", "train_torch_layer"]
