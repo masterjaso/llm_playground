@@ -166,6 +166,64 @@ def _contributions(
     )
 
 
+def _sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for block in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(block)
+    return digest.hexdigest()
+
+
+def _write_contribution_store(
+    store_dir: Path,
+    shared: np.ndarray,
+    routed: np.ndarray,
+    target: np.ndarray,
+    *,
+    dataset_hash: str,
+    partition_hash: str,
+    indices_hash: str,
+) -> dict[str, Any]:
+    """Persist a read-only mmap contribution store consumed by the CLI."""
+
+    store_dir.mkdir(parents=True, exist_ok=True)
+    arrays: dict[str, Any] = {}
+    for name, values in (("shared", shared), ("routed", routed), ("target", target)):
+        path = store_dir / f"{name}.npy"
+        mapped = np.lib.format.open_memmap(path, mode="w+", dtype=np.float32, shape=values.shape)
+        mapped[...] = np.asarray(values, dtype=np.float32)
+        mapped.flush()
+        del mapped
+        arrays[name] = {
+            "path": path.name,
+            "shape": list(values.shape),
+            "dtype": "float32",
+            "sha256": _sha256_file(path),
+        }
+    manifest = {
+        "schema_version": 1,
+        "format": "dense2moe-contribution-store-v1",
+        "arrays": arrays,
+        "dataset_hash": dataset_hash,
+        "partition_hash": partition_hash,
+        "indices_sha256": indices_hash,
+        "split": "train",
+        "classification": "FIT_ONLY_SOLVER_CALIBRATION_NO_HOLDOUT",
+        "holdout_opened": False,
+    }
+    manifest_path = store_dir / "manifest.json"
+    manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    return {
+        "path": str(store_dir),
+        "manifest": str(manifest_path),
+        "manifest_sha256": _sha256_file(manifest_path),
+        "format": manifest["format"],
+        "arrays": arrays,
+        "classification": manifest["classification"],
+        "holdout_opened": False,
+    }
+
+
 def _metric(shared: np.ndarray, routed: np.ndarray, target: np.ndarray, ids: np.ndarray, weights: np.ndarray) -> dict[str, Any]:
     prediction = shared + np.sum(np.take_along_axis(routed, ids[:, :, None], axis=1) * weights[:, :, None], axis=1)
     error = np.sum((prediction - target) ** 2, axis=1, dtype=np.float64)
@@ -265,6 +323,20 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
     indices = local.astype(np.int64)
     selection_started = time.perf_counter()
     shared, routed, target, hardness = _contributions(inputs, weights, plan, device=device, batch_size=args.microbatch)
+    partition_hash = hashlib.sha256(plan_path.read_bytes()).hexdigest()
+    contribution_store = (
+        _write_contribution_store(
+            Path(args.store_dir),
+            shared,
+            routed,
+            target,
+            dataset_hash=dataset.dataset_hash,
+            partition_hash=partition_hash,
+            indices_hash=_hash_indices(indices),
+        )
+        if args.store_dir
+        else None
+    )
     exact_ids, exact_weights = _exact_batches(shared, routed, target, device=device, batch_size=args.microbatch)
     exact_elapsed = time.perf_counter() - selection_started
     exact_metric = _metric(shared, routed, target, exact_ids, exact_weights)
@@ -335,7 +407,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         "split": "train",
         "holdout_opened": False,
         "partition": str(plan_path),
-        "partition_hash": hashlib.sha256(plan_path.read_bytes()).hexdigest(),
+        "partition_hash": partition_hash,
         "sample": {
             "stratify_pool": int(len(prefix_inputs)),
             "count": int(len(indices)),
@@ -383,6 +455,8 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         },
         "memory": {"peak_rss_bytes": rss, "peak_cuda_allocated_bytes": cuda_peak, "max_in_memory_bytes": int(args.max_in_memory_bytes)},
     }
+    if contribution_store is not None:
+        payload["contribution_store"] = contribution_store
     output = run_dir / "reports" / args.output_name
     output.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     output.with_suffix(".md").write_text(
@@ -407,6 +481,7 @@ def main() -> None:
     parser.add_argument("--stratify-pool", type=int, default=4096)
     parser.add_argument("--microbatch", type=int, default=128)
     parser.add_argument("--max-in-memory-bytes", type=int, default=1024 * 1024 * 1024)
+    parser.add_argument("--store-dir", type=Path, default=None, help="optionally persist the FIT-only contribution store")
     parser.add_argument("--output-name", default="streaming-solver-calibration.json")
     args = parser.parse_args()
     payload = run(args)
