@@ -36,7 +36,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
             "oracle_loss_mode": "repeated_cross_entropy",
             "oracle_amplitude_mode": "student_selected",
             "learning_rates": {"selection_router": 1e-5, "amplitude_router": 1e-5, "expert_scales": 1e-5, "experts": 5e-5, "shared": 2.5e-5},
-            "loss_coefficients": {"mse": 1.0, "cosine": 0.75, "load_balance": 0.25, "oracle": 0.02, "oracle_amplitude": 0.02, "router_z_loss": 0.001},
+            "loss_coefficients": {"mse": 1.0, "cosine": args.cosine_weight, "load_balance": 0.25, "oracle": 0.02, "oracle_amplitude": 0.02, "router_z_loss": 0.001},
         },
     ]
     output_dir = run_dir / "layer-checkpoints/clean-validation" / args.output_name
@@ -92,6 +92,7 @@ def main() -> None:
     parser.add_argument("--microbatch", type=int, default=512)
     parser.add_argument("--learning-rate", type=float, default=1e-4)
     parser.add_argument("--epochs", type=int, default=2)
+    parser.add_argument("--cosine-weight", type=float, default=0.75)
     parser.add_argument("--output-name", default="p16-top4-refined-course-correction-continue")
     parser.add_argument("--report-name", default="p16-top4-refined-course-correction-continuation.json")
     args = parser.parse_args()
