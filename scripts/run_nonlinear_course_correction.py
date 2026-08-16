@@ -23,7 +23,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
     dev_payload = json.loads((run_dir / "capture/architecture-dev.json").read_text(encoding="utf-8"))
     selection_indices = [int(value) for value in dev_payload["selected_global_indices"]]
     partition = run_dir / "partitions/high-sparsity-p16-top4.json"
-    initial_checkpoint = run_dir / "layer-checkpoints/clean-validation/p16-top4-nonlinear-listwise"
+    initial_checkpoint = run_dir / "layer-checkpoints/clean-validation" / args.initial_checkpoint
     schedule = [
         {
             "name": "nonlinear_joint_basis_cosine_balanced",
@@ -95,6 +95,7 @@ def main() -> None:
     parser.add_argument("--learning-rate", type=float, default=1e-4)
     parser.add_argument("--epochs", type=int, default=4)
     parser.add_argument("--router-hidden-size", type=int, default=128)
+    parser.add_argument("--initial-checkpoint", default="p16-top4-nonlinear-listwise")
     parser.add_argument("--cosine-weight", type=float, default=0.75)
     parser.add_argument("--output-name", default="p16-top4-nonlinear-course-correction")
     parser.add_argument("--report-name", default="p16-top4-nonlinear-course-correction.json")
