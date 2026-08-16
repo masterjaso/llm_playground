@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import os
 from collections.abc import Callable, Iterator, Mapping, Sequence
 from pathlib import Path
@@ -430,7 +431,10 @@ def _stream_metrics(
     cosine_sum = 0.0
     token_count = 0
     loads = np.zeros(model.routed_experts, dtype=np.float64)
+    soft_loads = np.zeros(model.routed_experts, dtype=np.float64)
     entropy_sum = 0.0
+    margin_sum = 0.0
+    margin_count = 0
     with torch.inference_mode():
         if selected_indices is not None and excluded_indices is not None:
             raise ValueError("selected_indices and excluded_indices are mutually exclusive")
@@ -458,15 +462,22 @@ def _stream_metrics(
             )
             token_count += int(target.shape[0])
             loads += np.bincount(info["indices"].detach().cpu().reshape(-1).numpy(), minlength=model.routed_experts)
+            soft_loads += torch.softmax(info["logits"], dim=-1).sum(dim=0).detach().cpu().numpy()
             entropy_sum += float(
                 torch.sum(
                     -(torch.softmax(info["logits"], dim=-1) * torch.log_softmax(info["logits"], dim=-1)).sum(dim=-1)
                 ).item()
             )
+            if model.top_k < model.routed_experts:
+                top_values = torch.topk(info["logits"], model.top_k + 1, dim=-1).values
+                margin_sum += float(torch.sum(top_values[:, model.top_k - 1] - top_values[:, model.top_k]).item())
+                margin_count += int(target.shape[0])
             del inputs, target, prediction, info
     if token_count <= 0:
         raise ValueError(f"activation split is empty: {dataset.manifest_path}")
     mean_target_norm = target_norm / (token_count * int(down.shape[0]))
+    hard_distribution = loads / max(float(token_count * model.top_k), 1.0)
+    soft_distribution = soft_loads / max(float(token_count), 1.0)
     return {
         "normalized_mse": (squared_error / (token_count * int(down.shape[0]))) / (mean_target_norm + 1e-12),
         "mse": squared_error / (token_count * int(down.shape[0])),
@@ -474,7 +485,12 @@ def _stream_metrics(
         "selected_counts": loads.tolist(),
         "dead_experts": int(np.sum(loads == 0)),
         "load_cv": float(loads.std() / (loads.mean() + 1e-12)),
+        "hard_load_balance": float(model.routed_experts * np.square(hard_distribution).sum()),
+        "soft_load_balance": float(model.routed_experts * np.square(soft_distribution).sum()),
+        "soft_loads": soft_loads.tolist(),
+        "soft_load_cv": float(soft_loads.std() / (soft_loads.mean() + 1e-12)),
         "router_entropy": entropy_sum / token_count,
+        "topk_logit_margin": (margin_sum / margin_count) if margin_count else None,
         "token_count": token_count,
         "streaming": True,
         "split": dataset.split,
@@ -496,6 +512,28 @@ def _oracle_indices_for_batch(
     target = _dense_target(np.asarray(values), gate, up, down)
     shared, routed = swiglu_contributions(np.asarray(values), gate, up, down, plan)
     return oracle_topk(shared, routed, target, top_k=top_k)["indices"]
+
+
+def _hard_dispatch_straight_through(logits: Any, indices: Any, top_k: int) -> Any:
+    """Return top-k dispatch mass with hard forward values and soft gradients.
+
+    The forward value is the actual selected-expert membership normalized by
+    ``top_k``.  The backward path follows the full softmax over router logits,
+    so a hard-load penalty can revive experts that are not currently selected.
+    """
+
+    import torch
+
+    if logits.ndim != 2 or indices.ndim != 2:
+        raise ValueError("logits and indices must be rank-2 tensors")
+    if indices.shape[0] != logits.shape[0] or indices.shape[1] != top_k:
+        raise ValueError("indices shape must be [batch, top_k] for logits")
+    if top_k <= 0 or top_k > logits.shape[1]:
+        raise ValueError("top_k must be in [1, experts]")
+    hard = torch.zeros_like(logits)
+    hard.scatter_(1, indices, 1.0 / float(top_k))
+    soft = torch.softmax(logits, dim=-1)
+    return hard + soft - soft.detach()
 
 
 def _enable_router_parameters(
@@ -577,6 +615,8 @@ def _train_stage_streaming(
     train_amplitude_router: bool = True,
     learning_rates: Mapping[str, float] | None = None,
     loss_coefficients: Mapping[str, float] | None = None,
+    oracle_regret_weight: float = 0.0,
+    expert_use_prices: Sequence[float] | None = None,
     excluded_indices: Sequence[int] | None = None,
     epoch_callback: Callable[[TorchQwen35SwiGLUMoE, str, int], Mapping[str, Any]] | None = None,
 ) -> dict[str, Any]:
@@ -593,6 +633,13 @@ def _train_stage_streaming(
         raise ValueError("oracle_amplitude_mode must be student_selected, teacher_forced, or mixed")
     if not 0.0 <= float(teacher_forcing_ratio) <= 1.0:
         raise ValueError("teacher_forcing_ratio must be between 0 and 1")
+    if float(oracle_regret_weight) < 0.0:
+        raise ValueError("oracle_regret_weight must be non-negative")
+    if expert_use_prices is not None:
+        if len(expert_use_prices) != model.routed_experts:
+            raise ValueError("expert_use_prices must contain one value per routed expert")
+        if any(not math.isfinite(float(price)) for price in expert_use_prices):
+            raise ValueError("expert_use_prices must contain finite values")
 
     for parameter in model.parameters():
         parameter.requires_grad = False
@@ -620,6 +667,14 @@ def _train_stage_streaming(
     last_loss = 0.0
     updates = 0
     epoch_metrics: list[dict[str, Any]] = []
+    regret_sum = 0.0
+    regret_weight_sum = 0.0
+    regret_token_count = 0
+    price_tensor = (
+        torch.as_tensor(expert_use_prices, dtype=torch.float32, device=device)
+        if expert_use_prices is not None
+        else None
+    )
     for epoch in range(epochs):
         model.train()
         batches = dataset.iter_batches(microbatch) if excluded_indices is None else dataset.iter_excluding_batches(excluded_indices, microbatch)
@@ -637,6 +692,8 @@ def _train_stage_streaming(
             # never satisfy the explicit dead-expert gate once it collapses.
             probs = torch.softmax(info["logits"], dim=-1)
             load_balance = model.routed_experts * torch.mean(probs, dim=0).square().sum()
+            hard_dispatch = _hard_dispatch_straight_through(info["logits"], info["indices"], model.top_k)
+            hard_load_balance = model.routed_experts * torch.mean(hard_dispatch, dim=0).square().sum()
             z_loss = torch.mean(torch.logsumexp(info["logits"], dim=-1).square())
             oracle_loss = torch.zeros((), device=device)
             oracle_amplitude_loss = torch.zeros((), device=device)
@@ -653,15 +710,30 @@ def _train_stage_streaming(
                 else:
                     # Preserve the original target-free warm-start baseline.
                     scores = torch.linalg.vector_norm(contributions, dim=-1)
+                if price_tensor is not None:
+                    scores = scores - price_tensor.reshape(1, -1)
                 labels = torch.topk(scores, model.top_k, dim=-1).indices
+                if float(oracle_regret_weight) > 0.0 and model.top_k < model.routed_experts:
+                    ranked_scores = torch.topk(scores, model.top_k + 1, dim=-1).values
+                    regret = (ranked_scores[:, model.top_k - 1] - ranked_scores[:, model.top_k]).clamp_min(0.0)
+                    normalized_regret = regret.detach() / (torch.mean(regret.detach()) + 1e-12)
+                    oracle_row_weights = 1.0 + float(oracle_regret_weight) * normalized_regret
+                    regret_sum += float(regret.detach().sum().item())
+                    regret_weight_sum += float(oracle_row_weights.detach().sum().item())
+                    regret_token_count += int(regret.shape[0])
+                else:
+                    oracle_row_weights = torch.ones(scores.shape[0], dtype=scores.dtype, device=scores.device)
                 if oracle_loss_mode == "multilabel_bce":
                     membership = torch.zeros_like(info["logits"])
                     membership.scatter_(1, labels, 1.0)
-                    oracle_loss = F.binary_cross_entropy_with_logits(info["logits"], membership)
+                    per_token = F.binary_cross_entropy_with_logits(info["logits"], membership, reduction="none").mean(dim=-1)
+                    oracle_loss = torch.mean(per_token * oracle_row_weights)
                 else:
-                    oracle_loss = torch.stack(
-                        [torch.nn.functional.cross_entropy(info["logits"], labels[:, slot]) for slot in range(labels.shape[1])]
-                    ).mean()
+                    per_token = torch.stack(
+                        [F.cross_entropy(info["logits"], labels[:, slot], reduction="none") for slot in range(labels.shape[1])],
+                        dim=1,
+                    ).mean(dim=1)
+                    oracle_loss = torch.mean(per_token * oracle_row_weights)
                 amplitude_coefficient = float((loss_coefficients or {}).get("oracle_amplitude", 0.0))
                 if amplitude_coefficient > 0.0 and model.routing_mode == "independent_positive":
                     # Fit positive coefficients for the currently selected
@@ -710,6 +782,7 @@ def _train_stage_streaming(
                 coefficients["mse"] * mse
                 + coefficients["cosine"] * cosine
                 + load_balance_coefficient * load_balance
+                + coefficients.get("hard_load_balance", 0.0) * hard_load_balance
                 + coefficients["router_z_loss"] * z_loss
                 + coefficients["oracle"] * oracle_loss
                 + coefficients.get("oracle_amplitude", 0.0) * oracle_amplitude_loss
@@ -737,6 +810,11 @@ def _train_stage_streaming(
         "train_shared": train_shared,
         "learning_rates": {group["group"]: group["lr"] for group in parameter_groups},
         "loss_coefficients": {str(name): float(value) for name, value in (loss_coefficients or {}).items()},
+        "hard_load_balance": float(hard_load_balance.detach().cpu().item()) if updates else None,
+        "oracle_regret_weight": float(oracle_regret_weight),
+        "expert_use_prices": [float(value) for value in expert_use_prices] if expert_use_prices is not None else None,
+        "mean_oracle_regret": regret_sum / regret_token_count if regret_token_count else None,
+        "mean_oracle_row_weight": regret_weight_sum / regret_token_count if regret_token_count else None,
         "oracle_target_mode": oracle_target_mode,
         "oracle_loss_mode": oracle_loss_mode,
         "oracle_amplitude_mode": oracle_amplitude_mode,
@@ -1108,6 +1186,22 @@ def train_torch_layer(
         loss_coefficients = {str(name): float(value) for name, value in (raw_loss_coefficients or {}).items()}
         if any(value < 0 for value in loss_coefficients.values()):
             raise ValueError(f"stage_schedule[{index}].loss_coefficients values must be non-negative")
+        oracle_regret_weight = float(raw_stage.get("oracle_regret_weight", 0.0))
+        if oracle_regret_weight < 0:
+            raise ValueError(f"stage_schedule[{index}].oracle_regret_weight must be non-negative")
+        raw_prices = raw_stage.get("expert_use_prices")
+        if raw_prices is not None:
+            if isinstance(raw_prices, (str, bytes)) or not isinstance(raw_prices, Sequence):
+                raise TypeError(f"stage_schedule[{index}].expert_use_prices must be a sequence")
+            expert_use_prices = [float(value) for value in raw_prices]
+            if len(expert_use_prices) != plan.routed_experts:
+                raise ValueError(
+                    f"stage_schedule[{index}].expert_use_prices must contain {plan.routed_experts} values"
+                )
+            if any(not math.isfinite(value) for value in expert_use_prices):
+                raise ValueError(f"stage_schedule[{index}].expert_use_prices must contain finite values")
+        else:
+            expert_use_prices = None
         oracle_target_mode = str(raw_stage.get("oracle_target_mode", "contribution_norm"))
         if oracle_target_mode not in {"contribution_norm", "residual_correlation"}:
             raise ValueError(
@@ -1143,6 +1237,8 @@ def train_torch_layer(
                 "learning_rate": stage_learning_rate,
                 "learning_rates": rates,
                 "loss_coefficients": loss_coefficients,
+                "oracle_regret_weight": oracle_regret_weight,
+                "expert_use_prices": expert_use_prices,
             }
         )
     for stage_spec in normalized_schedule:
@@ -1189,6 +1285,8 @@ def train_torch_layer(
             train_amplitude_router=bool(stage_spec["train_amplitude_router"]),
             learning_rates=stage_spec["learning_rates"],
             loss_coefficients=stage_spec["loss_coefficients"],
+            oracle_regret_weight=float(stage_spec["oracle_regret_weight"]),
+            expert_use_prices=stage_spec["expert_use_prices"],
             excluded_indices=fit_excluded_rows if fit_excluded_rows else None,
             epoch_callback=validation_epoch_callback if selection_rows is not None else None,
         )
