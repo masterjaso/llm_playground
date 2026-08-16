@@ -109,6 +109,8 @@ def _run(args: argparse.Namespace) -> dict[str, Any]:
             code_commit=current_git_commit(),
             stage_schedule=schedule,
             selection_indices=selection_indices,
+            fit_exclude_indices=selection_indices,
+            selection_identity_hash=dev_payload["selected_row_key_hash"],
             evaluate_holdout=False,
         )
         results.append(
@@ -127,11 +129,11 @@ def _run(args: argparse.Namespace) -> dict[str, Any]:
         print(json.dumps({"schedule": name, "status": result["status"], "final_selection": result["final_selection"]}, indent=2), flush=True)
     payload = {
         "schema_version": 1,
-        "status": "P16_TOP4_SCHEDULE_ABLATIONS_COMPLETE_TRAIN_DEV_ONLY",
-        "classification": "TRAIN_DEV_SCHEDULE_SELECTION_HOLDOUT_DEFERRED",
+        "status": "P16_TOP4_SCHEDULE_ABLATIONS_COMPLETE_VALIDATION_ONLY",
+        "classification": "TRUE_VALIDATION_SCHEDULE_SELECTION_HOLDOUT_DEFERRED",
         "profile": profile.name,
         "partition": str(partition),
-        "selection_split": "train_dev",
+        "selection_split": "validation",
         "selection_count": len(selection_indices),
         "selection_hash": dev_payload["selected_row_key_hash"],
         "budget": {"microbatch": args.microbatch, "base_learning_rate": args.learning_rate, "seed": 17, "total_stage_epochs": 3, "device": args.device},

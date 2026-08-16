@@ -33,6 +33,8 @@ def main() -> None:
             shutil.copy2(tensor, baseline_dir / tensor.name)
     train_manifest = run / "capture/layer-0000.json"
     source = Path(args.source_dir)
+    dev_payload = json.loads((run / "capture/architecture-dev.json").read_text(encoding="utf-8"))
+    validation_indices = [int(value) for value in dev_payload["selected_global_indices"]]
     search = json.loads((run / "reports/architecture-search.json").read_text(encoding="utf-8"))
     finalists = []
     for selected in search["finalists_selected_on_dev"]:
@@ -60,15 +62,21 @@ def main() -> None:
             seed=17,
             source_revision=profile.revision,
             code_commit=current_git_commit(),
+            selection_indices=validation_indices,
+            fit_exclude_indices=validation_indices,
+            selection_identity_hash=dev_payload["selected_row_key_hash"],
+            evaluate_holdout=False,
         )
         results.append({"profile": profile_name, "partition": str(partition), "output_dir": str(output_dir), "result": result})
         print(json.dumps({"profile": profile_name, "status": result.get("status"), "holdout_metrics": result.get("holdout_metrics")}, indent=2), flush=True)
     report = {
         "schema_version": 1,
-        "status": "ARCHITECTURE_FINALIST_TRAINING_COMPLETE",
-        "classification": "IDENTICAL_LAYER0_FINALIST_BUDGET",
+        "status": "ARCHITECTURE_FINALIST_VALIDATION_TRAINING_COMPLETE",
+        "classification": "IDENTICAL_LAYER0_FINALIST_BUDGET_TRUE_VALIDATION",
         "budget": {"epochs": args.epochs, "microbatch": args.microbatch, "learning_rate": args.learning_rate, "device": args.device, "seed": 17},
         "train_manifest": str(train_manifest),
+        "validation_count": len(validation_indices),
+        "validation_identity_hash": dev_payload["selected_row_key_hash"],
         "holdout_reserved_for_confirmation": str(run / "capture/layer-0000-holdout.json"),
         "results": results,
         "code_commit": current_git_commit(),

@@ -5,7 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
-from collections.abc import Iterator, Mapping, Sequence
+from collections.abc import Callable, Iterator, Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
@@ -19,6 +19,12 @@ from ..checkpoint.layer import (
 from ..models.torch_moe import TorchQwen35SwiGLUMoE
 from ..partition import PartitionPlan, oracle_topk, swiglu_contributions
 from ..provenance import current_git_commit
+
+
+def _hash_indices(indices: Sequence[int]) -> str:
+    """Stable receipt hash for global row positions in an explicit split."""
+
+    return hashlib.sha256("\n".join(str(int(index)) for index in indices).encode()).hexdigest()
 
 
 def _load_manifest(path: Path) -> dict[str, Any]:
@@ -150,6 +156,42 @@ class ActivationShardDataset:
             for start in range(0, int(shard.shape[0]), size):
                 yield shard[start : start + size]
 
+    def iter_excluding_batches(
+        self,
+        excluded_indices: Sequence[int],
+        microbatch: int | None = None,
+    ) -> Iterator[Any]:
+        """Yield every row except an explicit global-index exclusion set.
+
+        This is the FIT-side primitive for a true train/validation contract:
+        validation rows remain addressable for metrics, but never enter an
+        optimizer batch.
+        """
+
+        size = int(microbatch or self.microbatch)
+        if size <= 0:
+            raise ValueError("microbatch must be positive")
+        excluded = sorted({int(index) for index in excluded_indices})
+        if any(index < 0 or index >= self.count for index in excluded):
+            raise IndexError(f"excluded activation row is outside {self.split} split: count={self.count}")
+        excluded_set = set(excluded)
+        cursor = 0
+        manifest = self._resolved_manifest_path()
+        for shard in iter_activation_shards(manifest, expected_split=self.split):
+            shard_count = int(shard.shape[0])
+            local = [
+                offset
+                for offset in range(shard_count)
+                if cursor + offset not in excluded_set
+            ]
+            if local:
+                values = shard[local]
+                for start in range(0, int(values.shape[0]), size):
+                    yield values[start : start + size]
+            cursor += shard_count
+        if cursor != self.count:
+            raise ValueError(f"activation manifest count mismatch for {self.manifest_path}: {cursor} != {self.count}")
+
     def iter_selected_batches(self, indices: Sequence[int], microbatch: int | None = None) -> Iterator[Any]:
         """Yield a deterministic global-row subset without materializing it.
 
@@ -269,6 +311,7 @@ def _stream_metrics(
     microbatch: int,
     device: str,
     selected_indices: Sequence[int] | None = None,
+    excluded_indices: Sequence[int] | None = None,
 ) -> dict[str, Any]:
     """Evaluate one explicit split, optionally restricted to global rows."""
 
@@ -287,7 +330,14 @@ def _stream_metrics(
     loads = np.zeros(model.routed_experts, dtype=np.float64)
     entropy_sum = 0.0
     with torch.inference_mode():
-        batches = dataset.iter_batches(microbatch) if selected_indices is None else dataset.iter_selected_batches(selected_indices, microbatch)
+        if selected_indices is not None and excluded_indices is not None:
+            raise ValueError("selected_indices and excluded_indices are mutually exclusive")
+        if selected_indices is not None:
+            batches = dataset.iter_selected_batches(selected_indices, microbatch)
+        elif excluded_indices is not None:
+            batches = dataset.iter_excluding_batches(excluded_indices, microbatch)
+        else:
+            batches = dataset.iter_batches(microbatch)
         for values in batches:
             inputs = torch.as_tensor(values, dtype=torch.float32, device=device)
             target = _dense_target_torch(inputs, gate_device, up_device, down_device)
@@ -327,6 +377,7 @@ def _stream_metrics(
         "streaming": True,
         "split": dataset.split,
         "selected_count": int(len(selected_indices)) if selected_indices is not None else token_count,
+        "excluded_count": int(len(excluded_indices)) if excluded_indices is not None else 0,
     }
 
 
@@ -416,10 +467,15 @@ def _train_stage_streaming(
     stage: str,
     use_oracle_targets: bool = False,
     oracle_target_mode: str = "contribution_norm",
+    oracle_loss_mode: str = "repeated_cross_entropy",
+    oracle_amplitude_mode: str = "student_selected",
+    teacher_forcing_ratio: float = 0.0,
     train_selection_router: bool = True,
     train_amplitude_router: bool = True,
     learning_rates: Mapping[str, float] | None = None,
     loss_coefficients: Mapping[str, float] | None = None,
+    excluded_indices: Sequence[int] | None = None,
+    epoch_callback: Callable[[TorchQwen35SwiGLUMoE, str, int], Mapping[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """Train one stage while reading only bounded activation batches."""
 
@@ -428,6 +484,12 @@ def _train_stage_streaming(
 
     if oracle_target_mode not in {"contribution_norm", "residual_correlation"}:
         raise ValueError("oracle_target_mode must be contribution_norm or residual_correlation")
+    if oracle_loss_mode not in {"repeated_cross_entropy", "multilabel_bce"}:
+        raise ValueError("oracle_loss_mode must be repeated_cross_entropy or multilabel_bce")
+    if oracle_amplitude_mode not in {"student_selected", "teacher_forced", "mixed"}:
+        raise ValueError("oracle_amplitude_mode must be student_selected, teacher_forced, or mixed")
+    if not 0.0 <= float(teacher_forcing_ratio) <= 1.0:
+        raise ValueError("teacher_forcing_ratio must be between 0 and 1")
 
     for parameter in model.parameters():
         parameter.requires_grad = False
@@ -454,8 +516,11 @@ def _train_stage_streaming(
     model.train()
     last_loss = 0.0
     updates = 0
+    epoch_metrics: list[dict[str, Any]] = []
     for epoch in range(epochs):
-        for values in dataset.iter_batches(microbatch):
+        model.train()
+        batches = dataset.iter_batches(microbatch) if excluded_indices is None else dataset.iter_excluding_batches(excluded_indices, microbatch)
+        for values in batches:
             inputs = torch.as_tensor(values, dtype=torch.float32, device=device)
             teacher = _dense_target_torch(inputs, gate_device, up_device, down_device)
             prediction, info = model(inputs, return_router=True, return_contributions=use_oracle_targets)
@@ -486,9 +551,14 @@ def _train_stage_streaming(
                     # Preserve the original target-free warm-start baseline.
                     scores = torch.linalg.vector_norm(contributions, dim=-1)
                 labels = torch.topk(scores, model.top_k, dim=-1).indices
-                oracle_loss = torch.stack(
-                    [torch.nn.functional.cross_entropy(info["logits"], labels[:, slot]) for slot in range(labels.shape[1])]
-                ).mean()
+                if oracle_loss_mode == "multilabel_bce":
+                    membership = torch.zeros_like(info["logits"])
+                    membership.scatter_(1, labels, 1.0)
+                    oracle_loss = F.binary_cross_entropy_with_logits(info["logits"], membership)
+                else:
+                    oracle_loss = torch.stack(
+                        [torch.nn.functional.cross_entropy(info["logits"], labels[:, slot]) for slot in range(labels.shape[1])]
+                    ).mean()
                 amplitude_coefficient = float((loss_coefficients or {}).get("oracle_amplitude", 0.0))
                 if amplitude_coefficient > 0.0 and model.routing_mode == "independent_positive":
                     # Fit positive coefficients for the currently selected
@@ -497,16 +567,31 @@ def _train_stage_streaming(
                     # detached so it cannot turn into an implicit teacher
                     # gradient path.
                     residual_for_amplitude = teacher - info["shared"]
-                    selected = torch.gather(
-                        contributions,
-                        1,
-                        info["indices"].unsqueeze(-1).expand(-1, -1, contributions.shape[-1]),
+                    def _positive_coefficients(ids: Any) -> Any:
+                        selected = torch.gather(
+                            contributions,
+                            1,
+                            ids.unsqueeze(-1).expand(-1, -1, contributions.shape[-1]),
+                        )
+                        gram = torch.einsum("bkh,blh->bkl", selected, selected)
+                        rhs = torch.einsum("bkh,bh->bk", selected, residual_for_amplitude)
+                        identity = torch.eye(model.top_k, dtype=gram.dtype, device=gram.device).unsqueeze(0)
+                        return torch.linalg.solve(gram + 1e-4 * identity, rhs.unsqueeze(-1)).squeeze(-1).clamp_min(0.0)
+
+                    student_coefficients = _positive_coefficients(info["indices"])
+                    oracle_coefficients = _positive_coefficients(labels)
+                    predicted_all = F.softplus(info["amplitude_logits"])
+                    student_predicted = torch.gather(predicted_all, 1, info["indices"])
+                    oracle_predicted = torch.gather(predicted_all, 1, labels)
+                    ratio = float(teacher_forcing_ratio)
+                    if oracle_amplitude_mode == "teacher_forced":
+                        ratio = 1.0
+                    elif oracle_amplitude_mode == "student_selected":
+                        ratio = 0.0
+                    oracle_amplitude_loss = (
+                        ratio * F.smooth_l1_loss(oracle_predicted, oracle_coefficients.detach())
+                        + (1.0 - ratio) * F.smooth_l1_loss(student_predicted, student_coefficients.detach())
                     )
-                    gram = torch.einsum("bkh,blh->bkl", selected, selected)
-                    rhs = torch.einsum("bkh,bh->bk", selected, residual_for_amplitude)
-                    identity = torch.eye(model.top_k, dtype=gram.dtype, device=gram.device).unsqueeze(0)
-                    coefficients_target = torch.linalg.solve(gram + 1e-4 * identity, rhs.unsqueeze(-1)).squeeze(-1).clamp_min(0.0)
-                    oracle_amplitude_loss = F.smooth_l1_loss(info["weights"], coefficients_target.detach())
             # The denser fallback has enough capacity to trade a small amount
             # of reconstruction slack for a materially healthier expert load.
             # Keep this coefficient explicit in the receipt rather than hiding
@@ -530,6 +615,9 @@ def _train_stage_streaming(
             updates += 1
             del inputs, teacher, prediction, info
         model.train()
+        if epoch_callback is not None:
+            measured = dict(epoch_callback(model, stage, epoch + 1))
+            epoch_metrics.append(measured)
     return {
         "stage": stage,
         "epochs": epochs,
@@ -543,6 +631,11 @@ def _train_stage_streaming(
         "learning_rates": {group["group"]: group["lr"] for group in parameter_groups},
         "loss_coefficients": {str(name): float(value) for name, value in (loss_coefficients or {}).items()},
         "oracle_target_mode": oracle_target_mode,
+        "oracle_loss_mode": oracle_loss_mode,
+        "oracle_amplitude_mode": oracle_amplitude_mode,
+        "teacher_forcing_ratio": float(teacher_forcing_ratio),
+        "fit_excluded_count": int(len(excluded_indices)) if excluded_indices is not None else 0,
+        "epoch_validation_metrics": epoch_metrics,
     }
 
 
@@ -613,6 +706,35 @@ def _train_stage(
     return {"stage": stage, "epochs": epochs, "updates": updates, "loss": last_loss}
 
 
+def _gate_feasible(metrics: Mapping[str, Any]) -> bool:
+    """Return whether a validation checkpoint satisfies the product gate."""
+
+    return bool(
+        metrics.get("normalized_mse") is not None
+        and metrics.get("cosine") is not None
+        and metrics.get("dead_experts") is not None
+        and metrics.get("load_cv") is not None
+        and float(metrics["normalized_mse"]) <= 0.05
+        and float(metrics["cosine"]) >= 0.98
+        and int(metrics["dead_experts"]) == 0
+        and float(metrics["load_cv"]) <= 0.50
+    )
+
+
+def _feasible_rank(metrics: Mapping[str, Any]) -> tuple[float, float, float]:
+    """Gate-aware ordering: cosine first, then NMSE and load CV."""
+
+    return (float(metrics["cosine"]), -float(metrics["normalized_mse"]), -float(metrics["load_cv"]))
+
+
+def _pareto_dominates(left: Mapping[str, Any], right: Mapping[str, Any]) -> bool:
+    """Whether ``left`` is no worse on all frontier dimensions and better on one."""
+
+    left_values = (float(left["cosine"]), -float(left["normalized_mse"]), -float(left["load_cv"]))
+    right_values = (float(right["cosine"]), -float(right["normalized_mse"]), -float(right["load_cv"]))
+    return all(a >= b for a, b in zip(left_values, right_values)) and any(a > b for a, b in zip(left_values, right_values))
+
+
 def train_torch_layer(
     *,
     source_dir: str | Path,
@@ -630,6 +752,8 @@ def train_torch_layer(
     code_commit: str | None = None,
     stage_schedule: Sequence[Mapping[str, Any]] | None = None,
     selection_indices: Sequence[int] | None = None,
+    fit_exclude_indices: Sequence[int] | None = None,
+    selection_identity_hash: str | None = None,
     evaluate_holdout: bool = True,
 ) -> dict[str, Any]:
     """Run a configurable staged distillation schedule against fixed splits.
@@ -679,10 +803,24 @@ def train_torch_layer(
         if selection_rows[0] < 0 or selection_rows[-1] >= train_dataset.count:
             raise IndexError(f"selection_indices must be within the train split [0, {train_dataset.count})")
     selection_hash = (
-        hashlib.sha256("\n".join(str(index) for index in selection_rows).encode()).hexdigest()
+        _hash_indices(selection_rows)
         if selection_rows is not None
         else None
     )
+    if fit_exclude_indices is None:
+        fit_excluded_rows: tuple[int, ...] = ()
+    else:
+        fit_excluded_rows = tuple(sorted({int(index) for index in fit_exclude_indices}))
+        if any(index < 0 or index >= train_dataset.count for index in fit_excluded_rows):
+            raise IndexError(f"fit_exclude_indices must be within the train split [0, {train_dataset.count})")
+    if selection_rows is not None and not fit_excluded_rows:
+        raise ValueError("selection_indices require fit_exclude_indices: validation rows may not enter optimizer updates")
+    if selection_rows is not None and fit_excluded_rows != selection_rows:
+        raise ValueError("clean validation requires fit_exclude_indices to equal selection_indices")
+    fit_excluded_set = set(fit_excluded_rows)
+    fit_indices = tuple(index for index in range(train_dataset.count) if index not in fit_excluded_set)
+    fit_hash = _hash_indices(fit_indices)
+    fit_exclusion_hash = _hash_indices(fit_excluded_rows) if fit_excluded_rows else None
     plan = _plan_from_path(Path(partition_path))
     if plan.dense_intermediate_size != int(values["gate_proj.weight"].shape[0]):
         raise ValueError("selected partition does not match source dense width")
@@ -713,7 +851,12 @@ def train_torch_layer(
     # experts 0 and 1 on the first pass and the load-balance term could not
     # revive the remaining experts.  The labels are derived from the immutable
     # dense-slice contributions, never from holdout targets.
-    warmup_values = next(train_dataset.iter_batches(min(microbatch, 512)))
+    warmup_batches = (
+        train_dataset.iter_batches(min(microbatch, 512))
+        if not fit_excluded_rows
+        else train_dataset.iter_excluding_batches(fit_excluded_rows, min(microbatch, 512))
+    )
+    warmup_values = next(warmup_batches)
     warmup_inputs = torch.as_tensor(warmup_values, dtype=torch.float32, device=device)
     model.to(device)
     with torch.no_grad():
@@ -737,14 +880,49 @@ def train_torch_layer(
         device=device,
         selected_indices=selection_rows,
     )
+    initial_fit = _stream_metrics(
+        model,
+        train_dataset,
+        gate=gate_tensor,
+        up=up_tensor,
+        down=down_tensor,
+        microbatch=microbatch,
+        device=device,
+        excluded_indices=fit_excluded_rows if fit_excluded_rows else None,
+    )
     stages: list[dict[str, Any]] = []
     stage_metrics: list[dict[str, Any]] = []
-    # Always retain the initialized checkpoint as a candidate.  This makes
-    # every schedule stage an explicitly best-checkpoint comparison rather
-    # than returning a later regression when no stage improves development NMSE.
+    validation_trajectory: list[dict[str, Any]] = []
+    # Always retain the initialized checkpoint as a candidate.  Checkpoint
+    # selection is gate-aware: feasible candidates are ranked by cosine first;
+    # if none is feasible, the full Pareto frontier is retained in metadata.
     best_state: dict[str, Any] = {key: value.detach().cpu().clone() for key, value in model.state_dict().items()}
-    best_metric = float(initial_selection["normalized_mse"])
-    best_stage = "initialized"
+    initial_record = {"stage": "initialized", "epoch": 0, **initial_selection}
+    initial_record["feasible"] = _gate_feasible(initial_selection)
+    initial_record["selection_reason"] = "initial_checkpoint"
+    validation_trajectory.append(initial_record)
+    best_record: dict[str, Any] = initial_record
+    best_has_feasible = bool(initial_record["feasible"])
+
+    def consider_checkpoint(current_model: TorchQwen35SwiGLUMoE, stage_name: str, epoch_number: int, metrics: Mapping[str, Any]) -> dict[str, Any]:
+        nonlocal best_state, best_record, best_has_feasible
+        record = {"stage": stage_name, "epoch": int(epoch_number), **dict(metrics)}
+        record["feasible"] = _gate_feasible(metrics)
+        record["selection_reason"] = "validation_epoch_observation"
+        validation_trajectory.append(record)
+        should_select = False
+        if record["feasible"]:
+            if not best_has_feasible or _feasible_rank(record) > _feasible_rank(best_record):
+                should_select = True
+                record["selection_reason"] = "gate_feasible_max_cosine"
+            best_has_feasible = True
+        elif not best_has_feasible and _feasible_rank(record) > _feasible_rank(best_record):
+            should_select = True
+            record["selection_reason"] = "pareto_frontier_max_cosine_fallback"
+        if should_select:
+            best_state = {key: value.detach().cpu().clone() for key, value in current_model.state_dict().items()}
+            best_record = record
+        return record
     if stage_schedule is None:
         raw_schedule: Sequence[Mapping[str, Any]] = (
             {"name": "router_warm_start", "epochs": epochs, "train_scales": False, "train_experts": False, "use_oracle_targets": True},
@@ -785,6 +963,19 @@ def train_torch_layer(
             raise ValueError(
                 f"stage_schedule[{index}].oracle_target_mode must be contribution_norm or residual_correlation"
             )
+        oracle_loss_mode = str(raw_stage.get("oracle_loss_mode", "repeated_cross_entropy"))
+        if oracle_loss_mode not in {"repeated_cross_entropy", "multilabel_bce"}:
+            raise ValueError(
+                f"stage_schedule[{index}].oracle_loss_mode must be repeated_cross_entropy or multilabel_bce"
+            )
+        oracle_amplitude_mode = str(raw_stage.get("oracle_amplitude_mode", "student_selected"))
+        if oracle_amplitude_mode not in {"student_selected", "teacher_forced", "mixed"}:
+            raise ValueError(
+                f"stage_schedule[{index}].oracle_amplitude_mode must be student_selected, teacher_forced, or mixed"
+            )
+        teacher_forcing_ratio = float(raw_stage.get("teacher_forcing_ratio", 0.0))
+        if not 0.0 <= teacher_forcing_ratio <= 1.0:
+            raise ValueError(f"stage_schedule[{index}].teacher_forcing_ratio must be between 0 and 1")
         normalized_schedule.append(
             {
                 "name": stage_name,
@@ -794,6 +985,9 @@ def train_torch_layer(
                 "train_shared": bool(raw_stage.get("train_shared", False)),
                 "use_oracle_targets": bool(raw_stage.get("use_oracle_targets", False)),
                 "oracle_target_mode": oracle_target_mode,
+                "oracle_loss_mode": oracle_loss_mode,
+                "oracle_amplitude_mode": oracle_amplitude_mode,
+                "teacher_forcing_ratio": teacher_forcing_ratio,
                 "train_selection_router": bool(raw_stage.get("train_selection_router", True)),
                 "train_amplitude_router": bool(raw_stage.get("train_amplitude_router", True)),
                 "learning_rate": stage_learning_rate,
@@ -803,6 +997,24 @@ def train_torch_layer(
         )
     for stage_spec in normalized_schedule:
         stage_name = str(stage_spec["name"])
+
+        def validation_epoch_callback(current_model: TorchQwen35SwiGLUMoE, callback_stage: str, callback_epoch: int) -> Mapping[str, Any]:
+            return consider_checkpoint(
+                current_model,
+                callback_stage,
+                callback_epoch,
+                _stream_metrics(
+                    current_model,
+                    train_dataset,
+                    gate=gate_tensor,
+                    up=up_tensor,
+                    down=down_tensor,
+                    microbatch=microbatch,
+                    device=device,
+                    selected_indices=selection_rows,
+                ),
+            )
+
         stage_result = _train_stage_streaming(
             model,
             train_dataset,
@@ -820,27 +1032,31 @@ def train_torch_layer(
             stage=stage_name,
             use_oracle_targets=bool(stage_spec["use_oracle_targets"]),
             oracle_target_mode=str(stage_spec["oracle_target_mode"]),
+            oracle_loss_mode=str(stage_spec["oracle_loss_mode"]),
+            oracle_amplitude_mode=str(stage_spec["oracle_amplitude_mode"]),
+            teacher_forcing_ratio=float(stage_spec["teacher_forcing_ratio"]),
             train_selection_router=bool(stage_spec["train_selection_router"]),
             train_amplitude_router=bool(stage_spec["train_amplitude_router"]),
             learning_rates=stage_spec["learning_rates"],
             loss_coefficients=stage_spec["loss_coefficients"],
+            excluded_indices=fit_excluded_rows if fit_excluded_rows else None,
+            epoch_callback=validation_epoch_callback if selection_rows is not None else None,
         )
         stages.append(stage_result)
-        measured = _stream_metrics(
-            model,
-            train_dataset,
-            gate=gate_tensor,
-            up=up_tensor,
-            down=down_tensor,
-            microbatch=microbatch,
-            device=device,
-            selected_indices=selection_rows,
-        )
-        stage_metrics.append({"stage": stage_name, **measured})
-        if float(measured["normalized_mse"]) < best_metric:
-            best_metric = float(measured["normalized_mse"])
-            best_stage = stage_name
-            best_state = {key: value.detach().cpu().clone() for key, value in model.state_dict().items()}
+        if stage_result.get("epoch_validation_metrics"):
+            stage_metrics.append({"stage": stage_name, **stage_result["epoch_validation_metrics"][-1]})
+        elif selection_rows is not None:
+            measured = _stream_metrics(
+                model,
+                train_dataset,
+                gate=gate_tensor,
+                up=up_tensor,
+                down=down_tensor,
+                microbatch=microbatch,
+                device=device,
+                selected_indices=selection_rows,
+            )
+            stage_metrics.append({"stage": stage_name, "epoch": 0, **measured, "feasible": _gate_feasible(measured)})
     model.load_state_dict(best_state, strict=True)
     final_selection = _stream_metrics(
         model,
@@ -852,6 +1068,26 @@ def train_torch_layer(
         device=device,
         selected_indices=selection_rows,
     )
+    final_fit = _stream_metrics(
+        model,
+        train_dataset,
+        gate=gate_tensor,
+        up=up_tensor,
+        down=down_tensor,
+        microbatch=microbatch,
+        device=device,
+        excluded_indices=fit_excluded_rows if fit_excluded_rows else None,
+    )
+    pareto_frontier = [
+        record
+        for record in validation_trajectory
+        if not any(
+            other is not record and _pareto_dominates(other, record)
+            for other in validation_trajectory
+        )
+    ]
+    best_stage = str(best_record["stage"])
+    best_epoch = int(best_record.get("epoch", 0))
     if evaluate_holdout:
         trained = _stream_metrics(
             model,
@@ -928,11 +1164,32 @@ def train_torch_layer(
             "stage_schedule": normalized_schedule,
             "stages": stages,
             "stage_selection_metrics": stage_metrics,
+            "validation_trajectory": validation_trajectory,
+            "pareto_frontier": pareto_frontier,
+            "checkpoint_selection_rule": {
+                "feasibility": "normalized_mse<=0.05 and cosine>=0.98 and dead_experts==0 and load_cv<=0.50",
+                "ordering": "maximize cosine, then minimize normalized_mse, then minimize load_cv",
+                "fallback": "retain Pareto frontier and select highest-cosine frontier point",
+            },
             "best_selection_stage": best_stage,
-            "selection_split": "train_dev_subset" if selection_rows is not None else "train_split",
+            "best_selection_epoch": best_epoch,
+            "best_selection_reason": best_record.get("selection_reason"),
+            "selection_split": "validation" if selection_rows is not None else "train_split",
             "selection_indices_hash": selection_hash,
+            "selection_identity_hash": selection_identity_hash,
             "selection_count": int(len(selection_rows)) if selection_rows is not None else train_dataset.count,
+            "validation_count": int(len(selection_rows)) if selection_rows is not None else None,
+            "validation_hash": selection_identity_hash or selection_hash,
+            "fit_count": len(fit_indices),
+            "fit_index_hash": fit_hash,
+            "fit_excluded_indices_hash": fit_exclusion_hash,
+            "fit_exclusion_contract": "train rows excluding validation indices" if fit_excluded_rows else "no exclusion",
             "holdout_evaluation": holdout_status,
+            "split_opened_for": {
+                "fit": {"gradient_updates": True, "checkpoint_selection": False, "final_confirmation": False},
+                "validation": {"gradient_updates": False, "checkpoint_selection": selection_rows is not None, "final_confirmation": False},
+                "holdout": {"gradient_updates": False, "checkpoint_selection": False, "final_confirmation": evaluate_holdout},
+            },
             "streaming_dataset": {
                 "train_manifest": train_dataset.manifest_path.as_posix(),
                 "holdout_manifest": holdout_dataset.manifest_path.as_posix(),
@@ -946,15 +1203,15 @@ def train_torch_layer(
         tensor_file=tensor_path.name,
         tensor_sha256=tensor_hash,
         tensor_inventory=inventory,
-        train_metrics={"initial_selection": initial_selection, "final_selection": final_selection, "oracle_holdout": oracle_holdout, "all_expert_reconstruction_mse": 0.0},
+        train_metrics={"initial_fit": initial_fit, "final_fit": final_fit, "initial_selection": initial_selection, "final_selection": final_selection, "oracle_holdout": oracle_holdout, "all_expert_reconstruction_mse": 0.0},
         holdout_metrics=trained,
         router_metrics={"load_cv": gate_metrics["load_cv"], "dead_experts": gate_metrics["dead_experts"], "selected_counts": gate_metrics["selected_counts"], "actual_improvement": float(initial_selection["normalized_mse"] - gate_metrics["normalized_mse"]) if gate_metrics["normalized_mse"] is not None else None},
-        quality_gate={"overall": gate_overall if epochs > 0 else "untrained", "thresholds_version": "initial-2026-08-15", "evaluation_scope": "full_holdout" if evaluate_holdout else "train_dev_selection", "metrics": gate_metrics},
+        quality_gate={"overall": gate_overall if epochs > 0 else "untrained", "thresholds_version": "gate-aware-2026-08-16", "evaluation_scope": "full_holdout" if evaluate_holdout else "validation" if selection_rows is not None else "fit", "metrics": gate_metrics},
         code_commit=recorded_commit,
     )
     metadata_path = output / f"layer-{layer:04d}.json"
     save_layer_checkpoint(checkpoint, metadata_path)
-    return {"status": status, "layer": layer, "metadata": str(metadata_path), "tensor_file": str(tensor_path), "holdout_metrics": trained, "initial_selection": initial_selection, "final_selection": final_selection, "oracle_holdout": oracle_holdout, "training_config": checkpoint.training_config, "code_commit": recorded_commit}
+    return {"status": status, "layer": layer, "metadata": str(metadata_path), "tensor_file": str(tensor_path), "holdout_metrics": trained, "initial_fit": initial_fit, "final_fit": final_fit, "initial_selection": initial_selection, "final_selection": final_selection, "oracle_holdout": oracle_holdout, "training_config": checkpoint.training_config, "code_commit": recorded_commit}
 
 
 __all__ = ["load_fixed_activation_splits", "train_torch_layer"]
