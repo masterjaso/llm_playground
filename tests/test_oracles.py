@@ -12,7 +12,23 @@ from dense2moe.partition import (
     sparse_baseline,
     trainable_student_proxy,
 )
-from dense2moe.partition.oracle import _pareto_points
+from dense2moe.partition.oracle import _batched_candidate_vectors, _batched_exact_positive_fit, _pareto_points
+
+
+def test_selected_route_vector_shape_and_exact_refit_match_scalar_nnls() -> None:
+    from dense2moe.partition.oracle import _positive_weights_exact
+
+    rng = np.random.default_rng(123)
+    routed = rng.normal(size=(5, 7, 11)).astype(np.float32)
+    ids = np.asarray([[0, 2, 4, 6], [1, 3, 5, 6], [0, 1, 2, 3], [2, 4, 5, 6], [0, 3, 4, 6]])
+    residual = rng.normal(size=(5, 11)).astype(np.float32)
+    vectors = _batched_candidate_vectors(routed, ids)
+
+    assert vectors.shape == (5, 1, 4, 11)
+    _, fitted = _batched_exact_positive_fit(vectors, residual)
+    for row in range(5):
+        expected = _positive_weights_exact(vectors[row, 0].T, residual[row])
+        np.testing.assert_allclose(fitted[row, 0], expected, rtol=2e-5, atol=2e-5)
 
 
 def test_load_aware_oracle_reports_balanced_pareto_assignment() -> None:
@@ -52,7 +68,8 @@ def test_load_aware_oracle_uses_bounded_float32_blocks_for_float64_inputs(tmp_pa
 
     assert result["assurance"] == "exact_candidate_sets"
     assert result["candidate_fit_exact"] is False
-    assert result["coefficient_solver"].endswith("float32")
+    assert "float32" in result["coefficient_solver"]
+    assert result["selected_fit_exact"] is True
     assert result["weights"].dtype == np.float32
     assert result["candidate_error_storage"] == "memmap"
     assert result["candidate_batch_size"] < 1024

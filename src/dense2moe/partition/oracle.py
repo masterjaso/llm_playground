@@ -666,12 +666,71 @@ def _batched_candidate_fit(vectors: Any, residual: Any, *, simplex: bool) -> tup
     return _batched_projected_fit(gram, rhs, residual_norm, hidden, simplex=simplex)
 
 
+def _batched_exact_positive_fit(vectors: Any, residual: Any) -> tuple[Any, Any]:
+    """Exact non-negative active-face refit for a bounded selected-route batch.
+
+    Candidate pricing at real scale intentionally uses the projected float32
+    scorer above.  Once a route is selected, however, ``top_k`` is small and
+    the final coefficients can be solved exactly by enumerating its active
+    faces.  This vectorized implementation keeps the refit bounded over
+    ``[batch, candidate, top_k]`` route systems and avoids the old per-token
+    Python route-object loop.
+    """
+
+    np = _np()
+    values = np.asarray(vectors, dtype=np.float64)
+    goal = np.asarray(residual, dtype=np.float64)
+    batch, candidates, top_k, hidden = values.shape
+    if candidates != 1:
+        raise ValueError("exact selected-route refit expects one candidate per token")
+    gram = np.einsum("bckh,bclh->bckl", values, values, dtype=np.float64)
+    rhs = np.einsum("bckh,bh->bck", values, goal, dtype=np.float64)
+    residual_norm = np.sum(goal * goal, axis=1, dtype=np.float64)[:, None]
+    best_error = residual_norm.copy()
+    best_weights = np.zeros((batch, candidates, top_k), dtype=np.float64)
+    for mask in range(1, 1 << top_k):
+        active = tuple(index for index in range(top_k) if mask & (1 << index))
+        width = len(active)
+        raw_g = np.take(np.take(gram, active, axis=2), active, axis=3)
+        raw_b = np.take(rhs, active, axis=2)
+        flat_g = raw_g.reshape(batch * candidates, width, width)
+        flat_b = raw_b.reshape(batch * candidates, width)
+        try:
+            flat_solution = np.linalg.solve(flat_g, flat_b[..., None])[..., 0]
+        except np.linalg.LinAlgError:
+            # ``numpy.linalg.lstsq`` is not batch-aware on all supported
+            # NumPy versions.  Singular/collinear faces are uncommon for
+            # learned routes but are expected in deterministic fixtures, so
+            # keep this bounded fallback explicitly per selected system.
+            flat_solution = np.stack(
+                [np.linalg.lstsq(matrix, vector, rcond=None)[0] for matrix, vector in zip(flat_g, flat_b)],
+                axis=0,
+            )
+        solution = flat_solution.reshape(batch, candidates, width)
+        valid = np.isfinite(solution).all(axis=-1) & (solution.min(axis=-1) >= -1e-9)
+        solution = np.maximum(solution, 0.0)
+        quadratic = np.einsum("bcw,bcwv,bcv->bc", solution, raw_g, solution, dtype=np.float64)
+        candidate_error = residual_norm - 2.0 * np.sum(solution * raw_b, axis=-1) + quadratic
+        candidate_error = np.where(valid, candidate_error, np.inf)
+        update = candidate_error < best_error
+        if np.any(update):
+            full = np.zeros_like(best_weights)
+            full[:, :, active] = solution
+            best_weights = np.where(update[..., None], full, best_weights)
+            best_error = np.where(update, candidate_error, best_error)
+    return best_error / max(hidden, 1), best_weights.astype(np.float32)
+
+
 def _batched_candidate_vectors(routed: Any, candidate_ids: Any) -> Any:
     np = _np()
     routed_values = np.asarray(routed)
     ids = np.asarray(candidate_ids, dtype=np.int64)
     if ids.ndim == 2:
-        ids = np.broadcast_to(ids[None, ...], (routed_values.shape[0], *ids.shape))
+        # Selected routes are [batch, top_k]; add the singleton candidate
+        # axis.  Broadcasting a leading batch axis here would accidentally
+        # create [batch, batch, top_k] and make ``fitted[:, 0]`` use the first
+        # token's route for every token.
+        ids = ids[:, None, :]
     return np.take_along_axis(routed_values[:, None, :, :], ids[..., None], axis=2)
 
 
@@ -880,7 +939,16 @@ def _selected_ids(ids_store: Any | None, templates: Any, selected: Any) -> Any:
     return np.asarray(ids_store[rows, np.asarray(selected, dtype=np.int64)], dtype=np.int64)
 
 
-def _stream_selected_weights(routed: Any, target: Any, shared: Any, ids: Any, *, simplex: bool, batch_size: int) -> Any:
+def _stream_selected_weights(
+    routed: Any,
+    target: Any,
+    shared: Any,
+    ids: Any,
+    *,
+    simplex: bool,
+    batch_size: int,
+    exact_positive: bool = False,
+) -> Any:
     np = _np()
     tokens = int(ids.shape[0])
     weights = np.zeros((tokens, ids.shape[1]), dtype=np.float32)
@@ -888,7 +956,10 @@ def _stream_selected_weights(routed: Any, target: Any, shared: Any, ids: Any, *,
         stop = min(tokens, start + max(1, int(batch_size)))
         residual = np.asarray(target[start:stop], dtype=np.float32) - np.asarray(shared[start:stop], dtype=np.float32)
         vectors = _batched_candidate_vectors(np.asarray(routed[start:stop], dtype=np.float32), ids[start:stop])
-        _, fitted = _batched_candidate_fit(vectors, residual, simplex=simplex)
+        if exact_positive and not simplex:
+            _, fitted = _batched_exact_positive_fit(vectors, residual)
+        else:
+            _, fitted = _batched_candidate_fit(vectors, residual, simplex=simplex)
         weights[start:stop] = fitted[:, 0]
     return weights
 
@@ -1062,6 +1133,7 @@ def frozen_slice_load_aware_oracle(
             unconstrained_ids,
             simplex=simplex,
             batch_size=batch_size,
+            exact_positive=True,
         )
         unconstrained_metric = _stream_metrics(
             shared_values,
@@ -1100,6 +1172,7 @@ def frozen_slice_load_aware_oracle(
                     ids,
                     simplex=simplex,
                     batch_size=batch_size,
+                    exact_positive=True,
                 )
                 metric = _stream_metrics(
                     shared_values,
@@ -1213,8 +1286,9 @@ def frozen_slice_load_aware_oracle(
             "max_in_memory_bytes": int(max_in_memory_bytes),
             "materialize_outputs": bool(materialize_outputs),
             "candidate_storage_ephemeral": owned_storage is not None,
-            "coefficient_solver": "batched_ridge_kkt_projected_float32",
+            "coefficient_solver": "batched_projected_float32_candidate_scoring_with_exact_active_face_selected_refit",
             "candidate_fit_exact": False,
+            "selected_fit_exact": bool(not simplex),
             **score_metadata,
             "unconstrained": {
                 "global_nmse": unconstrained_metric["global_nmse"],
