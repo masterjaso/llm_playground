@@ -21,18 +21,32 @@ import numpy as np
 
 from dense2moe.partition import PartitionPlan, partition_indices
 from dense2moe.provenance import current_git_commit
-from scripts.run_topk_architecture_search import (
-    _dense_hidden_target,
-    _exact_topk,
-    _fit_scales,
-    _materialize_selected,
-    _plan_contributions,
-    _residual_correlation_beam_topk,
-    _route_reconstruction,
-    _select_dev_rows,
-    _load_mlp,
-    _accumulate_scales,
-)
+try:
+    from scripts.run_topk_architecture_search import (
+        _accumulate_scales,
+        _dense_hidden_target,
+        _exact_topk,
+        _fit_scales,
+        _load_mlp,
+        _materialize_selected,
+        _plan_contributions,
+        _residual_correlation_beam_topk,
+        _route_reconstruction,
+        _select_dev_rows,
+    )
+except ModuleNotFoundError:  # direct ``python scripts/<file>.py`` execution
+    from run_topk_architecture_search import (
+        _accumulate_scales,
+        _dense_hidden_target,
+        _exact_topk,
+        _fit_scales,
+        _load_mlp,
+        _materialize_selected,
+        _plan_contributions,
+        _residual_correlation_beam_topk,
+        _route_reconstruction,
+        _select_dev_rows,
+    )
 
 
 RUN = Path("runs/20260815-184644-windows-real-d2m-v4-streaming")
