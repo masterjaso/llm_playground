@@ -331,8 +331,12 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
     run_dir = Path(args.run_dir)
     source_dir = Path(args.source_dir)
     dev_payload = json.loads((run_dir / "capture/architecture-dev.json").read_text(encoding="utf-8"))
-    validation_indices = np.asarray(dev_payload["selected_global_indices"], dtype=np.int64)
-    validation_hash = str(dev_payload["selected_row_key_hash"])
+    if args.scope == "holdout":
+        validation_indices = None
+        validation_hash = "holdout-dataset"
+    else:
+        validation_indices = np.asarray(dev_payload["selected_global_indices"], dtype=np.int64)
+        validation_hash = str(dev_payload["selected_row_key_hash"])
     profile = load_config(Path("configs/qwen38_p16s1_top4.yaml"))
     plan_path = run_dir / "partitions" / args.partition_name
     plan = _load_plan(plan_path)
@@ -344,7 +348,11 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         run_dir / "layer-checkpoints" / "clean-validation" / args.checkpoint_name,
         args.device,
     )
-    dataset = ActivationShardDataset(run_dir / "capture/layer-0000.json", split="train", microbatch=args.microbatch)
+    split_name = "holdout" if args.scope == "holdout" else "train"
+    dataset = ActivationShardDataset(run_dir / "capture/layer-0000.json", split=split_name, microbatch=args.microbatch)
+    if validation_indices is None:
+        validation_indices = np.arange(dataset.count, dtype=np.int64)
+        validation_hash = dataset.dataset_hash
 
     started = time.perf_counter()
     residual_norms = _selected_positions(
@@ -361,6 +369,9 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
     if args.scope == "hard":
         scope_positions = hard_positions
         scope_name = "hardest_residual_norm_quartile"
+    elif args.scope == "holdout":
+        scope_positions = np.arange(validation_indices.shape[0], dtype=np.int64)
+        scope_name = "full_holdout"
     else:
         scope_positions = np.arange(validation_indices.shape[0], dtype=np.int64)
         scope_name = "all_validation"
@@ -444,7 +455,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
     payload = {
         "schema_version": 1,
         "status": "EXACT_P16_TOP4_ORACLE_COMPLETE",
-        "classification": "TRUE_VALIDATION_ONLY_NO_GRADIENTS_NO_HOLDOUT",
+        "classification": "TRUE_HOLDOUT_ORACLE_DIAGNOSTIC_NO_GRADIENTS" if args.scope == "holdout" else "TRUE_VALIDATION_ONLY_NO_GRADIENTS_NO_HOLDOUT",
         "hypothesis": "The deployed p16/top4 basis can clear cosine >= 0.98 if expert selection is exact.",
         "expected_result": "The exact all-1820-set positive oracle should materially exceed the learned linear selector, especially on the hardest residual quartile.",
         "falsifier": "Exact oracle mean cosine below 0.98 on the evaluated scope means selector learning alone cannot establish the product gate for this basis.",
@@ -462,7 +473,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
             "residual_norm_quartile_edges": [float(v) for v in residual_edges],
             "scope_residual_norm_min": float(scope_residual_norms.min()),
             "scope_residual_norm_max": float(scope_residual_norms.max()),
-            "holdout": {"count": 16598, "opened": False, "status": "CLOSED"},
+            "holdout": {"count": 16598, "opened": args.scope == "holdout", "status": "OPENED_FOR_POST_SELECTION_ORACLE_DIAGNOSTIC" if args.scope == "holdout" else "CLOSED"},
         },
         "architecture": {
             "profile": profile.name,
@@ -523,7 +534,7 @@ def main() -> None:
     parser.add_argument("--partition-name", default="high-sparsity-p16-top4.json")
     parser.add_argument("--checkpoint-name", default="p16-top4-residual-ce")
     parser.add_argument("--report-name", default="p16-top4-exact-oracle-validation.json")
-    parser.add_argument("--scope", choices=("hard", "all"), default="hard")
+    parser.add_argument("--scope", choices=("hard", "all", "holdout"), default="hard")
     parser.add_argument("--device", default="cuda:1")
     parser.add_argument("--microbatch", type=int, default=256)
     parser.add_argument("--beam-width", type=int, default=4)
