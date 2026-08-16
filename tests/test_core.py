@@ -227,6 +227,19 @@ class CoreTests(unittest.TestCase):
                 fit_exclude_indices=[2, 4, 9],
             )
 
+    def test_hard_dispatch_straight_through_has_hard_forward_and_soft_gradient(self):
+        import torch
+
+        from dense2moe.training.torch_distill import _hard_dispatch_straight_through
+
+        logits = torch.tensor([[2.0, 0.5, -1.0, -2.0]], requires_grad=True)
+        indices = torch.tensor([[0, 2]])
+        dispatch = _hard_dispatch_straight_through(logits, indices, top_k=2)
+        torch.testing.assert_close(dispatch.detach(), torch.tensor([[0.5, 0.0, 0.5, 0.0]]))
+        (dispatch * torch.tensor([[1.0, 2.0, 3.0, 4.0]])).sum().backward()
+        self.assertIsNotNone(logits.grad)
+        self.assertGreater(float(logits.grad.abs().sum()), 0.0)
+
     def test_job_queue_no_duplicate_lease(self):
         queue = JobQueue(self.root / "jobs.sqlite")
         queue.enqueue(0)
