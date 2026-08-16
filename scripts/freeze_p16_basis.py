@@ -14,6 +14,7 @@ if __package__ in {None, ""}:
     sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from dense2moe.provenance import current_git_commit
+from dense2moe.partition import PartitionPlan
 
 
 def _sha256(path: Path) -> str:
@@ -47,11 +48,19 @@ def main() -> None:
     if observed_tensor_hash != recorded_tensor_hash:
         raise ValueError("basis tensor SHA-256 does not match checkpoint metadata")
     partition_payload = json.loads(partition_path.read_text(encoding="utf-8"))
-    canonical_plan = partition_payload.get("plan", partition_payload)
+    canonical_plan = PartitionPlan(
+        int(partition_payload["dense_intermediate_size"]),
+        int(partition_payload["routed_experts"]),
+        int(partition_payload["expert_intermediate_size"]),
+        int(partition_payload["shared_intermediate_size"]),
+        tuple(int(value) for value in partition_payload["shared_indices"]),
+        tuple(tuple(int(value) for value in group) for group in partition_payload["expert_indices"]),
+    )
+    canonical_plan.validate()
     # Layer checkpoints historically hash ``plan.as_dict()`` with sorted JSON
     # keys and default separators.  Reproduce that exact recipe so the freeze
     # receipt can be checked against the checkpoint metadata byte-for-byte.
-    plan_hash = hashlib.sha256(json.dumps(canonical_plan, sort_keys=True).encode()).hexdigest()
+    plan_hash = hashlib.sha256(json.dumps(canonical_plan.as_dict(), sort_keys=True).encode()).hexdigest()
     recorded_plan_hash = str(metadata.get("partition_hash", ""))
     if plan_hash != recorded_plan_hash:
         raise ValueError("basis partition canonical hash does not match checkpoint metadata")
