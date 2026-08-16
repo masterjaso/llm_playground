@@ -45,3 +45,22 @@ The p8s14/top2 checkpoint is classified `DENSEISH_QUALITY_UPPER_BOUND` (NMSE 0.0
 | p16/k4 | independent_positive | validation failed | 0.068389 | 0.9458 | 0.044366 |
 
 Independent-positive routing materially closes the normalized-router gap. p8/k6 is the current sparse leader; its remaining gap to the oracle is an optimization-budget question, not a forced coefficient-sum limitation.
+
+## Superseding high-sparsity decision
+
+The p8/k6 recommendation above is retained only as a trainability/router-quality
+control. A current-HEAD (`47fda41`) TRAIN/dev search with contribution,
+residual-aware, signature-grouping, and bounded residual-swap refinement selected
+the >=70% candidates. Equal-budget train/dev schedules and a single post-selection
+holdout confirmation then produced:
+
+| profile | reduction | holdout NMSE | holdout cosine | dead | load CV |
+|---|---:|---:|---:|---:|---:|
+| p16/top4 independent-positive | 70.59% | 0.04427 | 0.96092 | 0 | 0.50080 |
+| p16/top3 independent-positive | 76.47% | 0.04729 | 0.95692 | 0 | 0.76087 |
+| p32/top6 independent-positive | 76.47% | 0.04697 | 0.95771 | 0 | 0.69416 |
+
+No >=70% candidate meets the cosine `>=0.98` green gate. The durable layer-29
+replay checkpoint therefore remains paused while basis/angular error and routing
+load are investigated. See `HIGH_SPARSITY_DECISION.md` and
+`high-sparsity-finalist-holdout-confirmation.json` for the authoritative decision.

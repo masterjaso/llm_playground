@@ -1,5 +1,9 @@
 {
-  "active_blocker": null,
+  "active_blocker": {
+    "kind": "quality_gate_not_met",
+    "reason": "no >=70% reduction finalist meets cosine >=0.98 with dead_experts=0 and load_cv<=0.50",
+    "replay_action": "do_not_resume_representative_or_64_layer_replay"
+  },
   "artifact_paths": {
     "artifact": "runs\\20260815-184644-windows-real-d2m-v4-streaming\\capture\\data-plan.json",
     "decision_register": "runs\\20260815-184644-windows-real-d2m-v4-streaming\\decision-register.json",
@@ -7,12 +11,12 @@
     "fact_ledger": "runs\\20260815-184644-windows-real-d2m-v4-streaming\\repository-fact-ledger.json",
     "source_manifest": "runs\\20260815-184644-windows-real-d2m-v4-streaming\\source-manifest.json"
   },
-  "code_commit": "964dcc6d3c90f3af7b60c11ddb9e7f5827320ee5",
-  "current_phase": "finalist-selection",
-  "last_successful_command": "independent-positive-finalist-training",
-  "next_exact_command": "review runs/20260815-184644-windows-real-d2m-v4-streaming/reports/TOP_K_ARCHITECTURE_SEARCH.md",
+  "code_commit": "7e375c4c9d92646ab9b15d65b12b9ffc8373b225",
+  "current_phase": "high-sparsity-finalist-holdout-confirmation",
+  "last_successful_command": "confirm_high_sparsity_holdout.py",
+  "next_exact_command": "investigate sparse basis/angular error and routing load before any representative replay",
   "parent_run_id": "20260815-180505-windows-real-d2m-v3",
-  "phase_status": "complete",
+  "phase_status": "quality_gate_not_met_replay_paused",
   "prediction_contract": {
     "expected_artifacts": [
       "source-manifest.json"
@@ -29,7 +33,7 @@
   "retry_counts": {},
   "run_id": "20260815-184644-windows-real-d2m-v4-streaming",
   "schema_version": 2,
-  "selected_profile": "qwen38_p8s1_top2",
+  "selected_profile": "qwen38_p16s1_top4",
   "source_config_hash": "191e0af232104ed8b65258cf3fb2b842e288008baca7633c11b82a1ac7203aab",
   "source_index_hash": "77042094076611b69791a610065f28b7013b8c621795fa86ddccc8bac7d1b9df",
   "source_revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
@@ -52,8 +56,39 @@
       "routing_mode": "independent_positive",
       "report": "reports/architecture-finalist-training.json",
       "best_sparse_candidate": "qwen38_p8s1_top6",
+      "classification": "TRAINABILITY_ROUTER_QUALITY_CONTROL",
       "best_sparse_status": "TRAINED_VALIDATED",
       "best_sparse_holdout_normalized_mse": 0.018899123945427157
+    },
+    "high_sparsity_search": {
+      "status": "HIGH_SPARSITY_TRAIN_DEV_SEARCH_COMPLETE",
+      "production_objective": ">=70% active dense-FFN reduction",
+      "primary_candidate": "qwen38_p16s1_top4",
+      "aggressive_candidates": ["qwen38_p16s1_top3", "qwen38_p32s1_top6", "qwen38_p32s1_top4"],
+      "control": "qwen38_p8s1_top6",
+      "representative_replay": "PAUSED",
+      "report": "reports/high-sparsity-partition-search.json",
+      "p8_control_report": "reports/p8-top6-current-head-control.json",
+      "selected_candidates": ["qwen38_p16s1_top4", "qwen38_p16s1_top3", "qwen38_p32s1_top6"]
+    },
+    "p16_schedule_ablations": {
+      "status": "COMPLETE_TRAIN_DEV_ONLY",
+      "report": "reports/p16-top4-schedule-ablations.json",
+      "winner": "A_warm_joint",
+      "winner_train_dev_normalized_mse": 0.045498747868190074,
+      "winner_train_dev_cosine": 0.9672467894852161,
+      "winner_dead_experts": 0,
+      "winner_load_cv": 0.4560538869846677
+    },
+    "equal_compute_finalists": {
+      "status": "COMPLETE_TRAIN_DEV_ONLY",
+      "report": "reports/high-sparsity-equal-compute-finalists.json",
+      "profiles": ["qwen38_p16s1_top3", "qwen38_p32s1_top6"]
+    },
+    "finalist_holdout_confirmation": {
+      "status": "COMPLETE",
+      "report": "reports/high-sparsity-finalist-holdout-confirmation.json",
+      "replay_gate": "BLOCKED_NO_GREEN_CANDIDATE"
     },
     "train_layer": {
       "classification": "DENSEISH_QUALITY_UPPER_BOUND",

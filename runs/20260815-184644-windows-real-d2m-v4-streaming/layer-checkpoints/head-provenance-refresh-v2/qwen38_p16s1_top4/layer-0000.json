@@ -1,0 +1,788 @@
+{
+  "code_commit": "914fae9d327fc82d4f1702e1d75a51e91221fb18",
+  "created_at": "2026-08-16T04:27:26.083771Z",
+  "dataset_hash": "46b278a85b4cb31a8fe659be2dd146bd9206eb491268220e25440981d06c0a03",
+  "holdout_metrics": {
+    "cosine": 0.9457615761458694,
+    "dead_experts": 0,
+    "load_cv": 0.28612232997920845,
+    "mse": 7.151255366356634e-05,
+    "normalized_mse": 0.06838882519672046,
+    "router_entropy": 2.6830496957523593,
+    "selected_count": 16598,
+    "selected_counts": [
+      5720.0,
+      5988.0,
+      5270.0,
+      3122.0,
+      3447.0,
+      3477.0,
+      2284.0,
+      2147.0,
+      3895.0,
+      4721.0,
+      3264.0,
+      3494.0,
+      4159.0,
+      5375.0,
+      5838.0,
+      4191.0
+    ],
+    "split": "holdout",
+    "streaming": true,
+    "token_count": 16598
+  },
+  "layer": 0,
+  "metrics": {},
+  "partition_hash": "34f5eba9d30fa2ab1647c8b13430143a4634e510d9cf78cab8ce42e3fe6ef879",
+  "partition_strategy": "artifact",
+  "profile": "qwen38_p16s1_top4",
+  "profile_hash": "e5236fb41c50f1b1910b5cd476c51c3567aa289649f27b639bf9ce0959b8801b",
+  "quality_gate": {
+    "evaluation_scope": "full_holdout",
+    "metrics": {
+      "cosine": 0.9457615761458694,
+      "dead_experts": 0,
+      "load_cv": 0.28612232997920845,
+      "mse": 7.151255366356634e-05,
+      "normalized_mse": 0.06838882519672046,
+      "router_entropy": 2.6830496957523593,
+      "selected_count": 16598,
+      "selected_counts": [
+        5720.0,
+        5988.0,
+        5270.0,
+        3122.0,
+        3447.0,
+        3477.0,
+        2284.0,
+        2147.0,
+        3895.0,
+        4721.0,
+        3264.0,
+        3494.0,
+        4159.0,
+        5375.0,
+        5838.0,
+        4191.0
+      ],
+      "split": "holdout",
+      "streaming": true,
+      "token_count": 16598
+    },
+    "overall": "red",
+    "thresholds_version": "initial-2026-08-15"
+  },
+  "router_architecture": "torch-linear-topk-independent_positive-v1",
+  "router_metrics": {
+    "actual_improvement": 0.0750369539306098,
+    "dead_experts": 0,
+    "load_cv": 0.28612232997920845,
+    "selected_counts": [
+      5720.0,
+      5988.0,
+      5270.0,
+      3122.0,
+      3447.0,
+      3477.0,
+      2284.0,
+      2147.0,
+      3895.0,
+      4721.0,
+      3264.0,
+      3494.0,
+      4159.0,
+      5375.0,
+      5838.0,
+      4191.0
+    ]
+  },
+  "routing_mode": "independent_positive",
+  "schema_version": 2,
+  "source_config_hash": "191e0af232104ed8b65258cf3fb2b842e288008baca7633c11b82a1ac7203aab",
+  "source_index_hash": "77042094076611b69791a610065f28b7013b8c621795fa86ddccc8bac7d1b9df",
+  "source_revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
+  "status": "VALIDATION_FAILED",
+  "tensor_file": "layer-0000.safetensors",
+  "tensor_inventory": {
+    "model.layers.0.amplitude_router.bias": {
+      "dtype": "float32",
+      "shape": [
+        16
+      ]
+    },
+    "model.layers.0.amplitude_router.weight": {
+      "dtype": "float32",
+      "shape": [
+        16,
+        5120
+      ]
+    },
+    "model.layers.0.expert_down_proj.0.weight": {
+      "dtype": "float32",
+      "shape": [
+        5120,
+        1024
+      ]
+    },
+    "model.layers.0.expert_down_proj.1.weight": {
+      "dtype": "float32",
+      "shape": [
+        5120,
+        1024
+      ]
+    },
+    "model.layers.0.expert_down_proj.10.weight": {
+      "dtype": "float32",
+      "shape": [
+        5120,
+        1024
+      ]
+    },
+    "model.layers.0.expert_down_proj.11.weight": {
+      "dtype": "float32",
+      "shape": [
+        5120,
+        1024
+      ]
+    },
+    "model.layers.0.expert_down_proj.12.weight": {
+      "dtype": "float32",
+      "shape": [
+        5120,
+        1024
+      ]
+    },
+    "model.layers.0.expert_down_proj.13.weight": {
+      "dtype": "float32",
+      "shape": [
+        5120,
+        1024
+      ]
+    },
+    "model.layers.0.expert_down_proj.14.weight": {
+      "dtype": "float32",
+      "shape": [
+        5120,
+        1024
+      ]
+    },
+    "model.layers.0.expert_down_proj.15.weight": {
+      "dtype": "float32",
+      "shape": [
+        5120,
+        1024
+      ]
+    },
+    "model.layers.0.expert_down_proj.2.weight": {
+      "dtype": "float32",
+      "shape": [
+        5120,
+        1024
+      ]
+    },
+    "model.layers.0.expert_down_proj.3.weight": {
+      "dtype": "float32",
+      "shape": [
+        5120,
+        1024
+      ]
+    },
+    "model.layers.0.expert_down_proj.4.weight": {
+      "dtype": "float32",
+      "shape": [
+        5120,
+        1024
+      ]
+    },
+    "model.layers.0.expert_down_proj.5.weight": {
+      "dtype": "float32",
+      "shape": [
+        5120,
+        1024
+      ]
+    },
+    "model.layers.0.expert_down_proj.6.weight": {
+      "dtype": "float32",
+      "shape": [
+        5120,
+        1024
+      ]
+    },
+    "model.layers.0.expert_down_proj.7.weight": {
+      "dtype": "float32",
+      "shape": [
+        5120,
+        1024
+      ]
+    },
+    "model.layers.0.expert_down_proj.8.weight": {
+      "dtype": "float32",
+      "shape": [
+        5120,
+        1024
+      ]
+    },
+    "model.layers.0.expert_down_proj.9.weight": {
+      "dtype": "float32",
+      "shape": [
+        5120,
+        1024
+      ]
+    },
+    "model.layers.0.expert_gate_proj.0.weight": {
+      "dtype": "float32",
+      "shape": [
+        1024,
+        5120
+      ]
+    },
+    "model.layers.0.expert_gate_proj.1.weight": {
+      "dtype": "float32",
+      "shape": [
+        1024,
+        5120
+      ]
+    },
+    "model.layers.0.expert_gate_proj.10.weight": {
+      "dtype": "float32",
+      "shape": [
+        1024,
+        5120
+      ]
+    },
+    "model.layers.0.expert_gate_proj.11.weight": {
+      "dtype": "float32",
+      "shape": [
+        1024,
+        5120
+      ]
+    },
+    "model.layers.0.expert_gate_proj.12.weight": {
+      "dtype": "float32",
+      "shape": [
+        1024,
+        5120
+      ]
+    },
+    "model.layers.0.expert_gate_proj.13.weight": {
+      "dtype": "float32",
+      "shape": [
+        1024,
+        5120
+      ]
+    },
+    "model.layers.0.expert_gate_proj.14.weight": {
+      "dtype": "float32",
+      "shape": [
+        1024,
+        5120
+      ]
+    },
+    "model.layers.0.expert_gate_proj.15.weight": {
+      "dtype": "float32",
+      "shape": [
+        1024,
+        5120
+      ]
+    },
+    "model.layers.0.expert_gate_proj.2.weight": {
+      "dtype": "float32",
+      "shape": [
+        1024,
+        5120
+      ]
+    },
+    "model.layers.0.expert_gate_proj.3.weight": {
+      "dtype": "float32",
+      "shape": [
+        1024,
+        5120
+      ]
+    },
+    "model.layers.0.expert_gate_proj.4.weight": {
+      "dtype": "float32",
+      "shape": [
+        1024,
+        5120
+      ]
+    },
+    "model.layers.0.expert_gate_proj.5.weight": {
+      "dtype": "float32",
+      "shape": [
+        1024,
+        5120
+      ]
+    },
+    "model.layers.0.expert_gate_proj.6.weight": {
+      "dtype": "float32",
+      "shape": [
+        1024,
+        5120
+      ]
+    },
+    "model.layers.0.expert_gate_proj.7.weight": {
+      "dtype": "float32",
+      "shape": [
+        1024,
+        5120
+      ]
+    },
+    "model.layers.0.expert_gate_proj.8.weight": {
+      "dtype": "float32",
+      "shape": [
+        1024,
+        5120
+      ]
+    },
+    "model.layers.0.expert_gate_proj.9.weight": {
+      "dtype": "float32",
+      "shape": [
+        1024,
+        5120
+      ]
+    },
+    "model.layers.0.expert_scales": {
+      "dtype": "float32",
+      "shape": [
+        16
+      ]
+    },
+    "model.layers.0.expert_up_proj.0.weight": {
+      "dtype": "float32",
+      "shape": [
+        1024,
+        5120
+      ]
+    },
+    "model.layers.0.expert_up_proj.1.weight": {
+      "dtype": "float32",
+      "shape": [
+        1024,
+        5120
+      ]
+    },
+    "model.layers.0.expert_up_proj.10.weight": {
+      "dtype": "float32",
+      "shape": [
+        1024,
+        5120
+      ]
+    },
+    "model.layers.0.expert_up_proj.11.weight": {
+      "dtype": "float32",
+      "shape": [
+        1024,
+        5120
+      ]
+    },
+    "model.layers.0.expert_up_proj.12.weight": {
+      "dtype": "float32",
+      "shape": [
+        1024,
+        5120
+      ]
+    },
+    "model.layers.0.expert_up_proj.13.weight": {
+      "dtype": "float32",
+      "shape": [
+        1024,
+        5120
+      ]
+    },
+    "model.layers.0.expert_up_proj.14.weight": {
+      "dtype": "float32",
+      "shape": [
+        1024,
+        5120
+      ]
+    },
+    "model.layers.0.expert_up_proj.15.weight": {
+      "dtype": "float32",
+      "shape": [
+        1024,
+        5120
+      ]
+    },
+    "model.layers.0.expert_up_proj.2.weight": {
+      "dtype": "float32",
+      "shape": [
+        1024,
+        5120
+      ]
+    },
+    "model.layers.0.expert_up_proj.3.weight": {
+      "dtype": "float32",
+      "shape": [
+        1024,
+        5120
+      ]
+    },
+    "model.layers.0.expert_up_proj.4.weight": {
+      "dtype": "float32",
+      "shape": [
+        1024,
+        5120
+      ]
+    },
+    "model.layers.0.expert_up_proj.5.weight": {
+      "dtype": "float32",
+      "shape": [
+        1024,
+        5120
+      ]
+    },
+    "model.layers.0.expert_up_proj.6.weight": {
+      "dtype": "float32",
+      "shape": [
+        1024,
+        5120
+      ]
+    },
+    "model.layers.0.expert_up_proj.7.weight": {
+      "dtype": "float32",
+      "shape": [
+        1024,
+        5120
+      ]
+    },
+    "model.layers.0.expert_up_proj.8.weight": {
+      "dtype": "float32",
+      "shape": [
+        1024,
+        5120
+      ]
+    },
+    "model.layers.0.expert_up_proj.9.weight": {
+      "dtype": "float32",
+      "shape": [
+        1024,
+        5120
+      ]
+    },
+    "model.layers.0.router.weight": {
+      "dtype": "float32",
+      "shape": [
+        16,
+        5120
+      ]
+    },
+    "model.layers.0.shared_down_proj.weight": {
+      "dtype": "float32",
+      "shape": [
+        5120,
+        1024
+      ]
+    },
+    "model.layers.0.shared_gate_proj.weight": {
+      "dtype": "float32",
+      "shape": [
+        1024,
+        5120
+      ]
+    },
+    "model.layers.0.shared_up_proj.weight": {
+      "dtype": "float32",
+      "shape": [
+        1024,
+        5120
+      ]
+    }
+  },
+  "tensor_sha256": "fd48f5578c8b2ddab7b4fc0d5cd2313b62608bba166a148cee90d3434339f65c",
+  "tensors": {},
+  "train_metrics": {
+    "all_expert_reconstruction_mse": 0.0,
+    "final_selection": {
+      "cosine": 0.9491384560242295,
+      "dead_experts": 0,
+      "load_cv": 0.28767948249519726,
+      "mse": 6.37453472108973e-05,
+      "normalized_mse": 0.07195633113429076,
+      "router_entropy": 2.6839085333049297,
+      "selected_count": 16384,
+      "selected_counts": [
+        5564.0,
+        5869.0,
+        5005.0,
+        3203.0,
+        3360.0,
+        3432.0,
+        2219.0,
+        2060.0,
+        4010.0,
+        4509.0,
+        3503.0,
+        3552.0,
+        4122.0,
+        5134.0,
+        6245.0,
+        3749.0
+      ],
+      "split": "train",
+      "streaming": true,
+      "token_count": 16384
+    },
+    "initial_selection": {
+      "cosine": 0.910885835532099,
+      "dead_experts": 0,
+      "load_cv": 1.097063708985842,
+      "mse": 0.00012705936983365974,
+      "normalized_mse": 0.14342577912733026,
+      "router_entropy": 2.6080366177484393,
+      "selected_count": 16384,
+      "selected_counts": [
+        10655.0,
+        6202.0,
+        4701.0,
+        954.0,
+        1110.0,
+        460.0,
+        409.0,
+        113.0,
+        758.0,
+        1633.0,
+        948.0,
+        2004.0,
+        3696.0,
+        5288.0,
+        10937.0,
+        15668.0
+      ],
+      "split": "train",
+      "streaming": true,
+      "token_count": 16384
+    },
+    "oracle_holdout": {
+      "cosine": null,
+      "normalized_mse": null,
+      "status": "bounded-oracle-summary-pending",
+      "streaming": true
+    }
+  },
+  "training_config": {
+    "best_selection_stage": "joint_expert_router",
+    "device": "cuda:1",
+    "epochs": 1,
+    "holdout_evaluation": "full_holdout_confirmation",
+    "initial_expert_scales": [
+      1.0000004460105987,
+      1.0000007857550222,
+      1.000001146610517,
+      1.0000007226429692,
+      1.0000009769542042,
+      1.0000005462200952,
+      1.00000040780425,
+      1.0000011181070767,
+      0.9999998588629032,
+      1.0000012229648534,
+      1.0000012479606137,
+      1.0000010699236612,
+      1.0000012129475762,
+      1.0000023531495459,
+      1.0000005894385773,
+      0.9999994976616855
+    ],
+    "learning_rate": 0.0001,
+    "loss_coefficients": {
+      "cosine": 0.05,
+      "load_balance": 0.05,
+      "mse": 1.0,
+      "router_z_loss": 0.001
+    },
+    "loss_version": "torch-distill-v1",
+    "microbatch": 512,
+    "optimizer": "AdamW",
+    "partition_path": "runs\\20260815-184644-windows-real-d2m-v4-streaming\\partitions\\layer-0000-p16-top4-architecture-finalist.json",
+    "router_initialization": "bounded_train_contribution_lstsq",
+    "routing_mode": "independent_positive",
+    "selection_count": 16384,
+    "selection_indices_hash": "7b2ff822febb9191b88d04cacfa6bb80aec3c6dd42f9210683c6b9fd2167b15f",
+    "selection_split": "train_dev_subset",
+    "stage_schedule": [
+      {
+        "epochs": 1,
+        "learning_rate": 0.0001,
+        "learning_rates": {},
+        "name": "router_warm_start",
+        "train_amplitude_router": true,
+        "train_experts": false,
+        "train_scales": false,
+        "train_selection_router": true,
+        "use_oracle_targets": true
+      },
+      {
+        "epochs": 1,
+        "learning_rate": 0.0001,
+        "learning_rates": {},
+        "name": "router_plus_scale",
+        "train_amplitude_router": true,
+        "train_experts": false,
+        "train_scales": true,
+        "train_selection_router": true,
+        "use_oracle_targets": false
+      },
+      {
+        "epochs": 1,
+        "learning_rate": 0.0001,
+        "learning_rates": {},
+        "name": "joint_expert_router",
+        "train_amplitude_router": true,
+        "train_experts": true,
+        "train_scales": true,
+        "train_selection_router": true,
+        "use_oracle_targets": false
+      }
+    ],
+    "stage_selection_metrics": [
+      {
+        "cosine": 0.9175520935095847,
+        "dead_experts": 0,
+        "load_cv": 1.1668406783196603,
+        "mse": 9.78787324129371e-05,
+        "normalized_mse": 0.11048640863479266,
+        "router_entropy": 2.5344527270644903,
+        "selected_count": 16384,
+        "selected_counts": [
+          10771.0,
+          6744.0,
+          3142.0,
+          981.0,
+          624.0,
+          518.0,
+          371.0,
+          355.0,
+          325.0,
+          1171.0,
+          821.0,
+          1398.0,
+          3678.0,
+          6939.0,
+          11473.0,
+          16225.0
+        ],
+        "split": "train",
+        "stage": "router_warm_start",
+        "streaming": true,
+        "token_count": 16384
+      },
+      {
+        "cosine": 0.8674172158353031,
+        "dead_experts": 0,
+        "load_cv": 0.37262541245479586,
+        "mse": 0.00017452579540986335,
+        "normalized_mse": 0.19700631458543177,
+        "router_entropy": 2.661196291446686,
+        "selected_count": 16384,
+        "selected_counts": [
+          6010.0,
+          5371.0,
+          4554.0,
+          3316.0,
+          3166.0,
+          2565.0,
+          2217.0,
+          1868.0,
+          3795.0,
+          4039.0,
+          3372.0,
+          3190.0,
+          3777.0,
+          4182.0,
+          6622.0,
+          7492.0
+        ],
+        "split": "train",
+        "stage": "router_plus_scale",
+        "streaming": true,
+        "token_count": 16384
+      },
+      {
+        "cosine": 0.9491384560242295,
+        "dead_experts": 0,
+        "load_cv": 0.28767948249519726,
+        "mse": 6.37453472108973e-05,
+        "normalized_mse": 0.07195633113429076,
+        "router_entropy": 2.6839085333049297,
+        "selected_count": 16384,
+        "selected_counts": [
+          5564.0,
+          5869.0,
+          5005.0,
+          3203.0,
+          3360.0,
+          3432.0,
+          2219.0,
+          2060.0,
+          4010.0,
+          4509.0,
+          3503.0,
+          3552.0,
+          4122.0,
+          5134.0,
+          6245.0,
+          3749.0
+        ],
+        "split": "train",
+        "stage": "joint_expert_router",
+        "streaming": true,
+        "token_count": 16384
+      }
+    ],
+    "stages": [
+      {
+        "epoch": 1,
+        "epochs": 1,
+        "learning_rates": {
+          "amplitude_router": 0.0001,
+          "selection_router": 0.0001
+        },
+        "loss": 0.31656402349472046,
+        "stage": "router_warm_start",
+        "streaming": true,
+        "train_amplitude_router": true,
+        "train_selection_router": true,
+        "updates": 288
+      },
+      {
+        "epoch": 1,
+        "epochs": 1,
+        "learning_rates": {
+          "amplitude_router": 0.0001,
+          "expert_scales": 0.0001,
+          "selection_router": 0.0001
+        },
+        "loss": 0.0641782134771347,
+        "stage": "router_plus_scale",
+        "streaming": true,
+        "train_amplitude_router": true,
+        "train_selection_router": true,
+        "updates": 288
+      },
+      {
+        "epoch": 1,
+        "epochs": 1,
+        "learning_rates": {
+          "amplitude_router": 0.0001,
+          "expert_scales": 0.0001,
+          "experts": 0.0001,
+          "selection_router": 0.0001
+        },
+        "loss": 0.05785529688000679,
+        "stage": "joint_expert_router",
+        "streaming": true,
+        "train_amplitude_router": true,
+        "train_selection_router": true,
+        "updates": 288
+      }
+    ],
+    "streaming_dataset": {
+      "holdout_count": 16598,
+      "holdout_manifest": "runs/20260815-184644-windows-real-d2m-v4-streaming/capture/layer-0000.json",
+      "train_count": 131508,
+      "train_manifest": "runs/20260815-184644-windows-real-d2m-v4-streaming/capture/layer-0000.json"
+    }
+  },
+  "training_seed": 17,
+  "updated_at": "2026-08-16T04:27:26.083771Z"
+}

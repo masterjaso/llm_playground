@@ -1,0 +1,685 @@
+{
+  "code_commit": "ecae8255679db390665bc763760d70a5678ab081",
+  "created_at": "2026-08-16T04:09:59.114616Z",
+  "dataset_hash": "46b278a85b4cb31a8fe659be2dd146bd9206eb491268220e25440981d06c0a03",
+  "holdout_metrics": {
+    "cosine": 0.9457615761458694,
+    "dead_experts": 0,
+    "load_cv": 0.28612232997920845,
+    "mse": 7.151255366356634e-05,
+    "normalized_mse": 0.06838882519672046,
+    "router_entropy": 2.6830496957523593,
+    "selected_counts": [
+      5720.0,
+      5988.0,
+      5270.0,
+      3122.0,
+      3447.0,
+      3477.0,
+      2284.0,
+      2147.0,
+      3895.0,
+      4721.0,
+      3264.0,
+      3494.0,
+      4159.0,
+      5375.0,
+      5838.0,
+      4191.0
+    ],
+    "streaming": true,
+    "token_count": 16598
+  },
+  "layer": 0,
+  "metrics": {},
+  "partition_hash": "34f5eba9d30fa2ab1647c8b13430143a4634e510d9cf78cab8ce42e3fe6ef879",
+  "partition_strategy": "artifact",
+  "profile": "qwen38_p16s1_top4",
+  "profile_hash": "e5236fb41c50f1b1910b5cd476c51c3567aa289649f27b639bf9ce0959b8801b",
+  "quality_gate": {
+    "metrics": {
+      "cosine": 0.9457615761458694,
+      "dead_experts": 0,
+      "load_cv": 0.28612232997920845,
+      "mse": 7.151255366356634e-05,
+      "normalized_mse": 0.06838882519672046,
+      "router_entropy": 2.6830496957523593,
+      "selected_counts": [
+        5720.0,
+        5988.0,
+        5270.0,
+        3122.0,
+        3447.0,
+        3477.0,
+        2284.0,
+        2147.0,
+        3895.0,
+        4721.0,
+        3264.0,
+        3494.0,
+        4159.0,
+        5375.0,
+        5838.0,
+        4191.0
+      ],
+      "streaming": true,
+      "token_count": 16598
+    },
+    "overall": "red",
+    "thresholds_version": "initial-2026-08-15"
+  },
+  "router_architecture": "torch-linear-topk-independent_positive-v1",
+  "router_metrics": {
+    "actual_improvement": 0.06593813334980228,
+    "dead_experts": 0,
+    "load_cv": 0.28612232997920845,
+    "selected_counts": [
+      5720.0,
+      5988.0,
+      5270.0,
+      3122.0,
+      3447.0,
+      3477.0,
+      2284.0,
+      2147.0,
+      3895.0,
+      4721.0,
+      3264.0,
+      3494.0,
+      4159.0,
+      5375.0,
+      5838.0,
+      4191.0
+    ]
+  },
+  "routing_mode": "independent_positive",
+  "schema_version": 2,
+  "source_config_hash": "191e0af232104ed8b65258cf3fb2b842e288008baca7633c11b82a1ac7203aab",
+  "source_index_hash": "77042094076611b69791a610065f28b7013b8c621795fa86ddccc8bac7d1b9df",
+  "source_revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
+  "status": "VALIDATION_FAILED",
+  "tensor_file": "layer-0000.safetensors",
+  "tensor_inventory": {
+    "model.layers.0.amplitude_router.bias": {
+      "dtype": "float32",
+      "shape": [
+        16
+      ]
+    },
+    "model.layers.0.amplitude_router.weight": {
+      "dtype": "float32",
+      "shape": [
+        16,
+        5120
+      ]
+    },
+    "model.layers.0.expert_down_proj.0.weight": {
+      "dtype": "float32",
+      "shape": [
+        5120,
+        1024
+      ]
+    },
+    "model.layers.0.expert_down_proj.1.weight": {
+      "dtype": "float32",
+      "shape": [
+        5120,
+        1024
+      ]
+    },
+    "model.layers.0.expert_down_proj.10.weight": {
+      "dtype": "float32",
+      "shape": [
+        5120,
+        1024
+      ]
+    },
+    "model.layers.0.expert_down_proj.11.weight": {
+      "dtype": "float32",
+      "shape": [
+        5120,
+        1024
+      ]
+    },
+    "model.layers.0.expert_down_proj.12.weight": {
+      "dtype": "float32",
+      "shape": [
+        5120,
+        1024
+      ]
+    },
+    "model.layers.0.expert_down_proj.13.weight": {
+      "dtype": "float32",
+      "shape": [
+        5120,
+        1024
+      ]
+    },
+    "model.layers.0.expert_down_proj.14.weight": {
+      "dtype": "float32",
+      "shape": [
+        5120,
+        1024
+      ]
+    },
+    "model.layers.0.expert_down_proj.15.weight": {
+      "dtype": "float32",
+      "shape": [
+        5120,
+        1024
+      ]
+    },
+    "model.layers.0.expert_down_proj.2.weight": {
+      "dtype": "float32",
+      "shape": [
+        5120,
+        1024
+      ]
+    },
+    "model.layers.0.expert_down_proj.3.weight": {
+      "dtype": "float32",
+      "shape": [
+        5120,
+        1024
+      ]
+    },
+    "model.layers.0.expert_down_proj.4.weight": {
+      "dtype": "float32",
+      "shape": [
+        5120,
+        1024
+      ]
+    },
+    "model.layers.0.expert_down_proj.5.weight": {
+      "dtype": "float32",
+      "shape": [
+        5120,
+        1024
+      ]
+    },
+    "model.layers.0.expert_down_proj.6.weight": {
+      "dtype": "float32",
+      "shape": [
+        5120,
+        1024
+      ]
+    },
+    "model.layers.0.expert_down_proj.7.weight": {
+      "dtype": "float32",
+      "shape": [
+        5120,
+        1024
+      ]
+    },
+    "model.layers.0.expert_down_proj.8.weight": {
+      "dtype": "float32",
+      "shape": [
+        5120,
+        1024
+      ]
+    },
+    "model.layers.0.expert_down_proj.9.weight": {
+      "dtype": "float32",
+      "shape": [
+        5120,
+        1024
+      ]
+    },
+    "model.layers.0.expert_gate_proj.0.weight": {
+      "dtype": "float32",
+      "shape": [
+        1024,
+        5120
+      ]
+    },
+    "model.layers.0.expert_gate_proj.1.weight": {
+      "dtype": "float32",
+      "shape": [
+        1024,
+        5120
+      ]
+    },
+    "model.layers.0.expert_gate_proj.10.weight": {
+      "dtype": "float32",
+      "shape": [
+        1024,
+        5120
+      ]
+    },
+    "model.layers.0.expert_gate_proj.11.weight": {
+      "dtype": "float32",
+      "shape": [
+        1024,
+        5120
+      ]
+    },
+    "model.layers.0.expert_gate_proj.12.weight": {
+      "dtype": "float32",
+      "shape": [
+        1024,
+        5120
+      ]
+    },
+    "model.layers.0.expert_gate_proj.13.weight": {
+      "dtype": "float32",
+      "shape": [
+        1024,
+        5120
+      ]
+    },
+    "model.layers.0.expert_gate_proj.14.weight": {
+      "dtype": "float32",
+      "shape": [
+        1024,
+        5120
+      ]
+    },
+    "model.layers.0.expert_gate_proj.15.weight": {
+      "dtype": "float32",
+      "shape": [
+        1024,
+        5120
+      ]
+    },
+    "model.layers.0.expert_gate_proj.2.weight": {
+      "dtype": "float32",
+      "shape": [
+        1024,
+        5120
+      ]
+    },
+    "model.layers.0.expert_gate_proj.3.weight": {
+      "dtype": "float32",
+      "shape": [
+        1024,
+        5120
+      ]
+    },
+    "model.layers.0.expert_gate_proj.4.weight": {
+      "dtype": "float32",
+      "shape": [
+        1024,
+        5120
+      ]
+    },
+    "model.layers.0.expert_gate_proj.5.weight": {
+      "dtype": "float32",
+      "shape": [
+        1024,
+        5120
+      ]
+    },
+    "model.layers.0.expert_gate_proj.6.weight": {
+      "dtype": "float32",
+      "shape": [
+        1024,
+        5120
+      ]
+    },
+    "model.layers.0.expert_gate_proj.7.weight": {
+      "dtype": "float32",
+      "shape": [
+        1024,
+        5120
+      ]
+    },
+    "model.layers.0.expert_gate_proj.8.weight": {
+      "dtype": "float32",
+      "shape": [
+        1024,
+        5120
+      ]
+    },
+    "model.layers.0.expert_gate_proj.9.weight": {
+      "dtype": "float32",
+      "shape": [
+        1024,
+        5120
+      ]
+    },
+    "model.layers.0.expert_scales": {
+      "dtype": "float32",
+      "shape": [
+        16
+      ]
+    },
+    "model.layers.0.expert_up_proj.0.weight": {
+      "dtype": "float32",
+      "shape": [
+        1024,
+        5120
+      ]
+    },
+    "model.layers.0.expert_up_proj.1.weight": {
+      "dtype": "float32",
+      "shape": [
+        1024,
+        5120
+      ]
+    },
+    "model.layers.0.expert_up_proj.10.weight": {
+      "dtype": "float32",
+      "shape": [
+        1024,
+        5120
+      ]
+    },
+    "model.layers.0.expert_up_proj.11.weight": {
+      "dtype": "float32",
+      "shape": [
+        1024,
+        5120
+      ]
+    },
+    "model.layers.0.expert_up_proj.12.weight": {
+      "dtype": "float32",
+      "shape": [
+        1024,
+        5120
+      ]
+    },
+    "model.layers.0.expert_up_proj.13.weight": {
+      "dtype": "float32",
+      "shape": [
+        1024,
+        5120
+      ]
+    },
+    "model.layers.0.expert_up_proj.14.weight": {
+      "dtype": "float32",
+      "shape": [
+        1024,
+        5120
+      ]
+    },
+    "model.layers.0.expert_up_proj.15.weight": {
+      "dtype": "float32",
+      "shape": [
+        1024,
+        5120
+      ]
+    },
+    "model.layers.0.expert_up_proj.2.weight": {
+      "dtype": "float32",
+      "shape": [
+        1024,
+        5120
+      ]
+    },
+    "model.layers.0.expert_up_proj.3.weight": {
+      "dtype": "float32",
+      "shape": [
+        1024,
+        5120
+      ]
+    },
+    "model.layers.0.expert_up_proj.4.weight": {
+      "dtype": "float32",
+      "shape": [
+        1024,
+        5120
+      ]
+    },
+    "model.layers.0.expert_up_proj.5.weight": {
+      "dtype": "float32",
+      "shape": [
+        1024,
+        5120
+      ]
+    },
+    "model.layers.0.expert_up_proj.6.weight": {
+      "dtype": "float32",
+      "shape": [
+        1024,
+        5120
+      ]
+    },
+    "model.layers.0.expert_up_proj.7.weight": {
+      "dtype": "float32",
+      "shape": [
+        1024,
+        5120
+      ]
+    },
+    "model.layers.0.expert_up_proj.8.weight": {
+      "dtype": "float32",
+      "shape": [
+        1024,
+        5120
+      ]
+    },
+    "model.layers.0.expert_up_proj.9.weight": {
+      "dtype": "float32",
+      "shape": [
+        1024,
+        5120
+      ]
+    },
+    "model.layers.0.router.weight": {
+      "dtype": "float32",
+      "shape": [
+        16,
+        5120
+      ]
+    },
+    "model.layers.0.shared_down_proj.weight": {
+      "dtype": "float32",
+      "shape": [
+        5120,
+        1024
+      ]
+    },
+    "model.layers.0.shared_gate_proj.weight": {
+      "dtype": "float32",
+      "shape": [
+        1024,
+        5120
+      ]
+    },
+    "model.layers.0.shared_up_proj.weight": {
+      "dtype": "float32",
+      "shape": [
+        1024,
+        5120
+      ]
+    }
+  },
+  "tensor_sha256": "fd48f5578c8b2ddab7b4fc0d5cd2313b62608bba166a148cee90d3434339f65c",
+  "tensors": {},
+  "train_metrics": {
+    "all_expert_reconstruction_mse": 0.0,
+    "initial_holdout": {
+      "cosine": 0.9134695869222407,
+      "dead_experts": 0,
+      "load_cv": 1.0863980796513042,
+      "mse": 0.00014046247766195743,
+      "normalized_mse": 0.13432695854652274,
+      "router_entropy": 2.606080668075126,
+      "selected_counts": [
+        10880.0,
+        6744.0,
+        5210.0,
+        869.0,
+        1202.0,
+        490.0,
+        450.0,
+        148.0,
+        782.0,
+        1803.0,
+        878.0,
+        1735.0,
+        3665.0,
+        5425.0,
+        10264.0,
+        15847.0
+      ],
+      "streaming": true,
+      "token_count": 16598
+    },
+    "oracle_holdout": {
+      "cosine": null,
+      "normalized_mse": null,
+      "status": "bounded-oracle-summary-pending",
+      "streaming": true
+    }
+  },
+  "training_config": {
+    "best_holdout_stage": "joint_expert_router",
+    "device": "cuda:1",
+    "epochs": 1,
+    "initial_expert_scales": [
+      1.0000004460105987,
+      1.0000007857550222,
+      1.000001146610517,
+      1.0000007226429692,
+      1.0000009769542042,
+      1.0000005462200952,
+      1.00000040780425,
+      1.0000011181070767,
+      0.9999998588629032,
+      1.0000012229648534,
+      1.0000012479606137,
+      1.0000010699236612,
+      1.0000012129475762,
+      1.0000023531495459,
+      1.0000005894385773,
+      0.9999994976616855
+    ],
+    "learning_rate": 0.0001,
+    "loss_coefficients": {
+      "cosine": 0.05,
+      "load_balance": 0.05,
+      "mse": 1.0,
+      "router_z_loss": 0.001
+    },
+    "loss_version": "torch-distill-v1",
+    "microbatch": 512,
+    "optimizer": "AdamW",
+    "partition_path": "runs\\20260815-184644-windows-real-d2m-v4-streaming\\partitions\\layer-0000-p16-top4-architecture-finalist.json",
+    "router_initialization": "bounded_train_contribution_lstsq",
+    "routing_mode": "independent_positive",
+    "stage_holdout_metrics": [
+      {
+        "cosine": 0.9201132855597484,
+        "dead_experts": 0,
+        "load_cv": 1.159747241859036,
+        "mse": 0.00010474360568047375,
+        "normalized_mse": 0.1001683169231535,
+        "router_entropy": 2.5352596398333005,
+        "selected_counts": [
+          10975.0,
+          7249.0,
+          3363.0,
+          899.0,
+          608.0,
+          566.0,
+          357.0,
+          344.0,
+          315.0,
+          1230.0,
+          753.0,
+          1405.0,
+          3726.0,
+          7283.0,
+          10854.0,
+          16465.0
+        ],
+        "stage": "router_warm_start",
+        "streaming": true,
+        "token_count": 16598
+      },
+      {
+        "cosine": 0.87413663826214,
+        "dead_experts": 0,
+        "load_cv": 0.3971270909442562,
+        "mse": 0.00018421982351391126,
+        "normalized_mse": 0.17617294674350575,
+        "router_entropy": 2.662330959314093,
+        "selected_counts": [
+          6256.0,
+          5545.0,
+          4747.0,
+          3231.0,
+          3252.0,
+          2579.0,
+          2214.0,
+          1878.0,
+          3652.0,
+          4211.0,
+          3030.0,
+          3072.0,
+          3782.0,
+          4561.0,
+          6139.0,
+          8243.0
+        ],
+        "stage": "router_plus_scale",
+        "streaming": true,
+        "token_count": 16598
+      },
+      {
+        "cosine": 0.9457615761458694,
+        "dead_experts": 0,
+        "load_cv": 0.28612232997920845,
+        "mse": 7.151255366356634e-05,
+        "normalized_mse": 0.06838882519672046,
+        "router_entropy": 2.6830496957523593,
+        "selected_counts": [
+          5720.0,
+          5988.0,
+          5270.0,
+          3122.0,
+          3447.0,
+          3477.0,
+          2284.0,
+          2147.0,
+          3895.0,
+          4721.0,
+          3264.0,
+          3494.0,
+          4159.0,
+          5375.0,
+          5838.0,
+          4191.0
+        ],
+        "stage": "joint_expert_router",
+        "streaming": true,
+        "token_count": 16598
+      }
+    ],
+    "stages": [
+      {
+        "epoch": 1,
+        "epochs": 1,
+        "loss": 0.31656402349472046,
+        "stage": "router_warm_start",
+        "streaming": true,
+        "updates": 288
+      },
+      {
+        "epoch": 1,
+        "epochs": 1,
+        "loss": 0.0641782134771347,
+        "stage": "router_plus_scale",
+        "streaming": true,
+        "updates": 288
+      },
+      {
+        "epoch": 1,
+        "epochs": 1,
+        "loss": 0.05785529688000679,
+        "stage": "joint_expert_router",
+        "streaming": true,
+        "updates": 288
+      }
+    ],
+    "streaming_dataset": {
+      "holdout_count": 16598,
+      "holdout_manifest": "runs/20260815-184644-windows-real-d2m-v4-streaming/capture/layer-0000.json",
+      "train_count": 131508,
+      "train_manifest": "runs/20260815-184644-windows-real-d2m-v4-streaming/capture/layer-0000.json"
+    }
+  },
+  "training_seed": 17,
+  "updated_at": "2026-08-16T04:09:59.114616Z"
+}
