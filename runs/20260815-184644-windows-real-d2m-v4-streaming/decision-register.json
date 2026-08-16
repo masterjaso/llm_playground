@@ -4,10 +4,10 @@
     "falsifier": "layer-streaming cannot reproduce the known native/text-only diagnostic",
     "reason": "teacher correctness is established; failure is whole-model residency/throughput",
     "production_objective": ">=70% active dense-FFN reduction with strongest achievable quality",
-    "current_research_path": "p16_top4_selector_generalization_blocked_after_exact_holdout_capacity_confirmation",
+    "current_research_path": "p16_top4_selector_generalization_blocked_after_bce_holdout_confirmation_and_load_sweeps",
     "replay_gate": "PAUSED_NO_GREEN_GE70_CANDIDATE"
   },
-  "code_commit": "11098c0f02296cce5825a8433d9caf600737afdc",
+  "code_commit": "b190014c1476ac30775651d0fe7bde317f2098b5",
   "created": "2026-08-15T22:46:52.495949Z",
   "dataset_hash": "46b278a85b4cb31a8fe659be2dd146bd9206eb491268220e25440981d06c0a03",
   "default_profile": "qwen38_p16s1_top4",
@@ -159,7 +159,7 @@
   "windows_native": true,
   "takeover_extension": {
     "status": "HIGH_SPARSITY_RESEARCH_COMPLETE_REPLAY_BLOCKED",
-    "code_commit": "11098c0f02296cce5825a8433d9caf600737afdc",
+    "code_commit": "b190014c1476ac30775651d0fe7bde317f2098b5",
     "report": "reports/p16-top4-research-synthesis.json",
     "best_ge70_validation": {
       "profile": "qwen38_p16s1_top4",
@@ -193,5 +193,46 @@
     ],
     "replay_gate": "BLOCKED_NO_GREEN_GE70_CANDIDATE",
     "next_work": "FIT/validation-only selector generalization research; no holdout tuning"
+  },
+  "takeover_followup_20260816": {
+    "status": "SELECTOR_GENERALIZATION_BLOCKED_REPLAY_PAUSED",
+    "code_commit": "b190014c1476ac30775651d0fe7bde317f2098b5",
+    "report": "reports/takeover-decision-20260816.json",
+    "base_head": "718c0c96b8a50b6aebc93bf1d165c6788a8f8ad8",
+    "split_hashes": {
+      "dataset": "46b278a85b4cb31a8fe659be2dd146bd9206eb491268220e25440981d06c0a03",
+      "validation_identity": "5a7739c753dae98698a8c1a22c6a10409230f0750b33cfc9631594f16d8b8e1c",
+      "validation_indices": "7b2ff822febb9191b88d04cacfa6bb80aec3c6dd42f9210683c6b9fd2167b15f",
+      "validation_b_identity": "efbbe351adf324a4960afd937ca0f85ca886fdbe55cb0012180610dffc1c2ad4"
+    },
+    "partition_hashes": {
+      "p16_top4": "6de8c65d27aff4054d791b80d0dfcf273d552f15e2e4de6592cfd3f8220e03be",
+      "p32_top4": "b468086f5d572596033c1085bf0a8abb87a196ca1d4641c3c86b29a568bbdf27",
+      "p32_top5": "a661efd6cd1171a6a69446eff399577ebc3b0ac25cb9a341b619a0f19a9f87f5"
+    },
+    "p16_selector": {
+      "checkpoint": "layer-checkpoints/clean-validation/p16-top4-selector-cross-validation-residual_bce",
+      "fit_validation_green": true,
+      "validation": {"normalized_mse": 0.020223602055059912, "cosine": 0.9861563111189753, "load_cv": 0.4734706483069833, "dead_experts": 0},
+      "holdout": {"normalized_mse": 0.027123212598176998, "cosine": 0.9771972329433546, "load_cv": 0.5002657250345942, "dead_experts": 0, "green": false},
+      "exact_oracle": {"cosine": 0.9821854088159624, "load_cv": 0.6674033191328232},
+      "decision": "selector_generalization_blocker"
+    },
+    "p32_selector_research": {
+      "top5_validation": {"normalized_mse": 0.04484423937495194, "cosine": 0.9672818835824728, "load_cv": 0.5365962125999276},
+      "top4_validation": {"normalized_mse": 0.04630313087226314, "cosine": 0.9648507134988904, "load_cv": 0.678257039834709},
+      "top5_refinement_final_load_cv": 0.9403722379097005,
+      "top4_refinement_final_load_cv": 1.103198757083291,
+      "oracle_report": "reports/load-aware-p32-pool16-fit.json",
+      "decision": "retain_original_research_finalists_reject_refinements"
+    },
+    "replay_gate": "BLOCKED_NO_GREEN_CANDIDATE",
+    "holdout_tuning": false,
+    "representative_layers_if_unblocked": {
+      "LINEAR_A": [0, 28, 60],
+      "LINEAR_B": [1, 29, 61],
+      "LINEAR_C": [2, 30, 62],
+      "FULL_ATTENTION": [3, 31, 63]
+    }
   }
 }

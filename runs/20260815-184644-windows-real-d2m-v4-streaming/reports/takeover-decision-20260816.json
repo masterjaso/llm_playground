@@ -1,0 +1,149 @@
+{
+  "schema_version": 1,
+  "run_id": "20260815-184644-windows-real-d2m-v4-streaming",
+  "base_head": "718c0c96b8a50b6aebc93bf1d165c6788a8f8ad8",
+  "code_commit": "b190014c1476ac30775651d0fe7bde317f2098b5",
+  "source_revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
+  "dataset_hash": "46b278a85b4cb31a8fe659be2dd146bd9206eb491268220e25440981d06c0a03",
+  "quality_gates": {
+    "normalized_mse_max": 0.05,
+    "cosine_min": 0.98,
+    "load_cv_max": 0.5,
+    "dead_experts": 0,
+    "simultaneous": true
+  },
+  "split_contract": {
+    "fit_count": 115124,
+    "validation_count": 16384,
+    "validation_identity_hash": "5a7739c753dae98698a8c1a22c6a10409230f0750b33cfc9631594f16d8b8e1c",
+    "validation_indices_hash": "7b2ff822febb9191b88d04cacfa6bb80aec3c6dd42f9210683c6b9fd2167b15f",
+    "validation_b_count": 16384,
+    "validation_b_identity_hash": "efbbe351adf324a4960afd937ca0f85ca886fdbe55cb0012180610dffc1c2ad4",
+    "holdout_count": 16598,
+    "holdout_identity_hash": "46b278a85b4cb31a8fe659be2dd146bd9206eb491268220e25440981d06c0a03",
+    "holdout_tuning": false
+  },
+  "partition_hashes": {
+    "p16_top4": "6de8c65d27aff4054d791b80d0dfcf273d552f15e2e4de6592cfd3f8220e03be",
+    "p32_top4": "b468086f5d572596033c1085bf0a8abb87a196ca1d4641c3c86b29a568bbdf27",
+    "p32_top5": "a661efd6cd1171a6a69446eff399577ebc3b0ac25cb9a341b619a0f19a9f87f5"
+  },
+  "experiments": [
+    {
+      "id": "p16_residual_bce_selector_cross_validation",
+      "report": "reports/p16-top4-selector-cross-validation-residual_bce.json",
+      "code_commit": "e2de5273aefd74e4b9e02278e4348c91d8d1fe32",
+      "hypothesis": "A frozen-basis residual-correlation BCE selector trained on FIT and selected on the validation-A/B union will preserve the green gate on both validation slices.",
+      "falsifier": "Combined validation or validation-B violates any fixed gate, or strict frozen-basis provenance fails.",
+      "budget": {"epochs": 2, "learning_rate": 0.00001, "microbatch": 512, "trainable_scope": "selection_router_and_positive_amplitude_router_only"},
+      "metrics": {
+        "validation_ab": {"normalized_mse": 0.020223602055059912, "cosine": 0.9861563111189753, "load_cv": 0.4734706483069833, "dead_experts": 0},
+        "validation_b": {"normalized_mse": 0.01763081979732899, "cosine": 0.9906046972610056, "load_cv": 0.47750668718239075, "dead_experts": 0}
+      },
+      "decision": "FIT_VALIDATION_GREEN_AUTHORIZE_POST_SELECTION_HOLDOUT_CONFIRMATION"
+    },
+    {
+      "id": "p16_residual_bce_holdout_confirmation",
+      "report": "reports/p16-top4-residual-bce-holdout-confirmation.json",
+      "code_commit": "e2de5273aefd74e4b9e02278e4348c91d8d1fe32",
+      "hypothesis": "The FIT/validation-green p16/top4 basis clears the product gate on holdout after selector confirmation.",
+      "falsifier": "Student holdout cosine or load CV misses the fixed gate; exact oracle is a capacity diagnostic only.",
+      "budget": {"scope": "full_holdout", "tokens": 16598, "gradient_updates": false},
+      "metrics": {
+        "student": {"normalized_mse": 0.027123212598176998, "cosine": 0.9771972329433546, "load_cv": 0.5002657250345942, "dead_experts": 0},
+        "bounded_oracle": {"normalized_mse": 0.015518843644968186, "cosine": 0.9821237266918366, "load_cv": 0.6924203703525768, "dead_experts": 0},
+        "exact_oracle": {"normalized_mse": 0.015444574452293146, "cosine": 0.9821854088159624, "load_cv": 0.6674033191328232, "dead_experts": 0},
+        "student_vs_exact_topk_recall": 0.8414116158573323,
+        "student_vs_exact_mean_jaccard": 0.7725824683409934
+      },
+      "decision": "REPLAY_BLOCKED_SELECTOR_GENERALIZATION_AND_LOAD_MISS"
+    },
+    {
+      "id": "p16_shared_output_bce_selector",
+      "report": "reports/p16-top4-selector-cross-validation-shared-output_bce.json",
+      "hypothesis": "Shared-output router features improve selector generalization without changing the basis.",
+      "falsifier": "No Pareto improvement on validation A+B or any gate regression.",
+      "budget": {"epochs": 2, "learning_rate": 0.00001, "router_hidden_size": 128, "router_feature_mode": "shared_output"},
+      "metrics": {"validation_ab": {"normalized_mse": 0.020335855343894704, "cosine": 0.986089750775136, "load_cv": 0.4468022678281243, "dead_experts": 0}},
+      "decision": "REJECT_NO_IMPROVEMENT_AND_LATER_EPOCH_LOAD_REGRESSION"
+    },
+    {
+      "id": "p16_load_balance_sweeps",
+      "reports": ["reports/p16-top4-selector-cross-validation-residual_bce-load035.json", "reports/p16-top4-selector-cross-validation-residual_bce-load050.json"],
+      "code_commit": "b190014c1476ac30775651d0fe7bde317f2098b5",
+      "hypothesis": "A stronger FIT-only load-balance coefficient can move the selector toward the holdout load gate without changing the green validation checkpoint.",
+      "falsifier": "No distinct validation Pareto point or any cosine/NMSE/load gate regression.",
+      "budget": {"epochs_per_sweep": 1, "learning_rate": 0.00001, "coefficients": [0.35, 0.5], "holdout_opened": false},
+      "metrics": {
+        "load035": {"normalized_mse": 0.020223602055059912, "cosine": 0.9861563111189753, "load_cv": 0.4734706483069833, "dead_experts": 0, "tensor_sha256": "6428f0d405eb67abf07913d1216675e55e704800d9417590444be011f7cd5c1f"},
+        "load050": {"normalized_mse": 0.020223602055059912, "cosine": 0.9861563111189753, "load_cv": 0.4734706483069833, "dead_experts": 0, "tensor_sha256": "6428f0d405eb67abf07913d1216675e55e704800d9417590444be011f7cd5c1f"}
+      },
+      "decision": "REJECT_IDENTICAL_CHECKPOINT_NO_GENERALIZATION_CHANGE"
+    },
+    {
+      "id": "p32_topology_specific_fit_validation",
+      "reports": ["reports/clean-validation-p32-top4-residual-ce-current-head.json", "reports/clean-validation-p32-top5-residual-ce-current-head.json"],
+      "hypothesis": "Topology-specific p32/top4 and p32/top5 partitions can approach the fixed gate on FIT/validation without holdout.",
+      "falsifier": "Validation misses any simultaneous gate or topology-specific provenance fails.",
+      "budget": {"epochs": 1, "microbatch": 512, "holdout_opened": false},
+      "metrics": {
+        "p32_top4_validation": {"normalized_mse": 0.04630313087226314, "cosine": 0.9648507134988904, "load_cv": 0.678257039834709, "dead_experts": 0},
+        "p32_top5_validation": {"normalized_mse": 0.04484423937495194, "cosine": 0.9672818835824728, "load_cv": 0.5365962125999276, "dead_experts": 0},
+        "p32_top4_fit": {"normalized_mse": 0.04831669795512869, "cosine": 0.9713557240265561, "load_cv": 0.6796679210464818, "dead_experts": 0},
+        "p32_top5_fit": {"normalized_mse": 0.04941075674696449, "cosine": 0.9739789550893646, "load_cv": 0.537300536446038, "dead_experts": 0}
+      },
+      "decision": "RETAIN_P32_TOP4_AND_TOP5_AS_RESEARCH_FINALISTS_NO_HOLDOUT"
+    },
+    {
+      "id": "p32_router_only_load_aware_refinement",
+      "reports": ["reports/p32-top4-selector-load-aware-refinement.json", "reports/p32-top5-selector-load-aware-refinement.json"],
+      "hypothesis": "A frozen-basis router-only load-aware refinement can reduce p32 validation load CV toward 0.50 without sacrificing near-target quality.",
+      "falsifier": "No green checkpoint, quality regression, load regression, or strict reload failure.",
+      "budget": {"epochs": 2, "learning_rate": 0.00001, "load_balance": 0.5, "holdout_opened": false},
+      "metrics": {
+        "p32_top4_initial": {"normalized_mse": 0.04630313087226314, "cosine": 0.9648507134988904, "load_cv": 0.678257039834709, "dead_experts": 0},
+        "p32_top4_final": {"normalized_mse": 0.04995001730611866, "cosine": 0.9664462641812861, "load_cv": 1.103198757083291, "dead_experts": 0},
+        "p32_top5_initial": {"normalized_mse": 0.04484423937495194, "cosine": 0.9672818835824728, "load_cv": 0.5365962125999276, "dead_experts": 0},
+        "p32_top5_final": {"normalized_mse": 0.04576353320945787, "cosine": 0.9687931560911238, "load_cv": 0.9403722379097005, "dead_experts": 0}
+      },
+      "decision": "REJECT_REFINEMENTS_RETAIN_ORIGINAL_P32_FINALISTS"
+    },
+    {
+      "id": "p32_bounded_load_aware_oracle_pool16",
+      "reports": ["reports/load-aware-p32-pool16-fit.json"],
+      "hypothesis": "A bounded FIT-only candidate pool can expose whether p32 route capacity plausibly supports the simultaneous quality/load gate.",
+      "falsifier": "Bounded oracle remains below cosine 0.98 or above load CV 0.50 with dead experts; result is not an exhaustive impossibility proof.",
+      "budget": {"candidate_pool": 16, "iterations": 32, "max_combinations": 8192, "holdout_opened": false, "memory_cap_bytes": 268435456},
+      "metrics": {
+        "p32_top4_exact_within_pool": {"normalized_mse": 0.08482978472610501, "cosine": 0.9194680212490317, "load_cv": 1.5970831031842276, "dead_experts": 0},
+        "p32_top4_load_priced": {"normalized_mse": 0.2327146367718716, "cosine": 0.8168117626453683, "load_cv": 1.3197345258611672, "dead_experts": 12},
+        "p32_top5_exact_within_pool": {"normalized_mse": 0.07349581202394767, "cosine": 0.9302207522758158, "load_cv": 1.4757413391241705, "dead_experts": 0},
+        "p32_top5_load_priced": {"normalized_mse": 0.20485227020239352, "cosine": 0.8372754810825076, "load_cv": 1.2993387741462963, "dead_experts": 11}
+      },
+      "decision": "RETAIN_AS_BOUNDED_RESEARCH_EVIDENCE_NOT_IMPOSSIBILITY_PROOF"
+    }
+  ],
+  "verification": {
+    "compile": "python -m py_compile scripts/train_selector_cross_validation.py scripts/refine_p32_selector.py scripts/materialize_contribution_store.py scripts/run_load_aware_oracle.py scripts/run_exact_p16_oracle.py",
+    "pytest": "PYTHONPATH=. uv run pytest -q -s",
+    "pytest_result": "76 tests passed (76 dots), guarded command rc=0",
+    "authoritative_json": "state.json, decision-register.json, and this receipt parse successfully"
+  },
+  "final_decision": {
+    "status": "SELECTOR_GENERALIZATION_BLOCKED_REPLAY_PAUSED",
+    "frozen_trainable_set": false,
+    "best_fit_validation_candidate": "layer-checkpoints/clean-validation/p16-top4-selector-cross-validation-residual_bce",
+    "best_fit_validation_gate": true,
+    "holdout_gate": false,
+    "replay_gate": "BLOCKED_NO_GREEN_GE70_CANDIDATE",
+    "reason": "The p16/top4 exact oracle clears cosine but the learned selector misses holdout cosine (0.977197 < 0.98) and load CV (0.500266 > 0.50); p32/top4 and top5 remain near-target research finalists but are not green.",
+    "representative_layers_if_unblocked": {
+      "LINEAR_A": [0, 28, 60],
+      "LINEAR_B": [1, 29, 61],
+      "LINEAR_C": [2, 30, 62],
+      "FULL_ATTENTION": [3, 31, 63]
+    },
+    "non_ffn_behavior": "preserve attention, RoPE, norms, residual topology, embeddings, LM head, tokenizer, and generation/reasoning behavior; replace SwiGLU FFNs only",
+    "telemetry": "routing/load/contribution/latency/attention-cycle/passive-generation telemetry remains required for any future replay; no reasoning post-training or effort optimization was performed"
+  }
+}

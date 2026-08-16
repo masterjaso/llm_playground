@@ -100,3 +100,39 @@ These follow-up artifacts validate the bounded solver and input path; they do
 not change the selector-generalization blocker or authorize representative or
 64-layer replay. The 1,024-row store is a FIT calibration, not a full
 validation/holdout result.
+
+## Takeover decision boundary (2026-08-16)
+
+The authoritative continuation receipt is
+`reports/takeover-decision-20260816.json`. It records every hypothesis,
+falsifier, budget, split identity, partition hash, and decision from this
+takeover. The source code at the boundary is `b190014c1476ac30775651d0fe7bde317f2098b5`
+and the pinned source revision remains
+`1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0`.
+
+The p16/top4 residual-BCE selector was green on FIT/validation-A+B:
+NMSE `0.02022360`, cosine `0.98615631`, load CV `0.47347065`, dead `0`;
+validation-B was NMSE `0.01763082`, cosine `0.99060470`, load CV
+`0.47750669`, dead `0`. Its authorized post-selection holdout confirmation
+was not green: student NMSE `0.02712321`, cosine `0.97719723`, load CV
+`0.50026573`, dead `0`. The exact holdout oracle reached cosine `0.98218541`
+but load CV `0.66740332`, confirming capacity while leaving selector/load
+generalization as the blocker. FIT-only load-balance sweeps at `0.35` and
+`0.50` selected the identical tensor SHA-256
+`6428f0d405eb67abf07913d1216675e55e704800d9417590444be011f7cd5c1f` and
+therefore did not change the decision.
+
+The topology-specific p32 finalists remain research-only. p32/top5 validation
+was NMSE `0.04484424`, cosine `0.96728188`, load CV `0.53659621`; p32/top4
+was NMSE `0.04630313`, cosine `0.96485071`, load CV `0.67825704` (dead `0`
+for both). The bounded router-only load-aware refinements were rejected: top5
+ended at load CV `0.94037224` and top4 at `1.10319876`. Pool-16 bounded
+load-aware oracle screens also stayed below cosine `0.98` and above load CV
+`0.50`; these are bounded screens, not impossibility proofs.
+
+Decision: `SELECTOR_GENERALIZATION_BLOCKED_REPLAY_PAUSED`. Do not resume
+representative or 64-layer replay, and do not tune the opened holdout. If a
+future candidate clears the gate, the representative set must be exactly
+layers `0/1/2/3`, `28/29/30/31`, and `60/61/62/63`, labeled respectively
+`LINEAR_A/B/C/FULL_ATTENTION`; only SwiGLU FFNs may be replaced. No reasoning
+effort optimization or reasoning post-training was performed.

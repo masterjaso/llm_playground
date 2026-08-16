@@ -11,10 +11,10 @@
     "fact_ledger": "runs\\20260815-184644-windows-real-d2m-v4-streaming\\repository-fact-ledger.json",
     "source_manifest": "runs\\20260815-184644-windows-real-d2m-v4-streaming\\source-manifest.json"
   },
-  "code_commit": "11098c0f02296cce5825a8433d9caf600737afdc",
+  "code_commit": "b190014c1476ac30775651d0fe7bde317f2098b5",
   "current_phase": "selector-generalization-blocked",
-  "last_successful_command": "confirm_refined_course_correction_holdout.py",
-  "next_exact_command": "FIT/validation-only selector generalization research; no holdout tuning or replay",
+  "last_successful_command": "p16-top4-selector-bce-load050",
+  "next_exact_command": "new FIT/validation-only selector architecture; no holdout tuning or replay",
   "parent_run_id": "20260815-180505-windows-real-d2m-v3",
   "phase_status": "quality_gate_not_met_replay_paused",
   "prediction_contract": {
@@ -40,7 +40,7 @@
   "terminal_state": null,
   "timestamps": {
     "created": "2026-08-15T22:46:50.345978Z",
-    "updated": "2026-08-16T01:53:10.393667Z"
+    "updated": "2026-08-16T22:10:35Z"
   },
   "validation_results": {
     "architecture_search": {
@@ -280,7 +280,7 @@
   },
   "takeover_extension": {
     "status": "HIGH_SPARSITY_RESEARCH_COMPLETE_REPLAY_BLOCKED",
-    "code_commit": "11098c0f02296cce5825a8433d9caf600737afdc",
+    "code_commit": "b190014c1476ac30775651d0fe7bde317f2098b5",
     "current_phase": "selector-generalization-blocked",
     "last_successful_command": "confirm_refined_course_correction_holdout.py",
     "best_ge70_checkpoint": "layer-checkpoints/clean-validation/p16-top4-refined-course-correction-continue",
@@ -306,5 +306,47 @@
     },
     "replay_gate": "BLOCKED_NO_GREEN_CANDIDATE",
     "next_exact_command": "FIT/validation-only selector generalization research; no holdout tuning or replay"
+  },
+  "takeover_followup_20260816": {
+    "status": "SELECTOR_GENERALIZATION_BLOCKED_REPLAY_PAUSED",
+    "code_commit": "b190014c1476ac30775651d0fe7bde317f2098b5",
+    "report": "reports/takeover-decision-20260816.json",
+    "base_head": "718c0c96b8a50b6aebc93bf1d165c6788a8f8ad8",
+    "best_fit_validation_candidate": "layer-checkpoints/clean-validation/p16-top4-selector-cross-validation-residual_bce",
+    "best_fit_validation": {
+      "normalized_mse": 0.020223602055059912,
+      "cosine": 0.9861563111189753,
+      "load_cv": 0.4734706483069833,
+      "dead_experts": 0,
+      "validation_b_cosine": 0.9906046972610056,
+      "validation_b_load_cv": 0.47750668718239075
+    },
+    "holdout_confirmation": {
+      "report": "reports/p16-top4-residual-bce-holdout-confirmation.json",
+      "normalized_mse": 0.027123212598176998,
+      "cosine": 0.9771972329433546,
+      "load_cv": 0.5002657250345942,
+      "dead_experts": 0,
+      "green": false,
+      "exact_oracle_cosine": 0.9821854088159624,
+      "exact_oracle_load_cv": 0.6674033191328232
+    },
+    "p32_research": {
+      "top5_validation": {"normalized_mse": 0.04484423937495194, "cosine": 0.9672818835824728, "load_cv": 0.5365962125999276, "dead_experts": 0},
+      "top4_validation": {"normalized_mse": 0.04630313087226314, "cosine": 0.9648507134988904, "load_cv": 0.678257039834709, "dead_experts": 0},
+      "top5_refinement_final_load_cv": 0.9403722379097005,
+      "top4_refinement_final_load_cv": 1.103198757083291,
+      "oracle_evidence": "reports/load-aware-p32-pool16-fit.json",
+      "decision": "retain_original_finalists_reject_router_only_refinements"
+    },
+    "replay_gate": "BLOCKED_NO_GREEN_CANDIDATE",
+    "representative_layers_if_unblocked": {
+      "LINEAR_A": [0, 28, 60],
+      "LINEAR_B": [1, 29, 61],
+      "LINEAR_C": [2, 30, 62],
+      "FULL_ATTENTION": [3, 31, 63]
+    },
+    "holdout_tuning": false,
+    "reasoning_post_training": false
   }
 }
