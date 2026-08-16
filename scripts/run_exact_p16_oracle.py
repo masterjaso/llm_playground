@@ -158,11 +158,15 @@ def _exact_positive_from_gram(
 ) -> tuple[Any, Any]:
     """Solve a non-negative least-squares active-face problem from Gram data."""
 
+    import math
+
     import torch
 
-    tokens, top_k, _ = gram.shape
+    prefix = tuple(int(value) for value in gram.shape[:-2])
+    system_count = math.prod(prefix)
+    top_k = int(gram.shape[-1])
     best_error = residual_squared.clone()
-    best_weights = torch.zeros((tokens, top_k), dtype=gram.dtype, device=gram.device)
+    best_weights = torch.zeros((*prefix, top_k), dtype=gram.dtype, device=gram.device)
     for width in range(1, top_k + 1):
         masks = [
             tuple(index for index in range(top_k) if mask & (1 << index))
@@ -171,35 +175,38 @@ def _exact_positive_from_gram(
         ]
         mask_index = torch.as_tensor(masks, dtype=torch.long, device=gram.device)
         mask_count = int(mask_index.shape[0])
-        raw_g = gram[:, mask_index[:, :, None], mask_index[:, None, :]]
-        b = rhs[:, mask_index]
+        raw_g = gram[..., mask_index[:, :, None], mask_index[:, None, :]]
+        b = rhs[..., mask_index]
         eye = torch.eye(width, dtype=gram.dtype, device=gram.device).view(1, 1, width, width)
-        flat_g = (raw_g + eye * 1e-7).reshape(tokens * mask_count, width, width)
-        flat_b = b.reshape(tokens * mask_count, width)
+        flat_g = (raw_g + eye * 1e-7).reshape(system_count * mask_count, width, width)
+        flat_b = b.reshape(system_count * mask_count, width)
         try:
             flat_solution = torch.linalg.solve(flat_g, flat_b.unsqueeze(-1)).squeeze(-1)
         except RuntimeError:
             flat_solution = torch.linalg.lstsq(flat_g, flat_b.unsqueeze(-1)).solution[:, :, 0]
-        active = flat_solution.reshape(tokens, mask_count, width)
-        valid = active.min(dim=2).values >= -1e-5
+        active = flat_solution.reshape(*prefix, mask_count, width)
+        valid = active.min(dim=-1).values >= -1e-5
         active = active.clamp_min(0.0)
         quadratic = torch.bmm(
-            raw_g.reshape(tokens * mask_count, width, width),
-            active.reshape(tokens * mask_count, width, 1),
-        ).reshape(tokens, mask_count, width)
-        candidate_error = residual_squared[:, None] - 2.0 * (active * b).sum(dim=2)
-        candidate_error = candidate_error + (active * quadratic).sum(dim=2)
+            raw_g.reshape(system_count * mask_count, width, width),
+            active.reshape(system_count * mask_count, width, 1),
+        ).reshape(*prefix, mask_count, width)
+        candidate_error = residual_squared.unsqueeze(-1) - 2.0 * (active * b).sum(dim=-1)
+        candidate_error = candidate_error + (active * quadratic).sum(dim=-1)
         candidate_error = torch.where(valid, candidate_error, torch.full_like(candidate_error, float("inf")))
-        face_error, face_index = candidate_error.min(dim=1)
+        face_error, face_index = candidate_error.min(dim=-1)
         update = face_error < best_error
         if bool(update.any()):
-            rows = torch.arange(tokens, device=gram.device)
-            selected_active = active[rows, face_index]
-            selected_mask = mask_index[face_index]
-            candidate_full = torch.zeros_like(best_weights)
+            active_flat = active.reshape(system_count, mask_count, width)
+            face_flat = face_index.reshape(system_count)
+            rows = torch.arange(system_count, device=gram.device)
+            selected_active = active_flat[rows, face_flat]
+            selected_mask = mask_index[face_flat]
+            candidate_full = torch.zeros((system_count, top_k), dtype=gram.dtype, device=gram.device)
             candidate_full.scatter_(1, selected_mask, selected_active)
+            candidate_full = candidate_full.reshape(*prefix, top_k)
             best_error = torch.where(update, face_error, best_error)
-            best_weights[update] = candidate_full[update]
+            best_weights = torch.where(update.unsqueeze(-1), candidate_full, best_weights)
     return best_error, best_weights
 
 
@@ -222,19 +229,20 @@ def _exact_topk_precomputed(shared: Any, routed: Any, target: Any, top_k: int) -
     gram = torch.bmm(routed, routed.transpose(1, 2))
     rhs = torch.bmm(routed, residual.unsqueeze(-1)).squeeze(-1)
     residual_squared = (residual * residual).sum(dim=1)
-    best_error = residual_squared.clone()
-    best_ids = torch.zeros((tokens, top_k), dtype=torch.long, device=routed.device)
-    best_weights = torch.zeros((tokens, top_k), dtype=routed.dtype, device=routed.device)
-    for combo in itertools.combinations(range(experts), top_k):
-        ids = torch.as_tensor(combo, dtype=torch.long, device=routed.device)
-        combo_gram = gram.index_select(1, ids).index_select(2, ids)
-        combo_rhs = rhs.index_select(1, ids)
-        error, weights = _exact_positive_from_gram(combo_gram, combo_rhs, residual_squared)
-        update = error < best_error
-        if bool(update.any()):
-            best_error = torch.where(update, error, best_error)
-            best_ids[update] = ids
-            best_weights[update] = weights[update]
+    combinations = list(itertools.combinations(range(experts), top_k))
+    combo_index = torch.as_tensor(combinations, dtype=torch.long, device=routed.device)
+    combo_gram = gram[:, combo_index[:, :, None], combo_index[:, None, :]]
+    combo_rhs = rhs[:, combo_index]
+    combo_errors, combo_weights = _exact_positive_from_gram(combo_gram, combo_rhs, residual_squared.unsqueeze(1).expand(-1, len(combinations)))
+    best_error, best_combo = combo_errors.min(dim=1)
+    rows = torch.arange(tokens, device=routed.device)
+    improved = best_error < residual_squared
+    best_ids = torch.where(improved.unsqueeze(-1), combo_index[best_combo], torch.zeros((tokens, top_k), dtype=torch.long, device=routed.device))
+    best_weights = torch.where(
+        improved.unsqueeze(-1),
+        combo_weights[rows, best_combo],
+        torch.zeros((tokens, top_k), dtype=routed.dtype, device=routed.device),
+    )
     return {
         "errors": best_error,
         "indices": best_ids,
