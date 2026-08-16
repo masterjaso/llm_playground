@@ -93,7 +93,11 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
     profile = load_config(Path("configs/qwen38_p16s1_top4.yaml"))
     dev_path = run_dir / "capture/architecture-dev.json"
     shadow_path = Path(args.validation_b) if args.validation_b else run_dir / "capture/validation-b-selector-only.json"
+    dev_payload = json.loads(dev_path.read_text(encoding="utf-8"))
     validation_a = _load_indices(dev_path, "selected_global_indices")
+    validation_a_identity_hash = str(
+        dev_payload.get("selected_row_key_hash") or _hash_indices(validation_a)
+    )
     validation_b = _load_indices(shadow_path, "selected_global_indices")
     if set(validation_a).intersection(validation_b):
         raise ValueError("validation-A and validation-B must be disjoint")
@@ -126,7 +130,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         selection_indices=validation_a,
         selection_union_indices=combined,
         fit_exclude_indices=combined,
-        selection_identity_hash=_hash_indices(validation_a),
+        selection_identity_hash=validation_a_identity_hash,
         validation_b_indices=validation_b,
         validation_b_identity_hash=_hash_indices(validation_b),
         evaluate_holdout=False,
@@ -172,7 +176,8 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
             },
             "validation_a": {
                 "count": len(validation_a),
-                "identity_hash": _hash_indices(validation_a),
+                "identity_hash": validation_a_identity_hash,
+                "indices_hash": _hash_indices(validation_a),
                 "checkpoint_selection": "combined_union",
                 "gradient_updates": False,
             },
