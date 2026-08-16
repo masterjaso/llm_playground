@@ -415,6 +415,7 @@ def _train_stage_streaming(
     device: str,
     stage: str,
     use_oracle_targets: bool = False,
+    oracle_target_mode: str = "contribution_norm",
     train_selection_router: bool = True,
     train_amplitude_router: bool = True,
     learning_rates: Mapping[str, float] | None = None,
@@ -423,6 +424,10 @@ def _train_stage_streaming(
     """Train one stage while reading only bounded activation batches."""
 
     import torch
+    import torch.nn.functional as F
+
+    if oracle_target_mode not in {"contribution_norm", "residual_correlation"}:
+        raise ValueError("oracle_target_mode must be contribution_norm or residual_correlation")
 
     for parameter in model.parameters():
         parameter.requires_grad = False
@@ -466,16 +471,42 @@ def _train_stage_streaming(
             load_balance = model.routed_experts * torch.mean(probs, dim=0).square().sum()
             z_loss = torch.mean(torch.logsumexp(info["logits"], dim=-1).square())
             oracle_loss = torch.zeros((), device=device)
+            oracle_amplitude_loss = torch.zeros((), device=device)
             if use_oracle_targets:
-                # The exact frozen oracle is a separate bounded research
-                # study.  For warm-up, rank the already-computed GPU expert
-                # contributions; this preserves the target-free streaming
-                # contract and avoids a CPU SwiGLU recomputation for every
-                # train microbatch.
-                labels = torch.topk(torch.linalg.vector_norm(info["contributions"], dim=-1), model.top_k, dim=-1).indices
+                contributions = info["contributions"]
+                if oracle_target_mode == "residual_correlation":
+                    # These labels use only the current train microbatch and
+                    # the dense teacher target.  They provide a differentiable
+                    # cross-entropy signal to the otherwise discrete top-k
+                    # selector while leaving the selected amplitudes positive.
+                    residual = teacher - info["shared"]
+                    contribution_norm = torch.linalg.vector_norm(contributions, dim=-1)
+                    scores = torch.sum(contributions * residual.unsqueeze(1), dim=-1) / (contribution_norm + 1e-12)
+                else:
+                    # Preserve the original target-free warm-start baseline.
+                    scores = torch.linalg.vector_norm(contributions, dim=-1)
+                labels = torch.topk(scores, model.top_k, dim=-1).indices
                 oracle_loss = torch.stack(
                     [torch.nn.functional.cross_entropy(info["logits"], labels[:, slot]) for slot in range(labels.shape[1])]
                 ).mean()
+                amplitude_coefficient = float((loss_coefficients or {}).get("oracle_amplitude", 0.0))
+                if amplitude_coefficient > 0.0 and model.routing_mode == "independent_positive":
+                    # Fit positive coefficients for the currently selected
+                    # experts against the train-only residual.  The tiny
+                    # batched k-by-k solve is bounded by top-k, and labels are
+                    # detached so it cannot turn into an implicit teacher
+                    # gradient path.
+                    residual_for_amplitude = teacher - info["shared"]
+                    selected = torch.gather(
+                        contributions,
+                        1,
+                        info["indices"].unsqueeze(-1).expand(-1, -1, contributions.shape[-1]),
+                    )
+                    gram = torch.einsum("bkh,blh->bkl", selected, selected)
+                    rhs = torch.einsum("bkh,bh->bk", selected, residual_for_amplitude)
+                    identity = torch.eye(model.top_k, dtype=gram.dtype, device=gram.device).unsqueeze(0)
+                    coefficients_target = torch.linalg.solve(gram + 1e-4 * identity, rhs.unsqueeze(-1)).squeeze(-1).clamp_min(0.0)
+                    oracle_amplitude_loss = F.smooth_l1_loss(info["weights"], coefficients_target.detach())
             # The denser fallback has enough capacity to trade a small amount
             # of reconstruction slack for a materially healthier expert load.
             # Keep this coefficient explicit in the receipt rather than hiding
@@ -489,6 +520,7 @@ def _train_stage_streaming(
                 + load_balance_coefficient * load_balance
                 + coefficients["router_z_loss"] * z_loss
                 + coefficients["oracle"] * oracle_loss
+                + coefficients.get("oracle_amplitude", 0.0) * oracle_amplitude_loss
             )
             optimizer.zero_grad(set_to_none=True)
             loss.backward()
@@ -510,6 +542,7 @@ def _train_stage_streaming(
         "train_shared": train_shared,
         "learning_rates": {group["group"]: group["lr"] for group in parameter_groups},
         "loss_coefficients": {str(name): float(value) for name, value in (loss_coefficients or {}).items()},
+        "oracle_target_mode": oracle_target_mode,
     }
 
 
@@ -747,6 +780,11 @@ def train_torch_layer(
         loss_coefficients = {str(name): float(value) for name, value in (raw_loss_coefficients or {}).items()}
         if any(value < 0 for value in loss_coefficients.values()):
             raise ValueError(f"stage_schedule[{index}].loss_coefficients values must be non-negative")
+        oracle_target_mode = str(raw_stage.get("oracle_target_mode", "contribution_norm"))
+        if oracle_target_mode not in {"contribution_norm", "residual_correlation"}:
+            raise ValueError(
+                f"stage_schedule[{index}].oracle_target_mode must be contribution_norm or residual_correlation"
+            )
         normalized_schedule.append(
             {
                 "name": stage_name,
@@ -755,6 +793,7 @@ def train_torch_layer(
                 "train_experts": bool(raw_stage.get("train_experts", False)),
                 "train_shared": bool(raw_stage.get("train_shared", False)),
                 "use_oracle_targets": bool(raw_stage.get("use_oracle_targets", False)),
+                "oracle_target_mode": oracle_target_mode,
                 "train_selection_router": bool(raw_stage.get("train_selection_router", True)),
                 "train_amplitude_router": bool(raw_stage.get("train_amplitude_router", True)),
                 "learning_rate": stage_learning_rate,
@@ -780,6 +819,7 @@ def train_torch_layer(
             device=device,
             stage=stage_name,
             use_oracle_targets=bool(stage_spec["use_oracle_targets"]),
+            oracle_target_mode=str(stage_spec["oracle_target_mode"]),
             train_selection_router=bool(stage_spec["train_selection_router"]),
             train_amplitude_router=bool(stage_spec["train_amplitude_router"]),
             learning_rates=stage_spec["learning_rates"],

@@ -270,6 +270,11 @@ class TorchQwen35SwiGLUMoE(nn.Module):
             "logits": logits.reshape(*original_shape[:-1], self.routed_experts),
             "routing_mode": self.routing_mode,
         }
+        if return_contributions:
+            # The detached shared branch is used only for optional
+            # train-only oracle-label diagnostics.  Keeping it out of the
+            # ordinary router receipt avoids enlarging inference metadata.
+            info["shared"] = shared.detach().reshape(*original_shape[:-1], self.hidden_size)
         if amplitude_logits is not None:
             info["amplitude_logits"] = amplitude_logits.reshape(*original_shape[:-1], self.routed_experts)
         if return_contributions:
