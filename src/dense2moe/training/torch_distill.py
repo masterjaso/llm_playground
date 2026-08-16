@@ -404,7 +404,8 @@ def _enable_router_parameters(
 ) -> None:
     """Enable independently controlled selection/amplitude router parameters."""
 
-    model.router.weight.requires_grad = bool(train_selection)
+    for parameter in model.router.parameters():
+        parameter.requires_grad = bool(train_selection)
     if model.routing_mode == "independent_positive":
         model.amplitude_router.weight.requires_grad = bool(train_amplitude)
         model.amplitude_router.bias.requires_grad = bool(train_amplitude)
@@ -420,7 +421,7 @@ def _optimizer_parameter_groups(
 
     overrides = {str(name): float(value) for name, value in (learning_rates or {}).items()}
     groups: list[tuple[str, list[Any]]] = [
-        ("selection_router", [model.router.weight]),
+        ("selection_router", list(model.router.parameters())),
         ("amplitude_router", list(model.amplitude_router.parameters()) if model.routing_mode == "independent_positive" else []),
         ("expert_scales", [model.expert_scales]),
         (
@@ -756,6 +757,7 @@ def train_torch_layer(
     selection_identity_hash: str | None = None,
     evaluate_holdout: bool = True,
     initial_checkpoint_dir: str | Path | None = None,
+    router_hidden_size: int | None = None,
 ) -> dict[str, Any]:
     """Run a configurable staged distillation schedule against fixed splits.
 
@@ -834,6 +836,7 @@ def train_torch_layer(
         shared_intermediate_size=plan.shared_intermediate_size,
         top_k=profile.top_k,
         routing_mode=profile.routing_mode,
+        router_hidden_size=router_hidden_size,
         partition=plan,
         learnable_scales=True,
     )
@@ -872,6 +875,8 @@ def train_torch_layer(
     # dense-slice contributions, never from holdout targets.
     model.to(device)
     if not initialized_from_checkpoint:
+        if router_hidden_size is not None:
+            raise ValueError("nonlinear router training requires an explicit initial checkpoint")
         warmup_batches = (
             train_dataset.iter_batches(min(microbatch, 512))
             if not fit_excluded_rows
@@ -1169,7 +1174,7 @@ def train_torch_layer(
         dataset_hash=dataset_hash,
         partition_strategy="artifact",
         partition_hash=partition_hash,
-        router_architecture=f"torch-linear-topk-{profile.routing_mode}-v1",
+        router_architecture=(f"torch-low-rank-silu-topk-{profile.routing_mode}-v1" if router_hidden_size is not None else f"torch-linear-topk-{profile.routing_mode}-v1"),
         routing_mode=profile.routing_mode,
         training_seed=seed,
         training_config={
@@ -1220,6 +1225,7 @@ def train_torch_layer(
             "initial_expert_scales": [float(value) for value in (initial_scales or [1.0] * plan.routed_experts)],
             "router_initialization": "initial_checkpoint" if initialized_from_checkpoint else "bounded_train_contribution_lstsq",
             "initial_checkpoint_dir": str(initial_checkpoint_dir) if initial_checkpoint_dir is not None else None,
+            "router_hidden_size": router_hidden_size,
         },
         tensor_file=tensor_path.name,
         tensor_sha256=tensor_hash,
