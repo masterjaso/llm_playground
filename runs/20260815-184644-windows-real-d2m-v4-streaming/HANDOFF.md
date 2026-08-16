@@ -62,3 +62,41 @@ p8/top6 result remains a trainability control only; its active width is
 Do not discard captures, checkpoints, or reports. A future selector experiment
 must keep validation excluded from gradient updates and must not use the
 opened holdout for tuning.
+
+## Follow-up evidence (2026-08-16)
+
+The prior handoff commit line above predates the guarded-command and oracle
+hardening work. The current source commits are `408675e` (native PowerShell
+guard supervision), `53fdc5a` (mmap contribution-store inputs and bounded
+input windows), `09d6acd` (exact selected-route active-face refit plus FIT-only
+calibration), and `edc824e` (reproducible FIT contribution-store writer).
+
+- Native Windows PowerShell 5.1 guarded-command smoke is complete and recorded
+  in `docs/windows-guarded-command-smoke-receipt.json`; success, failure,
+  timeout-descendant cleanup, heartbeat, and git-integrity cases all passed.
+- The current-head FIT search (`reports/high-sparsity-partition-search.json`)
+  selected p16/top4 residual-swap refinement at normalized MSE `0.04236924`,
+  cosine `0.94904102`. The same search gives p32/top5 `0.05537351` / `0.93400606`
+  (load CV `1.4957`) and p32/top4 `0.06408007` / `0.92364422` (load CV
+  `1.6382`); neither high-sparsity product target is green.
+- Capacity-exact FIT-only p32 plans were materialized as
+  `partitions/current-head-p32-top5-product.json` and
+  `partitions/current-head-p32-top4-product.json`. They are explicitly marked
+  `PARTITION_READY_P32_PRODUCT_TARGET_FIT_ONLY`; no replay was started.
+- `reports/streaming-solver-calibration-store-p16-1024.json` is a deterministic
+  1,024-row stratified train calibration. The streaming candidate sets match
+  the exhaustive 1,820-set reference exactly. After the selected-route exact
+  refit, cosine delta is `-2.96e-08` and global-NMSE delta is `-1.34e-10`; the
+  candidate score itself is also within `2.35e-07` cosine and `4.32e-11` NMSE.
+- The real mmap CLI receipt is
+  `reports/load-aware-real-store-p16-fit-1024.json`. It opened only the
+  generated FIT store (holdout opened: false), used `npy_memmap` arrays and a
+  726-token input batch under a 256 MiB cap, and spilled candidate errors to a
+  memmap. Its p16/top4 result is cosine `0.94680261`, NMSE `0.04575238`, dead
+  experts `0`, load CV `1.25233`; the target load CV `0.50` and green gate are
+  therefore false on this bounded FIT diagnostic.
+
+These follow-up artifacts validate the bounded solver and input path; they do
+not change the selector-generalization blocker or authorize representative or
+64-layer replay. The 1,024-row store is a FIT calibration, not a full
+validation/holdout result.

@@ -1,0 +1,7 @@
+python.exe : usage: run_guarded_command.py [-h] [--name NAME]
+At C:\workplace\llm_playground\scripts\Invoke-GuardedCommand.ps1:33 char:5
++     & $python @arguments
++     ~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (usage: run_guar...] [--name NAME]:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 

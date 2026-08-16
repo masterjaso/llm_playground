@@ -1,0 +1,5 @@
+[31;1mException: [0mC:\workplace\llm_playground\scripts\Invoke-GuardedCommand-Smoke.ps1:62[0m
+[31;1m[0m[36;1mLine |[0m
+[31;1m[0m[36;1m[36;1m  62 | [0m             [36;1mthrow "$Name did not emit required marker: $marker`n$text[0m .[0m
+[31;1m[0m[36;1m[36;1m[0m[36;1m[0m[36;1m     | [31;1m             ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~[0m
+[31;1m[0m[36;1m[36;1m[0m[36;1m[0m[36;1m[31;1m[31;1m[36;1m     | [31;1mwindows-smoke-success did not emit required marker: __CMD_START__ [0m

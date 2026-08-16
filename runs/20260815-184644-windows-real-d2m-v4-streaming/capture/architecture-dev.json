@@ -1,5 +1,5 @@
 {
-  "code_commit": "47fda4149c3364a61eda6e9deafd664901436ff9",
+  "code_commit": "53fdc5a44a0862f62835a040298ac6ce46c3d9be",
   "schema_version": 1,
   "selected_count": 16384,
   "selected_global_indices": [
@@ -16393,7 +16393,7 @@
   "selection_seed": 20260815,
   "source_count": 131508,
   "source_dataset_hash": "46b278a85b4cb31a8fe659be2dd146bd9206eb491268220e25440981d06c0a03",
-  "source_manifest": "runs\\20260815-184644-windows-real-d2m-v4-streaming\\capture\\layer-0000-train.json",
+  "source_manifest": "runs/20260815-184644-windows-real-d2m-v4-streaming/capture/layer-0000-train.json",
   "source_split": "train",
   "status": "ARCHITECTURE_DEV_SUBSET_READY",
   "token_id_note": "The capture stores MLP inputs, not token IDs; global row IDs and record/offset keys are the deterministic token identity.",

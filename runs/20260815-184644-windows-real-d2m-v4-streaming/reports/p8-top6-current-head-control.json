@@ -1,7 +1,7 @@
 {
-  "code_commit": "47fda4149c3364a61eda6e9deafd664901436ff9",
+  "code_commit": "53fdc5a44a0862f62835a040298ac6ce46c3d9be",
   "dev_subset": {
-    "code_commit": "47fda4149c3364a61eda6e9deafd664901436ff9",
+    "code_commit": "53fdc5a44a0862f62835a040298ac6ce46c3d9be",
     "schema_version": 1,
     "selected_count": 16384,
     "selected_global_indices": [
@@ -16395,7 +16395,7 @@
     "selection_seed": 20260815,
     "source_count": 131508,
     "source_dataset_hash": "46b278a85b4cb31a8fe659be2dd146bd9206eb491268220e25440981d06c0a03",
-    "source_manifest": "runs\\20260815-184644-windows-real-d2m-v4-streaming\\capture\\layer-0000-train.json",
+    "source_manifest": "runs/20260815-184644-windows-real-d2m-v4-streaming/capture/layer-0000-train.json",
     "source_split": "train",
     "status": "ARCHITECTURE_DEV_SUBSET_READY",
     "token_id_note": "The capture stores MLP inputs, not token IDs; global row IDs and record/offset keys are the deterministic token identity.",
@@ -16409,14 +16409,14 @@
     "beam_width": null,
     "candidate_pool_size": null,
     "classification": "TRAINABILITY_ROUTER_QUALITY_CONTROL",
-    "coefficient_max": 1.5398192405700684,
+    "coefficient_max": 1.539819598197937,
     "coefficient_mean": 1.0872286558151245,
-    "coefficient_min": 0.8142337799072266,
+    "coefficient_min": 0.814233660697937,
     "coefficient_sum_mean": 6.523371696472168,
-    "cosine": 0.9940499272197485,
+    "cosine": 0.9940499197691679,
     "dead_experts": 0,
     "dense_ffn_parameters": 267386880,
-    "elapsed_seconds": 6.886714700143784,
+    "elapsed_seconds": 7.689425971941091,
     "expert_dispatches_per_token": 6,
     "expert_usage_cv": 0.5171838966415694,
     "expert_usage_fraction": [
@@ -16433,18 +16433,18 @@
     "finite_coefficients_and_scales": true,
     "formulation": "independent_positive_oracle",
     "learned_global_scales": [
-      1.0000000040271848,
-      0.9999997932071729,
-      1.0000002576702298,
-      1.0000009960242917,
-      1.0000013970889214,
-      1.0000020207079847,
-      1.0000015195368004,
-      1.0000007961154544
+      1.0000000164393659,
+      0.9999997611066649,
+      1.000000284174253,
+      1.0000009764051128,
+      1.0000013760867208,
+      1.0000020945578612,
+      1.0000015232698019,
+      1.000000778095015
     ],
-    "learned_scale_cosine": 0.994049932807684,
-    "learned_scale_normalized_mse": 0.0057119628964512155,
-    "normalized_mse": 0.005711962819452775,
+    "learned_scale_cosine": 0.9940499253571033,
+    "learned_scale_normalized_mse": 0.005711962943909206,
+    "normalized_mse": 0.005711962982408427,
     "partition": {
       "dense_intermediate_size": 17408,
       "expert_indices": [
