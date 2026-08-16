@@ -602,7 +602,10 @@ def _run(args: argparse.Namespace) -> dict[str, Any]:
             ks = (2, 3, 4)
             exact = False
         else:
-            ks = (4, 6)
+            # Product track: evaluate both p32/top5 and the more aggressive
+            # p32/top4 point.  The bounded beam is an oracle-level screen; it
+            # must run before any selector training budget is spent.
+            ks = (4, 5, 6)
             exact = False
         print(f"evaluating {p['name']} {list(ks)} exact={exact} on {inputs.shape[0]} dev tokens", flush=True)
         results = _evaluate_profile(p, inputs, weights_cpu, plan, device=device, batch_size=args.batch_size, exact=exact, search_method=None if exact else "beam", top_ks=ks, split_name="architecture_dev")
@@ -644,6 +647,26 @@ def _run(args: argparse.Namespace) -> dict[str, Any]:
         "results": all_results,
         "p8_exact": True,
         "p16_p32_selection_method": "residual_correlation_beam_search_exact_final_coefficients",
+        "product_priority_tracks": [
+            {
+                "profile": "p16",
+                "top_k": 4,
+                "ffn_reduction": 1.0 - 5120 / 17408,
+                "classification": "PROOF_OF_METHOD_NEAR_TERM_PRODUCTION",
+            },
+            {
+                "profile": "p32",
+                "top_k": 5,
+                "ffn_reduction": 1.0 - 3584 / 17408,
+                "classification": "HIGH_SPARSITY_PRODUCT_TARGET",
+            },
+            {
+                "profile": "p32",
+                "top_k": 4,
+                "ffn_reduction": 1.0 - 3072 / 17408,
+                "classification": "HIGH_SPARSITY_PRODUCT_TARGET",
+            },
+        ],
         "finalists_selected_on_dev": [{"profile": r["profile"], "top_k": r["top_k"], "formulation": r["formulation"], "normalized_mse": r["normalized_mse"], "cosine": r["cosine"], "active_intermediate_width": r["active_intermediate_width"], "active_ffn_parameter_ratio": r["active_ffn_parameter_ratio"], "expert_dispatches_per_token": int(r["top_k"])} for r in finalists],
         "p8_top5_reserve": next(r for r in p8 if r["top_k"] == 5 and r["formulation"] == "positive"),
         "p8_quality_compute_elbow": p8_elbow,

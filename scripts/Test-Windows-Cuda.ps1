@@ -71,8 +71,10 @@ print(json.dumps(payload, indent=2, sort_keys=True))
     $temporaryScript = Join-Path $env:TEMP ("d2m-cuda-gate-" + [guid]::NewGuid().ToString("N") + ".py")
     Set-Content -LiteralPath $temporaryScript -Value $script -Encoding UTF8
     try {
-        $process = Start-Process -FilePath $venvPython -ArgumentList @($temporaryScript) -Wait -PassThru -NoNewWindow
-        if ($process.ExitCode -ne 0) { throw "CUDA gate failed" }
+        $wrapper = Join-Path $projectRoot "scripts\run_guarded_command.py"
+        $guarded = @($wrapper, "--name", "windows-cuda-gate", "--category", "MEDIUM", "--timeout", "300", "--", $venvPython, $temporaryScript)
+        & $venvPython @guarded
+        if ($LASTEXITCODE -ne 0) { throw "CUDA gate failed" }
     }
     finally {
         Remove-Item -LiteralPath $temporaryScript -Force -ErrorAction SilentlyContinue

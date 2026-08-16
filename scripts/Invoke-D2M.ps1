@@ -1,6 +1,12 @@
 param(
     [Parameter(Mandatory = $true, Position = 0)]
     [string]$Command,
+    [ValidateSet("FAST", "MEDIUM", "LONG_RUNNING")]
+    [string]$Category = "FAST",
+    [double]$Timeout = 0,
+    [switch]$LongRunning,
+    [double]$HeartbeatInterval = 30,
+    [string]$HeartbeatPath = "",
     [Parameter(ValueFromRemainingArguments = $true)]
     [string[]]$Arguments
 )
@@ -25,8 +31,21 @@ if (-not $python) {
 }
 Push-Location $projectRoot
 try {
-    $process = Start-Process -FilePath $python -ArgumentList (@("-m", "dense2moe.cli", $Command) + $Arguments) -Wait -PassThru -NoNewWindow
-    exit $process.ExitCode
+    $guarded = @(
+        (Join-Path $projectRoot "scripts\run_guarded_command.py"),
+        "--name", "d2m-$Command",
+        "--category", $Category,
+        "--heartbeat-interval", $HeartbeatInterval
+    )
+    if ($Timeout -gt 0) { $guarded += @("--timeout", $Timeout) }
+    if ($LongRunning) { $guarded += "--long-running" }
+    if ($HeartbeatPath) { $guarded += @("--heartbeat-path", $HeartbeatPath) }
+    $guarded += "--"
+    $guarded += @($python, "-m", "dense2moe.cli", $Command) + $Arguments
+    # The reusable Python wrapper owns markers, timeout enforcement, and
+    # process-tree termination; unsupervised native waits are not used.
+    & $python @guarded
+    exit $LASTEXITCODE
 }
 finally {
     Pop-Location

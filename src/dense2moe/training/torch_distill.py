@@ -27,6 +27,35 @@ def _hash_indices(indices: Sequence[int]) -> str:
     return hashlib.sha256("\n".join(str(int(index)) for index in indices).encode()).hexdigest()
 
 
+def deterministic_shadow_validation_indices(
+    count: int,
+    *,
+    excluded_indices: Sequence[int],
+    shadow_count: int,
+    seed: int = 20260816,
+) -> tuple[tuple[int, ...], str]:
+    """Choose a reproducible validation-B subset from FIT rows only.
+
+    ``excluded_indices`` is the existing validation-A identity.  The helper
+    refuses overlap and never derives rows from the holdout split; callers can
+    persist the returned hash in a shadow-validation receipt before training.
+    """
+
+    if count <= 0 or shadow_count <= 0:
+        raise ValueError("count and shadow_count must be positive")
+    excluded = {int(index) for index in excluded_indices}
+    if any(index < 0 or index >= count for index in excluded):
+        raise IndexError("excluded validation index is outside the train split")
+    candidates = [index for index in range(count) if index not in excluded]
+    if shadow_count > len(candidates):
+        raise ValueError("shadow_count exceeds FIT rows available after validation-A")
+    ranked = sorted(candidates, key=lambda index: hashlib.sha256(f"{int(seed)}:{index}".encode()).hexdigest())
+    selected = tuple(sorted(ranked[:shadow_count]))
+    if set(selected) & excluded:
+        raise AssertionError("shadow validation overlaps validation-A")
+    return selected, _hash_indices(selected)
+
+
 def _load_manifest(path: Path) -> dict[str, Any]:
     payload = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(payload, dict):

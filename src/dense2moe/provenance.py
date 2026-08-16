@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import re
-import subprocess
 from pathlib import Path
+
+from .command import run_guarded
 
 _COMMIT_PATTERN = re.compile(r"^[0-9a-f]{40}$")
 
@@ -19,14 +20,17 @@ def current_git_commit() -> str:
 
     repository = Path(__file__).resolve().parents[2]
     try:
-        completed = subprocess.run(
+        completed = run_guarded(
             ["git", "-C", str(repository), "rev-parse", "HEAD"],
-            check=True,
-            capture_output=True,
-            text=True,
+            name="git-rev-parse-head",
+            category="FAST",
+            timeout=60.0,
+            emit=lambda _line: None,
         )
-    except (OSError, subprocess.CalledProcessError) as exc:
+    except (OSError, RuntimeError) as exc:
         raise RuntimeError("unable to determine current git commit") from exc
+    if not completed.ok:
+        raise RuntimeError("unable to determine current git commit")
     commit = completed.stdout.strip().lower()
     if not _COMMIT_PATTERN.fullmatch(commit):
         raise RuntimeError(f"git returned an invalid commit: {commit!r}")

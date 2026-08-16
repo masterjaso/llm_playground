@@ -3,16 +3,16 @@
 This search deliberately never opens the holdout manifest.  It compares
 partition/basis choices for p16 and p32 with positive-amplitude oracle routing,
 uses a stronger residual-correlation beam than the original search, and then
-performs a small exact-oracle swap refinement on the best p16/top4 and
-p32/top6 plans.  The emitted partition artifacts are inputs to the subsequent
-fair layer-0 training schedules.
+performs a small FIT-only residual swap refinement on the best p16/top4 and
+p32/top5 plans.  Both p32/top5 and p32/top4 are emitted as explicit product
+targets; the artifacts are inputs to subsequent fair layer-0 training and
+load-aware oracle diagnostics.
 """
 
 from __future__ import annotations
 
 import argparse
 import json
-import os
 import time
 from pathlib import Path
 from typing import Any
@@ -441,7 +441,10 @@ def _run(args: argparse.Namespace) -> dict[str, Any]:
             "residual_aware_greedy": _ranked_plan(profile, score["residual_aware_greedy"], shared_indices=score["shared_indices"]),
             "signature_grouping": _signature_plan(profile, score["contribution_magnitude"], down, args.seed),
         }
-    candidate_ks = {"p16": (3, 4), "p32": (4, 6)}
+    # Keep the proof-of-method p16/top4 track while screening both high-
+    # sparsity p32 product targets.  All three are evaluated on the same
+    # FIT/dev rows before selector training or any holdout read.
+    candidate_ks = {"p16": (3, 4), "p32": (4, 5, 6)}
     all_results: list[dict[str, Any]] = []
     for profile_name in ("p16", "p32"):
         profile = profiles[profile_name]
@@ -461,10 +464,11 @@ def _run(args: argparse.Namespace) -> dict[str, Any]:
                 )
                 row.update({"partition_strategy": strategy, "partition": plan.as_dict(), "split": "architecture_dev"})
                 all_results.append(row)
-    # Refine only the two equal-compute production targets; the refined plans
-    # are then evaluated for both k values at the full 16k dev size.
+    # Refine the proof target and p32/top5's topology-specific basis.  The
+    # resulting p32 plan is evaluated for top4/top5/top6 so the quality/load
+    # curve is not inferred from a partition tuned for a different k.
     refinements: dict[str, Any] = {}
-    for profile_name, target_k in (("p16", 4), ("p32", 6)):
+    for profile_name, target_k in (("p16", 4), ("p32", 5)):
         profile = profiles[profile_name]
         candidates = [row for row in all_results if row["profile"] == profile_name and row["top_k"] == target_k]
         seed_row = min(candidates, key=lambda row: float(row["normalized_mse"]))
@@ -529,7 +533,13 @@ def _run(args: argparse.Namespace) -> dict[str, Any]:
     p8_control.update({"partition_strategy": "activation_magnitude", "partition": p8_plan.as_dict(), "split": "architecture_dev", "classification": "TRAINABILITY_ROUTER_QUALITY_CONTROL"})
     all_results.append(p8_control)
     selected_rows: list[dict[str, Any]] = []
-    selected_specs = (("p16", 4, "PRIMARY_PRODUCTION_RESEARCH_CANDIDATE"), ("p16", 3, "AGGRESSIVE_EQUAL_COMPUTE_CANDIDATE"), ("p32", 6, "AGGRESSIVE_EQUAL_COMPUTE_CANDIDATE"), ("p32", 4, "OPTIONAL_MAXIMUM_SPARSITY_CANDIDATE"))
+    selected_specs = (
+        ("p16", 4, "PROOF_OF_METHOD_NEAR_TERM_PRODUCTION"),
+        ("p16", 3, "AGGRESSIVE_EQUAL_COMPUTE_CANDIDATE"),
+        ("p32", 5, "HIGH_SPARSITY_PRODUCT_TARGET"),
+        ("p32", 4, "HIGH_SPARSITY_PRODUCT_TARGET"),
+        ("p32", 6, "AGGRESSIVE_EQUAL_COMPUTE_CANDIDATE"),
+    )
     for profile_name, top_k, classification in selected_specs:
         rows = [row for row in all_results if row["profile"] == profile_name and row["top_k"] == top_k]
         chosen = min(rows, key=lambda row: float(row["normalized_mse"]))
@@ -572,6 +582,17 @@ def _run(args: argparse.Namespace) -> dict[str, Any]:
         "dev_subset": dev_meta,
         "dev_tokens": int(inputs.shape[0]),
         "selection_policy": "deterministic TRAIN development subset; no holdout access",
+        "product_priority_tracks": [
+            {"profile": "p16", "top_k": 4, "active_intermediate_width": 5120, "ffn_reduction": 1.0 - 5120 / 17408, "classification": "PROOF_OF_METHOD_NEAR_TERM_PRODUCTION"},
+            {"profile": "p32", "top_k": 5, "active_intermediate_width": 3584, "ffn_reduction": 1.0 - 3584 / 17408, "classification": "HIGH_SPARSITY_PRODUCT_TARGET"},
+            {"profile": "p32", "top_k": 4, "active_intermediate_width": 3072, "ffn_reduction": 1.0 - 3072 / 17408, "classification": "HIGH_SPARSITY_PRODUCT_TARGET"},
+        ],
+        "load_aware_oracle": {
+            "status": "PENDING_CONTRIBUTION_ARRAY_MATERIALIZATION",
+            "command": "scripts/run_load_aware_oracle.py",
+            "target_load_cv": 0.50,
+            "holdout_opened": False,
+        },
         "strategies": ["activation_magnitude", "contribution_magnitude", "residual_aware_greedy", "signature_grouping", "residual_swap_refined"],
         "beam_policy": {"p16": {"beam_width": 8, "candidate_pool_size": 16}, "p32": {"beam_width": 8, "candidate_pool_size": 20}},
         "scores": {name: {"mean": float(np.mean(values)), "std": float(np.std(values)), "max": float(np.max(values))} for name, values in score.items() if isinstance(values, np.ndarray) and name != "shared_indices"},

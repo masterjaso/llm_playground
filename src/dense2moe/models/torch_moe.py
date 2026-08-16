@@ -78,6 +78,36 @@ class LowRankSiLURouter(nn.Module):
         return self.out_proj(F.silu(self.in_proj(inputs)))
 
 
+class SharedOutputFeatureRouter(nn.Module):
+    """Small selector that sees ``x`` and the already-computed shared output.
+
+    The shared SwiGLU branch is part of every sparse FFN invocation, so using
+    its output here adds only a compact router projection rather than a second
+    expert-sized feed-forward network.  This is intentionally an opt-in A/B
+    experiment; the default linear/low-rank router state is unchanged.
+    """
+
+    def __init__(self, hidden_size: int, router_hidden_size: int, routed_experts: int, *, dtype: Any | None = None, device: Any | None = None) -> None:
+        runtime = _require_torch()
+        if router_hidden_size <= 0:
+            raise ValueError("router_hidden_size must be positive")
+        kwargs: dict[str, Any] = {}
+        if dtype is not None:
+            kwargs["dtype"] = dtype
+        if device is not None:
+            kwargs["device"] = device
+        super().__init__()
+        self.in_proj = nn.Linear(hidden_size * 2, router_hidden_size, bias=True, **kwargs)
+        self.out_proj = nn.Linear(router_hidden_size, routed_experts, bias=False, **kwargs)
+        with runtime.no_grad():
+            self.out_proj.weight.zero_()
+
+    def forward(self, inputs: Tensor, shared_output: Tensor) -> Tensor:
+        if inputs.shape[:-1] != shared_output.shape[:-1]:
+            raise ValueError("router input and shared output shapes do not match")
+        return self.out_proj(F.silu(self.in_proj(torch.cat((inputs, shared_output), dim=-1))))
+
+
 def _partition_from_payload(payload: Mapping[str, Any]) -> PartitionPlan:
     return PartitionPlan(
         int(payload["dense_intermediate_size"]),
@@ -113,6 +143,7 @@ class TorchQwen35SwiGLUMoE(nn.Module):
         top_k: int = 2,
         routing_mode: str = "normalized_softmax",
         router_hidden_size: int | None = None,
+        router_feature_mode: str = "none",
         partition: PartitionPlan | None = None,
         learnable_scales: bool = False,
         dtype: Any | None = None,
@@ -128,6 +159,10 @@ class TorchQwen35SwiGLUMoE(nn.Module):
             raise ValueError("routing_mode must be normalized_softmax or independent_positive")
         if router_hidden_size is not None and router_hidden_size <= 0:
             raise ValueError("router_hidden_size must be positive when provided")
+        if router_feature_mode not in {"none", "shared_output"}:
+            raise ValueError("router_feature_mode must be none or shared_output")
+        if router_feature_mode == "shared_output" and router_hidden_size is None:
+            raise ValueError("router_hidden_size is required for shared_output router features")
         if partition is None:
             if intermediate_size != shared_intermediate_size + routed_experts * expert_intermediate_size:
                 raise ValueError("partition capacity must equal intermediate_size")
@@ -148,6 +183,7 @@ class TorchQwen35SwiGLUMoE(nn.Module):
         self.top_k = int(top_k)
         self.routing_mode = str(routing_mode)
         self.router_hidden_size = int(router_hidden_size) if router_hidden_size is not None else None
+        self.router_feature_mode = str(router_feature_mode)
         self.partition = partition
         linear_kwargs: dict[str, Any] = {"bias": False}
         if dtype is not None:
@@ -166,7 +202,15 @@ class TorchQwen35SwiGLUMoE(nn.Module):
         self.expert_down_proj = nn.ModuleList(
             [nn.Linear(expert_intermediate_size, hidden_size, **linear_kwargs) for _ in range(routed_experts)]
         )
-        if router_hidden_size is None:
+        if router_feature_mode == "shared_output":
+            self.router = SharedOutputFeatureRouter(
+                hidden_size,
+                int(router_hidden_size),
+                routed_experts,
+                dtype=dtype,
+                device=device,
+            )
+        elif router_hidden_size is None:
             self.router = nn.Linear(hidden_size, routed_experts, bias=False, **{key: value for key, value in linear_kwargs.items() if key != "bias"})
         else:
             self.router = LowRankSiLURouter(
@@ -204,6 +248,7 @@ class TorchQwen35SwiGLUMoE(nn.Module):
         top_k: int = 2,
         routing_mode: str = "normalized_softmax",
         router_hidden_size: int | None = None,
+        router_feature_mode: str = "none",
         partition: PartitionPlan | None = None,
         router: Any | None = None,
         amplitude_router: Any | None = None,
@@ -230,6 +275,7 @@ class TorchQwen35SwiGLUMoE(nn.Module):
             top_k=top_k,
             routing_mode=routing_mode,
             router_hidden_size=router_hidden_size,
+            router_feature_mode=router_feature_mode,
             partition=partition,
             learnable_scales=learnable_scales,
             dtype=dtype or gate.dtype,
@@ -247,7 +293,7 @@ class TorchQwen35SwiGLUMoE(nn.Module):
                 expert_up.weight.copy_(up[list(group)])
                 expert_down.weight.copy_(down[:, list(group)])
             if router is not None:
-                if router_hidden_size is not None:
+                if router_hidden_size is not None or router_feature_mode != "none":
                     raise ValueError("direct router tensor initialization is only supported for a linear router")
                 value = _as_tensor(router, dtype=model.router.weight.dtype, device=model.router.weight.device)
                 if tuple(value.shape) == (hidden_size, routed_experts):
@@ -256,7 +302,11 @@ class TorchQwen35SwiGLUMoE(nn.Module):
                     raise ValueError("router shape mismatch")
                 model.router.weight.copy_(value)
             else:
-                if router_hidden_size is None:
+                if router_feature_mode == "shared_output":
+                    model.router.in_proj.weight.zero_()
+                    model.router.in_proj.bias.zero_()
+                    model.router.out_proj.weight.zero_()
+                elif router_hidden_size is None:
                     model.router.weight.zero_()
                 else:
                     model.router.out_proj.weight.zero_()
@@ -273,6 +323,23 @@ class TorchQwen35SwiGLUMoE(nn.Module):
         hidden = F.silu(self.expert_gate_proj[expert](x)) * self.expert_up_proj[expert](x)
         return self.expert_down_proj[expert](hidden)
 
+    @property
+    def router_parameter_count(self) -> int:
+        """Number of selector/amplitude parameters added by the router."""
+
+        count = sum(int(parameter.numel()) for parameter in self.router.parameters())
+        if self.routing_mode == "independent_positive":
+            count += sum(int(parameter.numel()) for parameter in self.amplitude_router.parameters())
+        return count
+
+    @property
+    def router_parameter_fraction(self) -> float:
+        """Router parameters as a fraction of the active FFN projection size."""
+
+        active_width = self.shared_intermediate_size + self.top_k * self.expert_intermediate_size
+        active_parameters = max(3 * self.hidden_size * active_width, 1)
+        return float(self.router_parameter_count / active_parameters)
+
     def forward(
         self,
         inputs: Tensor,
@@ -286,7 +353,10 @@ class TorchQwen35SwiGLUMoE(nn.Module):
         original_shape = inputs.shape
         x = inputs.reshape(-1, self.hidden_size)
         shared = self.shared_down_proj(F.silu(self.shared_gate_proj(x)) * self.shared_up_proj(x))
-        logits = self.router(x)
+        if self.router_feature_mode == "shared_output":
+            logits = self.router(x, shared)
+        else:
+            logits = self.router(x)
         values, indices = runtime.topk(logits, self.top_k, dim=-1)
         amplitude_logits = None
         if self.routing_mode == "normalized_softmax":
@@ -312,7 +382,14 @@ class TorchQwen35SwiGLUMoE(nn.Module):
             "logits": logits.reshape(*original_shape[:-1], self.routed_experts),
             "routing_mode": self.routing_mode,
             "router_hidden_size": self.router_hidden_size,
-            "router_architecture": "linear" if self.router_hidden_size is None else "low_rank_silu",
+            "router_architecture": (
+                "shared_output_feature_low_rank_silu"
+                if self.router_feature_mode == "shared_output"
+                else "linear" if self.router_hidden_size is None else "low_rank_silu"
+            ),
+            "router_feature_mode": self.router_feature_mode,
+            "router_parameter_count": self.router_parameter_count,
+            "router_parameter_fraction": self.router_parameter_fraction,
         }
         if return_contributions:
             # The detached shared branch is used only for optional
@@ -355,7 +432,14 @@ class TorchQwen35SwiGLUMoE(nn.Module):
             "top_k": self.top_k,
             "routing_mode": self.routing_mode,
             "router_hidden_size": self.router_hidden_size,
-            "router_architecture": "linear" if self.router_hidden_size is None else "low_rank_silu",
+            "router_feature_mode": self.router_feature_mode,
+            "router_architecture": (
+                "shared_output_feature_low_rank_silu"
+                if self.router_feature_mode == "shared_output"
+                else "linear" if self.router_hidden_size is None else "low_rank_silu"
+            ),
+            "router_parameter_count": self.router_parameter_count,
+            "router_parameter_fraction": self.router_parameter_fraction,
             "learnable_scales": self.learnable_scales,
             "partition": self.partition.as_dict(),
             "partition_hash": self.partition_hash(),
@@ -388,6 +472,7 @@ class TorchQwen35SwiGLUMoE(nn.Module):
             top_k=int(config["top_k"]),
             routing_mode=str(config.get("routing_mode", "normalized_softmax")),
             router_hidden_size=(int(config["router_hidden_size"]) if config.get("router_hidden_size") is not None else None),
+            router_feature_mode=str(config.get("router_feature_mode", "none")),
             partition=partition,
             learnable_scales=bool(config.get("learnable_scales", False)),
             dtype=next(iter(state.values())).dtype,
@@ -399,4 +484,4 @@ class TorchQwen35SwiGLUMoE(nn.Module):
         return model
 
 
-__all__ = ["LowRankSiLURouter", "TorchQwen35SwiGLUMoE"]
+__all__ = ["LowRankSiLURouter", "SharedOutputFeatureRouter", "TorchQwen35SwiGLUMoE"]

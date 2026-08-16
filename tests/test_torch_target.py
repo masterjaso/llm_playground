@@ -37,6 +37,32 @@ class TorchTargetTests(unittest.TestCase):
             restored = TorchQwen35SwiGLUMoE.from_pretrained(tmp, strict=True)
             torch.testing.assert_close(model(inputs), restored(inputs))
 
+    def test_shared_output_feature_router_is_opt_in_and_reloadable(self) -> None:
+        import torch
+
+        rng = np.random.default_rng(31)
+        gate = rng.normal(size=(12, 4)).astype("float32")
+        up = rng.normal(size=(12, 4)).astype("float32")
+        down = rng.normal(size=(4, 12)).astype("float32")
+        model = TorchQwen35SwiGLUMoE.from_dense(
+            gate,
+            up,
+            down,
+            routed_experts=2,
+            shared_intermediate_size=4,
+            top_k=1,
+            router_hidden_size=6,
+            router_feature_mode="shared_output",
+        )
+        inputs = torch.randn(3, 4)
+        output, info = model(inputs, return_router=True)
+        self.assertEqual(tuple(output.shape), (3, 4))
+        self.assertEqual(info["router_feature_mode"], "shared_output")
+        with tempfile.TemporaryDirectory() as tmp:
+            model.save_pretrained(tmp)
+            restored = TorchQwen35SwiGLUMoE.from_pretrained(tmp, strict=True)
+            torch.testing.assert_close(model(inputs), restored(inputs))
+
     def test_full_model_spike_is_strict_and_deterministic(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             result = run_full_model_spike(tmp)

@@ -6,11 +6,12 @@ import importlib.util
 import os
 import platform
 import shutil
-import subprocess
 import sys
 from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
+
+from .command import run_guarded
 
 
 def _which(name: str) -> str | None:
@@ -32,9 +33,23 @@ def _which(name: str) -> str | None:
 
 def run_probe(command: Sequence[str]) -> dict[str, Any]:
     try:
-        completed = subprocess.run(command, capture_output=True, text=True, timeout=30, check=False)
-        return {"command": list(command), "returncode": completed.returncode, "stdout": completed.stdout, "stderr": completed.stderr}
-    except (OSError, subprocess.SubprocessError) as exc:
+        completed = run_guarded(
+            command,
+            name=f"probe-{Path(str(command[0])).name}",
+            category="FAST",
+            timeout=30.0,
+            emit=lambda _line: None,
+        )
+        return {
+            "command": list(command),
+            "returncode": completed.returncode,
+            "stdout": completed.stdout,
+            "stderr": completed.stderr,
+            "status": completed.status,
+            "elapsed_seconds": completed.elapsed_seconds,
+            "unavailable": completed.status != "DONE",
+        }
+    except (OSError, RuntimeError, ValueError) as exc:
         return {"command": list(command), "returncode": None, "stdout": "", "stderr": str(exc), "unavailable": True}
 
 

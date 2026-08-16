@@ -18,7 +18,17 @@ d2m doctor --run-dir runs\<run-id> --json
 d2m status --run-dir runs\<run-id> --json
 ```
 
+Unattended repository and experiment commands use the bounded wrapper so a
+stalled process cannot disappear into an unbounded wait:
+
+```powershell
+python scripts\run_guarded_command.py --name git-log --category FAST -- git log -1
+```
+
+It emits explicit start/done, failure, or timeout markers.  CUDA training and
+teacher capture must be marked `--category LONG_RUNNING --long-running` and
+provide a heartbeat receipt.
+
 The repository does not upload models or modify Windows drivers.  A real model
 run must pass discovery, source, structural, quality, and export gates before
 it can be marked `SUCCEEDED`.
-

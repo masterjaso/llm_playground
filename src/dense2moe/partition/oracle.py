@@ -19,6 +19,7 @@ relaxed coefficients do not represent a jointly trained router or experts.
 from __future__ import annotations
 
 import itertools
+import math
 from collections.abc import Iterable, Mapping, Sequence
 from typing import Any
 
@@ -249,6 +250,409 @@ def _metrics(shared: Any, routed: Any, target: Any, ids: Any, weights: Any) -> d
         "cosine": cosine,
         "residual_by_token": residual_by_token,
     }
+
+
+def _load_metrics(
+    shared: Any,
+    routed: Any,
+    target: Any,
+    ids: Any,
+    weights: Any,
+    *,
+    hard_fraction: float = 0.25,
+) -> dict[str, Any]:
+    """Return reconstruction and dispatch-load metrics for an assignment.
+
+    ``_metrics`` predates the load-aware diagnostic and intentionally keeps a
+    small compatibility surface.  This companion adds the names used by the
+    product gate (``global_nmse``, hard-quartile cosine, expert usage and dead
+    experts) without changing the historical oracle result shape.
+    """
+
+    np = _np()
+    shared_values = np.asarray(shared, dtype=np.float64)
+    routed_values = np.asarray(routed, dtype=np.float64)
+    target_values = np.asarray(target, dtype=np.float64)
+    ids_values = np.asarray(ids, dtype=np.int64)
+    weight_values = np.asarray(weights, dtype=np.float64)
+    if ids_values.ndim != 2 or weight_values.shape != ids_values.shape:
+        raise ValueError("ids and weights must both be [tokens, top_k]")
+    if ids_values.shape[0] != target_values.shape[0] or ids_values.shape[1] <= 0:
+        raise ValueError("route count does not match target rows")
+    if np.any(ids_values < 0) or np.any(ids_values >= routed_values.shape[1]):
+        raise ValueError("route contains an expert outside routed")
+    prediction = shared_values.copy()
+    for slot in range(ids_values.shape[1]):
+        prediction += weight_values[:, slot, None] * routed_values[np.arange(ids_values.shape[0]), ids_values[:, slot]]
+    error = np.sum((prediction - target_values) ** 2, axis=1)
+    target_norm = np.sum(target_values**2, axis=1)
+    cosine = np.sum(prediction * target_values, axis=1) / (
+        np.linalg.norm(prediction, axis=1) * np.linalg.norm(target_values, axis=1) + 1e-12
+    )
+    experts = int(routed_values.shape[1])
+    usage = np.bincount(ids_values.reshape(-1), minlength=experts).astype(np.int64)
+    usage_fraction = usage / max(ids_values.shape[0] * ids_values.shape[1], 1)
+    load_cv = float(usage.std() / max(usage.mean(), 1e-12))
+    hard_fraction = float(hard_fraction)
+    if not 0.0 < hard_fraction <= 1.0:
+        raise ValueError("hard_fraction must be in (0, 1]")
+    # Residual magnitude is known to dominate the selector's remaining error;
+    # use it for a deterministic, target-assisted diagnostic quartile.
+    hardness = np.linalg.norm(target_values - shared_values, axis=1)
+    hard_count = max(1, int(np.ceil(hardness.shape[0] * hard_fraction)))
+    hard_indices = np.argsort(-hardness, kind="stable")[:hard_count]
+    return {
+        "tokens": int(target_values.shape[0]),
+        "mse": float(np.mean((prediction - target_values) ** 2)),
+        "normalized_mse": float(np.mean((prediction - target_values) ** 2) / (np.mean(target_values**2) + 1e-12)),
+        "global_nmse": float(np.sum(error) / (np.sum(target_norm) + 1e-12)),
+        "mean_token_relative_mse": float(np.mean(error / np.maximum(target_norm, 1e-12))),
+        "cosine": float(np.mean(cosine)),
+        "hard_quartile_cosine": float(np.mean(cosine[hard_indices])),
+        "expert_usage_counts": usage.tolist(),
+        "expert_usage_fraction": usage_fraction.tolist(),
+        "dead_experts": int(np.sum(usage == 0)),
+        "load_cv": load_cv,
+        "indices": ids_values,
+        "weights": weight_values,
+        "reconstruction": prediction,
+        "residual_by_token": error / max(int(target_values.shape[1]), 1),
+        "hard_indices": hard_indices,
+    }
+
+
+def _candidate_routes(
+    routed: Any,
+    residual: Any,
+    top_k: int,
+    *,
+    simplex: bool,
+    candidate_pool_size: int | None,
+    max_combinations: int,
+) -> list[tuple[float, tuple[int, ...], Any]]:
+    """Build a bounded per-token route candidate set.
+
+    p16/top4 has only 1,820 sets, so the default path is exhaustive.  For
+    p32/top4/top5 the full combination count is much larger; the deterministic
+    correlation pool keeps the diagnostic tractable while still exposing
+    alternatives for price-based balancing.  The candidate metadata in the
+    returned report makes this distinction explicit.
+    """
+
+    np = _np()
+    routed_values = np.asarray(routed, dtype=np.float64)
+    residual_value = np.asarray(residual, dtype=np.float64)
+    experts = int(routed_values.shape[0])
+    if top_k <= 0 or top_k > experts:
+        raise ValueError("invalid top_k")
+    if max_combinations <= 0:
+        raise ValueError("max_combinations must be positive")
+    correlations = routed_values @ residual_value
+    norms = np.linalg.norm(routed_values, axis=1)
+    pool = min(experts, int(candidate_pool_size or experts))
+    # Exact enumeration is preferred whenever it is bounded.  Otherwise use
+    # a larger pool than top-k and deterministic norm/correlation alternatives.
+    combination_count = math.comb(pool, top_k) if pool >= top_k else 0
+    if combination_count <= max_combinations:
+        order = np.argsort(-correlations, kind="stable")[:pool]
+        combinations = list(itertools.combinations((int(value) for value in order), top_k))
+    else:
+        pool = min(experts, max(top_k, int(candidate_pool_size or (2 * top_k + 4))))
+        correlation_order = np.argsort(-correlations, kind="stable")[:pool]
+        norm_order = np.argsort(-norms, kind="stable")[:pool]
+        if math.comb(pool, top_k) <= max_combinations:
+            # The fallback pool is small enough to retain every set.  This is
+            # the preferred strongest-practical p32 screen (C(12,5)=792 by
+            # default), while avoiding the full 201,376-set enumeration.
+            combinations = list(itertools.combinations((int(value) for value in correlation_order), top_k))
+            result: list[tuple[float, tuple[int, ...], Any]] = []
+            for combo in combinations:
+                matrix = routed_values[list(combo)].T
+                weights = _simplex_weights_exact(matrix, residual_value) if simplex else _positive_weights_exact(matrix, residual_value)
+                error = _candidate_error(matrix, weights, residual_value)
+                result.append((float(error), tuple(int(value) for value in combo), weights))
+            result.sort(key=lambda item: (item[0], item[1]))
+            return result
+        combinations_set: set[tuple[int, ...]] = set()
+        combinations_set.add(tuple(sorted(int(value) for value in correlation_order[:top_k])))
+        combinations_set.add(tuple(sorted(int(value) for value in norm_order[:top_k])))
+        # Replacing one slot gives the Lagrangian loop useful alternatives
+        # without pretending to be an exhaustive p32 oracle.
+        base = min(combinations_set)
+        for replacement in correlation_order:
+            replacement_value = int(replacement)
+            for slot in range(top_k):
+                candidate = list(base)
+                candidate[slot] = replacement_value
+                if len(set(candidate)) == top_k:
+                    combinations_set.add(tuple(sorted(candidate)))
+        combinations = sorted(combinations_set)[:max_combinations]
+    result: list[tuple[float, tuple[int, ...], Any]] = []
+    for combo in combinations:
+        matrix = routed_values[list(combo)].T
+        weights = _simplex_weights_exact(matrix, residual_value) if simplex else _positive_weights_exact(matrix, residual_value)
+        error = _candidate_error(matrix, weights, residual_value)
+        result.append((float(error), tuple(int(value) for value in combo), weights))
+    result.sort(key=lambda item: (item[0], item[1]))
+    if not result:
+        raise RuntimeError("route candidate generation produced no feasible set")
+    return result
+
+
+def _assign_priced_routes(
+    candidates: Sequence[Sequence[tuple[float, tuple[int, ...], Any]]],
+    prices: Any,
+    *,
+    penalty: float,
+) -> tuple[Any, Any, Any]:
+    np = _np()
+    selected_ids: list[tuple[int, ...]] = []
+    selected_weights: list[Any] = []
+    errors = np.zeros(len(candidates), dtype=np.float64)
+    provisional_usage = np.zeros(len(prices), dtype=np.int64)
+    for token, options in enumerate(candidates):
+        scored = [
+            (
+                item[0] + float(penalty) * sum(float(prices[index]) for index in item[1]),
+                item[0],
+                item,
+            )
+            for item in options
+        ]
+        minimum = min(value[0] for value in scored)
+        # Independent Lagrangian choices can oscillate when several tokens
+        # have exactly the same reconstruction cost (a common occurrence for
+        # symmetric partitions).  Among numerically tied choices, assign the
+        # least-used candidate first; this is a deterministic bounded repair,
+        # not an unrecorded capacity constraint.
+        tied = [value for value in scored if value[0] <= minimum + 1e-12]
+        _, _, best = min(
+            tied,
+            key=lambda value: (
+                sum(int(provisional_usage[index]) for index in value[2][1]),
+                value[1],
+                value[2][1],
+            ),
+        )
+        errors[token] = best[0]
+        selected_ids.append(best[1])
+        selected_weights.append(best[2])
+        for index in best[1]:
+            provisional_usage[index] += 1
+    return np.asarray(selected_ids, dtype=np.int64), np.asarray(selected_weights, dtype=np.float64), errors
+
+
+def _assign_unconstrained_routes(candidates: Sequence[Sequence[tuple[float, tuple[int, ...], Any]]]) -> tuple[Any, Any]:
+    """Select each token's best reconstruction route without load tie-breaks."""
+
+    np = _np()
+    selected = [min(options, key=lambda item: (item[0], item[1])) for options in candidates]
+    return (
+        np.asarray([item[1] for item in selected], dtype=np.int64),
+        np.asarray([item[2] for item in selected], dtype=np.float64),
+    )
+
+
+def _pareto_points(points: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]:
+    """Keep non-dominated quality/load points in deterministic order."""
+
+    ordered = sorted(points, key=lambda point: (float(point["load_cv"]), float(point["global_nmse"]), -float(point["cosine"])))
+    frontier: list[dict[str, Any]] = []
+    best_nmse = float("inf")
+    for point in ordered:
+        nmse = float(point["global_nmse"])
+        if nmse < best_nmse - 1e-12:
+            frontier.append(dict(point))
+            best_nmse = nmse
+    return frontier
+
+
+def frozen_slice_load_aware_oracle(
+    shared: Any,
+    routed: Any,
+    target: Any,
+    *,
+    top_k: int = 2,
+    target_load_cv: float = 0.50,
+    simplex: bool = False,
+    candidate_pool_size: int | None = None,
+    max_combinations: int = 4096,
+    iterations: int = 32,
+    price_step: float = 0.5,
+    price_decay: float = 0.95,
+    penalty_grid: Sequence[float] | None = None,
+    hard_fraction: float = 0.25,
+) -> dict[str, Any]:
+    """Approximate a globally load-constrained frozen-slice oracle.
+
+    Independent per-token oracle routing can overuse a small set of experts.
+    This diagnostic retains several candidate sets per token, then iteratively
+    raises prices on overloaded experts.  Each assignment minimizes
+
+    ``reconstruction_error + penalty * sum(selected expert prices)``.
+
+    ``p16/top4`` defaults to exhaustive 1,820-set candidate generation.  The
+    p32 top-4/top-5 path is intentionally bounded by a correlation-ranked pool;
+    callers should report ``candidate_pool_size`` and ``max_combinations`` as
+    part of the assurance level.  The result includes the selected assignment,
+    load/constrained-gate metrics, and a non-dominated quality/load Pareto
+    curve.  It is a diagnostic, not a trained-router guarantee.
+    """
+
+    np = _np()
+    shared_values, routed_values, target_values = _validate_oracle_arrays(shared, routed, target, top_k)
+    if not 0.0 <= float(target_load_cv):
+        raise ValueError("target_load_cv must be non-negative")
+    if candidate_pool_size is not None and candidate_pool_size <= 0:
+        raise ValueError("candidate_pool_size must be positive when provided")
+    if iterations <= 0 or price_step <= 0 or not 0.0 < price_decay <= 1.0:
+        raise ValueError("iterations/price_step/price_decay are invalid")
+    tokens, experts, _ = routed_values.shape
+    if penalty_grid is None:
+        penalty_grid = (0.0, 0.05, 0.1, 0.25, 0.5, 1.0, 2.0)
+    penalties = tuple(float(value) for value in penalty_grid)
+    if not penalties or any(value < 0.0 for value in penalties):
+        raise ValueError("penalty_grid must contain non-negative values")
+    candidates = [
+        _candidate_routes(
+            routed_values[token],
+            target_values[token] - shared_values[token],
+            top_k,
+            simplex=simplex,
+            candidate_pool_size=candidate_pool_size,
+            max_combinations=max_combinations,
+        )
+        for token in range(tokens)
+    ]
+    unconstrained_ids, unconstrained_weights = _assign_unconstrained_routes(candidates)
+    unconstrained_metric = _load_metrics(
+        shared_values,
+        routed_values,
+        target_values,
+        unconstrained_ids,
+        unconstrained_weights,
+        hard_fraction=hard_fraction,
+    )
+    points: list[dict[str, Any]] = []
+    selected_by_point: list[tuple[Any, Any]] = []
+    target_usage = tokens * top_k / max(experts, 1)
+    for penalty in penalties:
+        prices = np.zeros(experts, dtype=np.float64)
+        best_assignment: tuple[Any, Any] | None = None
+        best_key: tuple[float, float, float] | None = None
+        for iteration in range(int(iterations)):
+            ids, weights, _errors = _assign_priced_routes(candidates, prices, penalty=penalty)
+            metric = _load_metrics(shared_values, routed_values, target_values, ids, weights, hard_fraction=hard_fraction)
+            key = (
+                0.0 if float(metric["load_cv"]) <= float(target_load_cv) else 1.0,
+                float(metric["global_nmse"]),
+                float(metric["load_cv"]),
+            )
+            if best_key is None or key < best_key:
+                best_key = key
+                best_assignment = (ids.copy(), weights.copy())
+            usage = np.asarray(metric["expert_usage_counts"], dtype=np.float64)
+            imbalance = usage / max(target_usage, 1e-12) - 1.0
+            # Prices are defined only up to an additive constant.  Centering
+            # prevents them from growing without bound while preserving route
+            # ordering, and the decaying step avoids a two-cycle on ties.
+            prices += float(price_step) * (float(price_decay) ** iteration) * imbalance
+            prices -= prices.mean()
+        if best_assignment is None:  # pragma: no cover - candidate generation guarantees one
+            raise RuntimeError("load-aware assignment produced no route")
+        ids, weights = best_assignment
+        metric = _load_metrics(shared_values, routed_values, target_values, ids, weights, hard_fraction=hard_fraction)
+        point = {
+            "penalty": float(penalty),
+            "global_nmse": metric["global_nmse"],
+            "mean_token_relative_mse": metric["mean_token_relative_mse"],
+            "cosine": metric["cosine"],
+            "hard_quartile_cosine": metric["hard_quartile_cosine"],
+            "load_cv": metric["load_cv"],
+            "dead_experts": metric["dead_experts"],
+            "expert_usage_counts": metric["expert_usage_counts"],
+            "feasible_load_target": bool(float(metric["load_cv"]) <= float(target_load_cv)),
+            "green_gate": bool(
+                float(metric["global_nmse"]) <= 0.05
+                and float(metric["cosine"]) >= 0.98
+                and float(metric["load_cv"]) <= float(target_load_cv)
+                and int(metric["dead_experts"]) == 0
+            ),
+            "iterations": int(iterations),
+        }
+        points.append(point)
+        selected_by_point.append((ids, weights))
+
+    # Select the best quality point that meets the requested balance.  If no
+    # candidate does, the least imbalanced point is returned truthfully.
+    feasible = [index for index, point in enumerate(points) if point["feasible_load_target"]]
+    if feasible:
+        selected_index = min(feasible, key=lambda index: (float(points[index]["global_nmse"]), -float(points[index]["cosine"]), float(points[index]["load_cv"])))
+    else:
+        selected_index = min(range(len(points)), key=lambda index: (float(points[index]["load_cv"]), float(points[index]["global_nmse"])))
+    ids, weights = selected_by_point[selected_index]
+    metric = _load_metrics(shared_values, routed_values, target_values, ids, weights, hard_fraction=hard_fraction)
+    pareto = _pareto_points(points)
+    result = {
+        "method": "frozen_slice_load_aware_oracle",
+        "routing_constraint": "nonnegative weights" if not simplex else "nonnegative weights summing to one",
+        "assignment_method": "priced_lagrangian_iterative_load_balancing",
+        "assurance": "exact_candidate_sets" if (candidate_pool_size in (None, experts) and math.comb(experts, top_k) <= max_combinations) else "bounded_correlation_candidate_pool",
+        "candidate_pool_size": int(candidate_pool_size or experts),
+        "effective_candidate_pool_size": int(
+            min(
+                experts,
+                int(candidate_pool_size or experts)
+                if math.comb(min(experts, int(candidate_pool_size or experts)), top_k) <= max_combinations
+                else max(top_k, int(candidate_pool_size or (2 * top_k + 4))),
+            )
+        ),
+        "max_combinations": int(max_combinations),
+        "target_load_cv": float(target_load_cv),
+        "feasible_load_target": bool(float(metric["load_cv"]) <= float(target_load_cv)),
+        "green_gate": bool(
+            float(metric["global_nmse"]) <= 0.05
+            and float(metric["cosine"]) >= 0.98
+            and float(metric["load_cv"]) <= float(target_load_cv)
+            and int(metric["dead_experts"]) == 0
+        ),
+        "selected_penalty": float(penalties[selected_index]),
+        "price_iterations": int(iterations),
+        "unconstrained": {
+            "global_nmse": unconstrained_metric["global_nmse"],
+            "mean_token_relative_mse": unconstrained_metric["mean_token_relative_mse"],
+            "cosine": unconstrained_metric["cosine"],
+            "hard_quartile_cosine": unconstrained_metric["hard_quartile_cosine"],
+            "load_cv": unconstrained_metric["load_cv"],
+            "expert_usage_counts": unconstrained_metric["expert_usage_counts"],
+            "dead_experts": unconstrained_metric["dead_experts"],
+            "indices": unconstrained_metric["indices"],
+            "weights": unconstrained_metric["weights"],
+        },
+        "indices": metric["indices"],
+        "weights": metric["weights"],
+        "reconstruction": metric["reconstruction"],
+        "mse": metric["mse"],
+        "normalized_mse": metric["normalized_mse"],
+        "global_nmse": metric["global_nmse"],
+        "mean_token_relative_mse": metric["mean_token_relative_mse"],
+        "cosine": metric["cosine"],
+        "hard_quartile_cosine": metric["hard_quartile_cosine"],
+        "expert_usage_counts": metric["expert_usage_counts"],
+        "expert_usage_fraction": metric["expert_usage_fraction"],
+        "dead_experts": metric["dead_experts"],
+        "load_cv": metric["load_cv"],
+        "pareto": pareto,
+        "pareto_all_points": points,
+    }
+    return result
+
+
+# Names used by reports and external experiments.  Keep both spellings so a
+# diagnostic can be adopted without coupling callers to an implementation
+# detail of the frozen-slice module.
+load_aware_oracle = frozen_slice_load_aware_oracle
+load_constrained_oracle = frozen_slice_load_aware_oracle
 
 
 def frozen_slice_simplex_oracle(
@@ -581,9 +985,12 @@ def sparse_baseline(shared: Any, routed: Any, *, top_k: int, mode: str = "normal
 
 
 __all__ = [
+    "frozen_slice_load_aware_oracle",
     "frozen_slice_positive_oracle",
     "frozen_slice_scaled_router_oracle",
     "frozen_slice_simplex_oracle",
+    "load_aware_oracle",
+    "load_constrained_oracle",
     "oracle_topk",
     "sparse_baseline",
     "swiglu_contributions",

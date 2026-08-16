@@ -1,45 +1,32 @@
-"""Materialize the bounded p32/top5 candidate after protocol machinery is fixed.
+"""Compatibility entry point for topology-specific p32/top5 materialization.
 
-The existing residual-correlation/refined p32 partition is capacity-exact for
-all p32 top-k values.  Reusing that immutable partition lets top5 be measured
-without reopening the holdout or silently changing neuron assignment.
+The old helper silently copied the top6 partition.  That path is retained only
+as a command name for existing handoffs; it now requires a FIT/dev search
+report and promotes a row evaluated specifically at top5.
 """
 
 from __future__ import annotations
 
 import argparse
-import json
 from pathlib import Path
 
-from dense2moe.provenance import current_git_commit
+try:
+    from scripts.materialize_p32_product_targets import materialize
+except ModuleNotFoundError:  # direct ``python scripts/<file>.py`` execution
+    from materialize_p32_product_targets import materialize  # type: ignore
 
 
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--run-dir", default="runs/20260815-184644-windows-real-d2m-v4-streaming")
-    parser.add_argument("--source-name", default="high-sparsity-p32-top6.json")
-    parser.add_argument("--output-name", default="high-sparsity-p32-top5.json")
+    parser.add_argument("--source-name", default=None, help="deprecated; top6 reuse is no longer permitted")
+    parser.add_argument("--output-name", default="high-sparsity-p32-top5-product.json")
     args = parser.parse_args()
     run = Path(args.run_dir)
-    source_path = run / "partitions" / args.source_name
-    payload = json.loads(source_path.read_text(encoding="utf-8"))
-    if int(payload.get("routed_experts", 0)) != 32 or int(payload.get("expert_intermediate_size", 0)) != 512:
-        raise ValueError("source partition is not the p32/512 candidate")
-    payload = dict(payload)
-    payload.update(
-        {
-            "status": "PARTITION_READY_P32_TOP5_PROTOCOL_FIXED",
-            "profile_name": "p32_top5",
-            "top_k": 5,
-            "strategy": "residual_swap_refined_partition_reused_for_top5",
-            "selection_contract": "TRAIN/dev bounded residual-correlation partition; true validation training; full holdout closed",
-            "materialized_from": str(source_path),
-            "code_commit": current_git_commit(),
-        }
-    )
-    output = run / "partitions" / args.output_name
-    output.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    print(json.dumps({"status": payload["status"], "partition": str(output), "top_k": payload["top_k"]}, indent=2), flush=True)
+    if args.source_name is not None:
+        raise ValueError("top6 partition reuse is prohibited; rerun FIT/dev search and materialize its top5 row")
+    output = materialize(run=run, top_k=5, output_name=args.output_name)
+    print(json.dumps({"status": "MATERIALIZED", "partition": str(output), "top_k": 5}, indent=2), flush=True)
 
 
 if __name__ == "__main__":

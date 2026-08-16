@@ -37,6 +37,16 @@ class CoreTests(unittest.TestCase):
         self.assertEqual(profile.total_capacity, 20)
         profile.validate()
 
+    def test_p32_product_target_geometry(self):
+        from dense2moe.config import load_config
+
+        top5 = load_config("configs/qwen38_p32s1_top5.yaml")
+        top4 = load_config("configs/qwen38_p32s1_top4.yaml")
+        self.assertEqual(top5.active_intermediate_size, 3584)
+        self.assertAlmostEqual(top5.sparsity, 0.7941176470588235)
+        self.assertEqual(top4.active_intermediate_size, 3072)
+        self.assertAlmostEqual(top4.sparsity, 0.8235294117647058)
+
     def test_source_manifest_revision_pinned(self):
         from dense2moe.discovery.source import is_pinned_revision
 
@@ -170,6 +180,15 @@ class CoreTests(unittest.TestCase):
         store = StateStore(self.root / "run")
         store.transition(current_phase="source", phase_status="pending", next_exact_command="d2m test")
         self.assertEqual(store.load().next_exact_command, "d2m test")
+
+    def test_shadow_validation_is_disjoint_and_deterministic(self):
+        from dense2moe.training import deterministic_shadow_validation_indices
+
+        first, first_hash = deterministic_shadow_validation_indices(20, excluded_indices=[1, 3, 5], shadow_count=5, seed=9)
+        second, second_hash = deterministic_shadow_validation_indices(20, excluded_indices=[1, 3, 5], shadow_count=5, seed=9)
+        self.assertEqual(first, second)
+        self.assertEqual(first_hash, second_hash)
+        self.assertTrue(set(first).isdisjoint({1, 3, 5}))
 
     def test_job_queue_no_duplicate_lease(self):
         queue = JobQueue(self.root / "jobs.sqlite")

@@ -1,6 +1,7 @@
 # Quality gates
 
-Thresholds are fixed for the initial p8/top-2 experiments.
+Thresholds are fixed for the initial p8/top-2 experiments and remain the
+layer-level gates for the p16 proof track and p32 product targets.
 
 | Gate | Green | Yellow | Use |
 |---|---:|---:|---|
@@ -24,6 +25,26 @@ evidence, but are not eligible for these gates, are not teacher-activation
 measurements, and must not be interpreted as a hard ceiling on a trainable
 student.  Real activation reports must identify the frozen simplex,
 non-negative, and train-fit global-scale methods separately.
+
+## Quality/load oracle gate
+
+An unconstrained per-token oracle is not sufficient evidence for a production
+router: it can obtain excellent reconstruction by dispatching nearly every
+token to the same experts.  Before selector training, each p16/top4,
+p32/top5, and p32/top4 basis should report:
+
+- global NMSE and mean cosine;
+- hardest residual-quartile cosine;
+- expert usage, dead experts, and load CV;
+- a priced load-aware assignment Pareto curve; and
+- whether any assignment reaches cosine `>= 0.98`, global NMSE `<= 0.05`, and
+  load CV `<= 0.50` simultaneously.
+
+`dense2moe.partition.frozen_slice_load_aware_oracle` performs this bounded
+Lagrangian diagnostic.  p16/top4 uses exhaustive candidate sets when its
+`C(16,4)=1820` combinations fit the configured bound.  p32/top4 and p32/top5
+use a deterministic correlation-ranked candidate pool and must be labelled as
+bounded rather than exhaustive.
 
 The `trainable_student_proxy` interpretation is intentionally separate: a
 trained student is constrained by the distillation data and fixed split, the

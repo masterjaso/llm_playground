@@ -7,12 +7,29 @@ $ErrorActionPreference = "Stop"
 $projectRoot = Split-Path -Parent $PSScriptRoot
 $venvPython = Join-Path $projectRoot ".venv\Scripts\python.exe"
 
-function Invoke-Python {
-    param([Parameter(Mandatory = $true)][string[]]$Args)
-    $process = Start-Process -FilePath $venvPython -ArgumentList $Args -Wait -PassThru -NoNewWindow
-    if ($process.ExitCode -ne 0) {
-        throw "Windows Python command failed: $($Args -join ' ')"
+function Invoke-GuardedPython {
+    param(
+        [Parameter(Mandatory = $true)][string]$Interpreter,
+        [Parameter(Mandatory = $true)][string]$Name,
+        [ValidateSet("FAST", "MEDIUM", "LONG_RUNNING")][string]$Category = "MEDIUM",
+        [double]$Timeout = 300,
+        [Parameter(Mandatory = $true)][string[]]$ChildArgs
+    )
+    $wrapper = Join-Path $projectRoot "scripts\run_guarded_command.py"
+    $guarded = @($wrapper, "--name", $Name, "--category", $Category, "--timeout", $Timeout, "--")
+    $guarded += @($Interpreter) + $ChildArgs
+    & $Interpreter @guarded
+    if ($LASTEXITCODE -ne 0) {
+        throw "Guarded Windows Python command failed: $Name ($($ChildArgs -join ' '))"
     }
+}
+
+function Invoke-Python {
+    param(
+        [Parameter(Mandatory = $true)][string]$Name,
+        [Parameter(Mandatory = $true)][string[]]$Args
+    )
+    Invoke-GuardedPython -Interpreter $venvPython -Name $Name -ChildArgs $Args
 }
 
 Push-Location $projectRoot
@@ -32,27 +49,22 @@ try {
             throw "A native Windows Python 3.10+ launcher is required to create .venv. Install Python from python.org, then rerun this script."
         }
         $launcherName = [System.IO.Path]::GetFileName($launcher.Source).ToLowerInvariant()
-        if ($launcherName -eq "py.exe") {
-            $process = Start-Process -FilePath $launcher.Source -ArgumentList @("-3", "-m", "venv", ".venv") -Wait -PassThru -NoNewWindow
-        }
-        else {
-            $process = Start-Process -FilePath $launcher.Source -ArgumentList @("-m", "venv", ".venv") -Wait -PassThru -NoNewWindow
-        }
-        if ($process.ExitCode -ne 0) { throw "Unable to create .venv" }
+        $launcherArgs = if ($launcherName -eq "py.exe") { @("-3") } else { @() }
+        Invoke-GuardedPython -Interpreter $launcher.Source -Name "create-venv" -ChildArgs ($launcherArgs + @("-m", "venv", ".venv"))
     }
 
-    Invoke-Python @("-m", "pip", "install", "--upgrade", "pip", "setuptools", "wheel")
+    Invoke-Python -Name "pip-bootstrap" -Args @("-m", "pip", "install", "--upgrade", "pip", "setuptools", "wheel")
     # Install project/runtime/dev dependencies without allowing the generic
     # torch requirement to replace the CUDA wheel below.
-    Invoke-Python @("-m", "pip", "install", "-e", ".[runtime,dev]")
+    Invoke-Python -Name "pip-project-runtime-dev" -Args @("-m", "pip", "install", "-e", ".[runtime,dev]")
     if (-not $SkipTorchInstall) {
-        Invoke-Python @("-m", "pip", "install", "--index-url", $CudaIndexUrl, "torch>=2.3")
+        Invoke-Python -Name "pip-install-cuda-torch" -Args @("-m", "pip", "install", "--index-url", $CudaIndexUrl, "torch>=2.3")
     }
     # Install ML packages after torch so dependency resolution cannot silently
     # downgrade it to a CPU wheel.
-    Invoke-Python @("-m", "pip", "install", "-e", ".[ml]")
-    Invoke-Python @("-m", "pip", "install", "transformers", "accelerate", "safetensors")
-    Invoke-Python @("-m", "pip", "show", "dense2moe", "torch", "transformers", "accelerate", "safetensors", "numpy", "pytest", "ruff", "mypy")
+    Invoke-Python -Name "pip-project-ml" -Args @("-m", "pip", "install", "-e", ".[ml]")
+    Invoke-Python -Name "pip-install-transformers" -Args @("-m", "pip", "install", "transformers", "accelerate", "safetensors")
+    Invoke-Python -Name "pip-show-environment" -Args @("-m", "pip", "show", "dense2moe", "torch", "transformers", "accelerate", "safetensors", "numpy", "pytest", "ruff", "mypy")
     Write-Host "WINDOWS_PYTHON_READY"
     Write-Host "Interpreter: $venvPython"
 }

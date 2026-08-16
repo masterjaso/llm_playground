@@ -7,14 +7,16 @@ from .router import normalize_topk_weights, shared_gate_initialization, topk_rou
 from .tiny import TinyDenseFFN, TinyMoE
 
 try:
-    from .torch_moe import TorchQwen35SwiGLUMoE
+    from .torch_moe import SharedOutputFeatureRouter, TorchQwen35SwiGLUMoE
 except RuntimeError:  # Optional PyTorch dependency is absent in minimal installs.
+    SharedOutputFeatureRouter = None  # type: ignore[assignment,misc]
     TorchQwen35SwiGLUMoE = None  # type: ignore[assignment,misc]
 
 __all__ = [
     "DenseSwiGLU",
     "Qwen35SwiGLUMoE",
     "ReferenceMoE",
+    "SharedOutputFeatureRouter",
     "TinyDenseFFN",
     "TinyMoE",
     "TinyQwen35TextConfig",

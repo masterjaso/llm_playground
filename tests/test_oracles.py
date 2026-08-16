@@ -5,12 +5,30 @@ from __future__ import annotations
 import numpy as np
 
 from dense2moe.partition import (
+    frozen_slice_load_aware_oracle,
     frozen_slice_positive_oracle,
     frozen_slice_scaled_router_oracle,
     frozen_slice_simplex_oracle,
     sparse_baseline,
     trainable_student_proxy,
 )
+
+
+def test_load_aware_oracle_reports_balanced_pareto_assignment() -> None:
+    # Every expert is an exact reconstruction, so the load-aware tie-breaker
+    # can balance dispatches without sacrificing quality.
+    shared = np.zeros((8, 1))
+    routed = np.ones((8, 4, 1))
+    target = np.ones((8, 1))
+
+    result = frozen_slice_load_aware_oracle(shared, routed, target, top_k=1, iterations=8)
+
+    assert result["method"] == "frozen_slice_load_aware_oracle"
+    assert result["global_nmse"] < 1e-12
+    assert result["load_cv"] == 0.0
+    assert result["dead_experts"] == 0
+    assert result["feasible_load_target"] is True
+    assert result["pareto"]
 
 
 def test_simplex_oracle_uses_exact_pairwise_clipped_solution() -> None:

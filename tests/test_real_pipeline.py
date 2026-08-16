@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import subprocess
 import tempfile
 import unittest
 from pathlib import Path
@@ -17,6 +16,7 @@ from dense2moe.checkpoint import (
     save_layer_checkpoint,
     validate_layer_checkpoint,
 )
+from dense2moe.command import run_guarded
 from dense2moe.models import DenseSwiGLU, Qwen35SwiGLUMoE
 from dense2moe.provenance import current_git_commit
 from dense2moe.state import StateStore, bootstrap_run, merge_fact_ledgers
@@ -25,11 +25,16 @@ from dense2moe.state import StateStore, bootstrap_run, merge_fact_ledgers
 class RealContractTests(unittest.TestCase):
     def test_new_receipts_use_current_git_commit(self) -> None:
         commit = current_git_commit()
-        expected = subprocess.check_output(
+        expected_result = run_guarded(
             ["git", "rev-parse", "HEAD"],
+            name="test-git-rev-parse-head",
+            category="FAST",
+            timeout=60.0,
             cwd=Path(__file__).resolve().parents[1],
-            text=True,
-        ).strip()
+            emit=lambda _line: None,
+        )
+        self.assertTrue(expected_result.ok)
+        expected = expected_result.stdout.strip()
         self.assertEqual(commit, expected)
         with tempfile.TemporaryDirectory() as tmp:
             store = StateStore(Path(tmp) / "run")

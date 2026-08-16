@@ -56,7 +56,16 @@ DEFAULT_RUN = Path("runs/20260815-184644-windows-real-d2m-v4-streaming")
 DEFAULT_SOURCE = Path("runs/20260815-030931-windows/source")
 
 
-def _warm_start_nonlinear(linear: TorchQwen35SwiGLUMoE, profile: Any, plan: Any, weights: dict[str, Any], device: str, hidden_size: int) -> TorchQwen35SwiGLUMoE:
+def _warm_start_nonlinear(
+    linear: TorchQwen35SwiGLUMoE,
+    profile: Any,
+    plan: Any,
+    weights: dict[str, Any],
+    device: str,
+    hidden_size: int,
+    *,
+    router_feature_mode: str = "none",
+) -> TorchQwen35SwiGLUMoE:
     import torch
 
     model = TorchQwen35SwiGLUMoE.from_dense(
@@ -68,6 +77,7 @@ def _warm_start_nonlinear(linear: TorchQwen35SwiGLUMoE, profile: Any, plan: Any,
         top_k=profile.top_k,
         routing_mode=profile.routing_mode,
         router_hidden_size=hidden_size,
+        router_feature_mode=router_feature_mode,
         partition=plan,
         learnable_scales=True,
     ).to(device)
@@ -83,7 +93,13 @@ def _warm_start_nonlinear(linear: TorchQwen35SwiGLUMoE, profile: Any, plan: Any,
         input_scale = 0.02
         model.router.in_proj.weight.zero_()
         model.router.in_proj.bias.zero_()
-        model.router.in_proj.weight[:rank].copy_(vh[:rank] * input_scale)
+        if router_feature_mode == "shared_output":
+            # Preserve the linear warm start on x and start the shared-output
+            # half at zero; subsequent FIT-only updates can discover whether
+            # the already-computed nonlinear feature improves generalization.
+            model.router.in_proj.weight[:rank, : linear.hidden_size].copy_(vh[:rank] * input_scale)
+        else:
+            model.router.in_proj.weight[:rank].copy_(vh[:rank] * input_scale)
         model.router.out_proj.weight.zero_()
         model.router.out_proj.weight[:, :rank].copy_(u[:, :rank] * singular[:rank].unsqueeze(0) * (2.0 / input_scale))
     for name, parameter in model.named_parameters():
@@ -207,7 +223,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
     plan = _load_plan(run_dir / "partitions" / "high-sparsity-p16-top4.json")
     weights = _load_dense_mlp(source_dir)
     linear, initial_metadata = _load_deployed_checkpoint(weights, base_profile, plan, run_dir / "layer-checkpoints" / "clean-validation" / args.initial_checkpoint, args.device)
-    model = _warm_start_nonlinear(linear, base_profile, plan, weights, args.device, args.router_hidden_size)
+    model = _warm_start_nonlinear(linear, base_profile, plan, weights, args.device, args.router_hidden_size, router_feature_mode=args.router_feature_mode)
     dataset = ActivationShardDataset(run_dir / "capture/layer-0000.json", split="train", microbatch=args.microbatch)
     dev = json.loads((run_dir / "capture/architecture-dev.json").read_text(encoding="utf-8"))
     validation_indices = np.asarray(dev["selected_global_indices"], dtype=np.int64)
@@ -234,7 +250,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
     hard = raw["rows"]["residual"] >= edges[3]
     all_mask = np.ones(len(validation_indices), dtype=bool)
     # Strict reload with the nonlinear router architecture before publishing.
-    reloaded = _warm_start_nonlinear(linear, base_profile, plan, weights, args.device, args.router_hidden_size)
+    reloaded = _warm_start_nonlinear(linear, base_profile, plan, weights, args.device, args.router_hidden_size, router_feature_mode=args.router_feature_mode)
     reloaded.load_state_dict(best_state, strict=True)
     strict_validation = _stream_metrics(reloaded, dataset, gate=gate, up=up, down=down, microbatch=args.microbatch, device=args.device, selected_indices=validation_indices.tolist())
     output_dir = run_dir / "layer-checkpoints" / "clean-validation" / args.output_name
@@ -251,7 +267,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         "dataset_hash": dataset.dataset_hash,
         "source_revision": str(base_profile.revision),
         "profile": base_profile.name,
-        "router": {"architecture": "5120->128->SiLU->16", "hidden_size": args.router_hidden_size, "loss": "exact_set_membership_mix_plus_correlation_listwise_cross_entropy", "temperature": args.temperature, "membership_mix": args.membership_mix},
+        "router": {"architecture": "shared-output-feature->5120+5120->128->SiLU->16" if args.router_feature_mode == "shared_output" else "5120->128->SiLU->16", "feature_mode": args.router_feature_mode, "hidden_size": args.router_hidden_size, "loss": "exact_set_membership_mix_plus_correlation_listwise_cross_entropy", "temperature": args.temperature, "membership_mix": args.membership_mix},
         "initial_checkpoint": {"name": args.initial_checkpoint, "metadata_code_commit": initial_metadata.get("code_commit"), "tensor_sha256": initial_metadata.get("tensor_sha256_observed")},
         "training": {"epochs": args.epochs, "microbatch": args.microbatch, "learning_rate": args.learning_rate, "seed": args.seed, "fit_rows": int(dataset.count - len(validation_indices)), "validation_rows": len(validation_indices), "basis_frozen": True},
         "split_contract": {"fit": {"count": int(dataset.count - len(validation_indices)), "gradient_updates": True, "oracle_labels": "exact_all_1820", "validation_excluded": True}, "validation": {"count": len(validation_indices), "identity_hash": validation_hash, "gradient_updates": False, "checkpoint_selection": True}, "holdout": {"count": 16598, "opened": False, "status": "CLOSED"}},
@@ -279,7 +295,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         dataset_hash=dataset.dataset_hash,
         partition_strategy="artifact",
         partition_hash=hashlib.sha256(json.dumps(plan.as_dict(), sort_keys=True).encode()).hexdigest(),
-        router_architecture="torch-low-rank-silu-topk-independent_positive-v1",
+        router_architecture="torch-shared-output-feature-low-rank-silu-topk-independent_positive-v1" if args.router_feature_mode == "shared_output" else "torch-low-rank-silu-topk-independent_positive-v1",
         routing_mode=base_profile.routing_mode,
         training_seed=args.seed,
         training_config=report["training"] | report["router"] | {"selection_identity_hash": validation_hash, "holdout_evaluation": "deferred"},
@@ -305,6 +321,7 @@ def main() -> None:
     parser.add_argument("--output-name", default="p16-top4-nonlinear-listwise")
     parser.add_argument("--report-name", default="p16-top4-nonlinear-listwise-training.json")
     parser.add_argument("--router-hidden-size", type=int, default=128)
+    parser.add_argument("--router-feature-mode", choices=("none", "shared_output"), default="none")
     parser.add_argument("--device", default="cuda:1")
     parser.add_argument("--microbatch", type=int, default=512)
     parser.add_argument("--epochs", type=int, default=2)
@@ -319,4 +336,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
