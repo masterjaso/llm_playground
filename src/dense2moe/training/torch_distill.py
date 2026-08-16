@@ -360,8 +360,10 @@ def _train_stage_streaming(
                 torch.sum(prediction * teacher, dim=-1)
                 / (torch.linalg.vector_norm(prediction, dim=-1) * torch.linalg.vector_norm(teacher, dim=-1) + 1e-12)
             )
-            probs = torch.zeros((prediction.shape[0], model.routed_experts), device=device)
-            probs.scatter_add_(1, info["indices"], info["weights"])
+            # Balance the dense softmax distribution, not only the selected
+            # top-k mass.  The latter gives a dead expert zero gradient and can
+            # never satisfy the explicit dead-expert gate once it collapses.
+            probs = torch.softmax(info["logits"], dim=-1)
             load_balance = model.routed_experts * torch.mean(probs, dim=0).square().sum()
             z_loss = torch.mean(torch.logsumexp(info["logits"], dim=-1).square())
             oracle_loss = torch.zeros((), device=device)
@@ -375,7 +377,12 @@ def _train_stage_streaming(
                 oracle_loss = torch.stack(
                     [torch.nn.functional.cross_entropy(info["logits"], labels[:, slot]) for slot in range(labels.shape[1])]
                 ).mean()
-            loss = mse + 0.05 * cosine + 0.01 * load_balance + 0.001 * z_loss + 0.1 * oracle_loss
+            # The denser fallback has enough capacity to trade a small amount
+            # of reconstruction slack for a materially healthier expert load.
+            # Keep this coefficient explicit in the receipt rather than hiding
+            # it in a profile-specific post-processing step.
+            load_balance_coefficient = 0.05
+            loss = mse + 0.05 * cosine + load_balance_coefficient * load_balance + 0.001 * z_loss + 0.1 * oracle_loss
             optimizer.zero_grad(set_to_none=True)
             loss.backward()
             torch.nn.utils.clip_grad_norm_(parameters, 1.0)
@@ -627,8 +634,12 @@ def train_torch_layer(
     )
     if epochs == 0:
         status = "INITIALIZED_UNTRAINED"
+    elif gate_overall == "green":
+        status = "TRAINED_VALIDATED"
+    elif gate_overall == "research-candidate":
+        status = "RESEARCH_CANDIDATE"
     else:
-        status = "TRAINED_VALIDATED" if gate_overall != "red" else "VALIDATION_FAILED"
+        status = "VALIDATION_FAILED"
     output = Path(output_dir)
     output.mkdir(parents=True, exist_ok=True)
     tensor_map = {f"model.layers.{layer}.{name}": value.detach().cpu().numpy() for name, value in model.state_dict().items()}
@@ -654,7 +665,7 @@ def train_torch_layer(
             "device": device,
             "optimizer": "AdamW",
             "loss_version": "torch-distill-v1",
-            "loss_coefficients": {"mse": 1.0, "cosine": 0.05, "load_balance": 0.01, "router_z_loss": 0.001},
+            "loss_coefficients": {"mse": 1.0, "cosine": 0.05, "load_balance": 0.05, "router_z_loss": 0.001},
             "stages": stages,
             "stage_holdout_metrics": stage_metrics,
             "best_holdout_stage": best_stage,

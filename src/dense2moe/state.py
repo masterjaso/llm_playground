@@ -6,6 +6,7 @@ import json
 import os
 import shutil
 import tempfile
+import time
 from collections.abc import Mapping
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
@@ -193,7 +194,18 @@ def atomic_write_json(path: str | os.PathLike[str], payload: Any) -> None:
             handle.write("\n")
             handle.flush()
             os.fsync(handle.fileno())
-        os.replace(temporary, target)
+        # Windows antivirus/indexer handles can briefly retain the destination
+        # between publication attempts. Retry the atomic rename so a transient
+        # sharing violation does not discard an otherwise durable shard-level
+        # progress receipt.
+        for attempt in range(6):
+            try:
+                os.replace(temporary, target)
+                break
+            except PermissionError:
+                if attempt == 5:
+                    raise
+                time.sleep(0.05 * (2**attempt))
     finally:
         if os.path.exists(temporary):
             os.unlink(temporary)

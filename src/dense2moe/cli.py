@@ -878,13 +878,14 @@ def _streaming_capture(args: argparse.Namespace, store: StateStore) -> dict[str,
             "falsifier": "selected-layer replay fails the validated 1176-token native/text-only equivalence",
             "code_commit": current_git_commit(),
         })
-        atomic_write_json(store.run_dir / "metrics" / "streaming-capture.json", result)
         next_command = (
             f"d2m oracle-study --run-dir {args.run_dir} --layer 0 --activation-manifest {store.run_dir / 'capture' / 'layer-0000-holdout.json'}"
             if quality_eligible
             else f"d2m streaming-capture --run-dir {args.run_dir} --split {args.split} --layers {args.layers} --dataset-manifest {args.dataset_manifest} --resume"
         )
-        store.transition(current_phase="streaming", phase_status="complete" if quality_eligible else "pending", selected_profile=profile.name, active_blocker=None, next_exact_command=next_command, validation_results={"streaming_capture": result})
+        result["next_exact_command"] = next_command
+        atomic_write_json(store.run_dir / "metrics" / "streaming-capture.json", result)
+        store.transition(current_phase="streaming", phase_status="complete" if quality_eligible else "pending", selected_profile=profile.name, active_blocker=None, last_successful_command="streaming-capture", next_exact_command=next_command, validation_results={"streaming_capture": result})
         store.write_handoff(next_command=next_command, expected_output="real holdout oracle metrics" if quality_eligible else "validated rolling hidden-state stage", blocker=None)
     except (OSError, ValueError, TypeError, RuntimeError, KeyError, TeacherCaptureBlocked) as exc:
         result = {"status": "BLOCKED", "blocker_code": getattr(exc, "code", "STREAMING_CAPTURE_FAILED"), "message": str(exc), "profile": "qwen38_p8s1_top2", "legacy_whole_model_capture_invoked": False, "next_exact_command": f"d2m streaming-capture --run-dir {args.run_dir} --split {args.split} --layers {args.layers} --dataset-manifest {args.dataset_manifest} --resume", "code_commit": current_git_commit()}

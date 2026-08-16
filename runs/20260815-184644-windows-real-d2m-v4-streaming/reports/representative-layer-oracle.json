@@ -1,0 +1,59 @@
+{
+  "layers": [
+    {
+      "best_variant": "output_contribution_top2",
+      "gate": {
+        "applies_to": "real teacher activation holdout",
+        "green": true,
+        "yellow": true
+      },
+      "layer": 0,
+      "learned_scale_status": "LEARNED_SCALE_ORACLE_COMPLETE"
+    },
+    {
+      "best_variant": "activation_magnitude_top2",
+      "gate": {
+        "applies_to": "real teacher activation holdout",
+        "green": false,
+        "yellow": false
+      },
+      "layer": 16,
+      "learned_scale_status": "NOT_RUN_NO_EXPLICIT_TRAIN_MANIFEST"
+    },
+    {
+      "best_variant": "activation_magnitude_top2",
+      "gate": {
+        "applies_to": "real teacher activation holdout",
+        "green": false,
+        "yellow": false
+      },
+      "layer": 32,
+      "learned_scale_status": "NOT_RUN_NO_EXPLICIT_TRAIN_MANIFEST"
+    },
+    {
+      "best_variant": "activation_magnitude_top2",
+      "gate": {
+        "applies_to": "real teacher activation holdout",
+        "green": false,
+        "yellow": false
+      },
+      "layer": 48,
+      "learned_scale_status": "NOT_RUN_NO_EXPLICIT_TRAIN_MANIFEST"
+    },
+    {
+      "best_variant": "output_contribution_top2",
+      "gate": {
+        "applies_to": "real teacher activation holdout",
+        "green": true,
+        "yellow": true
+      },
+      "layer": 63,
+      "learned_scale_status": "NOT_RUN_NO_EXPLICIT_TRAIN_MANIFEST"
+    }
+  ],
+  "next_exact_command": "d2m streaming-capture --run-dir runs\\20260815-184644-windows-real-d2m-v4-streaming --split train --layers 0,16,32,48,63 --dataset-manifest runs\\20260815-184644-windows-real-d2m-v4-streaming/capture/data-plan.json --resume",
+  "profile": "qwen38_p8s1_top2",
+  "profile_hash": "6d1a8ad97a52eb7b4ff4fcc47a0a1cbc7a5abf500a15b807f24394d72629f27",
+  "source_report": "real-holdout-oracle.json",
+  "status": "REPRESENTATIVE_ORACLE_READY"
+}
