@@ -59,6 +59,76 @@ def deterministic_shadow_validation_indices(
     return selected, _hash_indices(selected)
 
 
+def validate_split_contract(
+    count: int,
+    *,
+    selection_indices: Sequence[int] | None,
+    validation_b_indices: Sequence[int] | None = None,
+    fit_exclude_indices: Sequence[int] | None = None,
+    selection_union_indices: Sequence[int] | None = None,
+) -> dict[str, tuple[int, ...] | None]:
+    """Validate and normalize the selector FIT/A/B split contract.
+
+    Validation-A is the *only* split that may influence checkpoint selection.
+    Validation-B is an independent confirmation split and must be excluded
+    from optimizer updates without entering the selection metric.  The old
+    ``selection_union_indices`` argument is retained as a compatibility
+    guard, but it may only repeat A exactly; a union containing B is rejected
+    instead of silently changing the protocol.
+
+    The returned global row positions are tuples so callers can persist their
+    hashes without depending on input ordering or duplicate entries.
+    """
+
+    if count <= 0:
+        raise ValueError("count must be positive")
+
+    def normalize(name: str, values: Sequence[int] | None) -> tuple[int, ...]:
+        if values is None:
+            return ()
+        rows = tuple(sorted({int(value) for value in values}))
+        if any(index < 0 or index >= count for index in rows):
+            raise IndexError(f"{name} must be within the train split [0, {count})")
+        return rows
+
+    selection_rows = normalize("selection_indices", selection_indices)
+    validation_b_rows = normalize("validation_b_indices", validation_b_indices)
+    if selection_rows and set(selection_rows).intersection(validation_b_rows):
+        raise ValueError("validation-A and validation-B rows must be disjoint")
+
+    if selection_union_indices is not None:
+        union_rows = normalize("selection_union_indices", selection_union_indices)
+        if not selection_rows:
+            raise ValueError("selection_union_indices require selection_indices")
+        if union_rows != selection_rows:
+            raise ValueError(
+                "selection_union_indices are disabled: checkpoint selection must use "
+                "validation-A only; validation-B cannot participate"
+            )
+
+    if fit_exclude_indices is None:
+        if selection_rows or validation_b_rows:
+            raise ValueError(
+                "selection_indices/validation_b_indices require explicit fit_exclude_indices"
+            )
+        fit_excluded_rows: tuple[int, ...] = ()
+    else:
+        fit_excluded_rows = normalize("fit_exclude_indices", fit_exclude_indices)
+    fit_excluded_set = set(fit_excluded_rows)
+    if not set(selection_rows).issubset(fit_excluded_set):
+        raise ValueError("selection_indices must be excluded from optimizer updates")
+    if not set(validation_b_rows).issubset(fit_excluded_set):
+        raise ValueError("validation_b_indices must be excluded from optimizer updates")
+
+    fit_rows = tuple(index for index in range(count) if index not in fit_excluded_set)
+    return {
+        "selection_indices": selection_rows or None,
+        "validation_b_indices": validation_b_rows,
+        "fit_exclude_indices": fit_excluded_rows,
+        "fit_indices": fit_rows,
+    }
+
+
 def _load_manifest(path: Path) -> dict[str, Any]:
     payload = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(payload, dict):
@@ -806,13 +876,14 @@ def train_torch_layer(
     router warm-up, router/scale transitions, frozen-router expert adaptation,
     and joint fine-tuning without changing the activation or holdout contract.
     ``selection_indices`` identifies validation-A rows used only for checkpoint
-    selection.  ``validation_b_indices`` identifies an optional selector-only
-    shadow set.  Both are excluded from optimizer updates; callers may provide
-    the complete ``fit_exclude_indices`` set explicitly and its identity is
-    persisted alongside the A/B hashes.
-    ``selection_union_indices`` optionally widens the gate-aware checkpoint
-    selection metric to an explicit A+B union while preserving separate
-    validation-A and validation-B identities in the receipt.
+    selection.  ``validation_b_indices`` identifies an optional independent
+    confirmation set.  Both are excluded from optimizer updates; callers must
+    provide the complete ``fit_exclude_indices`` set explicitly and its
+    identity is persisted alongside the A/B hashes.  Validation-B is evaluated
+    only after the A-selected checkpoint is restored.  The legacy
+    ``selection_union_indices`` argument is accepted only when it is exactly
+    validation-A; an A+B union raises instead of allowing B to influence
+    checkpoint selection.
     """
 
     import torch
@@ -845,60 +916,21 @@ def train_torch_layer(
         dataset_hash = train_dataset.dataset_hash
     if holdout_dataset.dataset_hash != dataset_hash:
         raise ValueError("train and holdout activation manifests have different dataset_hash values")
-    if selection_indices is None:
-        selection_rows: tuple[int, ...] | None = None
-    else:
-        selection_rows = tuple(sorted({int(index) for index in selection_indices}))
-        if not selection_rows:
-            raise ValueError("selection_indices must contain at least one train row")
-        if selection_rows[0] < 0 or selection_rows[-1] >= train_dataset.count:
-            raise IndexError(f"selection_indices must be within the train split [0, {train_dataset.count})")
-    selection_hash = (
-        _hash_indices(selection_rows)
-        if selection_rows is not None
-        else None
+    split_contract = validate_split_contract(
+        train_dataset.count,
+        selection_indices=selection_indices,
+        validation_b_indices=validation_b_indices,
+        fit_exclude_indices=fit_exclude_indices,
+        selection_union_indices=selection_union_indices,
     )
+    selection_rows = split_contract["selection_indices"]
+    validation_b_rows = split_contract["validation_b_indices"] or ()
+    fit_excluded_rows = split_contract["fit_exclude_indices"] or ()
+    fit_indices = split_contract["fit_indices"] or ()
+    selection_hash = _hash_indices(selection_rows) if selection_rows is not None else None
+    # This remains a metadata key for old consumers, but is deliberately null:
+    # there is no second split in the checkpoint-selection metric.
     selection_union_hash = None
-    if validation_b_indices is None:
-        validation_b_rows: tuple[int, ...] = ()
-    else:
-        validation_b_rows = tuple(sorted({int(index) for index in validation_b_indices}))
-        if any(index < 0 or index >= train_dataset.count for index in validation_b_rows):
-            raise IndexError(f"validation_b_indices must be within the train split [0, {train_dataset.count})")
-    if selection_rows is not None and set(selection_rows).intersection(validation_b_rows):
-        raise ValueError("validation-A and validation-B rows must be disjoint")
-    if selection_union_indices is None:
-        selection_union_rows = selection_rows
-    else:
-        if selection_rows is None:
-            raise ValueError("selection_union_indices require selection_indices")
-        selection_union_rows = tuple(sorted({int(index) for index in selection_union_indices}))
-        if not selection_union_rows:
-            raise ValueError("selection_union_indices must contain at least one train row")
-        if selection_union_rows[0] < 0 or selection_union_rows[-1] >= train_dataset.count:
-            raise IndexError(f"selection_union_indices must be within the train split [0, {train_dataset.count})")
-        if not set(selection_rows).issubset(selection_union_rows):
-            raise ValueError("selection_union_indices must include validation-A rows")
-        if not set(validation_b_rows).issubset(selection_union_rows):
-            raise ValueError("selection_union_indices must include validation-B rows")
-    if fit_exclude_indices is None:
-        if selection_rows is not None or validation_b_rows:
-            raise ValueError(
-                "selection_indices/validation_b_indices require explicit fit_exclude_indices"
-            )
-        fit_excluded_set: set[int] = set()
-    else:
-        fit_excluded_set = {int(index) for index in fit_exclude_indices}
-    if any(index < 0 or index >= train_dataset.count for index in fit_excluded_set):
-        raise IndexError(f"fit_exclude_indices must be within the train split [0, {train_dataset.count})")
-    if selection_rows is not None and not set(selection_rows).issubset(fit_excluded_set):
-        raise ValueError("selection_indices must be excluded from optimizer updates")
-    if not set(validation_b_rows).issubset(fit_excluded_set):
-        raise ValueError("validation_b_indices must be excluded from optimizer updates")
-    if selection_union_rows is not None:
-        selection_union_hash = _hash_indices(selection_union_rows)
-    fit_excluded_rows = tuple(sorted(fit_excluded_set))
-    fit_indices = tuple(index for index in range(train_dataset.count) if index not in fit_excluded_set)
     fit_hash = _hash_indices(fit_indices)
     fit_exclusion_hash = _hash_indices(fit_excluded_rows) if fit_excluded_rows else None
     validation_a_hash = selection_identity_hash or selection_hash
@@ -988,7 +1020,7 @@ def train_torch_layer(
         down=down_tensor,
         microbatch=microbatch,
         device=device,
-        selected_indices=selection_union_rows,
+        selected_indices=selection_rows,
     )
     initial_fit = _stream_metrics(
         model,
@@ -1121,7 +1153,7 @@ def train_torch_layer(
                     down=down_tensor,
                     microbatch=microbatch,
                     device=device,
-                    selected_indices=selection_union_rows,
+                    selected_indices=selection_rows,
                 ),
             )
 
@@ -1150,12 +1182,12 @@ def train_torch_layer(
             learning_rates=stage_spec["learning_rates"],
             loss_coefficients=stage_spec["loss_coefficients"],
             excluded_indices=fit_excluded_rows if fit_excluded_rows else None,
-            epoch_callback=validation_epoch_callback if selection_union_rows is not None else None,
+            epoch_callback=validation_epoch_callback if selection_rows is not None else None,
         )
         stages.append(stage_result)
         if stage_result.get("epoch_validation_metrics"):
             stage_metrics.append({"stage": stage_name, **stage_result["epoch_validation_metrics"][-1]})
-        elif selection_union_rows is not None:
+        elif selection_rows is not None:
             measured = _stream_metrics(
                 model,
                 train_dataset,
@@ -1164,7 +1196,7 @@ def train_torch_layer(
                 down=down_tensor,
                 microbatch=microbatch,
                 device=device,
-                selected_indices=selection_union_rows,
+                selected_indices=selection_rows,
             )
             stage_metrics.append({"stage": stage_name, "epoch": 0, **measured, "feasible": _gate_feasible(measured)})
     model.load_state_dict(best_state, strict=True)
@@ -1176,7 +1208,7 @@ def train_torch_layer(
         down=down_tensor,
         microbatch=microbatch,
         device=device,
-        selected_indices=selection_union_rows,
+        selected_indices=selection_rows,
     )
     final_fit = _stream_metrics(
         model,
@@ -1309,21 +1341,24 @@ def train_torch_layer(
                 "feasibility": "normalized_mse<=0.05 and cosine>=0.98 and dead_experts==0 and load_cv<=0.50",
                 "ordering": "maximize cosine, then minimize normalized_mse, then minimize load_cv",
                 "fallback": "retain Pareto frontier and select highest-cosine frontier point",
+                "selection_split": "validation-A only",
+                "validation_b_role": "independent confirmation after checkpoint selection",
+                "selection_union": "disabled",
             },
             "best_selection_stage": best_stage,
             "best_selection_epoch": best_epoch,
             "best_selection_reason": best_record.get("selection_reason"),
-            "selection_split": "validation" if selection_rows is not None else "train_split",
+            "selection_split": "validation-A" if selection_rows is not None else "train_split",
             "selection_indices_hash": selection_hash,
             "selection_union_indices_hash": selection_union_hash,
             "selection_identity_hash": validation_a_hash,
-            "selection_count": len(selection_union_rows) if selection_union_rows is not None else train_dataset.count,
+            "selection_count": len(selection_rows) if selection_rows is not None else train_dataset.count,
             "validation_count": len(selection_rows) if selection_rows is not None else None,
             "validation_hash": validation_a_hash,
             "validation_a_indices_hash": selection_hash,
             "validation_a_identity_hash": validation_a_hash,
             "validation_a_count": len(selection_rows) if selection_rows is not None else 0,
-            "selection_union_count": len(selection_union_rows) if selection_union_rows is not None else 0,
+            "selection_union_count": 0,
             "validation_b_indices_hash": computed_validation_b_hash,
             "validation_b_identity_hash": validation_b_hash,
             "validation_b_count": len(validation_b_rows),
@@ -1343,8 +1378,8 @@ def train_torch_layer(
             "holdout_evaluation": holdout_status,
             "split_opened_for": {
                 "fit": {"gradient_updates": True, "checkpoint_selection": False, "final_confirmation": False},
-                "validation": {"gradient_updates": False, "checkpoint_selection": selection_union_rows is not None, "final_confirmation": False},
-                "validation_a": {"gradient_updates": False, "checkpoint_selection": selection_union_rows is not None, "final_confirmation": False},
+                "validation": {"gradient_updates": False, "checkpoint_selection": selection_rows is not None, "final_confirmation": False},
+                "validation_a": {"gradient_updates": False, "checkpoint_selection": selection_rows is not None, "final_confirmation": False},
                 "validation_b": {"gradient_updates": False, "checkpoint_selection": False, "final_confirmation": bool(validation_b_rows)},
                 "holdout": {"gradient_updates": False, "checkpoint_selection": False, "final_confirmation": evaluate_holdout},
             },
@@ -1367,7 +1402,7 @@ def train_torch_layer(
         train_metrics={"initial_fit": initial_fit, "final_fit": final_fit, "initial_selection": initial_selection, "final_selection": final_selection, "oracle_holdout": oracle_holdout, "all_expert_reconstruction_mse": 0.0},
         holdout_metrics=trained,
         router_metrics={"load_cv": gate_metrics["load_cv"], "dead_experts": gate_metrics["dead_experts"], "selected_counts": gate_metrics["selected_counts"], "actual_improvement": float(initial_selection["normalized_mse"] - gate_metrics["normalized_mse"]) if gate_metrics["normalized_mse"] is not None else None},
-        quality_gate={"overall": gate_overall if epochs > 0 else "untrained", "thresholds_version": "gate-aware-2026-08-16", "evaluation_scope": "full_holdout" if evaluate_holdout else "validation" if selection_union_rows is not None else "fit", "metrics": gate_metrics},
+        quality_gate={"overall": gate_overall if epochs > 0 else "untrained", "thresholds_version": "gate-aware-2026-08-16", "evaluation_scope": "full_holdout" if evaluate_holdout else "validation-a" if selection_rows is not None else "fit", "metrics": gate_metrics},
         code_commit=recorded_commit,
     )
     metadata_path = output / f"layer-{layer:04d}.json"

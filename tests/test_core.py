@@ -190,6 +190,43 @@ class CoreTests(unittest.TestCase):
         self.assertEqual(first_hash, second_hash)
         self.assertTrue(set(first).isdisjoint({1, 3, 5}))
 
+    def test_selector_split_contract_excludes_a_and_b_from_fit(self):
+        from dense2moe.training import validate_split_contract
+
+        contract = validate_split_contract(
+            12,
+            selection_indices=[2, 4],
+            validation_b_indices=[7, 9],
+            fit_exclude_indices=[2, 4, 7, 9],
+        )
+        self.assertEqual(contract["selection_indices"], (2, 4))
+        self.assertEqual(contract["validation_b_indices"], (7, 9))
+        self.assertEqual(contract["fit_exclude_indices"], (2, 4, 7, 9))
+        self.assertEqual(contract["fit_indices"], tuple(i for i in range(12) if i not in {2, 4, 7, 9}))
+
+    def test_selector_split_contract_rejects_b_in_selection_union(self):
+        from dense2moe.training import validate_split_contract
+
+        with self.assertRaisesRegex(ValueError, "validation-B cannot participate"):
+            validate_split_contract(
+                12,
+                selection_indices=[2, 4],
+                validation_b_indices=[7, 9],
+                fit_exclude_indices=[2, 4, 7, 9],
+                selection_union_indices=[2, 4, 7, 9],
+            )
+
+    def test_selector_split_contract_rejects_overlapping_a_and_b(self):
+        from dense2moe.training import validate_split_contract
+
+        with self.assertRaisesRegex(ValueError, "must be disjoint"):
+            validate_split_contract(
+                12,
+                selection_indices=[2, 4],
+                validation_b_indices=[4, 9],
+                fit_exclude_indices=[2, 4, 9],
+            )
+
     def test_job_queue_no_duplicate_lease(self):
         queue = JobQueue(self.root / "jobs.sqlite")
         queue.enqueue(0)

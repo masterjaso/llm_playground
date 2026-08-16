@@ -3,9 +3,10 @@
 The p16/top4 basis is frozen at the current best FIT/validation checkpoint;
 only selection and positive-amplitude router parameters are updated.  The
 historical validation-A rows and a deterministic selector-only validation-B
-shadow set are both excluded from optimizer updates.  The combined A+B set is
-used for gate-aware checkpoint selection, while B is reported independently as
-the generalization check.  The holdout split is never opened.
+shadow set are both excluded from optimizer updates.  A alone is used for
+gate-aware checkpoint selection; B is evaluated only after the A-selected
+checkpoint is restored as an independent generalization check.  The holdout
+split is never opened.
 
 Every invocation records an explicit hypothesis, falsifier, budget, split
 hashes, and decision enabled in a report so the result can be compared with
@@ -109,9 +110,9 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
     validation_b = _load_indices(shadow_path, "selected_global_indices")
     if set(validation_a).intersection(validation_b):
         raise ValueError("validation-A and validation-B must be disjoint")
-    combined = sorted(set(validation_a) | set(validation_b))
+    fit_exclude = sorted(set(validation_a) | set(validation_b))
     train_dataset = ActivationShardDataset(run_dir / "capture/layer-0000.json", split="train", microbatch=args.microbatch)
-    if combined[-1] >= train_dataset.count:
+    if fit_exclude[-1] >= train_dataset.count:
         raise IndexError("validation rows exceed the explicit FIT split")
     partition = run_dir / "partitions/high-sparsity-p16-top4.json"
     initial_checkpoint = Path(args.initial_checkpoint) if args.initial_checkpoint else DEFAULT_INITIAL
@@ -138,11 +139,8 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         source_revision=profile.revision,
         code_commit=current_git_commit(),
         stage_schedule=schedule,
-        # Select on the union so no single historical validation slice drives
-        # the router-only checkpoint.  B is still emitted separately below.
         selection_indices=validation_a,
-        selection_union_indices=combined,
-        fit_exclude_indices=combined,
+        fit_exclude_indices=fit_exclude,
         selection_identity_hash=validation_a_identity_hash,
         validation_b_indices=validation_b,
         validation_b_identity_hash=_hash_indices(validation_b),
@@ -156,15 +154,15 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         "status": "SELECTOR_CROSS_VALIDATION_COMPLETE",
         "classification": "FROZEN_BASIS_SELECTOR_ONLY_FIT_VALIDATION_A_B_HOLDOUT_CLOSED",
         "hypothesis": (
-            "A low-rate residual-correlation selector-only update selected on the combined "
-            "validation-A/B union will preserve the green gate on both slices and reduce "
+            "A low-rate residual-correlation selector-only update selected on validation-A "
+            "alone will preserve the green gate on independent validation-B and reduce "
             "the p16/top4 selector generalization gap without changing the frozen basis."
         ),
         "falsifier": (
-            "The combined A+B checkpoint is not green, validation-B is not green, or the "
-            "router-only update worsens the frozen-basis baseline on either validation slice."
+            "Validation-A or the post-selection validation-B confirmation is not green, or "
+            "the router-only update worsens the frozen-basis baseline on either slice."
         ),
-        "decision_enabled": "authorize_post_selection_holdout_confirmation_only_if_combined_and_B_green",
+        "decision_enabled": "authorize_post_selection_holdout_confirmation_only_if_validation_A_and_B_green",
         "code_commit": current_git_commit(),
         "profile": profile.name,
         "partition": str(partition),
@@ -184,7 +182,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         },
         "split_contract": {
             "fit": {
-                "count": train_dataset.count - len(combined),
+                "count": train_dataset.count - len(fit_exclude),
                 "gradient_updates": True,
                 "excluded_validation_a_and_b": True,
             },
@@ -192,7 +190,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
                 "count": len(validation_a),
                 "identity_hash": validation_a_identity_hash,
                 "indices_hash": _hash_indices(validation_a),
-                "checkpoint_selection": "combined_union",
+                "checkpoint_selection": True,
                 "gradient_updates": False,
             },
             "validation_b": {
@@ -202,10 +200,9 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
                 "gradient_updates": False,
                 "receipt": str(shadow_path),
             },
-            "combined_selection": {
-                "count": len(combined),
-                "identity_hash": _hash_indices(combined),
-                "checkpoint_selection": True,
+            "selection_union": {
+                "enabled": False,
+                "reason": "validation-B is confirmation-only and cannot enter checkpoint selection",
             },
             "holdout": {"count": 16598, "opened": False, "status": "CLOSED"},
         },
@@ -247,7 +244,7 @@ def main() -> None:
             {
                 "status": report["status"],
                 "code_commit": report["code_commit"],
-                "combined_selection": result["final_selection"],
+                "validation_a": result["final_selection"],
                 "validation_b": result["validation_b_metrics"],
                 "training_config": result["training_config"],
             },
