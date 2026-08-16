@@ -224,7 +224,7 @@ def main() -> None:
     parser.add_argument("--source-snapshot", type=Path, required=True)
     parser.add_argument("--source-revision", required=True)
     parser.add_argument("--historical-corpus", type=Path, default=Path("data/public_v2/corpus.jsonl"))
-    parser.add_argument("--train-tokens", type=int, default=350_000)
+    parser.add_argument("--train-tokens", type=int, default=300_000)
     parser.add_argument("--holdout-tokens", type=int, default=16_384)
     parser.add_argument("--validation-a-count", type=int, default=16_384)
     parser.add_argument("--validation-b-count", type=int, default=32_768)
