@@ -1,0 +1,29 @@
+{
+  "argv": [
+    "env",
+    "PYTHONPATH=.",
+    "uv",
+    "run",
+    "pytest",
+    "-q",
+    "-s"
+  ],
+  "child_output_stale": false,
+  "completed": 0,
+  "elapsed_seconds": 40.58441694296198,
+  "last_child_output_age_seconds": 1.4504041360341944,
+  "last_child_output_at": "2026-08-16T22:12:17.435178+00:00",
+  "last_heartbeat": "2026-08-16T22:12:18.885647+00:00",
+  "output_lines_dropped": 0,
+  "pid": 2847160,
+  "returncode": 0,
+  "started": "2026-08-16T22:11:38.302665+00:00",
+  "status": "SUCCESS",
+  "stderr_bytes": 0,
+  "stderr_log_path": "runs/20260815-184644-windows-real-d2m-v4-streaming/logs/pytest-takeover-pythonpath.err",
+  "stdout_bytes": 77,
+  "stdout_log_path": "runs/20260815-184644-windows-real-d2m-v4-streaming/logs/pytest-takeover-pythonpath.out",
+  "task": "pytest-takeover-pythonpath",
+  "terminal_status": "DONE",
+  "total": null
+}

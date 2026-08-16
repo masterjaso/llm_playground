@@ -1,0 +1,70 @@
+{
+  "budget": {
+    "device": "cuda:1",
+    "holdout_opened": false,
+    "microbatch": 128,
+    "sample_count": 512,
+    "stratify_pool": 4096
+  },
+  "classification": "FIT_ONLY_CONTRIBUTION_STORE_NO_HOLDOUT",
+  "code_commit": "e2de5273aefd74e4b9e02278e4348c91d8d1fe32",
+  "contribution_store": {
+    "arrays": {
+      "routed": {
+        "dtype": "float32",
+        "path": "routed.npy",
+        "sha256": "bda90a757f47f2b5172da8814e42f56e360a7d110269fa0fc8372be65af0bdd5",
+        "shape": [
+          512,
+          32,
+          5120
+        ]
+      },
+      "shared": {
+        "dtype": "float32",
+        "path": "shared.npy",
+        "sha256": "3828d574daa748bbbac934612623a80ac164e559a66afe5b2d3edd3f6a62ac24",
+        "shape": [
+          512,
+          5120
+        ]
+      },
+      "target": {
+        "dtype": "float32",
+        "path": "target.npy",
+        "sha256": "a711e547e84668df7086ca8c4ccbf46b8e1a0c4fa95499bab83ede591a631b2b",
+        "shape": [
+          512,
+          5120
+        ]
+      }
+    },
+    "classification": "FIT_ONLY_SOLVER_CALIBRATION_NO_HOLDOUT",
+    "format": "dense2moe-contribution-store-v1",
+    "holdout_opened": false,
+    "manifest": "runs/20260815-184644-windows-real-d2m-v4-streaming/evidence/contribution-stores/p32-top4-fit-stratified-512/manifest.json",
+    "manifest_sha256": "65fbc1b76cd463732442d9791ab931689e1dcb8bae37f07d0993b5053ae41546",
+    "path": "runs/20260815-184644-windows-real-d2m-v4-streaming/evidence/contribution-stores/p32-top4-fit-stratified-512"
+  },
+  "dataset_hash": "46b278a85b4cb31a8fe659be2dd146bd9206eb491268220e25440981d06c0a03",
+  "decision_enabled": "retain the topology as a research finalist and authorize a router/refinement follow-up only when bounded oracle evidence is near-target; never authorize holdout or replay from this step.",
+  "falsifier": "The bounded oracle remains below cosine 0.98 or cannot meet load CV <= 0.50 with dead experts = 0, or any provenance/split check indicates non-FIT data was opened.",
+  "holdout_opened": false,
+  "hypothesis": "A deterministic stratified FIT contribution store plus a bounded load-aware candidate pool can reveal whether this p32 product partition has sufficient routing capacity without holdout access.",
+  "partition": "runs/20260815-184644-windows-real-d2m-v4-streaming/partitions/current-head-p32-top4-product.json",
+  "partition_hash": "b468086f5d572596033c1085bf0a8abb87a196ca1d4641c3c86b29a568bbdf27",
+  "sample": {
+    "count": 512,
+    "indices_sha256": "65f14de67e89d3d471d7c12d4b42fbc0549b724f0d8fc53b6a9016320cfc17c9",
+    "strata": {
+      "easy": 128,
+      "hard": 128,
+      "medium": 256
+    },
+    "stratify_pool": 4096
+  },
+  "schema_version": 1,
+  "split": "train",
+  "status": "FIT_CONTRIBUTION_STORE_MATERIALIZED",
+  "topology": "p32/top4"
+}
