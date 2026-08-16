@@ -215,9 +215,9 @@ def run(
         "classification": "FIT_OR_VALIDATION_ARRAYS_ONLY_HOLDOUT_NOT_OPENED",
         "holdout_opened": False,
         "hypothesis": (
-            "A bounded load-aware candidate pool can expose whether the frozen "
-            "p32 partition has enough route capacity to clear cosine >= 0.98 "
-            "and load CV <= 0.50 without claiming exhaustive p32 optimality."
+            "A bounded load-aware candidate pool can expose whether each frozen "
+            "product partition has enough route capacity to clear cosine >= 0.98 "
+            "and load CV <= 0.50 without claiming exhaustive optimality."
         ),
         "falsifier": (
             "The bounded oracle remains below cosine 0.98 or above load CV 0.50 "
