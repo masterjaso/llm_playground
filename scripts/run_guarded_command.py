@@ -34,6 +34,10 @@ def main() -> int:
     parser.add_argument("--cwd", type=Path, default=None)
     parser.add_argument("--heartbeat-path", type=Path, default=None)
     parser.add_argument("--heartbeat-interval", type=float, default=30.0)
+    parser.add_argument("--stdout-log-path", type=Path, default=None)
+    parser.add_argument("--stderr-log-path", type=Path, default=None)
+    parser.add_argument("--tail-bytes", type=int, default=4_000_000)
+    parser.add_argument("--child-output-stale-after", type=float, default=None)
     parser.add_argument("--long-running", action="store_true")
     parser.add_argument("--check", action="store_true")
     parser.add_argument("command", nargs=argparse.REMAINDER, help="command after --")
@@ -51,6 +55,10 @@ def main() -> int:
         cwd=args.cwd,
         heartbeat_path=args.heartbeat_path,
         heartbeat_interval=args.heartbeat_interval,
+        stdout_log_path=args.stdout_log_path,
+        stderr_log_path=args.stderr_log_path,
+        tail_bytes=args.tail_bytes,
+        child_output_stale_after=args.child_output_stale_after,
         long_running=args.long_running,
         check=args.check,
     )

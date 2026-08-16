@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "status": "NOT_RUN_LINUX_ENVIRONMENT",
+  "required_runner": "native Windows PowerShell with project-local .venv\\Scripts\\python.exe",
+  "script": "scripts/Invoke-GuardedCommand-Smoke.ps1",
+  "reason": "This checkout is being validated in a Linux environment; no native PowerShell execution was claimed.",
+  "cases": {
+    "success": "pending-native-run",
+    "failure": "pending-native-run",
+    "timeout_descendant": "pending-native-run",
+    "long_running_heartbeat": "pending-native-run",
+    "git_log": "pending-native-run"
+  },
+  "acceptance": [
+    "__CMD_START__ and __CMD_DONE__ with rc=0 for success",
+    "__CMD_FAILED__ for a non-zero child",
+    "__CMD_TIMEOUT__ and terminated descendant tree",
+    "repeated __HEARTBEAT__ records and SUCCESS terminal receipt",
+    "guarded git --no-pager log -1 completes without prompts"
+  ]
+}

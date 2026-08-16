@@ -40,3 +40,13 @@ PowerShell callers can use the equivalent
 `scripts\Invoke-GuardedCommand.ps1 -Name <name> -- <program> <args>` entry
 point; it delegates to the same Python implementation instead of performing
 an unsupervised native wait.
+
+Long-running commands spool complete stdout/stderr to sibling `.stdout.log`
+and `.stderr.log` files next to the heartbeat receipt while retaining only a
+bounded tail in the JSON result.  Heartbeats include child output age and byte
+counters, plus `child_output_stale`; this marks a quiet child without killing
+it automatically.  Before a real Windows experiment, run
+`scripts\Invoke-GuardedCommand-Smoke.ps1`; its native result is written to
+`runs\windows-guarded-command-smoke.json`.  The checked-in
+`docs\windows-guarded-command-smoke-receipt.json` is explicitly marked
+`NOT_RUN_LINUX_ENVIRONMENT` until that native run occurs.
