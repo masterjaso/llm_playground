@@ -126,11 +126,13 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         selection_indices=validation_a,
         selection_union_indices=combined,
         fit_exclude_indices=combined,
-        selection_identity_hash=_hash_indices(combined),
+        selection_identity_hash=_hash_indices(validation_a),
         validation_b_indices=validation_b,
         validation_b_identity_hash=_hash_indices(validation_b),
         evaluate_holdout=False,
         initial_checkpoint_dir=initial_checkpoint,
+        router_hidden_size=args.router_hidden_size,
+        router_feature_mode=args.router_feature_mode,
     )
     report = {
         "schema_version": 1,
@@ -159,6 +161,8 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
             "device": args.device,
             "seed": args.seed,
             "trainable_scope": "selection_router_and_positive_amplitude_router_only",
+            "router_hidden_size": args.router_hidden_size,
+            "router_feature_mode": args.router_feature_mode,
         },
         "split_contract": {
             "fit": {
@@ -208,6 +212,8 @@ def main() -> None:
     parser.add_argument("--learning-rate", type=float, default=1e-5)
     parser.add_argument("--epochs", type=int, default=2)
     parser.add_argument("--seed", type=int, default=41)
+    parser.add_argument("--router-hidden-size", type=int, default=None)
+    parser.add_argument("--router-feature-mode", choices=("none", "shared_output"), default="none")
     args = parser.parse_args()
     report = run(args)
     result = report["result"]

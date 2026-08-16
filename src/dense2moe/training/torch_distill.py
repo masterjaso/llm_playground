@@ -797,6 +797,7 @@ def train_torch_layer(
     evaluate_holdout: bool = True,
     initial_checkpoint_dir: str | Path | None = None,
     router_hidden_size: int | None = None,
+    router_feature_mode: str = "none",
 ) -> dict[str, Any]:
     """Run a configurable staged distillation schedule against fixed splits.
 
@@ -916,6 +917,7 @@ def train_torch_layer(
         top_k=profile.top_k,
         routing_mode=profile.routing_mode,
         router_hidden_size=router_hidden_size,
+        router_feature_mode=router_feature_mode,
         partition=plan,
         learnable_scales=True,
     )
@@ -1357,6 +1359,7 @@ def train_torch_layer(
             "router_initialization": "initial_checkpoint" if initialized_from_checkpoint else "bounded_train_contribution_lstsq",
             "initial_checkpoint_dir": str(initial_checkpoint_dir) if initial_checkpoint_dir is not None else None,
             "router_hidden_size": router_hidden_size,
+            "router_feature_mode": router_feature_mode,
         },
         tensor_file=tensor_path.name,
         tensor_sha256=tensor_hash,
