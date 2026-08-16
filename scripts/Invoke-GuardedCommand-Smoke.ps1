@@ -47,14 +47,19 @@ function Invoke-SmokeCase {
         [string[]]$RequiredMarkers = @()
     )
 
-    $arguments = @("-Name", $Name, "-Category", $Category)
-    if ($Timeout -gt 0) { $arguments += @("-Timeout", [string]$Timeout) }
-    if ($LongRunning) { $arguments += "-LongRunning" }
-    if ($HeartbeatInterval -gt 0) { $arguments += @("-HeartbeatInterval", [string]$HeartbeatInterval) }
-    if ($HeartbeatPath) { $arguments += @("-HeartbeatPath", $HeartbeatPath) }
-    $arguments += "--"
-    $arguments += $Child
-    $lines = @(& $guarded @arguments 2>&1)
+    # Use a named hashtable splat rather than PowerShell's `--` stop-parsing
+    # token or an array splat.  Both forms are version-sensitive when the
+    # child itself contains option-like values such as Python's `-c`.
+    $parameters = [ordered]@{
+        Name = $Name
+        Category = $Category
+        Command = $Child
+    }
+    if ($Timeout -gt 0) { $parameters["Timeout"] = $Timeout }
+    if ($LongRunning) { $parameters["LongRunning"] = $true }
+    if ($HeartbeatInterval -gt 0) { $parameters["HeartbeatInterval"] = $HeartbeatInterval }
+    if ($HeartbeatPath) { $parameters["HeartbeatPath"] = $HeartbeatPath }
+    $lines = @(& $guarded @parameters 2>&1)
     $exitCode = $LASTEXITCODE
     $text = ($lines | ForEach-Object { $_.ToString() }) -join "`n"
     foreach ($marker in $RequiredMarkers) {

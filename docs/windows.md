@@ -48,5 +48,6 @@ counters, plus `child_output_stale`; this marks a quiet child without killing
 it automatically.  Before a real Windows experiment, run
 `scripts\Invoke-GuardedCommand-Smoke.ps1`; its native result is written to
 `runs\windows-guarded-command-smoke.json`.  The checked-in
-`docs\windows-guarded-command-smoke-receipt.json` is explicitly marked
-`NOT_RUN_LINUX_ENVIRONMENT` until that native run occurs.
+`docs\windows-guarded-command-smoke-receipt.json` records the most recent
+successful native run and should be refreshed whenever the guard or host
+environment changes.

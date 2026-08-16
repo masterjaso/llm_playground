@@ -1,21 +1,73 @@
 {
-  "schema_version": 1,
-  "status": "NOT_RUN_LINUX_ENVIRONMENT",
-  "required_runner": "native Windows PowerShell with project-local .venv\\Scripts\\python.exe",
-  "script": "scripts/Invoke-GuardedCommand-Smoke.ps1",
-  "reason": "This checkout is being validated in a Linux environment; no native PowerShell execution was claimed.",
-  "cases": {
-    "success": "pending-native-run",
-    "failure": "pending-native-run",
-    "timeout_descendant": "pending-native-run",
-    "long_running_heartbeat": "pending-native-run",
-    "git_log": "pending-native-run"
-  },
-  "acceptance": [
-    "__CMD_START__ and __CMD_DONE__ with rc=0 for success",
-    "__CMD_FAILED__ for a non-zero child",
-    "__CMD_TIMEOUT__ and terminated descendant tree",
-    "repeated __HEARTBEAT__ records and SUCCESS terminal receipt",
-    "guarded git --no-pager log -1 completes without prompts"
-  ]
+    "schema_version":  1,
+    "status":  "WINDOWS_GUARDED_COMMAND_SMOKE_COMPLETE",
+    "generated_at":  "2026-08-16T19:29:04.0578472Z",
+    "host_os":  "Windows_NT",
+    "powershell":  "5.1.26100.9168",
+    "python":  "C:\\Users\\maste\\AppData\\Local\\Programs\\Python\\Python312\\python.exe",
+    "git_head":  "a22e713088237a70c82b9404ba009c2b0d87a81a",
+    "cases":  {
+                  "success":  {
+                                  "name":  "windows-smoke-success",
+                                  "status":  "PASS",
+                                  "exit_code":  0,
+                                  "required_markers":  [
+                                                           "__CMD_START__",
+                                                           "__CMD_DONE__",
+                                                           "rc=0"
+                                                       ],
+                                  "heartbeat_count":  0,
+                                  "output_tail":  "__CMD_START__ name=windows-smoke-success timestamp=2026-08-16T19:28:00.687751+00:00\nsmoke-success\n__CMD_DONE__ name=windows-smoke-success rc=0 elapsed=0.138\n{\n  \"argv\": [\n    \"C:\\\\Users\\\\maste\\\\AppData\\\\Local\\\\Programs\\\\Python\\\\Python312\\\\python.exe\",\n    \"-c\",\n    \"print(\u0027smoke-success\u0027, flush=True)\"\n  ],\n  \"child_output_stale\": false,\n  \"elapsed_seconds\": 0.13767319999169558,\n  \"finished_at\": \"2026-08-16T19:28:00.827122+00:00\",\n  \"heartbeat_path\": null,\n  \"last_child_output_at\": \"2026-08-16T19:28:00.705914+00:00\",\n  \"name\": \"windows-smoke-success\",\n  \"ok\": true,\n  \"output_lines_dropped\": 0,\n  \"returncode\": 0,\n  \"started_at\": \"2026-08-16T19:28:00.687751+00:00\",\n  \"status\": \"DONE\",\n  \"stderr\": \"\",\n  \"stderr_bytes\": 0,\n  \"stderr_log_path\": null,\n  \"stderr_tail\": \"\",\n  \"stdout\": \"smoke-success\\n\",\n  \"stdout_bytes\": 14,\n  \"stdout_log_path\": null,\n  \"stdout_tail\": \"smoke-success\\n\",\n  \"timeout_seconds\": 30.0\n}"
+                              },
+                  "failure":  {
+                                  "name":  "windows-smoke-failure",
+                                  "status":  "PASS",
+                                  "exit_code":  1,
+                                  "required_markers":  [
+                                                           "__CMD_START__",
+                                                           "__CMD_FAILED__"
+                                                       ],
+                                  "heartbeat_count":  0,
+                                  "output_tail":  "__CMD_START__ name=windows-smoke-failure timestamp=2026-08-16T19:28:00.937924+00:00\nsmoke-failure\n__CMD_FAILED__ name=windows-smoke-failure rc=7 elapsed=0.125\n{\n  \"argv\": [\n    \"C:\\\\Users\\\\maste\\\\AppData\\\\Local\\\\Programs\\\\Python\\\\Python312\\\\python.exe\",\n    \"-c\",\n    \"import sys; print(\u0027smoke-failure\u0027, flush=True); sys.exit(7)\"\n  ],\n  \"child_output_stale\": false,\n  \"elapsed_seconds\": 0.12540560000343248,\n  \"finished_at\": \"2026-08-16T19:28:01.063328+00:00\",\n  \"heartbeat_path\": null,\n  \"last_child_output_at\": \"2026-08-16T19:28:00.958155+00:00\",\n  \"name\": \"windows-smoke-failure\",\n  \"ok\": false,\n  \"output_lines_dropped\": 0,\n  \"returncode\": 7,\n  \"started_at\": \"2026-08-16T19:28:00.937924+00:00\",\n  \"status\": \"FAILED\",\n  \"stderr\": \"\",\n  \"stderr_bytes\": 0,\n  \"stderr_log_path\": null,\n  \"stderr_tail\": \"\",\n  \"stdout\": \"smoke-failure\\n\",\n  \"stdout_bytes\": 14,\n  \"stdout_log_path\": null,\n  \"stdout_tail\": \"smoke-failure\\n\",\n  \"timeout_seconds\": 30.0\n}"
+                              },
+                  "timeout":  {
+                                  "name":  "windows-smoke-timeout-tree",
+                                  "status":  "PASS",
+                                  "exit_code":  1,
+                                  "required_markers":  [
+                                                           "__CMD_START__",
+                                                           "__CMD_TIMEOUT__"
+                                                       ],
+                                  "heartbeat_count":  0,
+                                  "output_tail":  "__CMD_START__ name=windows-smoke-timeout-tree timestamp=2026-08-16T19:28:01.178487+00:00\n__CMD_TIMEOUT__ name=windows-smoke-timeout-tree elapsed=2.329\n{\n  \"argv\": [\n    \"C:\\\\Users\\\\maste\\\\AppData\\\\Local\\\\Programs\\\\Python\\\\Python312\\\\python.exe\",\n    \"-c\",\n    \"import os,subprocess,sys,time; p=subprocess.Popen([sys.executable,\u0027-c\u0027,\u0027import time; time.sleep(300)\u0027]); open(os.environ[\u0027D2M_SMOKE_PID_FILE\u0027],\u0027w\u0027).write(str(p.pid)); time.sleep(300)\"\n  ],\n  \"child_output_stale\": false,\n  \"elapsed_seconds\": 2.3288350999937393,\n  \"finished_at\": \"2026-08-16T19:28:03.507699+00:00\",\n  \"heartbeat_path\": null,\n  \"last_child_output_at\": null,\n  \"name\": \"windows-smoke-timeout-tree\",\n  \"ok\": false,\n  \"output_lines_dropped\": 0,\n  \"returncode\": 1,\n  \"started_at\": \"2026-08-16T19:28:01.178487+00:00\",\n  \"status\": \"TIMEOUT\",\n  \"stderr\": \"\",\n  \"stderr_bytes\": 0,\n  \"stderr_log_path\": null,\n  \"stderr_tail\": \"\",\n  \"stdout\": \"\",\n  \"stdout_bytes\": 0,\n  \"stdout_log_path\": null,\n  \"stdout_tail\": \"\",\n  \"timeout_seconds\": 2.0\n}",
+                                  "descendant_pid":  38852,
+                                  "descendant_terminated":  true
+                              },
+                  "heartbeat":  {
+                                    "name":  "windows-smoke-heartbeat",
+                                    "status":  "PASS",
+                                    "exit_code":  0,
+                                    "required_markers":  [
+                                                             "__CMD_START__",
+                                                             "__HEARTBEAT__",
+                                                             "__CMD_DONE__"
+                                                         ],
+                                    "heartbeat_count":  5,
+                                    "output_tail":  ".001 progress=unknown last_child_output_age_seconds=9.979662299971096 stdout_bytes=21 stderr_bytes=0 child_output_stale=False\n__HEARTBEAT__ task=windows-smoke-heartbeat elapsed=20.091 progress=unknown last_child_output_age_seconds=20.0699477000162 stdout_bytes=21 stderr_bytes=0 child_output_stale=False\n__HEARTBEAT__ task=windows-smoke-heartbeat elapsed=30.158 progress=unknown last_child_output_age_seconds=30.136709499987774 stdout_bytes=21 stderr_bytes=0 child_output_stale=False\n__HEARTBEAT__ task=windows-smoke-heartbeat elapsed=40.252 progress=unknown last_child_output_age_seconds=40.23051490000216 stdout_bytes=21 stderr_bytes=0 child_output_stale=False\n__HEARTBEAT__ task=windows-smoke-heartbeat elapsed=50.327 progress=unknown last_child_output_age_seconds=50.30626129999291 stdout_bytes=21 stderr_bytes=0 child_output_stale=False\nchild-progress-done\n__CMD_DONE__ name=windows-smoke-heartbeat rc=0 elapsed=60.129\n{\n  \"argv\": [\n    \"C:\\\\Users\\\\maste\\\\AppData\\\\Local\\\\Programs\\\\Python\\\\Python312\\\\python.exe\",\n    \"-c\",\n    \"import time; print(\u0027child-progress-start\u0027, flush=True); time.sleep(60); print(\u0027child-progress-done\u0027, flush=True)\"\n  ],\n  \"child_output_stale\": false,\n  \"elapsed_seconds\": 60.12887850002153,\n  \"finished_at\": \"2026-08-16T19:29:03.749781+00:00\",\n  \"heartbeat_path\": \"C:\\\\workplace\\\\llm_playground\\\\docs\\\\guarded-command-smoke\\\\heartbeat.json\",\n  \"last_child_output_at\": \"2026-08-16T19:29:03.642478+00:00\",\n  \"name\": \"windows-smoke-heartbeat\",\n  \"ok\": true,\n  \"output_lines_dropped\": 0,\n  \"returncode\": 0,\n  \"started_at\": \"2026-08-16T19:28:03.620836+00:00\",\n  \"status\": \"DONE\",\n  \"stderr\": \"\",\n  \"stderr_bytes\": 0,\n  \"stderr_log_path\": \"C:\\\\workplace\\\\llm_playground\\\\docs\\\\guarded-command-smoke\\\\heartbeat.stderr.log\",\n  \"stderr_tail\": \"\",\n  \"stdout\": \"child-progress-start\\nchild-progress-done\\n\",\n  \"stdout_bytes\": 41,\n  \"stdout_log_path\": \"C:\\\\workplace\\\\llm_playground\\\\docs\\\\guarded-command-smoke\\\\heartbeat.stdout.log\",\n  \"stdout_tail\": \"child-progress-start\\nchild-progress-done\\n\",\n  \"timeout_seconds\": 90.0\n}",
+                                    "heartbeat_status":  "SUCCESS",
+                                    "stdout_bytes":  41,
+                                    "child_output_stale":  false
+                                },
+                  "git":  {
+                              "name":  "windows-smoke-git",
+                              "status":  "PASS",
+                              "exit_code":  0,
+                              "required_markers":  [
+                                                       "__CMD_START__",
+                                                       "__CMD_DONE__"
+                                                   ],
+                              "heartbeat_count":  0,
+                              "output_tail":  "__CMD_START__ name=windows-smoke-git timestamp=2026-08-16T19:29:03.911366+00:00\na22e713088237a70c82b9404ba009c2b0d87a81a\n__CMD_DONE__ name=windows-smoke-git rc=0 elapsed=0.134\n{\n  \"argv\": [\n    \"git\",\n    \"--no-pager\",\n    \"log\",\n    \"-1\",\n    \"--format=%H\"\n  ],\n  \"child_output_stale\": false,\n  \"elapsed_seconds\": 0.13415639998856932,\n  \"finished_at\": \"2026-08-16T19:29:04.045822+00:00\",\n  \"heartbeat_path\": null,\n  \"last_child_output_at\": \"2026-08-16T19:29:03.932367+00:00\",\n  \"name\": \"windows-smoke-git\",\n  \"ok\": true,\n  \"output_lines_dropped\": 0,\n  \"returncode\": 0,\n  \"started_at\": \"2026-08-16T19:29:03.911366+00:00\",\n  \"status\": \"DONE\",\n  \"stderr\": \"\",\n  \"stderr_bytes\": 0,\n  \"stderr_log_path\": null,\n  \"stderr_tail\": \"\",\n  \"stdout\": \"a22e713088237a70c82b9404ba009c2b0d87a81a\\n\",\n  \"stdout_bytes\": 41,\n  \"stdout_log_path\": null,\n  \"stdout_tail\": \"a22e713088237a70c82b9404ba009c2b0d87a81a\\n\",\n  \"timeout_seconds\": 30.0\n}"
+                          }
+              }
 }
