@@ -404,7 +404,6 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
                 routed.reshape(-1, routed.shape[-2], routed.shape[-1]),
                 target.reshape(-1, target.shape[-1]),
                 model.top_k,
-                simplex=False,
             )
             exact_prediction = _route_reconstruction(
                 shared.reshape(-1, shared.shape[-1]),
