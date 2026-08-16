@@ -213,6 +213,21 @@ def run(
         "schema_version": 1,
         "status": "LOAD_AWARE_ORACLE_COMPLETE",
         "classification": "FIT_OR_VALIDATION_ARRAYS_ONLY_HOLDOUT_NOT_OPENED",
+        "holdout_opened": False,
+        "hypothesis": (
+            "A bounded load-aware candidate pool can expose whether the frozen "
+            "p32 partition has enough route capacity to clear cosine >= 0.98 "
+            "and load CV <= 0.50 without claiming exhaustive p32 optimality."
+        ),
+        "falsifier": (
+            "The bounded oracle remains below cosine 0.98 or above load CV 0.50 "
+            "with dead experts, or input provenance is not FIT-only."
+        ),
+        "decision_enabled": (
+            "retain near-target p32 topologies for topology-specific refinement "
+            "when bounded evidence is close; never authorize holdout or replay "
+            "from a bounded oracle result alone."
+        ),
         "target_load_cv": float(target_load_cv),
         "candidate_pool_size": candidate_pool_size,
         "max_combinations": int(max_combinations),
@@ -221,6 +236,15 @@ def run(
         "max_in_memory_bytes": int(max_in_memory_bytes),
         "storage_dir": str(storage_dir) if storage_dir is not None else None,
         "allow_eager_npz": bool(allow_eager_npz),
+        "budget": {
+            "target_load_cv": float(target_load_cv),
+            "candidate_pool_size": candidate_pool_size,
+            "max_combinations": int(max_combinations),
+            "iterations": int(iterations),
+            "batch_size": int(batch_size),
+            "max_in_memory_bytes": int(max_in_memory_bytes),
+            "holdout_opened": False,
+        },
         "results": rows,
         "code_commit": current_git_commit(),
     }
