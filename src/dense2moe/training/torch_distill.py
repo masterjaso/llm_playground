@@ -755,6 +755,7 @@ def train_torch_layer(
     fit_exclude_indices: Sequence[int] | None = None,
     selection_identity_hash: str | None = None,
     evaluate_holdout: bool = True,
+    initial_checkpoint_dir: str | Path | None = None,
 ) -> dict[str, Any]:
     """Run a configurable staged distillation schedule against fixed splits.
 
@@ -836,6 +837,24 @@ def train_torch_layer(
         partition=plan,
         learnable_scales=True,
     )
+    initialized_from_checkpoint = False
+    if initial_checkpoint_dir is not None:
+        checkpoint_dir = Path(initial_checkpoint_dir)
+        tensor_path = checkpoint_dir / f"layer-{layer:04d}.safetensors"
+        metadata_path = checkpoint_dir / f"layer-{layer:04d}.json"
+        if not tensor_path.exists() or not metadata_path.exists():
+            raise FileNotFoundError(f"initial checkpoint is incomplete: {checkpoint_dir}")
+        from safetensors.torch import load_file  # type: ignore
+
+        raw_state = load_file(str(tensor_path), device="cpu")
+        tensor_prefix = f"model.layers.{layer}."
+        state = {key[len(tensor_prefix) :]: value for key, value in raw_state.items() if key.startswith(tensor_prefix)}
+        if len(state) != len(raw_state):
+            raise ValueError(f"initial checkpoint tensor namespace mismatch: {sorted(raw_state)[:3]}")
+        missing, unexpected = model.load_state_dict(state, strict=True)
+        if missing or unexpected:
+            raise ValueError(f"strict initial checkpoint reload failed: missing={missing}, unexpected={unexpected}")
+        initialized_from_checkpoint = True
     partition_payload = json.loads(Path(partition_path).read_text(encoding="utf-8"))
     initial_scales = partition_payload.get("initial_expert_scales")
     if initial_scales is not None:
@@ -851,25 +870,26 @@ def train_torch_layer(
     # experts 0 and 1 on the first pass and the load-balance term could not
     # revive the remaining experts.  The labels are derived from the immutable
     # dense-slice contributions, never from holdout targets.
-    warmup_batches = (
-        train_dataset.iter_batches(min(microbatch, 512))
-        if not fit_excluded_rows
-        else train_dataset.iter_excluding_batches(fit_excluded_rows, min(microbatch, 512))
-    )
-    warmup_values = next(warmup_batches)
-    warmup_inputs = torch.as_tensor(warmup_values, dtype=torch.float32, device=device)
     model.to(device)
-    with torch.no_grad():
-        warmup_contributions = torch.stack(
-            [model._expert_output(warmup_inputs, expert) * model.expert_scales[expert] for expert in range(model.routed_experts)],
-            dim=1,
+    if not initialized_from_checkpoint:
+        warmup_batches = (
+            train_dataset.iter_batches(min(microbatch, 512))
+            if not fit_excluded_rows
+            else train_dataset.iter_excluding_batches(fit_excluded_rows, min(microbatch, 512))
         )
-        warmup_labels = torch.topk(torch.linalg.vector_norm(warmup_contributions, dim=-1), model.top_k, dim=-1).indices
-        warmup_targets = torch.zeros((warmup_inputs.shape[0], model.routed_experts), dtype=torch.float32, device=device)
-        warmup_targets.scatter_(1, warmup_labels, 1.0)
-        warmup_solution = torch.linalg.lstsq(warmup_inputs, warmup_targets).solution.T
-        model.router.weight.copy_(warmup_solution.to(dtype=model.router.weight.dtype))
-    del warmup_values, warmup_inputs, warmup_contributions, warmup_labels, warmup_targets, warmup_solution
+        warmup_values = next(warmup_batches)
+        warmup_inputs = torch.as_tensor(warmup_values, dtype=torch.float32, device=device)
+        with torch.no_grad():
+            warmup_contributions = torch.stack(
+                [model._expert_output(warmup_inputs, expert) * model.expert_scales[expert] for expert in range(model.routed_experts)],
+                dim=1,
+            )
+            warmup_labels = torch.topk(torch.linalg.vector_norm(warmup_contributions, dim=-1), model.top_k, dim=-1).indices
+            warmup_targets = torch.zeros((warmup_inputs.shape[0], model.routed_experts), dtype=torch.float32, device=device)
+            warmup_targets.scatter_(1, warmup_labels, 1.0)
+            warmup_solution = torch.linalg.lstsq(warmup_inputs, warmup_targets).solution.T
+            model.router.weight.copy_(warmup_solution.to(dtype=model.router.weight.dtype))
+        del warmup_values, warmup_inputs, warmup_contributions, warmup_labels, warmup_targets, warmup_solution
     initial_selection = _stream_metrics(
         model,
         train_dataset,
@@ -1198,7 +1218,8 @@ def train_torch_layer(
             },
             "partition_path": str(partition_path),
             "initial_expert_scales": [float(value) for value in (initial_scales or [1.0] * plan.routed_experts)],
-            "router_initialization": "bounded_train_contribution_lstsq",
+            "router_initialization": "initial_checkpoint" if initialized_from_checkpoint else "bounded_train_contribution_lstsq",
+            "initial_checkpoint_dir": str(initial_checkpoint_dir) if initial_checkpoint_dir is not None else None,
         },
         tensor_file=tensor_path.name,
         tensor_sha256=tensor_hash,
