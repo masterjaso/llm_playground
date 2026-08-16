@@ -87,6 +87,7 @@ _PERMISSIVE_LICENSES = {
     "CDLA-Permissive-2.0",
     "MIT",
     "ODC-By-1.0",
+    "PSF-2.0",
     "Public Domain",
     "public-domain",
 }

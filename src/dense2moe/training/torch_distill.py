@@ -911,10 +911,18 @@ def train_torch_layer(
     wrapper_payload = _load_manifest(Path(activation_manifest))
     dataset_hash = str(wrapper_payload.get("dataset_hash", ""))
     train_dataset = ActivationShardDataset(activation_manifest, split="train", microbatch=microbatch)
-    holdout_dataset = ActivationShardDataset(activation_manifest, split="holdout", microbatch=microbatch)
+    # Selector-only research may use a train-only fresh capture with a
+    # separately frozen confirmation index.  Do not require or open the
+    # historical holdout manifest unless this invocation explicitly authorizes
+    # final holdout confirmation.
+    holdout_dataset = (
+        ActivationShardDataset(activation_manifest, split="holdout", microbatch=microbatch)
+        if evaluate_holdout
+        else None
+    )
     if train_dataset.dataset_hash != dataset_hash:
         dataset_hash = train_dataset.dataset_hash
-    if holdout_dataset.dataset_hash != dataset_hash:
+    if holdout_dataset is not None and holdout_dataset.dataset_hash != dataset_hash:
         raise ValueError("train and holdout activation manifests have different dataset_hash values")
     split_contract = validate_split_contract(
         train_dataset.count,
@@ -1259,6 +1267,8 @@ def train_torch_layer(
     best_stage = str(best_record["stage"])
     best_epoch = int(best_record.get("epoch", 0))
     if evaluate_holdout:
+        if holdout_dataset is None:  # pragma: no cover - guarded at construction
+            raise RuntimeError("holdout dataset is required for final confirmation")
         trained = _stream_metrics(
             model,
             holdout_dataset,
@@ -1385,9 +1395,9 @@ def train_torch_layer(
             },
             "streaming_dataset": {
                 "train_manifest": train_dataset.manifest_path.as_posix(),
-                "holdout_manifest": holdout_dataset.manifest_path.as_posix(),
+                "holdout_manifest": holdout_dataset.manifest_path.as_posix() if holdout_dataset is not None else None,
                 "train_count": train_dataset.count,
-                "holdout_count": holdout_dataset.count,
+                "holdout_count": holdout_dataset.count if holdout_dataset is not None else None,
             },
             "partition_path": str(partition_path),
             "initial_expert_scales": [float(value) for value in (initial_scales or [1.0] * plan.routed_experts)],
