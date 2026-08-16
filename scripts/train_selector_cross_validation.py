@@ -47,11 +47,23 @@ def _load_indices(path: Path, key: str) -> list[int]:
     return sorted({int(value) for value in values})
 
 
-def _schedule(variant: str, *, epochs: int, learning_rate: float) -> list[dict[str, Any]]:
+def _schedule(
+    variant: str,
+    *,
+    epochs: int,
+    learning_rate: float,
+    load_balance: float | None = None,
+) -> list[dict[str, Any]]:
     if epochs <= 0:
         raise ValueError("epochs must be positive")
     if learning_rate <= 0:
         raise ValueError("learning_rate must be positive")
+    if load_balance is not None and load_balance < 0:
+        raise ValueError("load_balance must be non-negative")
+    default_load_balance = 0.20 if variant == "residual_bce" else 0.15
+    effective_load_balance = (
+        default_load_balance if load_balance is None else float(load_balance)
+    )
     common: dict[str, Any] = {
         "name": f"selector_only_{variant}",
         "epochs": int(epochs),
@@ -68,7 +80,7 @@ def _schedule(variant: str, *, epochs: int, learning_rate: float) -> list[dict[s
         "loss_coefficients": {
             "mse": 1.0,
             "cosine": 0.50,
-            "load_balance": 0.15,
+            "load_balance": effective_load_balance,
             "oracle": 0.10,
             "oracle_amplitude": 0.05,
             "router_z_loss": 0.001,
@@ -78,10 +90,6 @@ def _schedule(variant: str, *, epochs: int, learning_rate: float) -> list[dict[s
         common["oracle_loss_mode"] = "repeated_cross_entropy"
     elif variant == "residual_bce":
         common["oracle_loss_mode"] = "multilabel_bce"
-        common["loss_coefficients"] = {
-            **common["loss_coefficients"],
-            "load_balance": 0.20,
-        }
     else:
         raise ValueError(f"unknown selector-only variant: {variant!r}")
     return [common]
@@ -109,7 +117,12 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
     initial_checkpoint = Path(args.initial_checkpoint) if args.initial_checkpoint else DEFAULT_INITIAL
     output_name = args.output_name or f"p16-top4-selector-cross-validation-{args.variant}"
     report_name = args.report_name or f"p16-top4-selector-cross-validation-{args.variant}.json"
-    schedule = _schedule(args.variant, epochs=args.epochs, learning_rate=args.learning_rate)
+    schedule = _schedule(
+        args.variant,
+        epochs=args.epochs,
+        learning_rate=args.learning_rate,
+        load_balance=args.load_balance,
+    )
     result = train_torch_layer(
         source_dir=source_dir,
         activation_manifest=run_dir / "capture/layer-0000.json",
@@ -162,6 +175,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
             "epochs": args.epochs,
             "microbatch": args.microbatch,
             "learning_rate": args.learning_rate,
+            "load_balance": args.load_balance,
             "device": args.device,
             "seed": args.seed,
             "trainable_scope": "selection_router_and_positive_amplitude_router_only",
@@ -210,6 +224,12 @@ def main() -> None:
     parser.add_argument("--validation-b", type=Path, default=None)
     parser.add_argument("--initial-checkpoint", type=Path, default=None)
     parser.add_argument("--variant", choices=("residual_ce", "residual_bce"), default="residual_ce")
+    parser.add_argument(
+        "--load-balance",
+        type=float,
+        default=None,
+        help="override selector load-balance coefficient (variant default when omitted)",
+    )
     parser.add_argument("--output-name", default=None)
     parser.add_argument("--report-name", default=None)
     parser.add_argument("--device", default="cuda:1")
