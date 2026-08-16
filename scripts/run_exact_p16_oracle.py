@@ -33,14 +33,12 @@ from dense2moe.training.torch_distill import ActivationShardDataset
 try:
     from scripts.run_topk_architecture_search import (
         _dense_hidden_target,
-        _exact_topk,
         _residual_correlation_beam_topk,
         _route_reconstruction,
     )
 except ModuleNotFoundError:  # direct ``python scripts/<file>.py`` execution
     from run_topk_architecture_search import (  # type: ignore
         _dense_hidden_target,
-        _exact_topk,
         _residual_correlation_beam_topk,
         _route_reconstruction,
     )
@@ -142,13 +140,107 @@ def _selected_positions(
         for batch in dataset.iter_selected_batches(indices.tolist(), microbatch):
             inputs = torch.as_tensor(batch, dtype=torch.float32, device=device)
             _hidden, target = _dense_hidden_target(inputs, {"gate_proj.weight": gate, "up_proj.weight": up, "down_proj.weight": down}, torch.device(device))
-            _prediction, info = model(inputs, return_router=True, return_contributions=True)
-            residual_norm = torch.linalg.vector_norm(target - info["shared"], dim=1)
+            shared = model.shared_down_proj(
+                torch.nn.functional.silu(model.shared_gate_proj(inputs)) * model.shared_up_proj(inputs)
+            )
+            residual_norm = torch.linalg.vector_norm(target - shared, dim=1)
             values.append(residual_norm.detach().cpu().numpy())
     result = np.concatenate(values) if values else np.empty(0, dtype=np.float64)
     if result.shape[0] != indices.shape[0]:
         raise ValueError(f"residual-norm count mismatch: {result.shape[0]} != {indices.shape[0]}")
     return result
+
+
+def _exact_positive_from_gram(
+    gram: Any,
+    rhs: Any,
+    residual_squared: Any,
+) -> tuple[Any, Any]:
+    """Solve a non-negative least-squares active-face problem from Gram data."""
+
+    import torch
+
+    tokens, top_k, _ = gram.shape
+    best_error = residual_squared.clone()
+    best_weights = torch.zeros((tokens, top_k), dtype=gram.dtype, device=gram.device)
+    for width in range(1, top_k + 1):
+        masks = [
+            tuple(index for index in range(top_k) if mask & (1 << index))
+            for mask in range(1, 1 << top_k)
+            if mask.bit_count() == width
+        ]
+        mask_index = torch.as_tensor(masks, dtype=torch.long, device=gram.device)
+        mask_count = int(mask_index.shape[0])
+        raw_g = gram[:, mask_index[:, :, None], mask_index[:, None, :]]
+        b = rhs[:, mask_index]
+        eye = torch.eye(width, dtype=gram.dtype, device=gram.device).view(1, 1, width, width)
+        flat_g = (raw_g + eye * 1e-7).reshape(tokens * mask_count, width, width)
+        flat_b = b.reshape(tokens * mask_count, width)
+        try:
+            flat_solution = torch.linalg.solve(flat_g, flat_b.unsqueeze(-1)).squeeze(-1)
+        except RuntimeError:
+            flat_solution = torch.linalg.lstsq(flat_g, flat_b.unsqueeze(-1)).solution[:, :, 0]
+        active = flat_solution.reshape(tokens, mask_count, width)
+        valid = active.min(dim=2).values >= -1e-5
+        active = active.clamp_min(0.0)
+        quadratic = torch.bmm(
+            raw_g.reshape(tokens * mask_count, width, width),
+            active.reshape(tokens * mask_count, width, 1),
+        ).reshape(tokens, mask_count, width)
+        candidate_error = residual_squared[:, None] - 2.0 * (active * b).sum(dim=2)
+        candidate_error = candidate_error + (active * quadratic).sum(dim=2)
+        candidate_error = torch.where(valid, candidate_error, torch.full_like(candidate_error, float("inf")))
+        face_error, face_index = candidate_error.min(dim=1)
+        update = face_error < best_error
+        if bool(update.any()):
+            rows = torch.arange(tokens, device=gram.device)
+            selected_active = active[rows, face_index]
+            selected_mask = mask_index[face_index]
+            candidate_full = torch.zeros_like(best_weights)
+            candidate_full.scatter_(1, selected_mask, selected_active)
+            best_error = torch.where(update, face_error, best_error)
+            best_weights[update] = candidate_full[update]
+    return best_error, best_weights
+
+
+def _exact_topk_precomputed(shared: Any, routed: Any, target: Any, top_k: int) -> dict[str, Any]:
+    """Enumerate every expert set after one full output Gram/RHS computation.
+
+    The result is mathematically the same positive active-face oracle as the
+    historical ``_exact_topk`` helper, but avoids recomputing 1,820 large
+    5,120-dimensional matrix products for every batch.
+    """
+
+    import itertools
+
+    import torch
+
+    tokens, experts, _ = routed.shape
+    if top_k < 1 or top_k > experts:
+        raise ValueError("invalid top_k")
+    residual = target - shared
+    gram = torch.bmm(routed, routed.transpose(1, 2))
+    rhs = torch.bmm(routed, residual.unsqueeze(-1)).squeeze(-1)
+    residual_squared = (residual * residual).sum(dim=1)
+    best_error = residual_squared.clone()
+    best_ids = torch.zeros((tokens, top_k), dtype=torch.long, device=routed.device)
+    best_weights = torch.zeros((tokens, top_k), dtype=routed.dtype, device=routed.device)
+    for combo in itertools.combinations(range(experts), top_k):
+        ids = torch.as_tensor(combo, dtype=torch.long, device=routed.device)
+        combo_gram = gram.index_select(1, ids).index_select(2, ids)
+        combo_rhs = rhs.index_select(1, ids)
+        error, weights = _exact_positive_from_gram(combo_gram, combo_rhs, residual_squared)
+        update = error < best_error
+        if bool(update.any()):
+            best_error = torch.where(update, error, best_error)
+            best_ids[update] = ids
+            best_weights[update] = weights[update]
+    return {
+        "errors": best_error,
+        "indices": best_ids,
+        "weights": best_weights,
+        "selection_method": "exact_all_combinations_active_faces_precomputed_gram",
+    }
 
 
 def _new_metric() -> dict[str, Any]:
@@ -307,7 +399,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
                 elapsed=time.perf_counter() - tic,
             )
             tic = time.perf_counter()
-            exact = _exact_topk(
+            exact = _exact_topk_precomputed(
                 shared.reshape(-1, shared.shape[-1]),
                 routed.reshape(-1, routed.shape[-2], routed.shape[-1]),
                 target.reshape(-1, target.shape[-1]),
@@ -382,7 +474,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
             "basis": "deployed_checkpoint_shared_and_routed_contributions",
         },
         "oracle": {
-            "exact_selection": "all_1820_four_expert_combinations_with_nonnegative_active_face_solves",
+            "exact_selection": "all_1820_four_expert_combinations_with_nonnegative_active_face_solves_precomputed_gram",
             "bounded_selection": "residual_correlation_beam_search_exact_final_coefficients",
             "bounded_beam_width": int(args.beam_width),
             "bounded_pool_size": int(args.pool_size),
