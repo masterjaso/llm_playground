@@ -1,564 +1,833 @@
-MID-RUN COURSE CORRECTION
-TOP-K / EXPERT-GRANULARITY SEARCH BEFORE FURTHER DEEP TOP-2 TRAINING
+You are taking over an active dense-to-MoE conversion research project after
+the previous agent session became stale/hung during repository bookkeeping.
 
-IMPORTANT
-=========
+PROJECT
+=======
 
-Do NOT throw away the work currently in progress.
+Repository:
+    C:\workplace\llm_playground
 
-If a training epoch/stage is actively running:
+Branch:
+    agent/windows-dense2moe-real-pipeline
 
-    finish the current safe checkpoint/epoch if reasonably short,
-    persist its checkpoint and metrics,
-    classify it as the p8/top2 baseline,
-    then apply this directive.
+Remote:
+    masterjaso/llm_playground
 
-If a long multi-hour top2-only optimization sequence has not yet begun,
-do not start it.
+Last known PUSHED commit:
+    290370ff1f44b4f45fbf651988350facab6087c0
+    "enforce clean validation and gate-aware routing selection"
 
-Do NOT restart teacher capture.
-Do NOT regenerate the corpus.
-Do NOT discard existing layer-0 train or holdout activations.
+Primary run:
+    runs/20260815-184644-windows-real-d2m-v4-streaming
 
-The new priority is to determine the best TOP-K / EXPERT-GRANULARITY /
-GATING design before spending substantial compute optimizing top-2 alone.
+Source model:
+    Qwen/Qwen3.8-27B
 
-======================================================================
-WHY THIS DIRECTION CHANGED
-======================================================================
+Pinned source revision:
+    1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0
 
-Current evidence suggests:
+Source geometry:
+    hidden size = 5120
+    dense FFN width = 17408
+    decoder layers = 64
 
-    p8/top2 positive/non-normalized oracle:
-        NMSE ~0.0465
-
-    current learned p8/top2 student:
-        NMSE ~0.18+
-
-Therefore:
-
-    the dense→expert decomposition has meaningful potential,
-
-but:
-
-    top2 + current routing/gating may not be the best architecture.
-
-We now want to answer:
-
-    How many experts should fire per token?
-
-and:
-
-    For the same active-compute budget, are fewer large experts or more
-    smaller experts better?
-
-Do not assume top2 is optimal.
+Execution environment:
+    Native Windows for D2M work.
+    Preserve existing captures/checkpoints/reports.
+    Do not restart teacher capture unless genuinely necessary.
 
 ======================================================================
-SCIENTIFIC SEARCH POLICY
+MISSION
 ======================================================================
 
-Treat the architecture as a two-dimensional design space:
+Finish the research needed to identify a TRAINABLE sparse-MoE architecture
+and training recipe suitable for conversion of all 64 dense Qwen FFNs.
 
-    expert granularity
-        ×
-    top-k
+The product objective remains:
 
-Initial profiles:
+    >= 70% reduction in ACTIVE dense-FFN width/compute
 
-    p8:
-        8 routed experts
-        2048 width/expert
-        1024 shared
+while preserving the Qwen backbone and achieving strong reconstruction and
+whole-model quality.
 
-    p16:
-        16 routed experts
-        1024 width/expert
-        1024 shared
+DO NOT allow an easier low-sparsity p8 solution to redefine the product goal.
 
-    p32:
-        32 routed experts
-        512 width/expert
-        1024 shared
+The conversion remains FFN-only.
 
-Evaluate top-k values:
+Preserve unchanged:
+    attention
+    RoPE / positional behavior
+    norms
+    residual topology
+    embeddings
+    LM head
+    tokenizer
+    special tokens
+    chat template / reasoning interface
+    other Qwen-specific non-FFN behavior
 
-    1
-    2
-    3
-    4
-    5
-    6
-
-Do NOT immediately train every combination.
-
-Use inexpensive oracle/diagnostic evaluation first.
+Only the dense SwiGLU FFNs are being replaced by sparse MoE FFNs.
 
 ======================================================================
-ACTIVE WIDTH REFERENCE
+FIRST: RECOVER LOCAL STATE SAFELY
 ======================================================================
 
-Dense source FFN width:
+The previous session appears to have hung during commands like:
 
-    17408
+    git status --short --ignored
 
-Active width is:
+against the very large runs tree.
 
-    shared_width + top_k * expert_width
+Those were repository-inspection commands, NOT model training.
 
-Therefore:
+Do NOT repeat whole-tree ignored-file enumeration.
 
-p8:
-    k=2:  5120   = 29.4% dense FFN
-    k=3:  7168   = 41.2%
-    k=4:  9216   = 52.9%
-    k=5: 11264   = 64.7%
-    k=6: 13312   = 76.5%
+If stale processes remain, inspect them with something targeted such as:
 
-p16:
-    k=2: 3072    = 17.6%
-    k=3: 4096    = 23.5%
-    k=4: 5120    = 29.4%
-    k=5: 6144    = 35.3%
-    k=6: 7168    = 41.2%
+    ps -eo pid,ppid,etime,stat,%cpu,%mem,cmd | rg \
+      'git status|git check-ignore|git log|clean-validation|train_|python'
 
-p32:
-    k=2: 2048    = 11.8%
-    k=3: 2560    = 14.7%
-    k=4: 3072    = 17.6%
-    k=5: 3584    = 20.6%
-    k=6: 4096    = 23.5%
+If an old multi-hour process is only:
 
-These are FFN active-width ratios, NOT exact whole-model active parameter
-counts.
+    git status --short --ignored
 
-Calculate exact active parameter counts from the real tensor inventory for
-reports.
+or equivalent read-only repository scanning, terminate it safely.
+
+Do not terminate genuine Python/CUDA training jobs until their purpose is
+identified.
+
+Use lightweight Git inspection:
+
+    git log -1 --oneline --decorate
+    git rev-parse HEAD
+    git rev-parse origin/agent/windows-dense2moe-real-pipeline
+    git status --short --untracked-files=no
+
+For ignored checkpoint verification use targeted:
+
+    git check-ignore -v <specific checkpoint path>
+
+Do NOT enumerate all ignored files.
+
+Safetensors model/checkpoint blobs are intentionally ignored. Preserve them
+locally. Reports/manifests/metadata should remain commit-able.
+
+Before doing new science:
+
+1. determine whether local HEAD is ahead of the pushed HEAD;
+2. determine whether meaningful uncommitted CODE or REPORT changes exist;
+3. determine whether a genuine experiment is still running;
+4. preserve all useful existing artifacts;
+5. do not blindly reset or clean the worktree.
+
+If there is valuable unpushed work from the stale session, inspect and preserve
+it first.
 
 ======================================================================
-PHASE A — FREEZE CURRENT TOP2 RESULT AS BASELINE
+CURRENT SCIENTIFIC STATE
 ======================================================================
 
-Record the best current p8/top2 checkpoint and metrics.
+A true FIT / VALIDATION / HOLDOUT protocol has now been established.
 
-It becomes:
+Original TRAIN:
+    131,508 rows
 
-    BASELINE_P8_TOP2
+TRUE FIT:
+    115,124 rows
+
+TRUE VALIDATION:
+    16,384 rows
+    excluded from ALL optimizer updates
+
+Validation identity hash:
+    5a7739c753dae98698a8c1a22c6a10409230f0750b33cfc9631594f16d8b8e1c
+
+Full holdout:
+    16,598 rows
+
+The holdout must remain closed during new architecture/router development.
+
+Current product layer-level green gate:
+
+    normalized MSE <= 0.05
+    cosine >= 0.98
+    dead experts = 0
+    load CV <= 0.50
+
+Checkpoint selection is intended to be gate-aware:
+
+FIRST satisfy:
+    NMSE <= .05
+    dead = 0
+    load CV <= .50
+
+THEN maximize:
+    cosine
+
+Tie-break:
+    lower NMSE
+    then lower load CV
+
+If nothing is fully feasible:
+    preserve the Pareto frontier
+    select the highest-cosine relevant fallback
+
+Validation should be measured every epoch and the best intermediate checkpoint
+must be retained.
+
+======================================================================
+CURRENT CANDIDATES
+======================================================================
+
+PRIMARY PRODUCTION RESEARCH CANDIDATE:
+
+    p16/top4 independent-positive
+
+Geometry:
+    16 routed experts
+    expert width = 1024
+    top-k = 4
+    shared width = 1024
+
+Active FFN width:
+    1024 + 4*1024 = 5120
+
+FFN reduction:
+    70.59%
+
+Latest CLEAN validation result:
+
+    NMSE        0.04251     PASS
+    cosine      0.97297     FAIL
+    dead        0           PASS
+    load CV     0.2978      PASS
+
+This is the current primary architecture.
+
+The problem is now specifically ANGULAR FIDELITY / EXPERT SELECTION.
+
+Do not waste effort re-solving NMSE or load balance unless a new method
+regresses them.
+
+OTHER RESULTS:
+
+p16/top4 unordered BCE:
+    reduction 70.59%
+    NMSE      0.04549
+    cosine    0.97276
+    dead      0
+    load CV   0.2447
+
+Conclusion:
+    BCE improves load balance but does NOT improve angular quality.
+    Do not pursue plain BCE as the main route.
+
+p32/top5:
+    32 routed experts
+    width 512
+    top-k 5
+    shared 1024
+    active width 3584
+    reduction 79.41%
+
+Clean validation:
+    NMSE      0.04485
+    cosine    0.96729
+    dead      0
+    load CV   0.5366
+
+Conclusion:
+    attractive sparsity but currently inferior to p16/top4.
+    Keep as a frontier candidate, not the immediate primary target.
+
+Other aggressive candidates remain:
+    p16/top3  -> 76.47% reduction
+    p32/top6  -> 76.47% reduction
+    p32/top4  -> 82.35% reduction
+
+p8/top6 remains ONLY:
+    TRAINABILITY / ROUTER QUALITY CONTROL
+
+Do not promote p8/top6 to production.
+
+======================================================================
+MOST IMPORTANT DIAGNOSTIC RESULT
+======================================================================
+
+For clean-validation p16/top4, comparison to the residual-correlation oracle
+showed:
+
+    mean selector recall      ~= 0.719
+    exact top-4 set match     ~= 23.4%
+    mean Jaccard              ~= 0.604
+
+Conditional reconstruction:
+
+    STUDENT IDs + STUDENT amplitudes:
+        cosine ~= 0.97297
+
+    STUDENT IDs + ORACLE amplitudes:
+        cosine ~= 0.97253
+
+    ORACLE IDs + STUDENT amplitudes:
+        cosine ~= 0.97936
+
+    ORACLE IDs + ORACLE amplitudes:
+        cosine ~= 0.97929
+
+This is highly important.
+
+Interpretation:
+
+1. Amplitude prediction is NOT the primary cosine blocker.
+2. Expert selection is the largest recoverable source of angular error.
+3. Replacing student expert IDs with oracle IDs recovers almost the entire
+   gap to 0.98.
+4. Therefore stop spending large budgets on amplitude-loss tuning while NMSE
+   remains green.
+5. The current selector/router deserves primary investigation.
+
+The current oracle used for diagnostics is still bounded:
+
+    residual-correlation search
+    beam width = 4
+    pool size = 10
+    positive exact final coefficients
+
+It is NOT proof that p16/top4 itself tops out at cosine ~0.9793.
+
+======================================================================
+HARD TOKEN DIAGNOSIS
+======================================================================
+
+Validation residual-norm quartiles approximately showed:
+
+easiest quartile:
+    student cosine ~0.98937
+    oracle cosine  ~0.98974
+    selector recall ~0.747
+
+Q2:
+    student cosine ~0.98840
+    oracle cosine  ~0.99024
+
+Q3:
+    student cosine ~0.97242
+    oracle cosine  ~0.97664
+
+hardest quartile:
+    student cosine ~0.94169
+    oracle cosine  ~0.96052
+    selector recall ~0.684
+
+The difficult/high-residual token population dominates the remaining failure.
+
+Do NOT assume all tokens need equal treatment.
+
+======================================================================
+PROVENANCE ISSUE TO FIX
+======================================================================
+
+The latest clean-validation implementation was committed at:
+
+    290370ff1f44b4f45fbf651988350facab6087c0
+
+but several generated clean-validation receipts record:
+
+    code_commit = 123ae0dcc7dd114337752ed97be0638d54f65a98
+
+because the experiments were apparently run before the implementation was
+committed.
+
+This is useful WIP evidence but not ideal reproducibility.
+
+For every NEW decisive experiment:
+
+    1. implement the needed code;
+    2. run tests;
+    3. commit the implementation;
+    4. ensure the code worktree is clean;
+    5. run the experiment from that exact committed HEAD;
+    6. record that exact HEAD in all experiment receipts;
+    7. commit/push reports and metadata afterward.
+
+Do not knowingly create another decisive result whose code_commit cannot be
+checked out and reproduced.
+
+======================================================================
+NEXT SCIENTIFIC QUESTION
+======================================================================
+
+We need to determine whether the remaining p16/top4 gap is primarily:
+
+    A. insufficient oracle/search quality;
+    B. insufficient ROUTER EXPRESSIVITY;
+    C. expert/shared basis limitation;
+    D. genuine top4 capacity limitation.
+
+Resolve these in that order.
+
+======================================================================
+PHASE 1 — STRONG / EXACT p16/top4 ORACLE
+======================================================================
+
+This is the next highest-priority experiment.
+
+For p16/top4 there are only:
+
+    C(16,4) = 1820
+
+possible routed-expert sets per token.
+
+The existing bounded beam oracle is no longer strong enough to decide whether
+the architecture itself can satisfy cosine >= .98.
+
+Implement a stronger oracle.
+
+Preferred progression:
+
+A. First run an EXACT all-1820-combination oracle on the hardest validation
+   quartile (~4096 tokens).
+
+For each token:
+    evaluate all 4-of-16 expert combinations
+    solve positive coefficients exactly/bounded
+    include the shared branch exactly as deployed
+    compute reconstruction NMSE/cosine
+
+Measure:
+
+    student
+    existing bounded oracle
+    exact oracle
+
+Report both:
+    global energy-weighted NMSE
+    mean token relative error
+
+Do NOT call both metrics "normalized_mse".
+
+Suggested naming:
+    global_nmse
+    mean_token_relative_mse
+
+B. If computationally reasonable, extend the exact oracle to all 16,384
+   validation tokens.
+
+C. Compare exact-oracle expert sets to:
+    current residual beam oracle
+    learned router
 
 Record:
+    exact-set match
+    top-k recall
+    Jaccard
+    error by residual quartile
+    selected expert frequency
 
-    initialization
-    router formulation
-    gating formulation
-    NMSE
-    cosine
-    dead experts
-    load CV
-    runtime
-    VRAM
-    training duration
+DECISION GATE:
 
-Do not overwrite it.
+If exact-oracle validation cosine is clearly >= .98:
+    current p16/top4 capacity is sufficient.
+    Focus on learning the selector.
 
-Then suspend further deep top2-only tuning until the architecture search below
-is complete.
+If exact-oracle cosine remains < .98:
+    do not waste weeks making the router imitate an insufficient basis.
+    Move to PHASE 3 basis/topology work.
 
-======================================================================
-PHASE B — AVOID HOLDOUT OVERFITTING
-======================================================================
-
-Do NOT repeatedly select architectures using the final holdout split.
-
-We already have full layer-0 training activations.
-
-Create a deterministic ARCHITECTURE_DEV subset from TRAIN data only.
-
-Suggested:
-
-    16k–32k representative train tokens
-
-stratified across the known corpus domains if practical.
-
-Use:
-
-    ARCHITECTURE_DEV
-        for oracle sweeps and architecture selection
-
-Preserve:
-
-    FULL HOLDOUT
-        for confirmation of finalists only.
-
-Do not change the existing train/holdout identity.
-
-Record the deterministic dev-token IDs/hash as a derived research artifact.
-
-Existing historical holdout oracle measurements remain valid evidence, but do
-not continue repeatedly optimizing architecture directly against holdout.
+Do not open holdout.
 
 ======================================================================
-PHASE C — p8 EXACT TOP-K ORACLE CURVE
+PHASE 2 — ROUTER EXPRESSIVITY
 ======================================================================
 
-Start with p8 because only eight experts exist and exact combination search is
-tractable.
+Run this phase if the strong oracle demonstrates that p16/top4 CAN clear the
+target.
 
-For top-k:
+Current selector is effectively a single linear map:
 
-    1
-    2
-    3
-    4
-    5
-    6
+    hidden(5120) -> 16 expert logits
 
-evaluate on ARCHITECTURE_DEV:
+The oracle decision depends on nonlinear shared/expert contribution geometry.
 
-1. normalized/simplex routing oracle
+Test whether the linear selector is underpowered.
 
-2. exact positive/non-negative coefficient oracle
+Preserve the existing linear router as BASELINE.
 
-3. learned global expert-scale formulation
+Add one deliberately small nonlinear router, preferably:
 
-4. token-dependent positive-amplitude formulation/proxy if currently
-   available
+    5120
+      ->
+    low-rank hidden size 128 or 256
+      ->
+    SiLU
+      ->
+    16 selection logits
 
-For p8, exhaustively enumerate expert combinations where computationally
-reasonable.
+Do not create a giant router.
 
-Examples:
+Router overhead must remain tiny relative to sparse FFN compute.
 
-    C(8,2) = 28
-    C(8,3) = 56
-    C(8,4) = 70
-    C(8,5) = 56
-    C(8,6) = 28
+Also consider, only if cleanly implemented:
 
-No approximate search is necessary for these candidate counts.
+    shared small trunk
+       -> selection head
+       -> amplitude head
 
-Produce:
+but keep the first A/B minimal.
 
-    reports/topk-p8-oracle-curve.json
+Compare:
 
-with for each k:
+    linear selector
+    nonlinear selector
 
-    active FFN width
-    active FFN ratio
-    exact active parameter estimate
-    NMSE
-    cosine
-    coefficient formulation
-    expert usage
-    oracle compute time
-
-Identify the QUALITY ELBOW:
-
-    the point beyond which another active expert yields little meaningful
-    NMSE/cosine improvement.
-
-Do not automatically prefer the lowest k.
-
-======================================================================
-PHASE D — SEPARATE TOP-K FROM GATING FORMULATION
-======================================================================
-
-Current evidence indicates coefficient semantics may matter almost as much as
-expert count.
-
-Therefore compare for each promising k:
-
-A.
-    top-k + normalized softmax
-    selected coefficients sum to 1
-
-B.
-    top-k selection + independent positive amplitudes
-
-C.
-    top-k selection + normalized routing + learned output scale
-
-D.
-    if useful:
-    token-dependent scale/amplitude head
-
-We specifically need to answer:
-
-    Is top2 bad because two experts are insufficient?
-
-or:
-
-    Is top2 bad because forcing the two coefficients onto a unit simplex is
-    too restrictive?
-
-or both?
-
-Do not conflate these.
-
-======================================================================
-PHASE E — SAME-COMPUTE EXPERT GRANULARITY TEST
-======================================================================
-
-This is a priority experiment.
-
-Compare architectures with approximately identical active FFN width but
-different numbers/sizes of experts.
-
-PAIR 1:
-
-    p16 / top2
-        active width = 3072
-
-versus
-
-    p32 / top4
-        active width = 3072
-
-PAIR 2:
-
-    p16 / top3
-        active width = 4096
-
-versus
-
-    p32 / top6
-        active width = 4096
-
-PAIR 3:
-
-    p8 / top2
-        active width = 5120
-
-versus
-
-    p16 / top4
-        active width = 5120
-
-These comparisons answer:
-
-    At equal nominal FFN compute, do more smaller experts provide better
-    reconstruction than fewer larger experts?
-
-Use identical ARCHITECTURE_DEV examples.
-
-Run the same oracle/coefficient formulations.
-
-Produce:
-
-    reports/equal-compute-expert-granularity.json
-
-======================================================================
-PHASE F — BUILD A PARETO FRONTIER
-======================================================================
-
-For every candidate record:
-
-    profile
-    number of total experts
-    top_k
-    shared width
-    expert width
-    active FFN width
-    active FFN fraction
-    exact active parameters/token
-    oracle NMSE
-    oracle cosine
-    gating formulation
-    expected dispatch count
-
-Build the Pareto frontier for:
-
-    quality
-        versus
-    active compute
-
-A candidate is dominated if another candidate has:
-
-    equal or better NMSE/cosine
-    AND
-    equal or lower active width.
-
-Do not train dominated candidates.
-
-======================================================================
-PHASE G — CHOOSE ONLY 2–3 TRAINING CANDIDATES
-======================================================================
-
-After the oracle search, select only the strongest 2–3 candidates.
-
-Likely categories, but DO NOT prejudge results:
-
-    quality-first candidate
-    balanced candidate
-    maximum-sparsity viable candidate
-
-Potential examples might be:
-
-    p8/top3
-    p16/top3
-    p32/top4
-
-but choose from measurements, not this suggestion.
-
-Confirm the finalists once on the FULL HOLDOUT oracle before training.
-
-======================================================================
-PHASE H — TRAIN THE FINALISTS ON LAYER 0
-======================================================================
-
-For each selected architecture:
-
-use identical:
-
-    training activations
-    holdout
-    seed set
+Same:
+    partition
+    experts
+    shared branch
+    FIT rows
+    validation rows
+    seed
     optimizer budget
-    stage schedule
+    routing mode
+    checkpoint rule
 
-Train actual students.
+The only intentional variable should initially be router architecture.
 
-Do not give one candidate substantially more optimization budget than another
-during the first comparison.
+Training target:
 
-Record:
+Use a selector objective that reflects expert SET / RANK quality.
 
-    initial NMSE/cosine
-    oracle ceiling
-    final trained NMSE/cosine
-    oracle regret
-    dead experts
-    load CV
-    wall-clock training time
-    peak VRAM
+Plain multi-label BCE already failed to improve cosine.
 
-If independent positive amplitudes were strongly favored by the oracle,
-implement/train that gating formulation rather than evaluating only softmax
-routing.
+Prefer one bounded experiment with either:
 
-======================================================================
-PHASE I — DO NOT USE NMSE ALONE
-======================================================================
-
-Architecture selection must consider:
-
-PRIMARY:
-    holdout NMSE
-    holdout cosine
-
-SECONDARY:
-    dead experts
-    load CV
-    oracle regret
-    reproducibility
-
-EFFICIENCY:
-    active FFN width
-    active parameters/token
-    number of expert dispatches
-
-LATER:
-    real inference tokens/sec
-
-Do not select a design solely because its nominal active-parameter count is
-lowest.
-
-======================================================================
-PHASE J — SEARCH STOP CONDITION
-======================================================================
-
-Stop increasing top-k when either:
-
-1. another expert produces only marginal reconstruction gain,
+    soft/listwise target distribution derived from exact/strong oracle scores
 
 or
 
-2. active FFN compute becomes too close to dense to justify the complexity.
+    ranking loss over oracle expert scores
 
-For p8, top5/top6 may primarily be diagnostic.
+or
 
-For p16/p32, top4/top6 can still represent strong sparsity and should not be
-dismissed merely because k is larger.
+    top-k set objective with useful score ordering
 
-In particular:
+Do not perform a giant selector-loss sweep.
 
-    p32/top4:
-        ~17.6% of dense FFN width active
+Track:
 
-    p32/top6:
-        ~23.5% of dense FFN width active
+    validation cosine/NMSE
+    selector recall
+    exact set match
+    Jaccard
+    hard-quartile cosine
+    hard-quartile selector recall
+    load CV
+    dead experts
 
-Both remain substantially sparse.
+SUCCESS:
 
-======================================================================
-PHASE K — PRESERVE THE TRUE PRODUCT GOAL
-======================================================================
+    p16/top4 true-validation:
+        NMSE <= .05
+        cosine >= .98
+        dead = 0
+        load CV <= .50
 
-The objective is NOT:
-
-    "top2 at all costs"
-
-and NOT:
-
-    "minimum active parameters at all costs."
-
-The objective is:
-
-    retain as much Qwen3.8 quality as possible
-        while
-    removing a large majority of dense FFN work
-        and
-    producing a runtime architecture that performs well on consumer hardware.
-
-A model using 20–25% of original FFN compute but preserving substantially more
-quality may be preferable to one using 12% but suffering meaningful model
-degradation.
-
-Likewise, a model with four small expert dispatches may or may not outperform
-one with two larger GEMMs despite identical nominal FLOPs.
-
-Runtime benchmarking will decide that later.
+If achieved:
+    freeze the candidate
+    strict-reload it
+    then perform ONE full holdout confirmation.
 
 ======================================================================
-DO NOT DO YET
+PHASE 3 — BASIS / TOPOLOGY ONLY IF STRONG ORACLE SAYS NECESSARY
 ======================================================================
 
-Until this top-k search finishes:
+If even the exact/strong p16/top4 oracle cannot reach cosine >= .98, treat
+that as evidence that routing alone cannot solve the problem.
 
-DO NOT:
+Then investigate basis/topology while preserving >=70% FFN reduction.
 
-    deeply optimize p8/top2 for many additional runs
-    propagate the full 131k train corpus to every representative layer
-    train layers 16/32/48/63
-    train all 64 layers
-    commit to p16/top2 or p32/top2
-    change the quality gates
+Priority ideas:
 
-Layer-0 cached real activations are sufficient for the current architectural
-decision.
+1. improve the shared/routed neuron partition specifically for difficult
+   residual tokens;
+
+2. residual-aware local swap/move refinement using TRUE FIT only;
+
+3. contribution/correlation clustering rather than only activation magnitude;
+
+4. optimize shared branch assignment for dense residual coverage;
+
+5. consider modestly increasing shared capacity while remaining at >=70%
+   active FFN reduction;
+
+6. consider a different routed expert width/count geometry only when the
+   active-compute comparison is explicit.
+
+Do not use validation gradients.
+
+Validation may select between FIT-trained candidates.
+
+Holdout remains closed.
+
+For every candidate, compute a strong frozen oracle BEFORE expensive training.
+
+Do not train architectures whose strong oracle cannot plausibly meet the gate.
 
 ======================================================================
-EXPECTED NEXT DELIVERABLE
+P32 / MORE AGGRESSIVE SPARSITY
 ======================================================================
 
-Produce a compact architecture-search report:
+The ultimate product objective is not merely 70.59% if higher sparsity can
+retain quality.
 
-    TOP_K_ARCHITECTURE_SEARCH.md/json
+However:
 
-containing:
+    first solve the METHOD on p16/top4.
 
-1. p8 k=1..6 oracle curves
-2. normalized vs positive/token-amplitude gating comparison
-3. equal-active-width p16/p32 comparisons
-4. active parameter estimates
-5. Pareto frontier
-6. selected 2–3 training finalists
-7. trained layer-0 comparison for those finalists
-8. recommended architecture for representative-layer testing
-9. exact reasoning for rejecting alternatives
+Once p16/top4 demonstrates a generalizable green recipe, apply the same method
+fairly to:
 
-Only after this decision is evidence-backed should deep representative-layer
-training resume.
+    p16/top3  76.47%
+    p32/top6  76.47%
+    p32/top5  79.41%
+    p32/top4  82.35%
 
-Continue autonomously after selecting the winner.
-Do not stop merely to report the sweep if the next experiment is locally
-executable.
+For p32/top5 remember the existing result reused the p32/top6 refined
+partition; it was a fair k interpolation but not necessarily a k5-specific
+optimal partition.
+
+Do not invest heavily in p32-specific refinement before the selector/basis
+method is understood.
+
+We want a quality/compute Pareto curve, not architecture churn.
+
+Preferred final product hierarchy:
+
+    >=76% reduction with green quality
+        BEST
+
+    ~70% reduction with excellent/green quality
+        ACCEPTABLE PRODUCTION TARGET
+
+    lower-sparsity p8
+        CONTROL / FALLBACK ONLY
+
+======================================================================
+STOP BROAD HYPERPARAMETER SWEEPS
+======================================================================
+
+We already learned that:
+
+    cosine weight changes
+    more epochs
+    shared-basis adaptation
+    BCE vs repeated CE
+    amplitude-supervision changes
+
+can move NMSE/load somewhat but did not independently solve ~.97 cosine.
+
+Do not launch broad blind sweeps.
+
+Every new experiment must answer one falsifiable question.
+
+Before running it, record:
+
+    hypothesis
+    expected result
+    falsifier
+    compute budget
+    decision enabled by the result
+
+======================================================================
+REPRESENTATIVE-LAYER TRAINING GATE
+======================================================================
+
+Do NOT resume the old 64-layer rolling replay yet.
+
+Durable historical replay is preserved through layer 29.
+
+Do not continue layer 30+ merely because compute is available.
+
+First obtain ONE >=70% layer-0 architecture that passes on TRUE validation and
+then full holdout:
+
+    NMSE <= .05
+    cosine >= .98
+    dead experts = 0
+    load CV <= .50
+
+Then train the same frozen architecture/training recipe on representative
+layers:
+
+    0
+    16
+    32
+    48
+    63
+
+Use layer-specific training data but do NOT redesign the architecture per
+layer unless a representative-layer failure demonstrates that it is necessary.
+
+Representative-layer success should demonstrate:
+
+    no systematic layer-depth collapse
+    acceptable reconstruction metrics
+    stable routing
+    no dead experts
+    bounded load imbalance
+
+If the recipe fails one representative layer:
+    diagnose before full replay.
+
+Only after representative-layer success should full 64-layer conversion be
+authorized.
+
+======================================================================
+FULL MODEL GOAL
+======================================================================
+
+Once all FFNs are converted:
+
+Preserve every non-FFN Qwen tensor unchanged.
+
+Assemble a real sparse MoE checkpoint with:
+    shared experts
+    routed experts
+    learned selector
+    independent-positive amplitudes
+    routing metadata
+    source-compatible tokenizer/config packaging
+
+Then validate end-to-end behavior.
+
+Whole-model quality gates already tracked by this project include:
+
+    perplexity increase:
+        green <= 5%
+        yellow <= 10%
+
+    token KL:
+        green <= 0.10
+        yellow <= 0.20
+
+    top-1 token agreement:
+        >= 85%
+
+Also evaluate:
+    normal instruction following
+    reasoning / thinking behavior
+    short context
+    long context
+    multi-turn generation
+    long-context retrieval
+
+Attention, tokenizer, chat template, etc. should be inherited from Qwen and
+must not be modified simply to compensate for FFN conversion quality.
+
+======================================================================
+ENGINEERING / SAFETY RULES
+======================================================================
+
+- Preserve all captured activations.
+- Preserve all existing checkpoints and reports.
+- Do not delete old evidence just because a new method wins.
+- Large safetensors stay ignored from Git.
+- Commit reports/manifests/code, not giant blobs.
+- Do not run expensive whole-tree `git status --ignored`.
+- Do not repeatedly open the holdout.
+- Do not silently lower quality gates.
+- Do not redefine p8 as production success.
+- Do not resume deep replay prematurely.
+- Do not change attention or unrelated backbone architecture.
+- Keep exact source revision and dataset hashes in receipts.
+- Use deterministic seeds where practical.
+- Strict-reload finalists before confirmation.
+- Keep train/validation/holdout provenance explicit.
+
+======================================================================
+COMMITS / HANDOFF
+======================================================================
+
+At each meaningful decision boundary:
+
+1. commit code;
+2. run the experiment from a clean committed implementation;
+3. save concise machine-readable + human-readable reports;
+4. update:
+       HANDOFF.md
+       state.json
+       decision-register.json
+   so they all agree;
+5. commit/push reports and metadata;
+6. include exact next action.
+
+Do not leave the project sitting on a vague status.
+
+Avoid spending hours on repository bookkeeping.
+
+If Git inspection takes unexpectedly long, diagnose the filesystem command
+rather than waiting indefinitely.
+
+======================================================================
+AUTONOMY
+======================================================================
+
+Proceed autonomously through the bounded experiments above.
+
+Do NOT stop to ask me for permission between routine steps.
+
+Pause and report before expensive representative-layer or 64-layer execution,
+or when a result changes the architecture decision materially.
+
+The immediate desired sequence is:
+
+    recover stale local state
+        ->
+    clean/reproducible implementation baseline
+        ->
+    exact/strong p16/top4 oracle
+        ->
+    determine ROUTER vs BASIS ceiling
+        ->
+    nonlinear/listwise selector experiment if oracle supports p16/top4
+        ->
+    obtain >=70% green layer-0 finalist
+        ->
+    strict holdout confirmation
+        ->
+    representative layers 0/16/32/48/63
+        ->
+    freeze trainable architecture + recipe
+        ->
+    full 64-layer conversion
+        ->
+    whole-model evaluation
+
+======================================================================
+DEFINITION OF SUCCESS FOR THIS TAKEOVER
+======================================================================
+
+The near-term goal is NOT merely "run more experiments."
+
+The near-term goal is to produce a defensible, reproducible answer to:
+
+    Which >=70%-reduction MoE architecture and training recipe should we
+    apply across Qwen's 64 FFNs?
+
+A TRAINABLE SET is reached when we have:
+
+    1. frozen expert/shared geometry;
+    2. frozen top-k;
+    3. frozen routing architecture;
+    4. frozen routing mode;
+    5. frozen loss/training schedule;
+    6. true FIT/VALIDATION separation;
+    7. layer-0 full green holdout confirmation;
+    8. representative-layer evidence that the recipe generalizes.
+
+Only then begin the full 64-layer production conversion.
+
+Start by inspecting the local state and determining whether anything valuable
+exists beyond pushed HEAD 290370ff1f44b4f45fbf651988350facab6087c0.
+Do not assume the stale session completed cleanly.
