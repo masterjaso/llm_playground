@@ -418,6 +418,7 @@ def _train_stage_streaming(
     train_selection_router: bool = True,
     train_amplitude_router: bool = True,
     learning_rates: Mapping[str, float] | None = None,
+    loss_coefficients: Mapping[str, float] | None = None,
 ) -> dict[str, Any]:
     """Train one stage while reading only bounded activation batches."""
 
@@ -479,8 +480,16 @@ def _train_stage_streaming(
             # of reconstruction slack for a materially healthier expert load.
             # Keep this coefficient explicit in the receipt rather than hiding
             # it in a profile-specific post-processing step.
-            load_balance_coefficient = 0.05
-            loss = mse + 0.05 * cosine + load_balance_coefficient * load_balance + 0.001 * z_loss + 0.1 * oracle_loss
+            coefficients = {"mse": 1.0, "cosine": 0.05, "load_balance": 0.05, "router_z_loss": 0.001, "oracle": 0.1}
+            coefficients.update({str(name): float(value) for name, value in (loss_coefficients or {}).items()})
+            load_balance_coefficient = coefficients["load_balance"]
+            loss = (
+                coefficients["mse"] * mse
+                + coefficients["cosine"] * cosine
+                + load_balance_coefficient * load_balance
+                + coefficients["router_z_loss"] * z_loss
+                + coefficients["oracle"] * oracle_loss
+            )
             optimizer.zero_grad(set_to_none=True)
             loss.backward()
             torch.nn.utils.clip_grad_norm_(parameters, 1.0)
@@ -500,6 +509,7 @@ def _train_stage_streaming(
         "train_amplitude_router": train_amplitude_router,
         "train_shared": train_shared,
         "learning_rates": {group["group"]: group["lr"] for group in parameter_groups},
+        "loss_coefficients": {str(name): float(value) for name, value in (loss_coefficients or {}).items()},
     }
 
 
@@ -731,6 +741,12 @@ def train_torch_layer(
         rates = {str(name): float(value) for name, value in (raw_rates or {}).items()}
         if any(value <= 0 for value in rates.values()):
             raise ValueError(f"stage_schedule[{index}].learning_rates values must be positive")
+        raw_loss_coefficients = raw_stage.get("loss_coefficients")
+        if raw_loss_coefficients is not None and not isinstance(raw_loss_coefficients, Mapping):
+            raise TypeError(f"stage_schedule[{index}].loss_coefficients must be a mapping")
+        loss_coefficients = {str(name): float(value) for name, value in (raw_loss_coefficients or {}).items()}
+        if any(value < 0 for value in loss_coefficients.values()):
+            raise ValueError(f"stage_schedule[{index}].loss_coefficients values must be non-negative")
         normalized_schedule.append(
             {
                 "name": stage_name,
@@ -743,6 +759,7 @@ def train_torch_layer(
                 "train_amplitude_router": bool(raw_stage.get("train_amplitude_router", True)),
                 "learning_rate": stage_learning_rate,
                 "learning_rates": rates,
+                "loss_coefficients": loss_coefficients,
             }
         )
     for stage_spec in normalized_schedule:
@@ -766,6 +783,7 @@ def train_torch_layer(
             train_selection_router=bool(stage_spec["train_selection_router"]),
             train_amplitude_router=bool(stage_spec["train_amplitude_router"]),
             learning_rates=stage_spec["learning_rates"],
+            loss_coefficients=stage_spec["loss_coefficients"],
         )
         stages.append(stage_result)
         measured = _stream_metrics(
