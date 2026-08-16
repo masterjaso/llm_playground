@@ -92,7 +92,10 @@ def _run(args: argparse.Namespace) -> dict[str, Any]:
         print(f"training p16/top4 schedule {name} on {len(selection_indices)} TRAIN/dev rows", flush=True)
         result = train_torch_layer(
             source_dir=source,
-            activation_manifest=run / "capture/layer-0000-train.json",
+            # The trainer validates both fixed splits; pass the explicit
+            # aggregate wrapper while selection_indices restricts stage
+            # comparisons to the deterministic TRAIN/dev rows.
+            activation_manifest=run / "capture/layer-0000.json",
             output_dir=output_dir,
             layer=0,
             profile=profile,
