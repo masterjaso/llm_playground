@@ -44,7 +44,14 @@ p32/top5, and p32/top4 basis should report:
 Lagrangian diagnostic.  p16/top4 uses exhaustive candidate sets when its
 `C(16,4)=1820` combinations fit the configured bound.  p32/top4 and p32/top5
 use a deterministic correlation-ranked candidate pool and must be labelled as
-bounded rather than exhaustive.
+bounded rather than exhaustive.  Candidate scores are streamed through
+float32 Gram/correlation blocks; score matrices and p32 candidate IDs may be
+memory-mapped, and the receipt records the candidate count, storage mode,
+coefficient solver, and assurance level.  Feasible points are ordered by
+cosine first (then NMSE and load CV), while the reported Pareto frontier keeps
+all three dimensions: maximize cosine, minimize global NMSE, and minimize load
+CV.  A bounded p32 result below the cosine target is screening evidence, not a
+proof of impossibility.
 
 The `trainable_student_proxy` interpretation is intentionally separate: a
 trained student is constrained by the distillation data and fixed split, the

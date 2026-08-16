@@ -45,11 +45,22 @@ def _load_arrays(path: Path) -> tuple[Any, Any, Any]:
         return values["shared"], values["routed"], values["target"]
 
 
-def run(inputs: list[Path], topologies: list[str], *, target_load_cv: float, candidate_pool_size: int | None, max_combinations: int, iterations: int) -> dict[str, Any]:
+def run(
+    inputs: list[Path],
+    topologies: list[str],
+    *,
+    target_load_cv: float,
+    candidate_pool_size: int | None,
+    max_combinations: int,
+    iterations: int,
+    batch_size: int,
+    max_in_memory_bytes: int,
+    storage_dir: Path | None,
+) -> dict[str, Any]:
     if len(inputs) != len(topologies):
         raise ValueError("each --input requires a matching --topology")
     rows: list[dict[str, Any]] = []
-    for path, topology in zip(inputs, topologies):
+    for row_index, (path, topology) in enumerate(zip(inputs, topologies)):
         if "/" not in topology:
             raise ValueError(f"topology must look like p16/top4: {topology!r}")
         profile, raw_top_k = topology.split("/", 1)
@@ -62,6 +73,11 @@ def run(inputs: list[Path], topologies: list[str], *, target_load_cv: float, can
             raise ValueError(f"unsupported product topology: {topology!r}")
         if int(routed.shape[1]) != expected_experts:
             raise ValueError(f"{topology} expects {expected_experts} routed experts, received {routed.shape[1]}")
+        input_storage = (
+            storage_dir / f"{row_index:02d}-{profile}-top{top_k}"
+            if storage_dir is not None
+            else None
+        )
         result = frozen_slice_load_aware_oracle(
             shared,
             routed,
@@ -71,6 +87,10 @@ def run(inputs: list[Path], topologies: list[str], *, target_load_cv: float, can
             candidate_pool_size=candidate_pool_size,
             max_combinations=max_combinations,
             iterations=iterations,
+            batch_size=batch_size,
+            max_in_memory_bytes=max_in_memory_bytes,
+            storage_dir=input_storage,
+            materialize_outputs=False,
         )
         rows.append(
             {
@@ -82,6 +102,17 @@ def run(inputs: list[Path], topologies: list[str], *, target_load_cv: float, can
                 "input": str(path),
                 "tokens": int(result["indices"].shape[0]),
                 "exact_or_bounded": result["assurance"],
+                "candidate_pool_size": result["candidate_pool_size"],
+                "effective_candidate_pool_size": result["effective_candidate_pool_size"],
+                "combinations_considered_per_token": result["combinations_considered_per_token"],
+                "max_combinations": result["max_combinations"],
+                "assurance": result["assurance"],
+                "candidate_error_storage": result["candidate_error_storage"],
+                "candidate_id_storage": result["candidate_id_storage"],
+                "candidate_storage_ephemeral": result["candidate_storage_ephemeral"],
+                "coefficient_solver": result["coefficient_solver"],
+                "candidate_fit_exact": result["candidate_fit_exact"],
+                "candidate_chunk_size": result["candidate_chunk_size"],
                 "exact_oracle_global_nmse": result["unconstrained"]["global_nmse"],
                 "exact_oracle_cosine": result["unconstrained"]["cosine"],
                 "oracle_hard_quartile_cosine": result["unconstrained"]["hard_quartile_cosine"],
@@ -96,6 +127,7 @@ def run(inputs: list[Path], topologies: list[str], *, target_load_cv: float, can
                 "dead_experts": result["dead_experts"],
                 "feasible_load_target": result["feasible_load_target"],
                 "green_gate": result["green_gate"],
+                "hard_feasible": result["hard_feasible"],
                 "selected_penalty": result["selected_penalty"],
                 "pareto": result["pareto"],
             }
@@ -108,6 +140,9 @@ def run(inputs: list[Path], topologies: list[str], *, target_load_cv: float, can
         "candidate_pool_size": candidate_pool_size,
         "max_combinations": int(max_combinations),
         "iterations": int(iterations),
+        "batch_size": int(batch_size),
+        "max_in_memory_bytes": int(max_in_memory_bytes),
+        "storage_dir": str(storage_dir) if storage_dir is not None else None,
         "results": rows,
         "code_commit": current_git_commit(),
     }
@@ -122,6 +157,9 @@ def main() -> None:
     parser.add_argument("--candidate-pool-size", type=int, default=None)
     parser.add_argument("--max-combinations", type=int, default=4096)
     parser.add_argument("--iterations", type=int, default=32)
+    parser.add_argument("--batch-size", type=int, default=64)
+    parser.add_argument("--max-in-memory-bytes", type=int, default=256 * 1024 * 1024)
+    parser.add_argument("--storage-dir", type=Path, default=None)
     args = parser.parse_args()
     payload = run(
         args.input,
@@ -130,6 +168,9 @@ def main() -> None:
         candidate_pool_size=args.candidate_pool_size,
         max_combinations=args.max_combinations,
         iterations=args.iterations,
+        batch_size=args.batch_size,
+        max_in_memory_bytes=args.max_in_memory_bytes,
+        storage_dir=args.storage_dir,
     )
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")

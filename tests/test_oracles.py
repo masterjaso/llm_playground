@@ -12,6 +12,7 @@ from dense2moe.partition import (
     sparse_baseline,
     trainable_student_proxy,
 )
+from dense2moe.partition.oracle import _pareto_points
 
 
 def test_load_aware_oracle_reports_balanced_pareto_assignment() -> None:
@@ -29,6 +30,58 @@ def test_load_aware_oracle_reports_balanced_pareto_assignment() -> None:
     assert result["dead_experts"] == 0
     assert result["feasible_load_target"] is True
     assert result["pareto"]
+
+
+def test_load_aware_oracle_uses_bounded_float32_blocks_for_float64_inputs(tmp_path) -> None:
+    rng = np.random.default_rng(41)
+    shared = rng.normal(size=(8, 3)).astype(np.float64)
+    routed = rng.normal(size=(8, 16, 3)).astype(np.float64)
+    target = rng.normal(size=(8, 3)).astype(np.float64)
+
+    result = frozen_slice_load_aware_oracle(
+        shared,
+        routed,
+        target,
+        top_k=4,
+        iterations=1,
+        batch_size=2,
+        max_in_memory_bytes=1024,
+        storage_dir=tmp_path,
+        materialize_outputs=False,
+    )
+
+    assert result["assurance"] == "exact_candidate_sets"
+    assert result["candidate_fit_exact"] is False
+    assert result["coefficient_solver"].endswith("float32")
+    assert result["weights"].dtype == np.float32
+    assert result["candidate_error_storage"] == "memmap"
+
+
+def test_load_aware_oracle_marks_p32_as_bounded_and_reports_candidate_count() -> None:
+    shared = np.zeros((2, 2), dtype=np.float32)
+    routed = np.ones((2, 32, 2), dtype=np.float32)
+    target = np.ones((2, 2), dtype=np.float32)
+
+    result = frozen_slice_load_aware_oracle(shared, routed, target, top_k=5, iterations=1, batch_size=1)
+
+    assert result["assurance"] == "bounded_correlation_candidate_pool"
+    assert result["combinations_considered_per_token"] == 2002
+    assert result["candidate_error_storage"] in {"ram", "memmap"}
+    assert result["candidate_id_storage"] in {"ram", "memmap"}
+
+
+def test_pareto_frontier_keeps_cosine_dimension() -> None:
+    points = [
+        {"cosine": 0.978, "global_nmse": 0.015, "load_cv": 0.40},
+        {"cosine": 0.982, "global_nmse": 0.025, "load_cv": 0.45},
+        {"cosine": 0.977, "global_nmse": 0.015, "load_cv": 0.50},
+    ]
+
+    frontier = _pareto_points(points)
+
+    assert points[0] in frontier
+    assert points[1] in frontier
+    assert points[2] not in frontier
 
 
 def test_simplex_oracle_uses_exact_pairwise_clipped_solution() -> None:
