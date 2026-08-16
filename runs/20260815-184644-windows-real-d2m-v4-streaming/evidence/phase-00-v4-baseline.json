@@ -1,0 +1,33 @@
+{
+  "baseline": {
+    "mypy": "5 pre-existing Windows-stub errors in src/dense2moe/capture/teacher.py",
+    "pytest": "55 passed",
+    "ruff": "All checks passed"
+  },
+  "code_commit": "9d7751817b651952c72cb312a6762c61156ac3d5",
+  "dataset_hash": "46b278a85b4cb31a8fe659be2dd146bd9206eb491268220e25440981d06c0a03",
+  "head": "9d7751817b651952c72cb312a6762c61156ac3d5",
+  "parent_run_id": "20260815-180505-windows-real-d2m-v3",
+  "profile": {
+    "active_intermediate_size": 5120,
+    "dense_intermediate_size": 17408,
+    "dtype": "bfloat16",
+    "expert_intermediate_size": 2048,
+    "hidden_size": 5120,
+    "model": "Qwen/Qwen3.8-27B",
+    "name": "qwen38_p8s1_top2",
+    "num_hidden_layers": 64,
+    "revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
+    "routed_capacity": 16384,
+    "routed_experts": 8,
+    "shared_intermediate_size": 1024,
+    "sparsity": 0.7058823529411764,
+    "top_k": 2,
+    "total_capacity": 17408
+  },
+  "profile_hash": "6d1a8ad97a52eb7b4ff4fcc47a0a1cbc7a5abf500a15b807f24394d72629f27c",
+  "run_id": "20260815-184644-windows-real-d2m-v4-streaming",
+  "selected_profile": "qwen38_p8s1_top2",
+  "source_revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
+  "status": "V4_BASELINE_AND_PROFILE_LOCKED"
+}

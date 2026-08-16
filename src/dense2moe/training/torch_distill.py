@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
@@ -353,7 +354,7 @@ def _train_stage_streaming(
         for values in dataset.iter_batches(microbatch):
             inputs = torch.as_tensor(values, dtype=torch.float32, device=device)
             teacher = _dense_target_torch(inputs, gate_device, up_device, down_device)
-            prediction, info = model(inputs, return_router=True)
+            prediction, info = model(inputs, return_router=True, return_contributions=use_oracle_targets)
             mse = torch.mean((prediction - teacher).square())
             cosine = 1.0 - torch.mean(
                 torch.sum(prediction * teacher, dim=-1)
@@ -366,14 +367,11 @@ def _train_stage_streaming(
             oracle_loss = torch.zeros((), device=device)
             if use_oracle_targets:
                 # The exact frozen oracle is a separate bounded research
-                # study.  For every training microbatch use its inexpensive
-                # contribution-magnitude routing proxy so warm-up remains
-                # streaming even on the full 131k-token split.
-                import numpy as np  # type: ignore
-
-                _shared, routed = swiglu_contributions(np.asarray(values), gate, up, down, plan)
-                labels_np = np.argsort(-np.linalg.norm(routed, axis=-1), axis=-1)[:, : model.top_k]
-                labels = torch.as_tensor(labels_np, dtype=torch.long, device=device)
+                # study.  For warm-up, rank the already-computed GPU expert
+                # contributions; this preserves the target-free streaming
+                # contract and avoids a CPU SwiGLU recomputation for every
+                # train microbatch.
+                labels = torch.topk(torch.linalg.vector_norm(info["contributions"], dim=-1), model.top_k, dim=-1).indices
                 oracle_loss = torch.stack(
                     [torch.nn.functional.cross_entropy(info["logits"], labels[:, slot]) for slot in range(labels.shape[1])]
                 ).mean()
@@ -500,7 +498,8 @@ def train_torch_layer(
         raise ValueError(f"layer {layer} source MLP inventory mismatch: {sorted(names)}")
     values: dict[str, Any] = {}
     for short, shard in names.items():
-        with safe_open(str(source / shard), framework="pt", device="cpu") as handle:
+        open_kwargs = {"backend": "pread"} if os.name == "nt" else {}
+        with safe_open(str(source / shard), framework="pt", device="cpu", **open_kwargs) as handle:
             values[short] = handle.get_tensor(prefix + short).float().numpy()
     wrapper_payload = _load_manifest(Path(activation_manifest))
     dataset_hash = str(wrapper_payload.get("dataset_hash", ""))
@@ -524,9 +523,35 @@ def train_torch_layer(
         partition=plan,
         learnable_scales=True,
     )
+    partition_payload = json.loads(Path(partition_path).read_text(encoding="utf-8"))
+    initial_scales = partition_payload.get("initial_expert_scales")
+    if initial_scales is not None:
+        if not isinstance(initial_scales, list) or len(initial_scales) != plan.routed_experts:
+            raise ValueError("initial_expert_scales must contain one value per routed expert")
+        with torch.no_grad():
+            model.expert_scales.copy_(torch.as_tensor(initial_scales, dtype=model.expert_scales.dtype))
     gate_tensor = torch.as_tensor(values["gate_proj.weight"], dtype=torch.float32)
     up_tensor = torch.as_tensor(values["up_proj.weight"], dtype=torch.float32)
     down_tensor = torch.as_tensor(values["down_proj.weight"], dtype=torch.float32)
+    # Break the zero-router tie deterministically with a bounded, train-only
+    # contribution-label warm start.  Without this, ``topk`` always selected
+    # experts 0 and 1 on the first pass and the load-balance term could not
+    # revive the remaining experts.  The labels are derived from the immutable
+    # dense-slice contributions, never from holdout targets.
+    warmup_values = next(train_dataset.iter_batches(min(microbatch, 512)))
+    warmup_inputs = torch.as_tensor(warmup_values, dtype=torch.float32, device=device)
+    model.to(device)
+    with torch.no_grad():
+        warmup_contributions = torch.stack(
+            [model._expert_output(warmup_inputs, expert) * model.expert_scales[expert] for expert in range(model.routed_experts)],
+            dim=1,
+        )
+        warmup_labels = torch.topk(torch.linalg.vector_norm(warmup_contributions, dim=-1), model.top_k, dim=-1).indices
+        warmup_targets = torch.zeros((warmup_inputs.shape[0], model.routed_experts), dtype=torch.float32, device=device)
+        warmup_targets.scatter_(1, warmup_labels, 1.0)
+        warmup_solution = torch.linalg.lstsq(warmup_inputs, warmup_targets).solution.T
+        model.router.weight.copy_(warmup_solution.to(dtype=model.router.weight.dtype))
+    del warmup_values, warmup_inputs, warmup_contributions, warmup_labels, warmup_targets, warmup_solution
     initial = _stream_metrics(
         model,
         holdout_dataset,
@@ -640,6 +665,8 @@ def train_torch_layer(
                 "holdout_count": holdout_dataset.count,
             },
             "partition_path": str(partition_path),
+            "initial_expert_scales": [float(value) for value in (initial_scales or [1.0] * plan.routed_experts)],
+            "router_initialization": "bounded_train_contribution_lstsq",
         },
         tensor_file=tensor_path.name,
         tensor_sha256=tensor_hash,

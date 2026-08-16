@@ -427,5 +427,13 @@ def iter_activation_shards(manifest_path: str | Path, *, expected_split: str | N
         path = _resolve_manifest_path(str(shard["path"]), Path(manifest_path))
         if _sha256(path) != shard.get("sha256"):
             raise ValueError(f"activation shard hash mismatch: {path}")
-        with safe_open(str(path), framework="numpy") as handle:
-            yield np.asarray(handle.get_tensor("mlp_input"))
+        # The NumPy safetensors backend cannot decode BF16 on the Windows
+        # runtime used for the streamed corpus.  Fall back to the PyTorch
+        # backend and convert only the yielded view to float32; the durable
+        # artifact remains BF16 and its hash is still checked above.
+        try:
+            with safe_open(str(path), framework="numpy") as handle:
+                yield np.asarray(handle.get_tensor("mlp_input"))
+        except (TypeError, ValueError, RuntimeError):
+            with safe_open(str(path), framework="pt", device="cpu") as handle:
+                yield handle.get_tensor("mlp_input").float().numpy()

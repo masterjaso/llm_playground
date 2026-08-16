@@ -1,0 +1,48 @@
+{
+  "active_blocker": null,
+  "artifact_paths": {
+    "decision_register": "runs\\20260815-20260815-184636-windows-real-d2m-v4-streaming\\decision-register.json",
+    "environment": "runs\\20260815-20260815-184636-windows-real-d2m-v4-streaming\\environment.json",
+    "fact_ledger": "runs\\20260815-20260815-184636-windows-real-d2m-v4-streaming\\repository-fact-ledger.json"
+  },
+  "code_commit": "9d7751817b651952c72cb312a6762c61156ac3d5",
+  "current_phase": "discovery",
+  "last_successful_command": "doctor",
+  "next_exact_command": "d2m inspect-source --run-dir runs/20260815-20260815-184636-windows-real-d2m-v4-streaming --model Qwen/Qwen3.8-27B",
+  "parent_run_id": "20260815-180505-windows-real-d2m-v3",
+  "phase_status": "complete",
+  "prediction_contract": {
+    "expected_artifacts": [
+      "environment.json",
+      "repository-fact-ledger.json",
+      "decision-register.json"
+    ],
+    "expected_validation_results": [
+      "DISCOVERY_READY"
+    ]
+  },
+  "retry_counts": {},
+  "run_id": "20260815-20260815-184636-windows-real-d2m-v4-streaming",
+  "schema_version": 2,
+  "selected_profile": null,
+  "source_config_hash": null,
+  "source_index_hash": null,
+  "source_revision": "unknown",
+  "terminal_state": null,
+  "timestamps": {
+    "created": "2026-08-15T22:46:36.946922Z",
+    "updated": "2026-08-15T22:46:39.968851Z"
+  },
+  "validation_results": {
+    "doctor": {
+      "decision_register": "runs\\20260815-20260815-184636-windows-real-d2m-v4-streaming\\decision-register.json",
+      "environment": "runs\\20260815-20260815-184636-windows-real-d2m-v4-streaming\\environment.json",
+      "fact_ledger": "runs\\20260815-20260815-184636-windows-real-d2m-v4-streaming\\repository-fact-ledger.json",
+      "next_exact_command": "d2m inspect-source --run-dir runs/20260815-20260815-184636-windows-real-d2m-v4-streaming --model Qwen/Qwen3.8-27B",
+      "status": "DISCOVERY_READY",
+      "torch_cuda": true,
+      "windows_native": true,
+      "wsl": false
+    }
+  }
+}

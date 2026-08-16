@@ -1,0 +1,120 @@
+{
+  "facts": {
+    "disk": {
+      "status": "verified",
+      "value": {
+        "C:\\": {
+          "free": 339004272640,
+          "total": 999137734656,
+          "used": 660133462016
+        }
+      }
+    },
+    "driver": {
+      "status": "verified",
+      "value": null
+    },
+    "exposed_ram": {
+      "status": "verified",
+      "value": 67767750656
+    },
+    "gpus": {
+      "status": "verified",
+      "value": "GPU 0: NVIDIA GeForce RTX 5060 Ti (UUID: GPU-49db48ba-f49e-6bf4-1d37-0eef00b47376)\nGPU 1: NVIDIA GeForce RTX 4060 (UUID: GPU-750f2411-a4ee-0f5a-40d0-9bef4e9143dc)\n"
+    },
+    "llama_cpp_support": {
+      "status": "unknown",
+      "value": null
+    },
+    "nsp_epic_execution_skill": {
+      "note": "Required NSP skill was not fabricated when absent.",
+      "path": "C:\\workplace\\llm_playground\\.agents\\skills\\nsp-epic-execution\\SKILL.md",
+      "status": "unknown",
+      "value": null
+    },
+    "operating_system": {
+      "status": "verified",
+      "value": "Windows"
+    },
+    "pytorch_compatibility": {
+      "status": "verified",
+      "value": {
+        "compiled_cuda": "13.0",
+        "cuda_available": true,
+        "devices": [
+          {
+            "allocated": 0,
+            "bf16_supported": true,
+            "bfloat16_matmul": true,
+            "compute_capability": [
+              8,
+              9
+            ],
+            "float16_matmul": true,
+            "index": 0,
+            "name": "NVIDIA GeForce RTX 4060",
+            "reserved": 0,
+            "total_memory": 8585216000
+          },
+          {
+            "allocated": 0,
+            "bf16_supported": true,
+            "bfloat16_matmul": true,
+            "compute_capability": [
+              12,
+              0
+            ],
+            "float16_matmul": true,
+            "index": 1,
+            "name": "NVIDIA GeForce RTX 5060 Ti",
+            "reserved": 0,
+            "total_memory": 17102864384
+          }
+        ],
+        "installed": true,
+        "peer_access": [
+          [
+            false,
+            false
+          ],
+          [
+            false,
+            false
+          ]
+        ],
+        "version": "2.13.0+cu130"
+      }
+    },
+    "source_config_shape": {
+      "status": "unknown",
+      "value": null
+    },
+    "source_model_availability": {
+      "status": "unknown",
+      "value": null
+    },
+    "source_revision": {
+      "status": "unknown",
+      "value": null
+    },
+    "source_tensor_naming": {
+      "status": "unknown",
+      "value": null
+    },
+    "swap": {
+      "status": "verified",
+      "value": 26460327936
+    },
+    "target_routing_semantics": {
+      "status": "verified",
+      "value": "top-k normalized weights"
+    },
+    "wsl_status": {
+      "note": "native Windows run; WSL is not required",
+      "status": "verified",
+      "value": false
+    }
+  },
+  "schema_version": 2,
+  "updated": "2026-08-15T22:46:39.739095Z"
+}

@@ -1,0 +1,56 @@
+{
+  "code_commit": "9d7751817b651952c72cb312a6762c61156ac3d5",
+  "count": 1176,
+  "dataset_hash": "46b278a85b4cb31a8fe659be2dd146bd9206eb491268220e25440981d06c0a03",
+  "metadata": {
+    "kind": "token_embedding_hidden_states",
+    "tokens_per_second": 5469.887016393687,
+    "weight_receipt": {
+      "source_index_hash": "77042094076611b69791a610065f28b7013b8c621795fa86ddccc8bac7d1b9df",
+      "tensor": {
+        "dtype": "bfloat16",
+        "sha256": "f529a0d7c21c420c5fb5ec4ca181cb018bdcb0b7d3acace8bd66f6166ffa88a9",
+        "shape": [
+          248320,
+          5120
+        ],
+        "source_name": "model.language_model.embed_tokens.weight",
+        "source_shard": "model-00003-of-00018.safetensors"
+      }
+    }
+  },
+  "schema_version": 1,
+  "shards": [
+    {
+      "count": 1176,
+      "dataset_hash": "46b278a85b4cb31a8fe659be2dd146bd9206eb491268220e25440981d06c0a03",
+      "dtype": "bfloat16",
+      "path": "shard-00000.safetensors",
+      "records": [
+        {
+          "chunk_index": 0,
+          "content_sha256": "8df6082d3a827ab7f052ac27c0a1b50c2dc207db8474cb3e1c14882b09fa7aac",
+          "example_id": "da378a3ec4dfcd6e3c5ef6cdedb43b6d",
+          "length": 1176,
+          "offset": 0,
+          "source_record_index": 1332,
+          "split": "holdout"
+        }
+      ],
+      "sha256": "0b33370f9208c0a6a54272e6615b9efbbb20dc3f4c038807d1cdadbbb1270385",
+      "shape": [
+        1,
+        1176,
+        5120
+      ],
+      "shard_id": 0,
+      "source_revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
+      "stage": 0
+    }
+  ],
+  "source_revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
+  "split": "holdout",
+  "stage": 0,
+  "status": "STAGE_COMPLETE",
+  "tokenizer_hash": "135547ffd6ba69bf188782195b85e2c33b124c7238c0d4e2d95e5cba74ebe716"
+}

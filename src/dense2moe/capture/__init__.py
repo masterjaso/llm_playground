@@ -7,6 +7,13 @@ from .activations import (
     capture_multi_layer_activation_shards,
     iter_activation_shards,
 )
+from .streaming_teacher import (
+    DEFAULT_DEVICE,
+    DEFAULT_SHARD_TOKENS,
+    StreamingTeacherExecutor,
+    TargetedLayerLoader,
+    stream_teacher_split,
+)
 from .teacher import (
     REPRESENTATIVE_LAYERS,
     HookVerification,
@@ -34,8 +41,12 @@ from .teacher import (
 )
 
 __all__ = [
+    "DEFAULT_DEVICE",
+    "DEFAULT_SHARD_TOKENS",
     "REPRESENTATIVE_LAYERS",
     "HookVerification",
+    "StreamingTeacherExecutor",
+    "TargetedLayerLoader",
     "TeacherCaptureBlocked",
     "TokenizedExample",
     "activation_partition_deterministic",
@@ -59,6 +70,7 @@ __all__ = [
     "resolve_corpus_records",
     "resource_aware_max_memory",
     "snapshot_tokenizer_hashes",
+    "stream_teacher_split",
     "tokenize_corpus_records",
     "validate_mlp_hook",
     "verify_mlp_reconstruction",

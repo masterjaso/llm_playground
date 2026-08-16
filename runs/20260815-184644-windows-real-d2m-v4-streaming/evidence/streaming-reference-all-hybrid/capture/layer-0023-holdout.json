@@ -1,0 +1,160 @@
+{
+  "capture_kind": "streaming_teacher_mlp_input",
+  "code_commit": "9d7751817b651952c72cb312a6762c61156ac3d5",
+  "count": 1176,
+  "dataset_hash": "46b278a85b4cb31a8fe659be2dd146bd9206eb491268220e25440981d06c0a03",
+  "diagnostic_only": false,
+  "dtype": "bfloat16",
+  "input_stage": 23,
+  "layer": 23,
+  "layer_receipt": {
+    "attention_implementation": "sdpa",
+    "compute_dtype": "bfloat16",
+    "layer": 23,
+    "source_bytes": 744510464,
+    "source_index_hash": "77042094076611b69791a610065f28b7013b8c621795fa86ddccc8bac7d1b9df",
+    "source_tensor_count": 11,
+    "source_tensor_hashes": [
+      {
+        "dtype": "bfloat16",
+        "sha256": "3d8c4657d951f01f12dbc43a1b220b6c790db4c7566a909dffccf3df41c7b848",
+        "shape": [
+          5120
+        ],
+        "source_name": "model.language_model.layers.23.input_layernorm.weight",
+        "source_shard": "model-00007-of-00018.safetensors"
+      },
+      {
+        "dtype": "bfloat16",
+        "sha256": "ad1da070a5e8043bbe2d9093dd351833d05bdbfcf3dcf129aed9d52b912765eb",
+        "shape": [
+          5120,
+          17408
+        ],
+        "source_name": "model.language_model.layers.23.mlp.down_proj.weight",
+        "source_shard": "model-00007-of-00018.safetensors"
+      },
+      {
+        "dtype": "bfloat16",
+        "sha256": "65356d8cbee3bdbfaa5b50065cec079bffb7916bfe2b39928bf185a99c36758b",
+        "shape": [
+          17408,
+          5120
+        ],
+        "source_name": "model.language_model.layers.23.mlp.gate_proj.weight",
+        "source_shard": "model-00007-of-00018.safetensors"
+      },
+      {
+        "dtype": "bfloat16",
+        "sha256": "3a47bb7a5a8cc25feef88b2cbafdb60c8066e13214ff1a6f149fc6ff0363beb3",
+        "shape": [
+          17408,
+          5120
+        ],
+        "source_name": "model.language_model.layers.23.mlp.up_proj.weight",
+        "source_shard": "model-00007-of-00018.safetensors"
+      },
+      {
+        "dtype": "bfloat16",
+        "sha256": "c21810332000a9560126be6a354f6428e2f94202868678654495d9bd26d5ba78",
+        "shape": [
+          5120
+        ],
+        "source_name": "model.language_model.layers.23.post_attention_layernorm.weight",
+        "source_shard": "model-00007-of-00018.safetensors"
+      },
+      {
+        "dtype": "bfloat16",
+        "sha256": "a1c479d9586c1a2e54603ae914dfce9cf778590c9a0cfa68446849c837304c07",
+        "shape": [
+          256
+        ],
+        "source_name": "model.language_model.layers.23.self_attn.k_norm.weight",
+        "source_shard": "model-00007-of-00018.safetensors"
+      },
+      {
+        "dtype": "bfloat16",
+        "sha256": "9f536f6dbcec1cd9c7590bab291455fc3a8e03f7e46b68bf43801d766b344d83",
+        "shape": [
+          1024,
+          5120
+        ],
+        "source_name": "model.language_model.layers.23.self_attn.k_proj.weight",
+        "source_shard": "model-00007-of-00018.safetensors"
+      },
+      {
+        "dtype": "bfloat16",
+        "sha256": "32f6798d48f443f3fe89080b0475f2e6d73e7c2368c7b28c934d6e1221172cda",
+        "shape": [
+          5120,
+          6144
+        ],
+        "source_name": "model.language_model.layers.23.self_attn.o_proj.weight",
+        "source_shard": "model-00007-of-00018.safetensors"
+      },
+      {
+        "dtype": "bfloat16",
+        "sha256": "32d5691823208bab22d1b7c2e535a5b7c15124fe846f7053dbda58c22113d335",
+        "shape": [
+          256
+        ],
+        "source_name": "model.language_model.layers.23.self_attn.q_norm.weight",
+        "source_shard": "model-00007-of-00018.safetensors"
+      },
+      {
+        "dtype": "bfloat16",
+        "sha256": "12c929744c646b116bb5c47cb781730f39f7c5d6da8d1da0d780bde2b5a5c7ec",
+        "shape": [
+          12288,
+          5120
+        ],
+        "source_name": "model.language_model.layers.23.self_attn.q_proj.weight",
+        "source_shard": "model-00007-of-00018.safetensors"
+      },
+      {
+        "dtype": "bfloat16",
+        "sha256": "8376209751e52e498d364836235944513a6d8d107c14ec81ef4f6165b8856d2c",
+        "shape": [
+          1024,
+          5120
+        ],
+        "source_name": "model.language_model.layers.23.self_attn.v_proj.weight",
+        "source_shard": "model-00007-of-00018.safetensors"
+      }
+    ]
+  },
+  "output_stage": 24,
+  "quality_gate_eligible": true,
+  "schema_version": 2,
+  "shard_tokens": 2048,
+  "shards": [
+    {
+      "bytes": 12042328,
+      "count": 1176,
+      "dtype": "bfloat16",
+      "path": "streaming/holdout/layer-0023/shard-00000.safetensors",
+      "records": [
+        {
+          "chunk_index": 0,
+          "content_sha256": "8df6082d3a827ab7f052ac27c0a1b50c2dc207db8474cb3e1c14882b09fa7aac",
+          "example_id": "da378a3ec4dfcd6e3c5ef6cdedb43b6d",
+          "length": 1176,
+          "offset": 0,
+          "source_record_index": 1332,
+          "split": "holdout"
+        }
+      ],
+      "sha256": "bc3fb31e7767e816bbe0dbcc53505a040ce749b3654ca6e27b82a4c24fc2d287",
+      "shape": [
+        1176,
+        5120
+      ],
+      "shard_id": 0
+    }
+  ],
+  "source_revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
+  "source_snapshot": "runs\\20260815-030931-windows\\source",
+  "split": "holdout",
+  "status": "CAPTURE_COMPLETE",
+  "tokenizer_hash": "135547ffd6ba69bf188782195b85e2c33b124c7238c0d4e2d95e5cba74ebe716"
+}

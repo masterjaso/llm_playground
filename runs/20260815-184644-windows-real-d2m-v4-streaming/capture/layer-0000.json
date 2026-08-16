@@ -1,0 +1,22 @@
+{
+  "capture_kind": "streaming_teacher_mlp_input_aggregate",
+  "code_commit": "9d7751817b651952c72cb312a6762c61156ac3d5",
+  "count": 148106,
+  "dataset_hash": "46b278a85b4cb31a8fe659be2dd146bd9206eb491268220e25440981d06c0a03",
+  "diagnostic_only": false,
+  "holdout_manifest": "layer-0000-holdout.json",
+  "holdout_tokens": 16598,
+  "layer": 0,
+  "partition_path": "../partitions/layer-0000.json",
+  "profile": "qwen38_p8s1_top2",
+  "profile_hash": "6d1a8ad97a52eb7b4ff4fcc47a0a1cbc7a5abf500a15b807f24394d72629f27c",
+  "quality_gate_eligible": true,
+  "schema_version": 3,
+  "source_index_hash": "77042094076611b69791a610065f28b7013b8c621795fa86ddccc8bac7d1b9df",
+  "source_revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
+  "split": "both",
+  "status": "CAPTURE_COMPLETE",
+  "tokenizer_hash": "135547ffd6ba69bf188782195b85e2c33b124c7238c0d4e2d95e5cba74ebe716",
+  "train_manifest": "layer-0000-train.json",
+  "train_tokens": 131508
+}

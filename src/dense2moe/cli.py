@@ -102,8 +102,22 @@ def _parser() -> argparse.ArgumentParser:
     capture.add_argument("--text-only", action="store_true", help="load an exact text-backbone view of the pinned multimodal snapshot")
     capture.add_argument("--text-only-view", default=None, help="metadata-only text-backbone view directory (created when --text-only is set)")
 
+    streaming = base("streaming-capture")
+    streaming.add_argument("--layers", default="0,16,32,48,63", help="selected capture layers; replay always advances from layer 0")
+    streaming.add_argument("--dataset-manifest", required=True)
+    streaming.add_argument("--source-dir", default=None, help="local pinned Transformers teacher snapshot")
+    streaming.add_argument("--source-revision", default=None, help="immutable source snapshot commit SHA")
+    streaming.add_argument("--split", choices=("train", "holdout"), required=True)
+    streaming.add_argument("--shard-tokens", type=int, default=2048)
+    streaming.add_argument("--device", default="cuda:1")
+    streaming.add_argument("--compute-dtype", default="bfloat16")
+    streaming.add_argument("--attention-implementation", default="sdpa")
+    streaming.add_argument("--max-examples", type=int, default=None, help="bounded diagnostic replay; never quality evidence")
+    streaming.add_argument("--resume", action="store_true", help="resume validated rolling stages and shard receipts")
+
     for command in (sub.choices["oracle-study"],):
         command.add_argument("--activation-manifest", help="aggregate or split activation manifest for real oracle evidence")
+        command.add_argument("--train-activation-manifest", help="explicit train activation manifest for train-only learned scale fitting")
 
     train_layer = base("train-layer")
     train_layer.add_argument("--layer", type=int, required=True)
@@ -471,6 +485,7 @@ def _oracle_study(args: argparse.Namespace, store: StateStore) -> dict[str, Any]
 
     try:
         activation_manifest = getattr(args, "activation_manifest", None)
+        train_activation_manifest = getattr(args, "train_activation_manifest", None)
         if activation_manifest is None:
             candidate = store.run_dir / "capture" / f"layer-{args.layer or 0:04d}.json"
             if candidate.exists():
@@ -479,14 +494,18 @@ def _oracle_study(args: argparse.Namespace, store: StateStore) -> dict[str, Any]
             _source_dir_for_run(store),
             layer=args.layer or 0,
             activation_manifest=activation_manifest,
+            train_activation_manifest=train_activation_manifest,
         )
         state = store.load()
         result.update({"source_repository": "Qwen/Qwen3.8-27B", "source_revision": state.source_revision, "source_config_hash": state.source_config_hash, "source_index_hash": state.source_index_hash, "profile": "qwen38_p8s1_top2", "seed": 17, "code_commit": current_git_commit()})
-        atomic_write_json(store.run_dir / "metrics" / "oracle-ablation.json", result)
         best = result.get("best_variant")
         blocker = None if result.get("gate", {}).get("green") else "p8 oracle ceiling is red; bounded fallback or capacity change is required before router training"
-        next_command = f"d2m prepare-data --run-dir {args.run_dir} --corpus-manifest <approved-jsonl>"
+        if blocker is None and result.get("quality_gate_eligible"):
+            next_command = f"d2m streaming-capture --run-dir {args.run_dir} --split train --layers 0 --dataset-manifest {store.run_dir / 'capture' / 'data-plan.json'} --resume"
+        else:
+            next_command = f"d2m prepare-data --run-dir {args.run_dir} --corpus-manifest <approved-jsonl>"
         result.update({"best_variant": best, "next_exact_command": next_command})
+        atomic_write_json(store.run_dir / "metrics" / "oracle-ablation.json", result)
         store.transition(current_phase="oracle", phase_status="pending" if blocker else "complete", active_blocker=blocker, next_exact_command=next_command, validation_results={"oracle": result})
         store.write_handoff(next_command=next_command, expected_output="fixed calibration manifest before router training", blocker=blocker)
     except (OSError, ValueError, TypeError, RuntimeError, KeyError) as exc:
@@ -790,6 +809,91 @@ def _capture(args: argparse.Namespace, store: StateStore) -> dict[str, Any]:
     return result
 
 
+def _streaming_capture(args: argparse.Namespace, store: StateStore) -> dict[str, Any]:
+    """Run the layer-major teacher replay without invoking legacy capture."""
+
+    from .capture import TeacherCaptureBlocked, stream_teacher_split
+    from .checkpoint import profile_fingerprint
+
+    result: dict[str, Any]
+    manifest_path = Path(args.dataset_manifest)
+    if not manifest_path.is_file():
+        result = {"status": "BLOCKED", "blocker_code": "STREAM_DATASET_MANIFEST_MISSING", "message": f"dataset manifest does not exist: {manifest_path}"}
+        store.transition(current_phase="streaming", phase_status="blocked", active_blocker=result["message"], next_exact_command=f"d2m streaming-capture --run-dir {args.run_dir} --split {args.split} --layers {args.layers} --dataset-manifest <manifest>", validation_results={"streaming_capture": result})
+        store.write_handoff(next_command=store.load().next_exact_command, expected_output="complete layer-major streaming corpus", blocker=result["message"])
+        return result
+    try:
+        payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+        if payload.get("status") != "CALIBRATION_READY":
+            raise ValueError("streaming capture requires a CALIBRATION_READY dataset manifest")
+        layers: list[int] = []
+        for part in str(args.layers).split(","):
+            part = part.strip()
+            if not part:
+                continue
+            if "-" in part:
+                start, stop = (int(item) for item in part.split("-", 1))
+                layers.extend(range(start, stop + 1))
+            else:
+                layers.append(int(part))
+        if not layers:
+            raise ValueError("at least one streaming capture layer is required")
+        state = store.load()
+        source = Path(args.source_dir) if args.source_dir else _source_dir_for_run(store)
+        expected_revision = str(payload.get("source_revision") or state.source_revision or "")
+        requested_revision = str(args.source_revision or expected_revision)
+        if expected_revision and requested_revision != expected_revision:
+            raise ValueError(f"source revision mismatch: dataset={expected_revision}, requested={requested_revision}")
+        result = stream_teacher_split(
+            source,
+            manifest_path,
+            store.run_dir,
+            split=args.split,
+            layers=layers,
+            device=args.device,
+            compute_dtype=args.compute_dtype,
+            shard_tokens=args.shard_tokens,
+            max_examples=args.max_examples,
+            attention_implementation=args.attention_implementation,
+        )
+        profile = _profile_from_args(argparse.Namespace(profile="qwen38_p8s1_top2", config=None))
+        expected_tokens = int(payload.get(f"{args.split}_tokens", 0))
+        complete_split = args.max_examples is None and (expected_tokens <= 0 or int(result["tokens"]) == expected_tokens)
+        quality_eligible = bool(args.split == "holdout" and complete_split and max(layers) >= 63)
+        result.update({
+            "profile": profile.name,
+            "profile_hash": profile_fingerprint(profile.as_dict()),
+            "selected_profile": profile.name,
+            "parent_run_id": state.parent_run_id,
+            "dataset_manifest": str(manifest_path),
+            "dataset_hash": payload.get("dataset_hash"),
+            "source_revision": requested_revision,
+            "source_config_hash": state.source_config_hash,
+            "source_index_hash": state.source_index_hash,
+            "quality_gate_eligible": quality_eligible,
+            "gate": "FULL_REAL_HOLDOUT_CAPTURE_GREEN" if quality_eligible else "STREAMING_SPLIT_COMPLETE",
+            "legacy_whole_model_capture_invoked": False,
+            "command": "d2m streaming-capture",
+            "hypothesis": "layer-major native replay removes whole-model residency pressure without changing teacher MLP inputs",
+            "falsifier": "selected-layer replay fails the validated 1176-token native/text-only equivalence",
+            "code_commit": current_git_commit(),
+        })
+        atomic_write_json(store.run_dir / "metrics" / "streaming-capture.json", result)
+        next_command = (
+            f"d2m oracle-study --run-dir {args.run_dir} --layer 0 --activation-manifest {store.run_dir / 'capture' / 'layer-0000-holdout.json'}"
+            if quality_eligible
+            else f"d2m streaming-capture --run-dir {args.run_dir} --split {args.split} --layers {args.layers} --dataset-manifest {args.dataset_manifest} --resume"
+        )
+        store.transition(current_phase="streaming", phase_status="complete" if quality_eligible else "pending", selected_profile=profile.name, active_blocker=None, next_exact_command=next_command, validation_results={"streaming_capture": result})
+        store.write_handoff(next_command=next_command, expected_output="real holdout oracle metrics" if quality_eligible else "validated rolling hidden-state stage", blocker=None)
+    except (OSError, ValueError, TypeError, RuntimeError, KeyError, TeacherCaptureBlocked) as exc:
+        result = {"status": "BLOCKED", "blocker_code": getattr(exc, "code", "STREAMING_CAPTURE_FAILED"), "message": str(exc), "profile": "qwen38_p8s1_top2", "legacy_whole_model_capture_invoked": False, "next_exact_command": f"d2m streaming-capture --run-dir {args.run_dir} --split {args.split} --layers {args.layers} --dataset-manifest {args.dataset_manifest} --resume", "code_commit": current_git_commit()}
+        atomic_write_json(store.run_dir / "metrics" / "streaming-capture.json", result)
+        store.transition(current_phase="streaming", phase_status="blocked", active_blocker=result["message"], next_exact_command=result["next_exact_command"], validation_results={"streaming_capture": result})
+        store.write_handoff(next_command=result["next_exact_command"], expected_output="resumable layer-major streaming corpus", blocker=result["message"])
+    return result
+
+
 def _partition_layer(args: argparse.Namespace, store: StateStore) -> dict[str, Any]:
     profile = load_config(args.config or str(Path(__file__).resolve().parents[2] / "configs" / "qwen38_p32s1_top2.yaml"))
     layer = args.layer if args.layer is not None else 0
@@ -1081,6 +1185,7 @@ HANDLERS: dict[str, Callable[[argparse.Namespace, StateStore], dict[str, Any]]] 
     "oracle-study": _oracle_study,
     "prepare-data": _prepare_data,
     "capture": _capture,
+    "streaming-capture": _streaming_capture,
     "partition-layer": _partition_layer,
     "train-layer": _train_layer,
     "validate-layer": _validate_layer,

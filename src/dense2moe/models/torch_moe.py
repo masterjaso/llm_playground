@@ -206,7 +206,13 @@ class TorchQwen35SwiGLUMoE(nn.Module):
         hidden = F.silu(self.expert_gate_proj[expert](x)) * self.expert_up_proj[expert](x)
         return self.expert_down_proj[expert](hidden)
 
-    def forward(self, inputs: Tensor, *, return_router: bool = False) -> Tensor | tuple[Tensor, dict[str, Tensor]]:
+    def forward(
+        self,
+        inputs: Tensor,
+        *,
+        return_router: bool = False,
+        return_contributions: bool = False,
+    ) -> Tensor | tuple[Tensor, dict[str, Tensor]]:
         runtime = _require_torch()
         if inputs.shape[-1] != self.hidden_size:
             raise ValueError("input hidden dimension does not match MoE layer")
@@ -217,8 +223,11 @@ class TorchQwen35SwiGLUMoE(nn.Module):
         values, indices = runtime.topk(logits, self.top_k, dim=-1)
         weights = runtime.softmax(values, dim=-1)
         routed = runtime.zeros_like(shared)
+        contributions: list[Tensor] = []
         for expert in range(self.routed_experts):
             contribution = self._expert_output(x, expert) * self.expert_scales[expert]
+            if return_contributions:
+                contributions.append(contribution.detach())
             selected = (indices == expert).to(contribution.dtype)
             coefficient = (weights * selected).sum(dim=-1, keepdim=True)
             routed = routed + contribution * coefficient
@@ -230,6 +239,10 @@ class TorchQwen35SwiGLUMoE(nn.Module):
             "weights": weights.reshape(*original_shape[:-1], self.top_k),
             "logits": logits.reshape(*original_shape[:-1], self.routed_experts),
         }
+        if return_contributions:
+            info["contributions"] = runtime.stack(contributions, dim=1).reshape(
+                *original_shape[:-1], self.routed_experts, self.hidden_size
+            )
         return result, info
 
     def state_dict_inventory(self) -> dict[str, Any]:

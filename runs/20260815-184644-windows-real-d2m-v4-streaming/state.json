@@ -1,0 +1,210 @@
+{
+  "active_blocker": "layer quality gate did not pass",
+  "artifact_paths": {
+    "artifact": "runs\\20260815-184644-windows-real-d2m-v4-streaming\\capture\\data-plan.json",
+    "decision_register": "runs\\20260815-184644-windows-real-d2m-v4-streaming\\decision-register.json",
+    "environment": "runs\\20260815-184644-windows-real-d2m-v4-streaming\\environment.json",
+    "fact_ledger": "runs\\20260815-184644-windows-real-d2m-v4-streaming\\repository-fact-ledger.json",
+    "source_manifest": "runs\\20260815-184644-windows-real-d2m-v4-streaming\\source-manifest.json"
+  },
+  "code_commit": "9d7751817b651952c72cb312a6762c61156ac3d5",
+  "current_phase": "training",
+  "last_successful_command": "inspect-source",
+  "next_exact_command": "d2m validate-layer --run-dir runs/20260815-184644-windows-real-d2m-v4-streaming --layer 0 --profile qwen38_p8s1_top2",
+  "parent_run_id": "20260815-180505-windows-real-d2m-v3",
+  "phase_status": "pending",
+  "prediction_contract": {
+    "expected_artifacts": [
+      "source-manifest.json"
+    ],
+    "expected_observations": [
+      "pinned revision",
+      "verified text config geometry",
+      "text tensor inventory"
+    ],
+    "expected_validation_results": [
+      "SOURCE_READY"
+    ]
+  },
+  "retry_counts": {},
+  "run_id": "20260815-184644-windows-real-d2m-v4-streaming",
+  "schema_version": 2,
+  "selected_profile": "qwen38_p8s1_top2",
+  "source_config_hash": "191e0af232104ed8b65258cf3fb2b842e288008baca7633c11b82a1ac7203aab",
+  "source_index_hash": "77042094076611b69791a610065f28b7013b8c621795fa86ddccc8bac7d1b9df",
+  "source_revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
+  "terminal_state": "BLOCKED",
+  "timestamps": {
+    "created": "2026-08-15T22:46:50.345978Z",
+    "updated": "2026-08-16T01:02:15.416049Z"
+  },
+  "validation_results": {
+    "train_layer": {
+      "code_commit": "9d7751817b651952c72cb312a6762c61156ac3d5",
+      "holdout_metrics": {
+        "cosine": 0.8954537549440021,
+        "dead_experts": 1,
+        "load_cv": 1.5307258003574875,
+        "mse": 0.00019451508982840297,
+        "normalized_mse": 0.18601850716983084,
+        "router_entropy": 1.18560645120347,
+        "selected_counts": [
+          15562.0,
+          14588.0,
+          2263.0,
+          609.0,
+          163.0,
+          9.0,
+          2.0,
+          0.0
+        ],
+        "streaming": true,
+        "token_count": 16598
+      },
+      "initial_holdout": {
+        "cosine": 0.8888264669971533,
+        "dead_experts": 6,
+        "load_cv": 1.732050807568877,
+        "mse": 0.0001994856546723508,
+        "normalized_mse": 0.19077195356248705,
+        "router_entropy": 2.0794415435441675,
+        "selected_counts": [
+          16598.0,
+          16598.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "streaming": true,
+        "token_count": 16598
+      },
+      "layer": 0,
+      "metadata": "runs\\20260815-184644-windows-real-d2m-v4-streaming\\layer-checkpoints\\layer-0000.json",
+      "next_exact_command": "d2m validate-layer --run-dir runs/20260815-184644-windows-real-d2m-v4-streaming --layer 0 --profile qwen38_p8s1_top2",
+      "oracle_holdout": {
+        "cosine": null,
+        "normalized_mse": null,
+        "status": "bounded-oracle-summary-pending",
+        "streaming": true
+      },
+      "status": "VALIDATION_FAILED",
+      "tensor_file": "runs\\20260815-184644-windows-real-d2m-v4-streaming\\layer-checkpoints\\layer-0000.safetensors",
+      "training_config": {
+        "best_holdout_stage": "router_warm_start",
+        "device": "cuda:1",
+        "epochs": 1,
+        "learning_rate": 0.001,
+        "loss_coefficients": {
+          "cosine": 0.05,
+          "load_balance": 0.01,
+          "mse": 1.0,
+          "router_z_loss": 0.001
+        },
+        "loss_version": "torch-distill-v1",
+        "microbatch": 512,
+        "optimizer": "AdamW",
+        "partition_path": "runs/20260815-184644-windows-real-d2m-v4-streaming/partitions/layer-0000.json",
+        "stage_holdout_metrics": [
+          {
+            "cosine": 0.8954537549440021,
+            "dead_experts": 1,
+            "load_cv": 1.5307258003574875,
+            "mse": 0.00019451508982840297,
+            "normalized_mse": 0.18601850716983084,
+            "router_entropy": 1.18560645120347,
+            "selected_counts": [
+              15562.0,
+              14588.0,
+              2263.0,
+              609.0,
+              163.0,
+              9.0,
+              2.0,
+              0.0
+            ],
+            "stage": "router_warm_start",
+            "streaming": true,
+            "token_count": 16598
+          },
+          {
+            "cosine": 0.861774767719273,
+            "dead_experts": 3,
+            "load_cv": 0.8051985243193925,
+            "mse": 0.00023210855625755659,
+            "normalized_mse": 0.2219698593793661,
+            "router_entropy": 1.4273236967997602,
+            "selected_counts": [
+              8718.0,
+              6602.0,
+              5231.0,
+              6599.0,
+              6046.0,
+              0.0,
+              0.0,
+              0.0
+            ],
+            "stage": "router_plus_scale",
+            "streaming": true,
+            "token_count": 16598
+          },
+          {
+            "cosine": 0.9345477083847169,
+            "dead_experts": 3,
+            "load_cv": 0.7799328154230869,
+            "mse": 0.00022518007974191406,
+            "normalized_mse": 0.2153440245429119,
+            "router_entropy": 1.4362471852048015,
+            "selected_counts": [
+              6881.0,
+              6973.0,
+              5710.0,
+              6969.0,
+              6663.0,
+              0.0,
+              0.0,
+              0.0
+            ],
+            "stage": "joint_expert_router",
+            "streaming": true,
+            "token_count": 16598
+          }
+        ],
+        "stages": [
+          {
+            "epoch": 1,
+            "epochs": 1,
+            "loss": 0.15899819135665894,
+            "stage": "router_warm_start",
+            "streaming": true,
+            "updates": 288
+          },
+          {
+            "epoch": 1,
+            "epochs": 1,
+            "loss": 0.024012813344597816,
+            "stage": "router_plus_scale",
+            "streaming": true,
+            "updates": 288
+          },
+          {
+            "epoch": 1,
+            "epochs": 1,
+            "loss": 0.020175190642476082,
+            "stage": "joint_expert_router",
+            "streaming": true,
+            "updates": 288
+          }
+        ],
+        "streaming_dataset": {
+          "holdout_count": 16598,
+          "holdout_manifest": "runs/20260815-184644-windows-real-d2m-v4-streaming/capture/layer-0000.json",
+          "train_count": 131508,
+          "train_manifest": "runs/20260815-184644-windows-real-d2m-v4-streaming/capture/layer-0000.json"
+        }
+      }
+    }
+  }
+}
