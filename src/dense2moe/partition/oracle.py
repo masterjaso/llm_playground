@@ -692,13 +692,28 @@ def _score_candidate_batches(
     """Stream candidate scoring into compact arrays/memmaps."""
 
     np = _np()
-    tokens, _experts, hidden = routed.shape
+    tokens, experts, hidden = routed.shape
     candidates = int(templates.shape[0])
     itemsize = np.dtype(np.float32).itemsize
+    requested_batch = max(1, min(int(batch_size), tokens))
+    # A caller may have a large historical batch-size default even when the
+    # contribution store is a read-only memmap.  Bound the decompressed input
+    # window itself before considering candidate score storage; otherwise one
+    # ``routed[start:stop]`` slice can still recreate the multi-gigabyte NPZ
+    # failure that this streaming path is meant to avoid.
+    input_bytes_per_token = ((experts + 2) * hidden + experts * experts + experts) * itemsize
+    max_batch_by_input = int(max_in_memory_bytes // max(input_bytes_per_token, 1))
+    if max_batch_by_input < 1:
+        raise ValueError(
+            "max_in_memory_bytes is smaller than one decompressed contribution row; "
+            f"need at least {int(input_bytes_per_token)} bytes"
+        )
+    effective_batch = max(1, min(requested_batch, max_batch_by_input))
+    input_batch_bytes = int(effective_batch * input_bytes_per_token)
     estimated_scores = tokens * candidates * np.dtype(np.float32).itemsize
     estimated_ids = tokens * candidates * top_k * np.dtype(np.int16).itemsize if not exact_global else 0
-    estimated_storage = estimated_scores + estimated_ids
-    use_memmap = estimated_scores > max_in_memory_bytes
+    available_storage = max(1, int(max_in_memory_bytes - input_batch_bytes))
+    use_memmap = estimated_scores > available_storage
     temporary_path: Path | None = None
     ids_path: Path | None = None
     if use_memmap:
@@ -713,7 +728,8 @@ def _score_candidate_batches(
         errors = np.empty((tokens, candidates), dtype=np.float32)
     ids_store: Any | None = None
     if not exact_global:
-        if estimated_ids > max_in_memory_bytes:
+        remaining_storage = available_storage if use_memmap else max(1, available_storage - estimated_scores)
+        if estimated_ids > remaining_storage:
             if storage_dir is None:
                 import tempfile
 
@@ -723,13 +739,20 @@ def _score_candidate_batches(
             ids_store = np.memmap(ids_path, mode="w+", dtype=np.int16, shape=(tokens, candidates, top_k))
         else:
             ids_store = np.empty((tokens, candidates, top_k), dtype=np.int16)
-    effective_batch = max(1, int(batch_size))
     # Candidate scoring uses the per-batch expert Gram matrix and correlation
     # vector, so the candidate block is [batch, candidates, top_k, top_k], not
     # [batch, candidates, top_k, hidden].
-    resident_storage = 0 if use_memmap or (not exact_global and estimated_ids > max_in_memory_bytes) else estimated_storage
-    working_budget = max(1, max_in_memory_bytes - resident_storage)
-    bytes_per_candidate = max(int(effective_batch * (top_k + 1) ** 2 * itemsize * 3), 1)
+    resident_storage = 0 if use_memmap else estimated_scores
+    if not exact_global and not isinstance(ids_store, np.memmap):
+        resident_storage += estimated_ids
+    working_budget = max(1, int(max_in_memory_bytes - input_batch_bytes - resident_storage))
+    # ``selected_rows`` is [batch, candidates, top_k, experts], so account for
+    # the expert dimension as well as the compact Gram/KKT blocks.  This keeps
+    # candidate chunks bounded even for p32 where experts > top_k.
+    bytes_per_candidate = max(
+        int(effective_batch * (top_k * experts + (top_k + 1) ** 2 * 3 + top_k) * itemsize),
+        1,
+    )
     candidate_chunk = max(1, min(candidates, working_budget // bytes_per_candidate))
     candidate_chunk = int(max(1, candidate_chunk))
     for start in range(0, tokens, effective_batch):
@@ -790,6 +813,9 @@ def _score_candidate_batches(
         "candidate_id_path": str(ids_path) if ids_path is not None else None,
         "candidate_count": candidates,
         "candidate_batch_size": effective_batch,
+        "requested_batch_size": requested_batch,
+        "input_bytes_per_token": int(input_bytes_per_token),
+        "input_batch_bytes": input_batch_bytes,
         "candidate_chunk_size": candidate_chunk,
     }
     return errors, ids_store, metadata

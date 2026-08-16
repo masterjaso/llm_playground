@@ -1,23 +1,27 @@
 """Run bounded load-aware oracle diagnostics from contribution arrays.
 
 The expensive teacher/model stage is intentionally kept separate.  A caller
-materializes FIT/validation-only ``.npz`` files containing ``shared``,
-``routed`` and ``target`` arrays, then this script evaluates p16/top4 and/or
-p32/top4/top5 with the same deterministic Lagrangian implementation.  This
-separation makes it impossible for the diagnostic to silently open the full
-holdout while still producing a concise quality/load Pareto report.
+materializes a FIT/validation-only contribution store containing
+``shared.npy``, ``routed.npy``, ``target.npy`` and ``manifest.json``.  The
+arrays are opened with NumPy read-only memory mapping, so the loader never
+eagerly decompresses a multi-gigabyte contribution cube.  A small ``.npz``
+fixture remains available only through the explicit ``--allow-eager-npz``
+test escape hatch.  This separation makes it impossible for the diagnostic to
+silently open the full holdout while still producing a concise quality/load
+Pareto report.
 
 Example::
 
     python scripts/run_load_aware_oracle.py \
-      --input p16_top4.npz --topology p16/top4 \
-      --input p32_top5.npz --topology p32/top5 \
+      --input validation/p16-top4-contributions --topology p16/top4 \
+      --input validation/p32-top5-contributions --topology p32/top5 \
       --output reports/load-aware-oracle.json
 """
 
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import sys
 from pathlib import Path
@@ -32,17 +36,81 @@ from dense2moe.partition import frozen_slice_load_aware_oracle
 from dense2moe.provenance import current_git_commit
 
 
-def _load_arrays(path: Path) -> tuple[Any, Any, Any]:
+_ARRAY_NAMES = ("shared", "routed", "target")
+
+
+def _sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for block in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(block)
+    return digest.hexdigest()
+
+
+def _validate_store_manifest(path: Path, manifest: dict[str, Any]) -> dict[str, Any]:
+    arrays = manifest.get("arrays")
+    if not isinstance(arrays, dict):
+        raise ValueError(f"{path / 'manifest.json'} must contain an 'arrays' mapping")
+    for name in _ARRAY_NAMES:
+        entry = arrays.get(name)
+        if not isinstance(entry, dict):
+            raise ValueError(f"{path / 'manifest.json'} is missing arrays.{name}")
+        relative = Path(str(entry.get("path", f"{name}.npy")))
+        candidate = (path / relative).resolve()
+        if candidate.parent != path.resolve():
+            raise ValueError(f"contribution array path escapes store: {relative}")
+        if candidate.suffix != ".npy":
+            raise ValueError(f"contribution array must be a .npy file: {relative}")
+        if not candidate.is_file():
+            raise FileNotFoundError(candidate)
+        entry["path"] = relative.as_posix()
+    return manifest
+
+
+def _load_arrays(path: Path, *, allow_eager_npz: bool = False) -> tuple[tuple[Any, Any, Any], dict[str, Any]]:
     try:
         import numpy as np
     except ImportError as exc:  # pragma: no cover - optional runtime dependency
         raise RuntimeError("numpy is required for load-aware oracle diagnostics") from exc
-    with np.load(path) as values:
-        required = {"shared", "routed", "target"}
+    if path.is_dir():
+        manifest_path = path / "manifest.json"
+        if not manifest_path.is_file():
+            raise FileNotFoundError(f"memory-mapped contribution stores require {manifest_path}")
+        manifest = _validate_store_manifest(path, json.loads(manifest_path.read_text(encoding="utf-8")))
+        arrays = tuple(
+            np.load(path / str(manifest["arrays"][name]["path"]), mmap_mode="r", allow_pickle=False)
+            for name in _ARRAY_NAMES
+        )
+        for name, values in zip(_ARRAY_NAMES, arrays):
+            if not isinstance(values, np.memmap):
+                raise ValueError(f"{path / name}.npy did not open as a read-only memmap")
+            entry = manifest["arrays"][name]
+            expected_shape = entry.get("shape")
+            if expected_shape is not None and list(values.shape) != list(expected_shape):
+                raise ValueError(f"{name} shape {values.shape} disagrees with manifest {expected_shape}")
+            expected_dtype = entry.get("dtype")
+            if expected_dtype is not None and str(values.dtype) != str(expected_dtype):
+                raise ValueError(f"{name} dtype {values.dtype} disagrees with manifest {expected_dtype}")
+        return arrays, {
+            "format": "npy_memmap",
+            "manifest": str(manifest_path),
+            "manifest_sha256": _sha256(manifest_path),
+            "array_paths": {name: str(path / str(manifest["arrays"][name]["path"])) for name in _ARRAY_NAMES},
+        }
+    if path.suffix.lower() != ".npz":
+        raise ValueError(f"input must be a contribution-store directory or .npz fixture: {path}")
+    if not allow_eager_npz:
+        raise ValueError(
+            f"refusing eager NPZ input {path}; use shared.npy/routed.npy/target.npy + manifest.json "
+            "or pass --allow-eager-npz for a small test fixture"
+        )
+    with np.load(path, allow_pickle=False) as values:
+        required = set(_ARRAY_NAMES)
         missing = sorted(required - set(values.files))
         if missing:
             raise ValueError(f"{path} is missing contribution arrays: {missing}")
-        return values["shared"], values["routed"], values["target"]
+        arrays = tuple(np.asarray(values[name]) for name in _ARRAY_NAMES)
+    return arrays, {"format": "eager_npz", "manifest": None, "manifest_sha256": None, "array_paths": {}}
 
 
 def run(
@@ -56,6 +124,7 @@ def run(
     batch_size: int,
     max_in_memory_bytes: int,
     storage_dir: Path | None,
+    allow_eager_npz: bool = False,
 ) -> dict[str, Any]:
     if len(inputs) != len(topologies):
         raise ValueError("each --input requires a matching --topology")
@@ -65,7 +134,7 @@ def run(
             raise ValueError(f"topology must look like p16/top4: {topology!r}")
         profile, raw_top_k = topology.split("/", 1)
         top_k = int(raw_top_k.removeprefix("top"))
-        shared, routed, target = _load_arrays(path)
+        (shared, routed, target), input_metadata = _load_arrays(path, allow_eager_npz=allow_eager_npz)
         expected_experts = {"p16": 16, "p32": 32}.get(profile)
         if expected_experts is None:
             raise ValueError(f"unsupported topology profile: {profile!r}")
@@ -100,6 +169,10 @@ def run(
                 "active_intermediate_width": (1024 + top_k * (1024 if profile == "p16" else 512)),
                 "ffn_reduction": 1.0 - (1024 + top_k * (1024 if profile == "p16" else 512)) / 17408.0,
                 "input": str(path),
+                "input_format": input_metadata["format"],
+                "input_manifest": input_metadata["manifest"],
+                "input_manifest_sha256": input_metadata["manifest_sha256"],
+                "input_array_paths": input_metadata["array_paths"],
                 "tokens": int(result["indices"].shape[0]),
                 "exact_or_bounded": result["assurance"],
                 "candidate_pool_size": result["candidate_pool_size"],
@@ -113,6 +186,10 @@ def run(
                 "coefficient_solver": result["coefficient_solver"],
                 "candidate_fit_exact": result["candidate_fit_exact"],
                 "candidate_chunk_size": result["candidate_chunk_size"],
+                "candidate_batch_size": result["candidate_batch_size"],
+                "requested_batch_size": result["requested_batch_size"],
+                "input_bytes_per_token": result["input_bytes_per_token"],
+                "input_batch_bytes": result["input_batch_bytes"],
                 "exact_oracle_global_nmse": result["unconstrained"]["global_nmse"],
                 "exact_oracle_cosine": result["unconstrained"]["cosine"],
                 "oracle_hard_quartile_cosine": result["unconstrained"]["hard_quartile_cosine"],
@@ -143,6 +220,7 @@ def run(
         "batch_size": int(batch_size),
         "max_in_memory_bytes": int(max_in_memory_bytes),
         "storage_dir": str(storage_dir) if storage_dir is not None else None,
+        "allow_eager_npz": bool(allow_eager_npz),
         "results": rows,
         "code_commit": current_git_commit(),
     }
@@ -160,6 +238,11 @@ def main() -> None:
     parser.add_argument("--batch-size", type=int, default=64)
     parser.add_argument("--max-in-memory-bytes", type=int, default=256 * 1024 * 1024)
     parser.add_argument("--storage-dir", type=Path, default=None)
+    parser.add_argument(
+        "--allow-eager-npz",
+        action="store_true",
+        help="allow a small NPZ fixture; real validation runs must use an mmap contribution directory",
+    )
     args = parser.parse_args()
     payload = run(
         args.input,
@@ -171,6 +254,7 @@ def main() -> None:
         batch_size=args.batch_size,
         max_in_memory_bytes=args.max_in_memory_bytes,
         storage_dir=args.storage_dir,
+        allow_eager_npz=args.allow_eager_npz,
     )
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")

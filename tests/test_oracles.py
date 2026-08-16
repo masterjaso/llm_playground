@@ -45,7 +45,7 @@ def test_load_aware_oracle_uses_bounded_float32_blocks_for_float64_inputs(tmp_pa
         top_k=4,
         iterations=1,
         batch_size=2,
-        max_in_memory_bytes=1024,
+        max_in_memory_bytes=4096,
         storage_dir=tmp_path,
         materialize_outputs=False,
     )
@@ -55,6 +55,8 @@ def test_load_aware_oracle_uses_bounded_float32_blocks_for_float64_inputs(tmp_pa
     assert result["coefficient_solver"].endswith("float32")
     assert result["weights"].dtype == np.float32
     assert result["candidate_error_storage"] == "memmap"
+    assert result["candidate_batch_size"] < 1024
+    assert result["input_batch_bytes"] <= 4096
 
 
 def test_load_aware_oracle_marks_p32_as_bounded_and_reports_candidate_count() -> None:
