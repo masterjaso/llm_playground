@@ -21,6 +21,7 @@ from ..provenance import current_git_commit
 from ..state import atomic_write_json
 
 LAYER_SCHEMA_VERSION = 2
+ROUTING_MODES = {"normalized_softmax", "independent_positive"}
 _GIT_COMMIT_PATTERN = re.compile(r"^[0-9a-f]{40}$")
 
 
@@ -71,6 +72,7 @@ class LayerCheckpoint:
     created_at: str = ""
     updated_at: str = ""
     code_commit: str = field(default_factory=current_git_commit)
+    routing_mode: str = "normalized_softmax"
 
     def as_dict(self) -> dict[str, Any]:
         now = _now()
@@ -89,6 +91,7 @@ class LayerCheckpoint:
             "partition_strategy": self.partition_strategy,
             "partition_hash": self.partition_hash,
             "router_architecture": self.router_architecture,
+            "routing_mode": self.routing_mode,
             "training_seed": self.training_seed,
             "training_config": self.training_config,
             "tensor_file": self.tensor_file,
@@ -123,6 +126,7 @@ def _metadata_to_checkpoint(payload: Mapping[str, Any]) -> LayerCheckpoint:
         partition_strategy=str(payload.get("partition_strategy", "contiguous")),
         partition_hash=str(payload.get("partition_hash", "")),
         router_architecture=str(payload.get("router_architecture", "topk-normalized")),
+        routing_mode=str(payload.get("routing_mode", "normalized_softmax")),
         training_seed=int(payload.get("training_seed", 0)),
         training_config=dict(payload.get("training_config", {})),
         tensor_file=payload.get("tensor_file"),
@@ -143,6 +147,8 @@ def _metadata_to_checkpoint(payload: Mapping[str, Any]) -> LayerCheckpoint:
 def save_layer_checkpoint(checkpoint: LayerCheckpoint, path: str | Path) -> Path:
     """Write metadata only; real workers must publish a tensor artifact too."""
 
+    if checkpoint.routing_mode not in ROUTING_MODES:
+        raise ValueError(f"unsupported routing_mode: {checkpoint.routing_mode}")
     if checkpoint.status == "TRAINED_VALIDATED":
         commit = str(checkpoint.code_commit)
         if not _GIT_COMMIT_PATTERN.fullmatch(commit):
@@ -220,6 +226,8 @@ def validate_layer_checkpoint(
         errors.append("legacy schema")
     if checkpoint.status != "TRAINED_VALIDATED":
         errors.append(f"status is {checkpoint.status!r}")
+    if checkpoint.routing_mode not in ROUTING_MODES:
+        errors.append(f"unsupported routing_mode {checkpoint.routing_mode!r}")
     for field_name in ("profile_hash", "source_revision", "source_config_hash", "source_index_hash", "dataset_hash", "partition_hash"):
         if not getattr(checkpoint, field_name):
             errors.append(f"missing {field_name}")

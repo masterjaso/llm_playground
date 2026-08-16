@@ -14,10 +14,11 @@
     "5": 0.01687352450439692,
     "6": 0.010126070227102305
   },
+  "p8_quality_compute_elbow": {"profile": "p8", "top_k": 4, "active_intermediate_width": 9216, "rationale": "first strong quality/compute knee; k5 and k6 remain diagnostic quality endpoints with increasingly dense active width", "nmse_gain_k5_over_k4": 0.008528112852089434, "nmse_gain_k6_over_k5": 0.006747454276910593},
   "finalists_selected_before_holdout": [
-    {"profile": "p8", "top_k": 4, "dev_nmse": 0.025401637356608355, "holdout_nmse": 0.022180944110429163},
-    {"profile": "p8", "top_k": 6, "dev_nmse": 0.010126070227102305, "holdout_nmse": 0.008752492145587761},
-    {"profile": "p16", "top_k": 4, "dev_nmse": 0.051105876151999456, "holdout_nmse": 0.045592499930941416}
+    {"profile": "p8", "top_k": 4, "dev_nmse": 0.025401637356608355, "dev_cosine": 0.9720384553074837, "holdout_nmse": 0.022180944110429163, "holdout_cosine": 0.9736115616162809, "active_intermediate_width": 9216, "expert_dispatches_per_token": 4},
+    {"profile": "p8", "top_k": 6, "dev_nmse": 0.010126070227102305, "dev_cosine": 0.989030711352825, "holdout_nmse": 0.008752492145587761, "holdout_cosine": 0.9897614555023336, "active_intermediate_width": 13312, "expert_dispatches_per_token": 6},
+    {"profile": "p16", "top_k": 4, "dev_nmse": 0.04983624052097766, "dev_cosine": 0.9454130679368973, "holdout_nmse": 0.04436550826754667, "holdout_cosine": 0.9477491313282992, "active_intermediate_width": 5120, "expert_dispatches_per_token": 4}
   ],
   "identical_layer0_training": [
     {"profile": "qwen38_p8s1_top4", "status": "RESEARCH_CANDIDATE", "holdout_nmse": 0.08282298284781404, "cosine": 0.9659823840433523},
@@ -25,6 +26,15 @@
     {"profile": "qwen38_p16s1_top4", "status": "VALIDATION_FAILED", "holdout_nmse": 0.1089928465672149, "cosine": 0.9396539162492046}
   ],
   "training_budget": {"epochs": 1, "microbatch": 512, "learning_rate": 0.0001, "seed": 17},
+  "training_routing_mode": "independent_positive",
+  "independent_positive_training": [
+    {"profile": "qwen38_p8s1_top4", "status": "RESEARCH_CANDIDATE", "holdout_nmse": 0.04103405177813487, "cosine": 0.9682082035898056, "oracle_holdout_nmse": 0.022180944110429163},
+    {"profile": "qwen38_p8s1_top6", "status": "TRAINED_VALIDATED", "holdout_nmse": 0.018899123945427157, "cosine": 0.9833764382939351, "oracle_holdout_nmse": 0.008752492145587761},
+    {"profile": "qwen38_p16s1_top4", "status": "VALIDATION_FAILED", "holdout_nmse": 0.06838882519672046, "cosine": 0.9457615761458694, "oracle_holdout_nmse": 0.04436550826754667}
+  ],
   "holdout_policy": "full holdout read once after the dev finalist list was frozen",
+  "p16_p32_selection_method": "residual_correlation_beam_search_exact_final_coefficients",
+  "denseish_quality_upper_bound": {"profile": "qwen38_p8s14_top2", "status": "DENSEISH_QUALITY_UPPER_BOUND", "holdout_nmse": 0.0020866937502252362, "cosine": 0.9975998342173662, "active_ffn_width": 15104, "active_ffn_ratio": 0.8676470588235294, "production_candidate": false},
+  "provisional_recommendation": "p8/k6 independent_positive is the trained sparse leader; keep representative-layer replay paused until equal-budget oracle-regret extension confirms the choice",
   "safe_replay_checkpoint": "train rolling replay durable through layer 29; layer 30 partial work stopped"
 }

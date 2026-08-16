@@ -33,11 +33,13 @@ def main() -> None:
             shutil.copy2(tensor, baseline_dir / tensor.name)
     train_manifest = run / "capture/layer-0000.json"
     source = Path(args.source_dir)
-    finalists = (
-        ("qwen38_p8s1_top4", run / "partitions/layer-0000-p8-top4-architecture-finalist.json"),
-        ("qwen38_p8s1_top6", run / "partitions/layer-0000-p8-top6-architecture-finalist.json"),
-        ("qwen38_p16s1_top4", run / "partitions/layer-0000-p16-top4-architecture-finalist.json"),
-    )
+    search = json.loads((run / "reports/architecture-search.json").read_text(encoding="utf-8"))
+    finalists = []
+    for selected in search["finalists_selected_on_dev"]:
+        profile_name = str(selected["profile"])
+        top_k = int(selected["top_k"])
+        config_name = {"p8": "qwen38_p8s1", "p16": "qwen38_p16s1", "p32": "qwen38_p32s1"}[profile_name] + f"_top{top_k}"
+        finalists.append((config_name, run / "partitions" / f"layer-0000-{profile_name}-top{top_k}-architecture-finalist.json"))
     results = []
     for profile_name, partition in finalists:
         profile = load_config(Path("configs") / f"{profile_name}.yaml")

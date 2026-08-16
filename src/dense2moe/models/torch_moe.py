@@ -4,8 +4,8 @@ The NumPy target in :mod:`dense2moe.models.qwen_moe` is intentionally kept as
 the dependency-light numerical oracle.  This module is the trainable path used
 by one-layer distillation and by the tiny full-model save/reload spike.  It
 uses the same Hugging Face weight orientation (``[out, in]``), preserves the
-selected dense partition, and performs normalized top-k routing without token
-dropping.
+selected dense partition, and supports normalized-simplex or independent-
+positive top-k routing without token dropping.
 """
 
 from __future__ import annotations
@@ -68,7 +68,7 @@ def _partition_from_payload(payload: Mapping[str, Any]) -> PartitionPlan:
 
 
 class TorchQwen35SwiGLUMoE(nn.Module):
-    """Trainable shared+routed SwiGLU layer with normalized top-k routing.
+    """Trainable shared+routed SwiGLU layer with explicit routing semantics.
 
     ``from_dense`` initializes every routed and shared parameter from one
     immutable dense layer according to the supplied :class:`PartitionPlan`.
@@ -78,6 +78,7 @@ class TorchQwen35SwiGLUMoE(nn.Module):
     """
 
     architecture = "qwen3_5_text_torch_swiglu_moe_v1"
+    ROUTING_MODES = {"normalized_softmax", "independent_positive"}
 
     def __init__(
         self,
@@ -88,6 +89,7 @@ class TorchQwen35SwiGLUMoE(nn.Module):
         expert_intermediate_size: int,
         shared_intermediate_size: int,
         top_k: int = 2,
+        routing_mode: str = "normalized_softmax",
         partition: PartitionPlan | None = None,
         learnable_scales: bool = False,
         dtype: Any | None = None,
@@ -99,6 +101,8 @@ class TorchQwen35SwiGLUMoE(nn.Module):
             raise ValueError("MoE dimensions must be positive")
         if top_k <= 0 or top_k > routed_experts:
             raise ValueError("top_k must be in [1, routed_experts]")
+        if routing_mode not in self.ROUTING_MODES:
+            raise ValueError("routing_mode must be normalized_softmax or independent_positive")
         if partition is None:
             if intermediate_size != shared_intermediate_size + routed_experts * expert_intermediate_size:
                 raise ValueError("partition capacity must equal intermediate_size")
@@ -117,6 +121,7 @@ class TorchQwen35SwiGLUMoE(nn.Module):
         self.expert_intermediate_size = int(expert_intermediate_size)
         self.shared_intermediate_size = int(shared_intermediate_size)
         self.top_k = int(top_k)
+        self.routing_mode = str(routing_mode)
         self.partition = partition
         linear_kwargs: dict[str, Any] = {"bias": False}
         if dtype is not None:
@@ -136,6 +141,16 @@ class TorchQwen35SwiGLUMoE(nn.Module):
             [nn.Linear(expert_intermediate_size, hidden_size, **linear_kwargs) for _ in range(routed_experts)]
         )
         self.router = nn.Linear(hidden_size, routed_experts, bias=False, **{key: value for key, value in linear_kwargs.items() if key != "bias"})
+        if self.routing_mode == "independent_positive":
+            # A bias gives the positive router a stable amplitude-one starting
+            # point while retaining an unconstrained, token-dependent scale.
+            amplitude_kwargs = {key: value for key, value in linear_kwargs.items() if key != "bias"}
+            amplitude_kwargs["bias"] = True
+            self.amplitude_router = nn.Linear(hidden_size, routed_experts, **amplitude_kwargs)
+            inverse_softplus_one = float(runtime.log(runtime.expm1(runtime.tensor(1.0))).item())
+            with runtime.no_grad():
+                self.amplitude_router.weight.zero_()
+                self.amplitude_router.bias.fill_(inverse_softplus_one)
         if learnable_scales:
             self.expert_scales = nn.Parameter(runtime.ones(routed_experts, **{key: value for key, value in linear_kwargs.items() if key in {"dtype", "device"}}))
         else:
@@ -152,8 +167,10 @@ class TorchQwen35SwiGLUMoE(nn.Module):
         routed_experts: int,
         shared_intermediate_size: int,
         top_k: int = 2,
+        routing_mode: str = "normalized_softmax",
         partition: PartitionPlan | None = None,
         router: Any | None = None,
+        amplitude_router: Any | None = None,
         learnable_scales: bool = False,
         dtype: Any | None = None,
         device: Any | None = None,
@@ -175,6 +192,7 @@ class TorchQwen35SwiGLUMoE(nn.Module):
             expert_intermediate_size=partition.expert_intermediate_size,
             shared_intermediate_size=partition.shared_intermediate_size,
             top_k=top_k,
+            routing_mode=routing_mode,
             partition=partition,
             learnable_scales=learnable_scales,
             dtype=dtype or gate.dtype,
@@ -200,6 +218,13 @@ class TorchQwen35SwiGLUMoE(nn.Module):
                 model.router.weight.copy_(value)
             else:
                 model.router.weight.zero_()
+            if routing_mode == "independent_positive" and amplitude_router is not None:
+                value = _as_tensor(amplitude_router, dtype=model.amplitude_router.weight.dtype, device=model.amplitude_router.weight.device)
+                if tuple(value.shape) == (hidden_size, routed_experts):
+                    value = value.T
+                if tuple(value.shape) != tuple(model.amplitude_router.weight.shape):
+                    raise ValueError("amplitude router weight shape mismatch")
+                model.amplitude_router.weight.copy_(value)
         return model
 
     def _expert_output(self, x: Tensor, expert: int) -> Tensor:
@@ -212,7 +237,7 @@ class TorchQwen35SwiGLUMoE(nn.Module):
         *,
         return_router: bool = False,
         return_contributions: bool = False,
-    ) -> Tensor | tuple[Tensor, dict[str, Tensor]]:
+    ) -> Tensor | tuple[Tensor, dict[str, Any]]:
         runtime = _require_torch()
         if inputs.shape[-1] != self.hidden_size:
             raise ValueError("input hidden dimension does not match MoE layer")
@@ -221,7 +246,12 @@ class TorchQwen35SwiGLUMoE(nn.Module):
         shared = self.shared_down_proj(F.silu(self.shared_gate_proj(x)) * self.shared_up_proj(x))
         logits = self.router(x)
         values, indices = runtime.topk(logits, self.top_k, dim=-1)
-        weights = runtime.softmax(values, dim=-1)
+        amplitude_logits = None
+        if self.routing_mode == "normalized_softmax":
+            weights = runtime.softmax(values, dim=-1)
+        else:
+            amplitude_logits = self.amplitude_router(x)
+            weights = F.softplus(runtime.gather(amplitude_logits, dim=-1, index=indices))
         routed = runtime.zeros_like(shared)
         contributions: list[Tensor] = []
         for expert in range(self.routed_experts):
@@ -238,7 +268,10 @@ class TorchQwen35SwiGLUMoE(nn.Module):
             "indices": indices.reshape(*original_shape[:-1], self.top_k),
             "weights": weights.reshape(*original_shape[:-1], self.top_k),
             "logits": logits.reshape(*original_shape[:-1], self.routed_experts),
+            "routing_mode": self.routing_mode,
         }
+        if amplitude_logits is not None:
+            info["amplitude_logits"] = amplitude_logits.reshape(*original_shape[:-1], self.routed_experts)
         if return_contributions:
             info["contributions"] = runtime.stack(contributions, dim=1).reshape(
                 *original_shape[:-1], self.routed_experts, self.hidden_size
@@ -271,6 +304,7 @@ class TorchQwen35SwiGLUMoE(nn.Module):
             "expert_intermediate_size": self.expert_intermediate_size,
             "shared_intermediate_size": self.shared_intermediate_size,
             "top_k": self.top_k,
+            "routing_mode": self.routing_mode,
             "learnable_scales": self.learnable_scales,
             "partition": self.partition.as_dict(),
             "partition_hash": self.partition_hash(),
@@ -301,6 +335,7 @@ class TorchQwen35SwiGLUMoE(nn.Module):
             expert_intermediate_size=int(config["expert_intermediate_size"]),
             shared_intermediate_size=int(config["shared_intermediate_size"]),
             top_k=int(config["top_k"]),
+            routing_mode=str(config.get("routing_mode", "normalized_softmax")),
             partition=partition,
             learnable_scales=bool(config.get("learnable_scales", False)),
             dtype=next(iter(state.values())).dtype,

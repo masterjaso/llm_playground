@@ -69,6 +69,7 @@ class MoEProfile:
     model: str = "Qwen/Qwen3.8-27B"
     revision: str = "main"
     dtype: str = "bfloat16"
+    routing_mode: str = "normalized_softmax"
 
     @property
     def routed_capacity(self) -> int:
@@ -101,6 +102,8 @@ class MoEProfile:
             raise ValueError(f"profile values must be positive: {', '.join(invalid)}")
         if self.top_k > self.routed_experts:
             raise ValueError("top_k cannot exceed routed_experts")
+        if self.routing_mode not in {"normalized_softmax", "independent_positive"}:
+            raise ValueError("routing_mode must be normalized_softmax or independent_positive")
         if self.total_capacity != self.dense_intermediate_size:
             raise ValueError(
                 "capacity mismatch: routed_experts * expert_intermediate_size "
@@ -155,6 +158,7 @@ class MoEProfile:
             expert_intermediate_size=int(normalized["expert_intermediate_size"]),
             shared_intermediate_size=int(normalized["shared_intermediate_size"]),
             top_k=int(normalized["top_k"]),
+            routing_mode=str(normalized.get("routing_mode", "normalized_softmax")),
         )
         profile.validate()
         return profile
@@ -168,4 +172,3 @@ def write_config_json(profile: MoEProfile, path: str | Path) -> None:
     target = Path(path)
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(json.dumps(profile.as_dict(), indent=2, sort_keys=True) + "\n", encoding="utf-8")
-

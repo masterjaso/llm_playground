@@ -8,4 +8,5 @@ routed_experts: 16
 expert_intermediate_size: 1024
 shared_intermediate_size: 1024
 top_k: 4
+routing_mode: independent_positive
 dtype: bfloat16

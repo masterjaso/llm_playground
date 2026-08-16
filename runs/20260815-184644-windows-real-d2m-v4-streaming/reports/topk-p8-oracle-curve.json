@@ -1,7 +1,7 @@
 {
-  "code_commit": "964dcc6d3c90f3af7b60c11ddb9e7f5827320ee5",
+  "code_commit": "2b9c50aabb376df92baae7fdb37da3e4c80ef63c",
   "dev_subset": {
-    "code_commit": "964dcc6d3c90f3af7b60c11ddb9e7f5827320ee5",
+    "code_commit": "2b9c50aabb376df92baae7fdb37da3e4c80ef63c",
     "schema_version": 1,
     "selected_count": 16384,
     "selected_global_indices": [
@@ -16399,6 +16399,7 @@
     "source_split": "train",
     "status": "ARCHITECTURE_DEV_SUBSET_READY",
     "token_id_note": "The capture stores MLP inputs, not token IDs; global row IDs and record/offset keys are the deterministic token identity.",
+    "token_ids_hash": "5a7739c753dae98698a8c1a22c6a10409230f0750b33cfc9631594f16d8b8e1c",
     "tokenizer_hash": "135547ffd6ba69bf188782195b85e2c33b124c7238c0d4e2d95e5cba74ebe716"
   },
   "profile": {
@@ -16418,7 +16419,7 @@
       "coefficient_sum_mse_from_one": 0.0,
       "cosine": 0.8965493738651276,
       "dense_ffn_parameters": 267386880,
-      "elapsed_seconds": 0.582944699912332,
+      "elapsed_seconds": 0.5492566999746487,
       "expert_usage_cv": 2.111562075432112,
       "expert_usage_fraction": [
         0.07208251953125,
@@ -33904,7 +33905,7 @@
       "coefficient_sum_mse_from_one": null,
       "cosine": 0.8905653096735477,
       "dense_ffn_parameters": 267386880,
-      "elapsed_seconds": 0.23830150009598583,
+      "elapsed_seconds": 0.23746240010950714,
       "expert_usage_cv": 2.120261069273506,
       "expert_usage_fraction": [
         0.08489990234375,
@@ -51390,7 +51391,7 @@
       "coefficient_sum_mse_from_one": 0.0,
       "cosine": 0.9081367701292038,
       "dense_ffn_parameters": 267386880,
-      "elapsed_seconds": 1.5230632998864166,
+      "elapsed_seconds": 1.4910070000914857,
       "expert_usage_cv": 1.4668726895139008,
       "expert_usage_fraction": [
         0.41802978515625,
@@ -68876,7 +68877,7 @@
       "coefficient_sum_mse_from_one": null,
       "cosine": 0.9379244036972523,
       "dense_ffn_parameters": 267386880,
-      "elapsed_seconds": 1.3788343998603523,
+      "elapsed_seconds": 1.3222772001754493,
       "expert_usage_cv": 1.2954352901592834,
       "expert_usage_fraction": [
         0.29486083984375,
@@ -86362,7 +86363,7 @@
       "coefficient_sum_mse_from_one": 0.0,
       "cosine": 0.9087037220597267,
       "dense_ffn_parameters": 267386880,
-      "elapsed_seconds": 4.2957046999945305,
+      "elapsed_seconds": 4.224724500090815,
       "expert_usage_cv": 1.1342952889424065,
       "expert_usage_fraction": [
         0.32696533203125,
@@ -103848,7 +103849,7 @@
       "coefficient_sum_mse_from_one": null,
       "cosine": 0.9589768126606941,
       "dense_ffn_parameters": 267386880,
-      "elapsed_seconds": 3.7929527001688257,
+      "elapsed_seconds": 3.699902600084897,
       "expert_usage_cv": 0.9127299783939934,
       "expert_usage_fraction": [
         0.27734375,
@@ -121334,7 +121335,7 @@
       "coefficient_sum_mse_from_one": 0.0,
       "cosine": 0.9087549187242985,
       "dense_ffn_parameters": 267386880,
-      "elapsed_seconds": 6.9463165999623016,
+      "elapsed_seconds": 6.7687914001289755,
       "expert_usage_cv": 0.8933569079533095,
       "expert_usage_fraction": [
         0.2491302490234375,
@@ -138820,7 +138821,7 @@
       "coefficient_sum_mse_from_one": null,
       "cosine": 0.9720384553074837,
       "dense_ffn_parameters": 267386880,
-      "elapsed_seconds": 6.098242099920753,
+      "elapsed_seconds": 6.068122199969366,
       "expert_usage_cv": 0.643865787986193,
       "expert_usage_fraction": [
         0.233306884765625,
@@ -156306,7 +156307,7 @@
       "coefficient_sum_mse_from_one": 0.0,
       "cosine": 0.9087596908211708,
       "dense_ffn_parameters": 267386880,
-      "elapsed_seconds": 6.89157470013015,
+      "elapsed_seconds": 6.521217200148385,
       "expert_usage_cv": 0.693699010057693,
       "expert_usage_fraction": [
         0.19989013671875,
@@ -173792,7 +173793,7 @@
       "coefficient_sum_mse_from_one": null,
       "cosine": 0.9815639555454254,
       "dense_ffn_parameters": 267386880,
-      "elapsed_seconds": 6.068824000132736,
+      "elapsed_seconds": 5.909642199985683,
       "expert_usage_cv": 0.4401006812083653,
       "expert_usage_fraction": [
         0.1956787109375,
@@ -191278,7 +191279,7 @@
       "coefficient_sum_mse_from_one": 0.0,
       "cosine": 0.9087598770856857,
       "dense_ffn_parameters": 267386880,
-      "elapsed_seconds": 4.059317100036424,
+      "elapsed_seconds": 4.000448199803941,
       "expert_usage_cv": 0.5096546927711506,
       "expert_usage_fraction": [
         0.16666666666666666,
@@ -208764,7 +208765,7 @@
       "coefficient_sum_mse_from_one": null,
       "cosine": 0.9890307113528252,
       "dense_ffn_parameters": 267386880,
-      "elapsed_seconds": 3.62077970005339,
+      "elapsed_seconds": 3.6474348000483587,
       "expert_usage_cv": 0.28001413375419276,
       "expert_usage_fraction": [
         0.16608683268229166,
@@ -226261,7 +226262,7 @@
     {
       "active_intermediate_width": 5120,
       "formulation": "positive",
-      "normalized_mse": 0.051105876151999456,
+      "normalized_mse": 0.04983624052097766,
       "profile": "p16",
       "top_k": 4
     }

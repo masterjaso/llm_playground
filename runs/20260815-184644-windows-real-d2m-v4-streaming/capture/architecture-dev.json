@@ -1,5 +1,5 @@
 {
-  "code_commit": "964dcc6d3c90f3af7b60c11ddb9e7f5827320ee5",
+  "code_commit": "2b9c50aabb376df92baae7fdb37da3e4c80ef63c",
   "schema_version": 1,
   "selected_count": 16384,
   "selected_global_indices": [
@@ -16389,7 +16389,6 @@
     131499
   ],
   "selected_row_key_hash": "5a7739c753dae98698a8c1a22c6a10409230f0750b33cfc9631594f16d8b8e1c",
-  "token_ids_hash": "5a7739c753dae98698a8c1a22c6a10409230f0750b33cfc9631594f16d8b8e1c",
   "selection_method": "sha256_ranked_stable_token_rows",
   "selection_seed": 20260815,
   "source_count": 131508,
@@ -16398,5 +16397,6 @@
   "source_split": "train",
   "status": "ARCHITECTURE_DEV_SUBSET_READY",
   "token_id_note": "The capture stores MLP inputs, not token IDs; global row IDs and record/offset keys are the deterministic token identity.",
+  "token_ids_hash": "5a7739c753dae98698a8c1a22c6a10409230f0750b33cfc9631594f16d8b8e1c",
   "tokenizer_hash": "135547ffd6ba69bf188782195b85e2c33b124c7238c0d4e2d95e5cba74ebe716"
 }

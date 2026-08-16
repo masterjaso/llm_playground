@@ -29,6 +29,10 @@
   "profile": "qwen38_p8s14_top2",
   "profile_hash": "23204b0b9e1b1ad1ee82d3947f8e4c4143879198f41d0f853d38b368de7d124f",
   "quality_gate": {
+    "classification": "DENSEISH_QUALITY_UPPER_BOUND",
+    "production_candidate": false,
+    "active_intermediate_width": 15104,
+    "active_ffn_ratio": 0.8676470588235294,
     "metrics": {
       "cosine": 0.9975998342173662,
       "dead_experts": 0,
@@ -49,10 +53,11 @@
       "streaming": true,
       "token_count": 16598
     },
-    "overall": "green",
+    "overall": "denseish-quality-upper-bound",
     "thresholds_version": "initial-2026-08-15"
   },
   "router_architecture": "torch-linear-topk-normalized-v1",
+  "routing_mode": "normalized_softmax",
   "router_metrics": {
     "actual_improvement": 0.001000697540825911,
     "dead_experts": 0,
@@ -72,7 +77,7 @@
   "source_config_hash": "191e0af232104ed8b65258cf3fb2b842e288008baca7633c11b82a1ac7203aab",
   "source_index_hash": "77042094076611b69791a610065f28b7013b8c621795fa86ddccc8bac7d1b9df",
   "source_revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
-  "status": "TRAINED_VALIDATED",
+  "status": "DENSEISH_QUALITY_UPPER_BOUND",
   "tensor_file": "layer-0000.safetensors",
   "tensor_inventory": {
     "model.layers.0.expert_down_proj.0.weight": {
@@ -335,6 +340,7 @@
     "optimizer": "AdamW",
     "partition_path": "runs/20260815-184644-windows-real-d2m-v4-streaming/partitions/layer-0000-p8s14.json",
     "router_initialization": "bounded_train_contribution_lstsq",
+    "routing_mode": "normalized_softmax",
     "stage_holdout_metrics": [
       {
         "cosine": 0.997085157597348,

@@ -1,23 +1,23 @@
 {
-  "code_commit": "964dcc6d3c90f3af7b60c11ddb9e7f5827320ee5",
-  "created_at": "2026-08-16T02:39:25.195269Z",
+  "code_commit": "2b9c50aabb376df92baae7fdb37da3e4c80ef63c",
+  "created_at": "2026-08-16T03:18:54.480296Z",
   "dataset_hash": "46b278a85b4cb31a8fe659be2dd146bd9206eb491268220e25440981d06c0a03",
   "holdout_metrics": {
-    "cosine": 0.9659823840433523,
+    "cosine": 0.9682082035898056,
     "dead_experts": 0,
-    "load_cv": 0.21667485722739493,
-    "mse": 8.660600600235145e-05,
-    "normalized_mse": 0.08282298284781404,
-    "router_entropy": 1.9959015322817508,
+    "load_cv": 0.2575354940857064,
+    "mse": 4.290832341945463e-05,
+    "normalized_mse": 0.04103405177813487,
+    "router_entropy": 1.991311243951055,
     "selected_counts": [
-      11114.0,
-      7446.0,
-      7041.0,
-      7136.0,
-      7178.0,
-      6353.0,
-      8833.0,
-      11291.0
+      11566.0,
+      7322.0,
+      6695.0,
+      6822.0,
+      6949.0,
+      6283.0,
+      8699.0,
+      12056.0
     ],
     "streaming": true,
     "token_count": 16598
@@ -27,24 +27,24 @@
   "partition_hash": "62f221632d87a9240fb071ba7f0d79336170ce6432ec3488af91765cb44d5808",
   "partition_strategy": "artifact",
   "profile": "qwen38_p8s1_top4",
-  "profile_hash": "3d2f21909b0a56ffe7a83e7883aeadaa7803534501528572670c5758dc5e1f51",
+  "profile_hash": "7368a437a12c2bb57344044eba09c841ce3d730a37a14acf736ffa4eccb11cdc",
   "quality_gate": {
     "metrics": {
-      "cosine": 0.9659823840433523,
+      "cosine": 0.9682082035898056,
       "dead_experts": 0,
-      "load_cv": 0.21667485722739493,
-      "mse": 8.660600600235145e-05,
-      "normalized_mse": 0.08282298284781404,
-      "router_entropy": 1.9959015322817508,
+      "load_cv": 0.2575354940857064,
+      "mse": 4.290832341945463e-05,
+      "normalized_mse": 0.04103405177813487,
+      "router_entropy": 1.991311243951055,
       "selected_counts": [
-        11114.0,
-        7446.0,
-        7041.0,
-        7136.0,
-        7178.0,
-        6353.0,
-        8833.0,
-        11291.0
+        11566.0,
+        7322.0,
+        6695.0,
+        6822.0,
+        6949.0,
+        6283.0,
+        8699.0,
+        12056.0
       ],
       "streaming": true,
       "token_count": 16598
@@ -52,22 +52,23 @@
     "overall": "research-candidate",
     "thresholds_version": "initial-2026-08-15"
   },
-  "router_architecture": "torch-linear-topk-normalized-v1",
+  "router_architecture": "torch-linear-topk-independent_positive-v1",
   "router_metrics": {
-    "actual_improvement": 0.18354068658731898,
+    "actual_improvement": 0.016406261124574696,
     "dead_experts": 0,
-    "load_cv": 0.21667485722739493,
+    "load_cv": 0.2575354940857064,
     "selected_counts": [
-      11114.0,
-      7446.0,
-      7041.0,
-      7136.0,
-      7178.0,
-      6353.0,
-      8833.0,
-      11291.0
+      11566.0,
+      7322.0,
+      6695.0,
+      6822.0,
+      6949.0,
+      6283.0,
+      8699.0,
+      12056.0
     ]
   },
+  "routing_mode": "independent_positive",
   "schema_version": 2,
   "source_config_hash": "191e0af232104ed8b65258cf3fb2b842e288008baca7633c11b82a1ac7203aab",
   "source_index_hash": "77042094076611b69791a610065f28b7013b8c621795fa86ddccc8bac7d1b9df",
@@ -75,6 +76,19 @@
   "status": "RESEARCH_CANDIDATE",
   "tensor_file": "layer-0000.safetensors",
   "tensor_inventory": {
+    "model.layers.0.amplitude_router.bias": {
+      "dtype": "float32",
+      "shape": [
+        8
+      ]
+    },
+    "model.layers.0.amplitude_router.weight": {
+      "dtype": "float32",
+      "shape": [
+        8,
+        5120
+      ]
+    },
     "model.layers.0.expert_down_proj.0.weight": {
       "dtype": "float32",
       "shape": [
@@ -278,16 +292,16 @@
       ]
     }
   },
-  "tensor_sha256": "d59cff7adb5ac7e1249031c6d82c6c7ca145e11cb7f61fc139f842744cb0f565",
+  "tensor_sha256": "2cccd4099a4408abc40c01c536a290deebcf7ac22f740ecd3c178b6a7c9c0526",
   "tensors": {},
   "train_metrics": {
     "all_expert_reconstruction_mse": 0.0,
     "initial_holdout": {
-      "cosine": 0.9000887183026098,
+      "cosine": 0.9581871322299044,
       "dead_experts": 0,
       "load_cv": 0.6770602677381683,
-      "mse": 0.00027853009829766523,
-      "normalized_mse": 0.266363669435133,
+      "mse": 6.006395704402365e-05,
+      "normalized_mse": 0.05744031290270957,
       "router_entropy": 1.9447205016405873,
       "selected_counts": [
         16013.0,
@@ -335,65 +349,66 @@
     "optimizer": "AdamW",
     "partition_path": "runs\\20260815-184644-windows-real-d2m-v4-streaming\\partitions\\layer-0000-p8-top4-architecture-finalist.json",
     "router_initialization": "bounded_train_contribution_lstsq",
+    "routing_mode": "independent_positive",
     "stage_holdout_metrics": [
       {
-        "cosine": 0.9056589209555086,
+        "cosine": 0.9608229616346496,
         "dead_experts": 0,
-        "load_cv": 0.7150694137869462,
-        "mse": 0.0002727471880057243,
-        "normalized_mse": 0.26083336152661607,
-        "router_entropy": 1.9272498077822817,
+        "load_cv": 0.714778807237047,
+        "mse": 4.687550971343986e-05,
+        "normalized_mse": 0.04482794803946229,
+        "router_entropy": 1.9278289173464989,
         "selected_counts": [
-          16411.0,
-          8040.0,
-          2342.0,
-          2163.0,
-          2625.0,
-          4611.0,
-          13613.0,
-          16587.0
+          16406.0,
+          8047.0,
+          2337.0,
+          2161.0,
+          2634.0,
+          4615.0,
+          13607.0,
+          16585.0
         ],
         "stage": "router_warm_start",
         "streaming": true,
         "token_count": 16598
       },
       {
-        "cosine": 0.8910645152706886,
+        "cosine": 0.9385877003194568,
         "dead_experts": 0,
-        "load_cv": 0.3975573782042334,
-        "mse": 0.0002892808542723885,
-        "normalized_mse": 0.2766448233503865,
-        "router_entropy": 1.9864340061767372,
+        "load_cv": 0.32192845564829115,
+        "mse": 8.131470313516348e-05,
+        "normalized_mse": 0.07776280853842724,
+        "router_entropy": 1.979980608485868,
         "selected_counts": [
-          11846.0,
-          6640.0,
-          5990.0,
-          6098.0,
-          6284.0,
-          5735.0,
-          8363.0,
-          15436.0
+          12306.0,
+          6899.0,
+          6246.0,
+          6452.0,
+          6654.0,
+          6003.0,
+          8704.0,
+          13128.0
         ],
         "stage": "router_plus_scale",
         "streaming": true,
         "token_count": 16598
       },
       {
-        "cosine": 0.9659823840433523,
+        "cosine": 0.9682082035898056,
         "dead_experts": 0,
-        "load_cv": 0.21667485722739493,
-        "mse": 8.660600600235145e-05,
-        "normalized_mse": 0.08282298284781404,
-        "router_entropy": 1.9959015322817508,
+        "load_cv": 0.2575354940857064,
+        "mse": 4.290832341945463e-05,
+        "normalized_mse": 0.04103405177813487,
+        "router_entropy": 1.991311243951055,
         "selected_counts": [
-          11114.0,
-          7446.0,
-          7041.0,
-          7136.0,
-          7178.0,
-          6353.0,
-          8833.0,
-          11291.0
+          11566.0,
+          7322.0,
+          6695.0,
+          6822.0,
+          6949.0,
+          6283.0,
+          8699.0,
+          12056.0
         ],
         "stage": "joint_expert_router",
         "streaming": true,
@@ -404,7 +419,7 @@
       {
         "epoch": 1,
         "epochs": 1,
-        "loss": 0.25823599100112915,
+        "loss": 0.2552528381347656,
         "stage": "router_warm_start",
         "streaming": true,
         "updates": 288
@@ -412,7 +427,7 @@
       {
         "epoch": 1,
         "epochs": 1,
-        "loss": 0.060143984854221344,
+        "loss": 0.05715315043926239,
         "stage": "router_plus_scale",
         "streaming": true,
         "updates": 288
@@ -420,7 +435,7 @@
       {
         "epoch": 1,
         "epochs": 1,
-        "loss": 0.05434080958366394,
+        "loss": 0.05407043918967247,
         "stage": "joint_expert_router",
         "streaming": true,
         "updates": 288
@@ -434,5 +449,5 @@
     }
   },
   "training_seed": 17,
-  "updated_at": "2026-08-16T02:39:25.195269Z"
+  "updated_at": "2026-08-16T03:18:54.480296Z"
 }

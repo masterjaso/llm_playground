@@ -309,6 +309,15 @@ def _oracle_indices_for_batch(
     return oracle_topk(shared, routed, target, top_k=top_k)["indices"]
 
 
+def _enable_router_parameters(model: TorchQwen35SwiGLUMoE) -> None:
+    """Enable selection and independent-positive amplitude router parameters."""
+
+    model.router.weight.requires_grad = True
+    if model.routing_mode == "independent_positive":
+        model.amplitude_router.weight.requires_grad = True
+        model.amplitude_router.bias.requires_grad = True
+
+
 def _train_stage_streaming(
     model: TorchQwen35SwiGLUMoE,
     dataset: ActivationShardDataset,
@@ -332,7 +341,7 @@ def _train_stage_streaming(
 
     for parameter in model.parameters():
         parameter.requires_grad = False
-    model.router.weight.requires_grad = True
+    _enable_router_parameters(model)
     if train_scales:
         model.expert_scales.requires_grad = True
     if train_experts:
@@ -419,7 +428,7 @@ def _train_stage(
 
     for parameter in model.parameters():
         parameter.requires_grad = False
-    model.router.weight.requires_grad = True
+    _enable_router_parameters(model)
     if train_scales:
         model.expert_scales.requires_grad = True
     if train_experts:
@@ -527,6 +536,7 @@ def train_torch_layer(
         routed_experts=plan.routed_experts,
         shared_intermediate_size=plan.shared_intermediate_size,
         top_k=profile.top_k,
+        routing_mode=profile.routing_mode,
         partition=plan,
         learnable_scales=True,
     )
@@ -656,7 +666,8 @@ def train_torch_layer(
         dataset_hash=dataset_hash,
         partition_strategy="artifact",
         partition_hash=partition_hash,
-        router_architecture="torch-linear-topk-normalized-v1",
+        router_architecture=f"torch-linear-topk-{profile.routing_mode}-v1",
+        routing_mode=profile.routing_mode,
         training_seed=seed,
         training_config={
             "epochs": epochs,
@@ -666,6 +677,7 @@ def train_torch_layer(
             "optimizer": "AdamW",
             "loss_version": "torch-distill-v1",
             "loss_coefficients": {"mse": 1.0, "cosine": 0.05, "load_balance": 0.05, "router_z_loss": 0.001},
+            "routing_mode": profile.routing_mode,
             "stages": stages,
             "stage_holdout_metrics": stage_metrics,
             "best_holdout_stage": best_stage,

@@ -3,9 +3,10 @@
 The script deliberately keeps the expensive teacher corpus out of the search
 path: it selects a deterministic row subset from the captured TRAIN manifest,
 computes frozen SwiGLU contributions in bounded GPU batches, and evaluates an
-exact small-k simplex/positive oracle for p8.  Larger expert counts use the
-same coefficient solve after a deterministic norm-ranked selection because an
-exhaustive p32 combination search is not a meaningful bounded experiment.
+exact small-k simplex/positive oracle for p8.  Larger expert counts use a
+deterministic residual-correlation candidate pool, bounded beam search, and an
+exact final positive/simplex coefficient solve; exhaustive p32 enumeration is
+not a meaningful bounded experiment.
 
 The resulting JSON artifacts are run evidence, not a trainable quality claim.
 The holdout is read only after the TRAIN/dev finalist list is frozen, and is
@@ -310,6 +311,83 @@ def _norm_ranked_topk(shared: Any, routed: Any, target: Any, top_k: int, *, simp
     return {"errors": error, "indices": ids, "weights": coeff, "selection_method": "norm_ranked_selection_then_exact_coefficients"}
 
 
+def _residual_correlation_beam_topk(
+    shared: Any,
+    routed: Any,
+    target: Any,
+    top_k: int,
+    *,
+    simplex: bool,
+    beam_width: int = 4,
+    pool_size: int | None = None,
+) -> dict[str, Any]:
+    """Bounded residual-correlation pool plus beam search.
+
+    This is intentionally stronger than norm ranking: each token gets a pool
+    ranked by correlation with the teacher residual, then a small beam explores
+    combinations.  Fast unconstrained coefficient fits score intermediate beam
+    extensions; the retained final beam is refined with the exact positive or
+    simplex active-face solve.  Beam and pool bounds keep p16/p32 finite.
+    """
+
+    import torch
+
+    n, experts, width = routed.shape
+    residual = target - shared
+    pool_size = min(experts, int(pool_size or max(8, 2 * top_k + 2)))
+    correlations = torch.einsum("neh,nh->ne", routed, residual)
+    pool = torch.topk(correlations, k=pool_size, dim=1, largest=True, sorted=True).indices
+    beam_width = max(1, min(int(beam_width), pool_size))
+    beam_ids = torch.empty((n, 1, 0), dtype=torch.long, device=routed.device)
+    for step in range(top_k):
+        candidate_errors: list[Any] = []
+        candidate_ids: list[Any] = []
+        for beam in range(beam_ids.shape[1]):
+            prefix = beam_ids[:, beam, :]
+            for pool_slot in range(pool_size):
+                expert_ids = pool[:, pool_slot]
+                ids = torch.cat((prefix, expert_ids.unsqueeze(1)), dim=1)
+                matrix = torch.gather(routed, 1, ids.unsqueeze(-1).expand(-1, -1, width))
+                gram = torch.bmm(matrix, matrix.transpose(1, 2))
+                rhs = torch.bmm(matrix, residual.unsqueeze(-1)).squeeze(-1)
+                coeff = _solve_subset(gram, rhs, tuple(range(step + 1)), simplex=simplex)
+                coeff = coeff.clamp_min(0.0)
+                if simplex:
+                    coeff = coeff / coeff.sum(dim=1, keepdim=True).clamp_min(1e-12)
+                error = _candidate_error(gram, rhs, (residual * residual).sum(dim=1), coeff)
+                duplicate = (prefix == expert_ids.unsqueeze(1)).any(dim=1) if step else torch.zeros(n, dtype=torch.bool, device=routed.device)
+                error = torch.where(duplicate, torch.full_like(error, float("inf")), error)
+                candidate_errors.append(error)
+                candidate_ids.append(ids)
+        errors = torch.stack(candidate_errors, dim=1)
+        keep = min(beam_width, errors.shape[1])
+        _, selected = torch.topk(errors, k=keep, dim=1, largest=False, sorted=True)
+        all_ids = torch.stack(candidate_ids, dim=1)
+        gather_ids = selected.unsqueeze(-1).expand(-1, -1, step + 1)
+        beam_ids = torch.gather(all_ids, 1, gather_ids)
+    # Refine only the bounded final beam with the exact active-face solve.
+    exact_errors = []
+    exact_weights = []
+    for beam in range(beam_ids.shape[1]):
+        ids = beam_ids[:, beam]
+        matrix = torch.gather(routed, 1, ids.unsqueeze(-1).expand(-1, -1, width))
+        error, weights = _exact_combo(matrix, residual, top_k, simplex=simplex)
+        exact_errors.append(error)
+        exact_weights.append(weights)
+    refined_errors = torch.stack(exact_errors, dim=1)
+    refined_weights = torch.stack(exact_weights, dim=1)
+    refined_best = refined_errors.argmin(dim=1)
+    rows = torch.arange(n, device=routed.device)
+    return {
+        "errors": refined_errors[rows, refined_best],
+        "indices": beam_ids[rows, refined_best],
+        "weights": refined_weights[rows, refined_best],
+        "selection_method": "residual_correlation_beam_search_exact_final_coefficients",
+        "candidate_pool_size": pool_size,
+        "beam_width": beam_width,
+    }
+
+
 def _route_reconstruction(shared: Any, routed: Any, result: dict[str, Any], scales: np.ndarray | None = None) -> Any:
     import torch
 
@@ -358,6 +436,7 @@ def _evaluate_profile(
     device: str,
     batch_size: int,
     exact: bool,
+    search_method: str | None = None,
     top_ks: Iterable[int],
     split_name: str,
 ) -> list[dict[str, Any]]:
@@ -373,7 +452,7 @@ def _evaluate_profile(
                 "profile": profile["name"],
                 "top_k": int(k),
                 "formulation": "simplex" if simplex else "positive",
-                "selection_method": "exact_all_combinations_active_faces" if exact else "norm_ranked_selection_then_exact_coefficients",
+                "selection_method": "exact_all_combinations_active_faces" if exact else "residual_correlation_beam_search_exact_final_coefficients" if search_method == "beam" else search_method or "norm_ranked_selection_then_exact_coefficients",
                 "split": split_name,
                 "tokens": 0,
                 "error_sum": 0.0,
@@ -395,6 +474,8 @@ def _evaluate_profile(
             tic = time.perf_counter()
             if exact:
                 route = _exact_topk(shared, routed, target, k, simplex=simplex)
+            elif search_method == "beam":
+                route = _residual_correlation_beam_topk(shared, routed, target, k, simplex=simplex)
             else:
                 route = _norm_ranked_topk(shared, routed, target, k, simplex=simplex)
             item["elapsed_seconds"] += time.perf_counter() - tic
@@ -512,7 +593,7 @@ def _run(args: argparse.Namespace) -> dict[str, Any]:
             ks = (4, 6)
             exact = False
         print(f"evaluating {p['name']} {list(ks)} exact={exact} on {inputs.shape[0]} dev tokens", flush=True)
-        results = _evaluate_profile(p, inputs, weights_cpu, plan, device=device, batch_size=args.batch_size, exact=exact, top_ks=ks, split_name="architecture_dev")
+        results = _evaluate_profile(p, inputs, weights_cpu, plan, device=device, batch_size=args.batch_size, exact=exact, search_method=None if exact else "beam", top_ks=ks, split_name="architecture_dev")
         for result in results:
             result["partition_strategy"] = "activation_magnitude"
             result["partition"] = partition_payload
@@ -520,12 +601,25 @@ def _run(args: argparse.Namespace) -> dict[str, Any]:
         all_results.extend(results)
         _json(run / "reports" / f"topk-{p['name']}-architecture-dev.json", {"profile": p, "results": results, "dev": dev_meta})
     p8 = [r for r in all_results if r["profile"] == "p8"]
-    # Selection is train-dev only.  Keep three interpretable Pareto points:
-    # p8/k4 is the first strong elbow, p8/k6 is the quality ceiling, and
-    # p16/k4 is the equal-active-width granularity finalist.  The full
-    # holdout is not consulted until after this list is frozen.
-    finalist_specs = (("p8", 4), ("p8", 6), ("p16", 4))
+    # Selection is train-dev only.  Keep the first strong p8 elbow, the p8
+    # quality endpoint, and the best more-sparse p16/p32 positive candidate at
+    # <=5120 active width.  k5 remains an explicitly recorded reserve point;
+    # the full holdout is not consulted until this list is frozen.
+    sparse_candidates = [r for r in all_results if r["profile"] != "p8" and r["formulation"] == "positive" and r["active_intermediate_width"] <= 5120]
+    if not sparse_candidates:
+        raise RuntimeError("p16/p32 fair-search produced no sparse candidate")
+    best_sparse = min(sparse_candidates, key=lambda r: (r["normalized_mse"], r["active_intermediate_width"]))
+    finalist_specs = (("p8", 4), ("p8", 6), (best_sparse["profile"], best_sparse["top_k"]))
     finalists = [next(r for r in all_results if r["profile"] == profile and r["top_k"] == k and r["formulation"] == "positive") for profile, k in finalist_specs]
+    p8_positive = {int(r["top_k"]): r for r in p8 if r["formulation"] == "positive"}
+    p8_elbow = {
+        "profile": "p8",
+        "top_k": 4,
+        "active_intermediate_width": int(p8_positive[4]["active_intermediate_width"]),
+        "rationale": "first strong quality/compute knee; k5 and k6 remain diagnostic quality endpoints with increasingly dense active width",
+        "nmse_gain_k5_over_k4": float(p8_positive[4]["normalized_mse"] - p8_positive[5]["normalized_mse"]),
+        "nmse_gain_k6_over_k5": float(p8_positive[5]["normalized_mse"] - p8_positive[6]["normalized_mse"]),
+    }
     payload = {
         "schema_version": 1,
         "status": "ARCHITECTURE_DEV_SEARCH_COMPLETE",
@@ -537,8 +631,10 @@ def _run(args: argparse.Namespace) -> dict[str, Any]:
         "selection_policy": "deterministic TRAIN architecture-dev subset; full holdout reserved for finalists",
         "results": all_results,
         "p8_exact": True,
-        "p16_p32_selection_method": "norm_ranked_selection_then_exact_coefficients",
-        "finalists_selected_on_dev": [{"profile": r["profile"], "top_k": r["top_k"], "formulation": r["formulation"], "normalized_mse": r["normalized_mse"], "active_intermediate_width": r["active_intermediate_width"]} for r in finalists],
+        "p16_p32_selection_method": "residual_correlation_beam_search_exact_final_coefficients",
+        "finalists_selected_on_dev": [{"profile": r["profile"], "top_k": r["top_k"], "formulation": r["formulation"], "normalized_mse": r["normalized_mse"], "cosine": r["cosine"], "active_intermediate_width": r["active_intermediate_width"], "active_ffn_parameter_ratio": r["active_ffn_parameter_ratio"], "expert_dispatches_per_token": int(r["top_k"])} for r in finalists],
+        "p8_top5_reserve": next(r for r in p8 if r["top_k"] == 5 and r["formulation"] == "positive"),
+        "p8_quality_compute_elbow": p8_elbow,
         "code_commit": current_git_commit(),
     }
     _json(run / "reports/topk-p8-oracle-curve.json", {"dev_subset": dev_meta, "profile": _profile("p8", 8, 2048, 1024), "results": p8, "selection": payload["finalists_selected_on_dev"], "code_commit": current_git_commit()})
@@ -550,7 +646,7 @@ def _run(args: argparse.Namespace) -> dict[str, Any]:
     holdout_results: list[dict[str, Any]] = []
     for profile_name, top_k in finalist_specs:
         profile = next(p for p in profiles if p["name"] == profile_name)
-        result_rows = _evaluate_profile(profile, holdout_inputs, weights_cpu, plans[profile_name], device=device, batch_size=args.batch_size, exact=profile_name == "p8", top_ks=(top_k,), split_name="full_holdout_confirmation")
+        result_rows = _evaluate_profile(profile, holdout_inputs, weights_cpu, plans[profile_name], device=device, batch_size=args.batch_size, exact=profile_name == "p8", search_method=None if profile_name == "p8" else "beam", top_ks=(top_k,), split_name="full_holdout_confirmation")
         row = next(r for r in result_rows if r["formulation"] == "positive")
         row["partition_strategy"] = "activation_magnitude_frozen_from_architecture_dev"
         row["dev_selection_hash"] = dev_meta["selected_row_key_hash"]
@@ -578,6 +674,7 @@ def _run(args: argparse.Namespace) -> dict[str, Any]:
             "profile": finalist_profile,
             "profile_name": finalist_profile["name"],
             "top_k": int(row["top_k"]),
+            "routing_mode": "independent_positive",
             "strategy": "activation_magnitude",
             "initial_expert_scales": row["learned_global_scales"],
             "scale_fit_scope": "architecture_dev_train_only",
@@ -596,7 +693,7 @@ def _run(args: argparse.Namespace) -> dict[str, Any]:
         f"- Architecture-dev row-key hash: `{dev_meta['selected_row_key_hash']}`",
         f"- Holdout confirmation rows: **{holdout_inputs.shape[0]}**",
         "- p8 k=1..6: exact all-combination active-face simplex and positive oracles.",
-        "- p16/p32: deterministic norm-ranked selection with exact coefficients on the selected set; not an exhaustive p32 combination claim.",
+        "- p16/p32: deterministic residual-correlation candidate pools with bounded beam search and exact final positive/simplex coefficient solves; not an exhaustive p32 combination claim.",
         "",
         "## p8 exact curve (TRAIN/dev)",
         "",
@@ -605,12 +702,14 @@ def _run(args: argparse.Namespace) -> dict[str, Any]:
     ]
     for row in sorted((r for r in p8 if r["formulation"] == "positive"), key=lambda r: r["top_k"]):
         lines.append(f"| {row['top_k']} | {row['normalized_mse']:.6f} | {row['learned_scale_normalized_mse']:.6f} | {row['cosine']:.4f} | {row['active_intermediate_width']} |")
-    lines += ["", "## Frozen finalists", "", "| profile | k | dev positive NMSE | holdout positive NMSE | active width |", "|---|---:|---:|---:|---:|"]
+    lines += ["", f"Quality/compute elbow: **p8/k4** is the first strong knee at width {p8_elbow['active_intermediate_width']} (NMSE gain k5 over k4: {p8_elbow['nmse_gain_k5_over_k4']:.6f}; k6 over k5: {p8_elbow['nmse_gain_k6_over_k5']:.6f}). k5/k6 remain diagnostic quality endpoints with increasingly dense active width."]
+    lines += ["", "## Frozen finalists", "", "| profile | k | dev NMSE | dev cosine | holdout NMSE | holdout cosine | active width | dispatches/token |", "|---|---:|---:|---:|---:|---:|---:|---:|"]
     holdout_by_key = {(r["profile"], r["top_k"]): r for r in holdout_results}
     for row in finalists:
         hold = holdout_by_key[(row["profile"], row["top_k"])]
-        lines.append(f"| {row['profile']} | {row['top_k']} | {row['normalized_mse']:.6f} | {hold['normalized_mse']:.6f} | {row['active_intermediate_width']} |")
-    lines += ["", "The p8/top2 trained checkpoint remains the historical baseline; no deeper representative replay was started after the safe layer-29 checkpoint.", ""]
+        lines.append(f"| {row['profile']} | {row['top_k']} | {row['normalized_mse']:.6f} | {row['cosine']:.4f} | {hold['normalized_mse']:.6f} | {hold['cosine']:.4f} | {row['active_intermediate_width']} | {row['top_k']} |")
+    reserve = next(r for r in p8 if r["top_k"] == 5 and r["formulation"] == "positive")
+    lines += ["", f"p8/k5 remains a dev-selected reserve point (NMSE {reserve['normalized_mse']:.6f}, active width {reserve['active_intermediate_width']}) and was not trained under the three-finalist cap.", "", "Current provisional recommendation: p8/k6 independent-positive is the trained sparse leader, but representative-layer replay remains paused until its oracle regret is resolved with an equal-budget extension; p8s14 is not eligible.", "", "The p8s14/top2 checkpoint is classified `DENSEISH_QUALITY_UPPER_BOUND` (NMSE 0.002087, cosine 0.997600) because it retains 15,104/17,408 active FFN width (86.8%); it is a control, not the production candidate. No deeper representative replay was started after the safe layer-29 checkpoint.", ""]
     (run / "reports/TOP_K_ARCHITECTURE_SEARCH.md").write_text("\n".join(lines), encoding="utf-8")
     return payload
 

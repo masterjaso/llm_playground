@@ -6,7 +6,8 @@ Status: complete. Selection used only a deterministic TRAIN architecture-dev sub
 - Architecture-dev row-key hash: `5a7739c753dae98698a8c1a22c6a10409230f0750b33cfc9631594f16d8b8e1c`
 - Holdout confirmation rows: **16598**
 - p8 k=1..6: exact all-combination active-face simplex and positive oracles.
-- p16/p32: deterministic norm-ranked selection with exact coefficients on the selected set; not an exhaustive p32 combination claim.
+- p16/p32: deterministic residual-correlation candidate pools with bounded beam search and exact final positive/simplex coefficient solves; not an exhaustive p32 combination claim.
+- Finalist training used `routing_mode: independent_positive`; normalized-softmax remains a baseline mode only.
 
 ## p8 exact curve (TRAIN/dev)
 
@@ -19,24 +20,28 @@ Status: complete. Selection used only a deterministic TRAIN architecture-dev sub
 | 5 | 0.016874 | 0.016873 | 0.9816 | 11264 |
 | 6 | 0.010126 | 0.010126 | 0.9890 | 13312 |
 
+Quality/compute elbow: **p8/k4** is the first strong knee at width 9216 (NMSE gain k5 over k4: 0.008528; k6 over k5: 0.006747). k5/k6 remain diagnostic quality endpoints with increasingly dense active width.
+
 ## Frozen finalists
 
-| profile | k | dev positive NMSE | holdout positive NMSE | active width |
-|---|---:|---:|---:|---:|
-| p8 | 4 | 0.025402 | 0.022181 | 9216 |
-| p8 | 6 | 0.010126 | 0.008752 | 13312 |
-| p16 | 4 | 0.051106 | 0.045592 | 5120 |
+| profile | k | dev NMSE | dev cosine | holdout NMSE | holdout cosine | active width | dispatches/token |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| p8 | 4 | 0.025402 | 0.9720 | 0.022181 | 0.9736 | 9216 | 4 |
+| p8 | 6 | 0.010126 | 0.9890 | 0.008752 | 0.9898 | 13312 | 6 |
+| p16 | 4 | 0.049836 | 0.9454 | 0.044366 | 0.9477 | 5120 | 4 |
 
-The p8/top2 trained checkpoint remains the historical baseline; no deeper representative replay was started after the safe layer-29 checkpoint.
+p8/k5 remains a dev-selected reserve point (NMSE 0.016874, active width 11264) and was not trained under the three-finalist cap.
 
-## Identical layer-0 finalist budget
+Current provisional recommendation: p8/k6 independent-positive is the trained sparse leader, but representative-layer replay remains paused until its oracle regret is resolved with an equal-budget extension; p8s14 is not eligible.
 
-All three frozen finalists were trained for one epoch with microbatch 512, learning rate 1e-4, seed 17, and the same streaming train/holdout manifests:
+The p8s14/top2 checkpoint is classified `DENSEISH_QUALITY_UPPER_BOUND` (NMSE 0.002087, cosine 0.997600) because it retains 15,104/17,408 active FFN width (86.8%); it is a control, not the production candidate. No deeper representative replay was started after the safe layer-29 checkpoint.
 
-| profile | training status | trained holdout NMSE | cosine | dead experts | load CV |
-|---|---|---:|---:|---:|---:|
-| p8/k4 | research candidate | 0.082823 | 0.9660 | 0 | 0.217 |
-| p8/k6 | research candidate | 0.081370 | 0.9776 | 0 | 0.271 |
-| p16/k4 | validation failed | 0.108993 | 0.9397 | 0 | 0.292 |
+## Independent-positive finalist training
 
-The frozen oracle ceilings are substantially better than the one-epoch trained values, so these results measure the bounded training budget rather than a final architecture ceiling.
+| profile | routing mode | status | trained holdout NMSE | cosine | oracle holdout NMSE |
+|---|---|---|---:|---:|---:|
+| p8/k4 | independent_positive | research candidate | 0.041034 | 0.9682 | 0.022181 |
+| p8/k6 | independent_positive | trained validated | 0.018899 | 0.9834 | 0.008752 |
+| p16/k4 | independent_positive | validation failed | 0.068389 | 0.9458 | 0.044366 |
+
+Independent-positive routing materially closes the normalized-router gap. p8/k6 is the current sparse leader; its remaining gap to the oracle is an optimization-budget question, not a forced coefficient-sum limitation.
