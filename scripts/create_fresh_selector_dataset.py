@@ -138,6 +138,7 @@ def build_corpus(
     source_cache: Path,
     historical_corpus: Path | None,
     max_chars: int,
+    max_records_per_source: int | None = None,
 ) -> dict[str, Any]:
     historical = _historical_hashes(historical_corpus)
     records: list[dict[str, Any]] = []
@@ -150,6 +151,8 @@ def build_corpus(
         if "Gutenberg" in source["name"]:
             text = _clean_gutenberg(text)
         chunks = _chunks(text, max_chars=max_chars)
+        if max_records_per_source is not None:
+            chunks = chunks[:max_records_per_source]
         source_receipts.append(
             {
                 "name": source["name"],
@@ -221,7 +224,8 @@ def main() -> None:
     parser.add_argument("--seed", type=int, default=20260816)
     parser.add_argument("--holdout-seed", type=int, default=20260817)
     parser.add_argument("--shadow-seed", type=int, default=20260818)
-    parser.add_argument("--max-chars", type=int, default=8_000)
+    parser.add_argument("--max-chars", type=int, default=16_000)
+    parser.add_argument("--max-records-per-source", type=int, default=800)
     args = parser.parse_args()
     if args.validation_a_count <= 0 or args.validation_b_count <= 0:
         raise ValueError("validation A/B counts must be positive")
@@ -233,6 +237,7 @@ def main() -> None:
         source_cache=cache_dir,
         historical_corpus=args.historical_corpus,
         max_chars=args.max_chars,
+        max_records_per_source=args.max_records_per_source,
     )
     data_plan = root / "capture" / "fresh-selector-data-plan.json"
     receipt = root / "capture" / "fresh-selector-corpus-receipt.json"
