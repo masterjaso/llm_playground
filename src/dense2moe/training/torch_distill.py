@@ -918,7 +918,11 @@ def train_torch_layer(
         initialized_from_checkpoint = True
     partition_payload = json.loads(Path(partition_path).read_text(encoding="utf-8"))
     initial_scales = partition_payload.get("initial_expert_scales")
-    if initial_scales is not None:
+    # A strict checkpoint reload is authoritative for every tensor, including
+    # learned expert scales.  Reapplying partition initialization here would
+    # silently mutate a frozen basis before a selector-only continuation and
+    # would make the reported checkpoint differ from the input checkpoint.
+    if initial_scales is not None and not initialized_from_checkpoint:
         if not isinstance(initial_scales, list) or len(initial_scales) != plan.routed_experts:
             raise ValueError("initial_expert_scales must contain one value per routed expert")
         with torch.no_grad():
