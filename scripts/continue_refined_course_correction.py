@@ -39,7 +39,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
             "loss_coefficients": {"mse": 1.0, "cosine": 0.75, "load_balance": 0.25, "oracle": 0.02, "oracle_amplitude": 0.02, "router_z_loss": 0.001},
         },
     ]
-    output_dir = run_dir / "layer-checkpoints/clean-validation/p16-top4-refined-course-correction-continue"
+    output_dir = run_dir / "layer-checkpoints/clean-validation" / args.output_name
     result = train_torch_layer(
         source_dir=source_dir,
         activation_manifest=run_dir / "capture/layer-0000.json",
@@ -79,7 +79,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         "stage_schedule": schedule,
         "result": result,
     }
-    report_path = run_dir / "reports/p16-top4-refined-course-correction-continuation.json"
+    report_path = run_dir / "reports" / args.report_name
     report_path.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     return report
 
@@ -92,6 +92,8 @@ def main() -> None:
     parser.add_argument("--microbatch", type=int, default=512)
     parser.add_argument("--learning-rate", type=float, default=1e-4)
     parser.add_argument("--epochs", type=int, default=2)
+    parser.add_argument("--output-name", default="p16-top4-refined-course-correction-continue")
+    parser.add_argument("--report-name", default="p16-top4-refined-course-correction-continuation.json")
     args = parser.parse_args()
     report = run(args)
     result = report["result"]
