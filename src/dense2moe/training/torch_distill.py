@@ -789,6 +789,7 @@ def train_torch_layer(
     code_commit: str | None = None,
     stage_schedule: Sequence[Mapping[str, Any]] | None = None,
     selection_indices: Sequence[int] | None = None,
+    selection_union_indices: Sequence[int] | None = None,
     fit_exclude_indices: Sequence[int] | None = None,
     selection_identity_hash: str | None = None,
     validation_b_indices: Sequence[int] | None = None,
@@ -808,6 +809,9 @@ def train_torch_layer(
     shadow set.  Both are excluded from optimizer updates; callers may provide
     the complete ``fit_exclude_indices`` set explicitly and its identity is
     persisted alongside the A/B hashes.
+    ``selection_union_indices`` optionally widens the gate-aware checkpoint
+    selection metric to an explicit A+B union while preserving separate
+    validation-A and validation-B identities in the receipt.
     """
 
     import torch
@@ -853,6 +857,7 @@ def train_torch_layer(
         if selection_rows is not None
         else None
     )
+    selection_union_hash = None
     if validation_b_indices is None:
         validation_b_rows: tuple[int, ...] = ()
     else:
@@ -861,6 +866,20 @@ def train_torch_layer(
             raise IndexError(f"validation_b_indices must be within the train split [0, {train_dataset.count})")
     if selection_rows is not None and set(selection_rows).intersection(validation_b_rows):
         raise ValueError("validation-A and validation-B rows must be disjoint")
+    if selection_union_indices is None:
+        selection_union_rows = selection_rows
+    else:
+        if selection_rows is None:
+            raise ValueError("selection_union_indices require selection_indices")
+        selection_union_rows = tuple(sorted({int(index) for index in selection_union_indices}))
+        if not selection_union_rows:
+            raise ValueError("selection_union_indices must contain at least one train row")
+        if selection_union_rows[0] < 0 or selection_union_rows[-1] >= train_dataset.count:
+            raise IndexError(f"selection_union_indices must be within the train split [0, {train_dataset.count})")
+        if not set(selection_rows).issubset(selection_union_rows):
+            raise ValueError("selection_union_indices must include validation-A rows")
+        if not set(validation_b_rows).issubset(selection_union_rows):
+            raise ValueError("selection_union_indices must include validation-B rows")
     if fit_exclude_indices is None:
         if selection_rows is not None or validation_b_rows:
             raise ValueError(
@@ -875,6 +894,8 @@ def train_torch_layer(
         raise ValueError("selection_indices must be excluded from optimizer updates")
     if not set(validation_b_rows).issubset(fit_excluded_set):
         raise ValueError("validation_b_indices must be excluded from optimizer updates")
+    if selection_union_rows is not None:
+        selection_union_hash = _hash_indices(selection_union_rows)
     fit_excluded_rows = tuple(sorted(fit_excluded_set))
     fit_indices = tuple(index for index in range(train_dataset.count) if index not in fit_excluded_set)
     fit_hash = _hash_indices(fit_indices)
@@ -965,7 +986,7 @@ def train_torch_layer(
         down=down_tensor,
         microbatch=microbatch,
         device=device,
-        selected_indices=selection_rows,
+        selected_indices=selection_union_rows,
     )
     initial_fit = _stream_metrics(
         model,
@@ -1098,7 +1119,7 @@ def train_torch_layer(
                     down=down_tensor,
                     microbatch=microbatch,
                     device=device,
-                    selected_indices=selection_rows,
+                    selected_indices=selection_union_rows,
                 ),
             )
 
@@ -1127,12 +1148,12 @@ def train_torch_layer(
             learning_rates=stage_spec["learning_rates"],
             loss_coefficients=stage_spec["loss_coefficients"],
             excluded_indices=fit_excluded_rows if fit_excluded_rows else None,
-            epoch_callback=validation_epoch_callback if selection_rows is not None else None,
+            epoch_callback=validation_epoch_callback if selection_union_rows is not None else None,
         )
         stages.append(stage_result)
         if stage_result.get("epoch_validation_metrics"):
             stage_metrics.append({"stage": stage_name, **stage_result["epoch_validation_metrics"][-1]})
-        elif selection_rows is not None:
+        elif selection_union_rows is not None:
             measured = _stream_metrics(
                 model,
                 train_dataset,
@@ -1141,7 +1162,7 @@ def train_torch_layer(
                 down=down_tensor,
                 microbatch=microbatch,
                 device=device,
-                selected_indices=selection_rows,
+                selected_indices=selection_union_rows,
             )
             stage_metrics.append({"stage": stage_name, "epoch": 0, **measured, "feasible": _gate_feasible(measured)})
     model.load_state_dict(best_state, strict=True)
@@ -1153,7 +1174,7 @@ def train_torch_layer(
         down=down_tensor,
         microbatch=microbatch,
         device=device,
-        selected_indices=selection_rows,
+        selected_indices=selection_union_rows,
     )
     final_fit = _stream_metrics(
         model,
@@ -1292,13 +1313,15 @@ def train_torch_layer(
             "best_selection_reason": best_record.get("selection_reason"),
             "selection_split": "validation" if selection_rows is not None else "train_split",
             "selection_indices_hash": selection_hash,
+            "selection_union_indices_hash": selection_union_hash,
             "selection_identity_hash": validation_a_hash,
-            "selection_count": len(selection_rows) if selection_rows is not None else train_dataset.count,
+            "selection_count": len(selection_union_rows) if selection_union_rows is not None else train_dataset.count,
             "validation_count": len(selection_rows) if selection_rows is not None else None,
             "validation_hash": validation_a_hash,
             "validation_a_indices_hash": selection_hash,
             "validation_a_identity_hash": validation_a_hash,
             "validation_a_count": len(selection_rows) if selection_rows is not None else 0,
+            "selection_union_count": len(selection_union_rows) if selection_union_rows is not None else 0,
             "validation_b_indices_hash": computed_validation_b_hash,
             "validation_b_identity_hash": validation_b_hash,
             "validation_b_count": len(validation_b_rows),
@@ -1318,8 +1341,8 @@ def train_torch_layer(
             "holdout_evaluation": holdout_status,
             "split_opened_for": {
                 "fit": {"gradient_updates": True, "checkpoint_selection": False, "final_confirmation": False},
-                "validation": {"gradient_updates": False, "checkpoint_selection": selection_rows is not None, "final_confirmation": False},
-                "validation_a": {"gradient_updates": False, "checkpoint_selection": selection_rows is not None, "final_confirmation": False},
+                "validation": {"gradient_updates": False, "checkpoint_selection": selection_union_rows is not None, "final_confirmation": False},
+                "validation_a": {"gradient_updates": False, "checkpoint_selection": selection_union_rows is not None, "final_confirmation": False},
                 "validation_b": {"gradient_updates": False, "checkpoint_selection": False, "final_confirmation": bool(validation_b_rows)},
                 "holdout": {"gradient_updates": False, "checkpoint_selection": False, "final_confirmation": evaluate_holdout},
             },
@@ -1341,7 +1364,7 @@ def train_torch_layer(
         train_metrics={"initial_fit": initial_fit, "final_fit": final_fit, "initial_selection": initial_selection, "final_selection": final_selection, "oracle_holdout": oracle_holdout, "all_expert_reconstruction_mse": 0.0},
         holdout_metrics=trained,
         router_metrics={"load_cv": gate_metrics["load_cv"], "dead_experts": gate_metrics["dead_experts"], "selected_counts": gate_metrics["selected_counts"], "actual_improvement": float(initial_selection["normalized_mse"] - gate_metrics["normalized_mse"]) if gate_metrics["normalized_mse"] is not None else None},
-        quality_gate={"overall": gate_overall if epochs > 0 else "untrained", "thresholds_version": "gate-aware-2026-08-16", "evaluation_scope": "full_holdout" if evaluate_holdout else "validation" if selection_rows is not None else "fit", "metrics": gate_metrics},
+        quality_gate={"overall": gate_overall if epochs > 0 else "untrained", "thresholds_version": "gate-aware-2026-08-16", "evaluation_scope": "full_holdout" if evaluate_holdout else "validation" if selection_union_rows is not None else "fit", "metrics": gate_metrics},
         code_commit=recorded_commit,
     )
     metadata_path = output / f"layer-{layer:04d}.json"

@@ -123,7 +123,8 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         stage_schedule=schedule,
         # Select on the union so no single historical validation slice drives
         # the router-only checkpoint.  B is still emitted separately below.
-        selection_indices=combined,
+        selection_indices=validation_a,
+        selection_union_indices=combined,
         fit_exclude_indices=combined,
         selection_identity_hash=_hash_indices(combined),
         validation_b_indices=validation_b,
@@ -228,4 +229,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
