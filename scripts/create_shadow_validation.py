@@ -1,9 +1,11 @@
-"""Create an untouched validation-B identity from FIT activation rows.
+"""Create a selector-only validation-B identity from historical FIT rows.
 
 The command writes only a deterministic index receipt.  It does not copy
-activations, train a model, or read the holdout manifest.  Evaluators can pass
-``selected_global_indices`` to ``ActivationShardDataset.iter_selected_batches``
-after the router is frozen.
+activations, train a model, or read the holdout manifest.  Because the basis
+may already have been trained on this historical FIT corpus, the result is not
+an untouched end-to-end validation set.  It is eligible for a future
+selector-only run when the basis is frozen and both validation-A and
+validation-B are excluded from optimizer updates.
 """
 
 from __future__ import annotations
@@ -47,8 +49,8 @@ def main() -> None:
     )
     payload = {
         "schema_version": 1,
-        "status": "SHADOW_VALIDATION_READY",
-        "classification": "FIT_ONLY_UNTOUCHED_VALIDATION_B",
+        "status": "SHADOW_VALIDATION_READY_SELECTOR_ONLY",
+        "classification": "HISTORICAL_FIT_SELECTOR_ONLY_NOT_END_TO_END_UNTOUCHED",
         "train_manifest": str(args.train_manifest),
         "train_dataset_hash": train_payload.get("dataset_hash"),
         "validation_a_identity_hash": validation_payload.get("selected_row_key_hash"),
@@ -58,6 +60,9 @@ def main() -> None:
         "selected_identity_hash": identity_hash,
         "selection_method": "sha256_ranked_train_rows_excluding_validation_a",
         "selection_seed": int(args.seed),
+        "basis_already_trained_on_source": True,
+        "eligible_for_frozen_basis_selector_training": True,
+        "optimizer_exclusion_required": ["validation_a", "validation_b"],
         "holdout_opened": False,
         "code_commit": current_git_commit(),
     }

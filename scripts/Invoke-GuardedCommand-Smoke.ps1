@@ -85,18 +85,18 @@ $heartbeatPath = Join-Path $scratch "heartbeat.json"
 $env:D2M_SMOKE_PID_FILE = $pidFile
 try {
     # A. Successful child.
-    $cases.success = Invoke-SmokeCase -Name "windows-smoke-success" -Category "FAST" -Timeout 30 `
+    $cases["success"] = Invoke-SmokeCase -Name "windows-smoke-success" -Category "FAST" -Timeout 30 `
         -Child @($python, "-c", "print('smoke-success', flush=True)") -RequiredMarkers @("__CMD_START__", "__CMD_DONE__", "rc=0")
 
     # B. Non-zero child.
-    $cases.failure = Invoke-SmokeCase -Name "windows-smoke-failure" -Category "FAST" -Timeout 30 `
+    $cases["failure"] = Invoke-SmokeCase -Name "windows-smoke-failure" -Category "FAST" -Timeout 30 `
         -Child @($python, "-c", "import sys; print('smoke-failure', flush=True); sys.exit(7)") `
         -ExpectedExit 1 -RequiredMarkers @("__CMD_START__", "__CMD_FAILED__")
 
     # C. Timeout with a descendant.  The child writes the descendant PID so
     # the receipt can verify that taskkill /T removed the complete tree.
     $timeoutCode = "import os,subprocess,sys,time; p=subprocess.Popen([sys.executable,'-c','import time; time.sleep(300)']); open(os.environ['D2M_SMOKE_PID_FILE'],'w').write(str(p.pid)); time.sleep(300)"
-    $cases.timeout = Invoke-SmokeCase -Name "windows-smoke-timeout-tree" -Category "FAST" -Timeout 2 `
+    $cases["timeout"] = Invoke-SmokeCase -Name "windows-smoke-timeout-tree" -Category "FAST" -Timeout 2 `
         -Child @($python, "-c", $timeoutCode) -ExpectedExit 1 -RequiredMarkers @("__CMD_START__", "__CMD_TIMEOUT__")
     if (-not (Test-Path -LiteralPath $pidFile -PathType Leaf)) {
         throw "Timeout smoke child did not record its descendant PID"
@@ -111,7 +111,7 @@ try {
     # D. Heartbeat-only long-running child.  The child is intentionally quiet
     # between two structured lines; the heartbeat receipt must still advance.
     $heartbeatCode = "import time; print('child-progress-start', flush=True); time.sleep($HeartbeatSeconds); print('child-progress-done', flush=True)"
-    $cases.heartbeat = Invoke-SmokeCase -Name "windows-smoke-heartbeat" -Category "LONG_RUNNING" `
+    $cases["heartbeat"] = Invoke-SmokeCase -Name "windows-smoke-heartbeat" -Category "LONG_RUNNING" `
         -Timeout ($HeartbeatSeconds + 30) -LongRunning -HeartbeatInterval 10 -HeartbeatPath $heartbeatPath `
         -Child @($python, "-c", $heartbeatCode) -MinHeartbeatCount 2 `
         -RequiredMarkers @("__CMD_START__", "__HEARTBEAT__", "__CMD_DONE__")
@@ -127,7 +127,7 @@ try {
     $cases["heartbeat"]["child_output_stale"] = $heartbeatPayload.child_output_stale
 
     # E. Git must complete without a pager or credential prompt.
-    $cases.git = Invoke-SmokeCase -Name "windows-smoke-git" -Category "FAST" -Timeout 30 `
+    $cases["git"] = Invoke-SmokeCase -Name "windows-smoke-git" -Category "FAST" -Timeout 30 `
         -Child @("git", "--no-pager", "log", "-1", "--format=%H") -RequiredMarkers @("__CMD_START__", "__CMD_DONE__")
     $gitHeadMatch = [regex]::Match($cases["git"]["output_tail"], "\b[0-9a-f]{40}\b")
     if (-not $gitHeadMatch.Success) { throw "Guarded git smoke output did not contain a commit hash" }

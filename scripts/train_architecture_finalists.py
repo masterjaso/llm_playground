@@ -9,7 +9,11 @@ from pathlib import Path
 
 from dense2moe.config import load_config
 from dense2moe.provenance import current_git_commit
-from dense2moe.training.torch_distill import train_torch_layer
+from dense2moe.training.torch_distill import (
+    ActivationShardDataset,
+    deterministic_shadow_validation_indices,
+    train_torch_layer,
+)
 
 
 def main() -> None:
@@ -20,6 +24,8 @@ def main() -> None:
     parser.add_argument("--microbatch", type=int, default=512)
     parser.add_argument("--learning-rate", type=float, default=1e-4)
     parser.add_argument("--epochs", type=int, default=1)
+    parser.add_argument("--validation-b-count", type=int, default=16_384)
+    parser.add_argument("--validation-b-seed", type=int, default=20260816)
     args = parser.parse_args()
     run = Path(args.run_dir)
     checkpoint_root = run / "layer-checkpoints"
@@ -35,6 +41,17 @@ def main() -> None:
     source = Path(args.source_dir)
     dev_payload = json.loads((run / "capture/architecture-dev.json").read_text(encoding="utf-8"))
     validation_indices = [int(value) for value in dev_payload["selected_global_indices"]]
+    train_dataset = ActivationShardDataset(train_manifest, split="train", microbatch=args.microbatch)
+    available_shadow = train_dataset.count - len(set(validation_indices))
+    if available_shadow <= 0:
+        raise ValueError("the explicit TRAIN split has no rows available for validation-B")
+    validation_b_indices, validation_b_hash = deterministic_shadow_validation_indices(
+        train_dataset.count,
+        excluded_indices=validation_indices,
+        shadow_count=min(args.validation_b_count, available_shadow),
+        seed=args.validation_b_seed,
+    )
+    fit_exclude_indices = sorted(set(validation_indices) | set(validation_b_indices))
     search = json.loads((run / "reports/architecture-search.json").read_text(encoding="utf-8"))
     finalists = []
     for selected in search["finalists_selected_on_dev"]:
@@ -63,8 +80,10 @@ def main() -> None:
             source_revision=profile.revision,
             code_commit=current_git_commit(),
             selection_indices=validation_indices,
-            fit_exclude_indices=validation_indices,
+            fit_exclude_indices=fit_exclude_indices,
             selection_identity_hash=dev_payload["selected_row_key_hash"],
+            validation_b_indices=validation_b_indices,
+            validation_b_identity_hash=validation_b_hash,
             evaluate_holdout=False,
         )
         results.append({"profile": profile_name, "partition": str(partition), "output_dir": str(output_dir), "result": result})
@@ -72,11 +91,15 @@ def main() -> None:
     report = {
         "schema_version": 1,
         "status": "ARCHITECTURE_FINALIST_VALIDATION_TRAINING_COMPLETE",
-        "classification": "IDENTICAL_LAYER0_FINALIST_BUDGET_TRUE_VALIDATION",
+        "classification": "IDENTICAL_LAYER0_FINALIST_BUDGET_VALIDATION_A_SELECTION_B_SHADOW",
         "budget": {"epochs": args.epochs, "microbatch": args.microbatch, "learning_rate": args.learning_rate, "device": args.device, "seed": 17},
         "train_manifest": str(train_manifest),
         "validation_count": len(validation_indices),
         "validation_identity_hash": dev_payload["selected_row_key_hash"],
+        "validation_b_count": len(validation_b_indices),
+        "validation_b_identity_hash": validation_b_hash,
+        "fit_excluded_count": len(fit_exclude_indices),
+        "fit_excluded_indices_hash": results[0]["result"]["training_config"]["fit_excluded_indices_hash"] if results else None,
         "holdout_reserved_for_confirmation": str(run / "capture/layer-0000-holdout.json"),
         "results": results,
         "code_commit": current_git_commit(),

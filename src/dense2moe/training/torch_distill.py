@@ -34,11 +34,14 @@ def deterministic_shadow_validation_indices(
     shadow_count: int,
     seed: int = 20260816,
 ) -> tuple[tuple[int, ...], str]:
-    """Choose a reproducible validation-B subset from FIT rows only.
+    """Choose a reproducible selector-only validation-B subset from FIT rows.
 
-    ``excluded_indices`` is the existing validation-A identity.  The helper
-    refuses overlap and never derives rows from the holdout split; callers can
-    persist the returned hash in a shadow-validation receipt before training.
+    Rows returned by this helper are *not* an untouched end-to-end test for a
+    basis that has already seen the historical FIT corpus.  They are suitable
+    for a future selector-only run when the basis is frozen and both validation
+    A and B are excluded from optimizer updates.  The helper refuses overlap,
+    never derives rows from the holdout split, and returns a stable identity
+    hash for the receipt.
     """
 
     if count <= 0 or shadow_count <= 0:
@@ -405,8 +408,8 @@ def _stream_metrics(
         "token_count": token_count,
         "streaming": True,
         "split": dataset.split,
-        "selected_count": int(len(selected_indices)) if selected_indices is not None else token_count,
-        "excluded_count": int(len(excluded_indices)) if excluded_indices is not None else 0,
+        "selected_count": len(selected_indices) if selected_indices is not None else token_count,
+        "excluded_count": len(excluded_indices) if excluded_indices is not None else 0,
     }
 
 
@@ -597,14 +600,18 @@ def _train_stage_streaming(
                     # detached so it cannot turn into an implicit teacher
                     # gradient path.
                     residual_for_amplitude = teacher - info["shared"]
-                    def _positive_coefficients(ids: Any) -> Any:
+                    def _positive_coefficients(
+                        ids: Any,
+                        contribution_values: Any = contributions,
+                        residual_values: Any = residual_for_amplitude,
+                    ) -> Any:
                         selected = torch.gather(
-                            contributions,
+                            contribution_values,
                             1,
-                            ids.unsqueeze(-1).expand(-1, -1, contributions.shape[-1]),
+                            ids.unsqueeze(-1).expand(-1, -1, contribution_values.shape[-1]),
                         )
                         gram = torch.einsum("bkh,blh->bkl", selected, selected)
-                        rhs = torch.einsum("bkh,bh->bk", selected, residual_for_amplitude)
+                        rhs = torch.einsum("bkh,bh->bk", selected, residual_values)
                         identity = torch.eye(model.top_k, dtype=gram.dtype, device=gram.device).unsqueeze(0)
                         return torch.linalg.solve(gram + 1e-4 * identity, rhs.unsqueeze(-1)).squeeze(-1).clamp_min(0.0)
 
@@ -664,7 +671,7 @@ def _train_stage_streaming(
         "oracle_loss_mode": oracle_loss_mode,
         "oracle_amplitude_mode": oracle_amplitude_mode,
         "teacher_forcing_ratio": float(teacher_forcing_ratio),
-        "fit_excluded_count": int(len(excluded_indices)) if excluded_indices is not None else 0,
+        "fit_excluded_count": len(excluded_indices) if excluded_indices is not None else 0,
         "epoch_validation_metrics": epoch_metrics,
     }
 
@@ -784,6 +791,8 @@ def train_torch_layer(
     selection_indices: Sequence[int] | None = None,
     fit_exclude_indices: Sequence[int] | None = None,
     selection_identity_hash: str | None = None,
+    validation_b_indices: Sequence[int] | None = None,
+    validation_b_identity_hash: str | None = None,
     evaluate_holdout: bool = True,
     initial_checkpoint_dir: str | Path | None = None,
     router_hidden_size: int | None = None,
@@ -794,6 +803,11 @@ def train_torch_layer(
     A caller may provide a bounded sequence of stage mappings to compare
     router warm-up, router/scale transitions, frozen-router expert adaptation,
     and joint fine-tuning without changing the activation or holdout contract.
+    ``selection_indices`` identifies validation-A rows used only for checkpoint
+    selection.  ``validation_b_indices`` identifies an optional selector-only
+    shadow set.  Both are excluded from optimizer updates; callers may provide
+    the complete ``fit_exclude_indices`` set explicitly and its identity is
+    persisted alongside the A/B hashes.
     """
 
     import torch
@@ -839,20 +853,35 @@ def train_torch_layer(
         if selection_rows is not None
         else None
     )
-    if fit_exclude_indices is None:
-        fit_excluded_rows: tuple[int, ...] = ()
+    if validation_b_indices is None:
+        validation_b_rows: tuple[int, ...] = ()
     else:
-        fit_excluded_rows = tuple(sorted({int(index) for index in fit_exclude_indices}))
-        if any(index < 0 or index >= train_dataset.count for index in fit_excluded_rows):
-            raise IndexError(f"fit_exclude_indices must be within the train split [0, {train_dataset.count})")
-    if selection_rows is not None and not fit_excluded_rows:
-        raise ValueError("selection_indices require fit_exclude_indices: validation rows may not enter optimizer updates")
-    if selection_rows is not None and fit_excluded_rows != selection_rows:
-        raise ValueError("clean validation requires fit_exclude_indices to equal selection_indices")
-    fit_excluded_set = set(fit_excluded_rows)
+        validation_b_rows = tuple(sorted({int(index) for index in validation_b_indices}))
+        if any(index < 0 or index >= train_dataset.count for index in validation_b_rows):
+            raise IndexError(f"validation_b_indices must be within the train split [0, {train_dataset.count})")
+    if selection_rows is not None and set(selection_rows).intersection(validation_b_rows):
+        raise ValueError("validation-A and validation-B rows must be disjoint")
+    if fit_exclude_indices is None:
+        if selection_rows is not None or validation_b_rows:
+            raise ValueError(
+                "selection_indices/validation_b_indices require explicit fit_exclude_indices"
+            )
+        fit_excluded_set: set[int] = set()
+    else:
+        fit_excluded_set = {int(index) for index in fit_exclude_indices}
+    if any(index < 0 or index >= train_dataset.count for index in fit_excluded_set):
+        raise IndexError(f"fit_exclude_indices must be within the train split [0, {train_dataset.count})")
+    if selection_rows is not None and not set(selection_rows).issubset(fit_excluded_set):
+        raise ValueError("selection_indices must be excluded from optimizer updates")
+    if not set(validation_b_rows).issubset(fit_excluded_set):
+        raise ValueError("validation_b_indices must be excluded from optimizer updates")
+    fit_excluded_rows = tuple(sorted(fit_excluded_set))
     fit_indices = tuple(index for index in range(train_dataset.count) if index not in fit_excluded_set)
     fit_hash = _hash_indices(fit_indices)
     fit_exclusion_hash = _hash_indices(fit_excluded_rows) if fit_excluded_rows else None
+    validation_a_hash = selection_identity_hash or selection_hash
+    computed_validation_b_hash = _hash_indices(validation_b_rows) if validation_b_rows else None
+    validation_b_hash = validation_b_identity_hash or computed_validation_b_hash
     plan = _plan_from_path(Path(partition_path))
     if plan.dense_intermediate_size != int(values["gate_proj.weight"].shape[0]):
         raise ValueError("selected partition does not match source dense width")
@@ -1132,6 +1161,34 @@ def train_torch_layer(
         device=device,
         excluded_indices=fit_excluded_rows if fit_excluded_rows else None,
     )
+    if validation_b_rows:
+        validation_b_metrics = _stream_metrics(
+            model,
+            train_dataset,
+            gate=gate_tensor,
+            up=up_tensor,
+            down=down_tensor,
+            microbatch=microbatch,
+            device=device,
+            selected_indices=validation_b_rows,
+        )
+        validation_b_metrics = {
+            **validation_b_metrics,
+            "split": "validation-b",
+            "checkpoint_selection": False,
+        }
+    else:
+        validation_b_metrics = {
+            "split": "validation-b",
+            "status": "NOT_CONFIGURED",
+            "checkpoint_selection": False,
+            "normalized_mse": None,
+            "cosine": None,
+            "selected_counts": [],
+            "dead_experts": None,
+            "load_cv": None,
+            "streaming": True,
+        }
     pareto_frontier = [
         record
         for record in validation_trajectory
@@ -1220,6 +1277,7 @@ def train_torch_layer(
             "stage_selection_metrics": stage_metrics,
             "validation_trajectory": validation_trajectory,
             "pareto_frontier": pareto_frontier,
+            "validation_b_metrics": validation_b_metrics,
             "checkpoint_selection_rule": {
                 "feasibility": "normalized_mse<=0.05 and cosine>=0.98 and dead_experts==0 and load_cv<=0.50",
                 "ordering": "maximize cosine, then minimize normalized_mse, then minimize load_cv",
@@ -1230,18 +1288,35 @@ def train_torch_layer(
             "best_selection_reason": best_record.get("selection_reason"),
             "selection_split": "validation" if selection_rows is not None else "train_split",
             "selection_indices_hash": selection_hash,
-            "selection_identity_hash": selection_identity_hash,
-            "selection_count": int(len(selection_rows)) if selection_rows is not None else train_dataset.count,
-            "validation_count": int(len(selection_rows)) if selection_rows is not None else None,
-            "validation_hash": selection_identity_hash or selection_hash,
+            "selection_identity_hash": validation_a_hash,
+            "selection_count": len(selection_rows) if selection_rows is not None else train_dataset.count,
+            "validation_count": len(selection_rows) if selection_rows is not None else None,
+            "validation_hash": validation_a_hash,
+            "validation_a_indices_hash": selection_hash,
+            "validation_a_identity_hash": validation_a_hash,
+            "validation_a_count": len(selection_rows) if selection_rows is not None else 0,
+            "validation_b_indices_hash": computed_validation_b_hash,
+            "validation_b_identity_hash": validation_b_hash,
+            "validation_b_count": len(validation_b_rows),
             "fit_count": len(fit_indices),
             "fit_index_hash": fit_hash,
             "fit_excluded_indices_hash": fit_exclusion_hash,
-            "fit_exclusion_contract": "train rows excluding validation indices" if fit_excluded_rows else "no exclusion",
+            "fit_excluded_count": len(fit_excluded_rows),
+            "fit_exclusion_contract": (
+                "train rows excluding validation-A and validation-B"
+                if validation_b_rows and selection_rows is not None
+                else "train rows excluding validation-A"
+                if selection_rows is not None
+                else "train rows excluding validation-B"
+                if validation_b_rows
+                else "no exclusion"
+            ),
             "holdout_evaluation": holdout_status,
             "split_opened_for": {
                 "fit": {"gradient_updates": True, "checkpoint_selection": False, "final_confirmation": False},
                 "validation": {"gradient_updates": False, "checkpoint_selection": selection_rows is not None, "final_confirmation": False},
+                "validation_a": {"gradient_updates": False, "checkpoint_selection": selection_rows is not None, "final_confirmation": False},
+                "validation_b": {"gradient_updates": False, "checkpoint_selection": False, "final_confirmation": bool(validation_b_rows)},
                 "holdout": {"gradient_updates": False, "checkpoint_selection": False, "final_confirmation": evaluate_holdout},
             },
             "streaming_dataset": {
@@ -1267,7 +1342,7 @@ def train_torch_layer(
     )
     metadata_path = output / f"layer-{layer:04d}.json"
     save_layer_checkpoint(checkpoint, metadata_path)
-    return {"status": status, "layer": layer, "metadata": str(metadata_path), "tensor_file": str(tensor_path), "holdout_metrics": trained, "initial_fit": initial_fit, "final_fit": final_fit, "initial_selection": initial_selection, "final_selection": final_selection, "oracle_holdout": oracle_holdout, "training_config": checkpoint.training_config, "code_commit": recorded_commit}
+    return {"status": status, "layer": layer, "metadata": str(metadata_path), "tensor_file": str(tensor_path), "holdout_metrics": trained, "validation_b_metrics": validation_b_metrics, "initial_fit": initial_fit, "final_fit": final_fit, "initial_selection": initial_selection, "final_selection": final_selection, "oracle_holdout": oracle_holdout, "training_config": checkpoint.training_config, "code_commit": recorded_commit}
 
 
 __all__ = ["load_fixed_activation_splits", "train_torch_layer"]

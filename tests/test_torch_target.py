@@ -165,10 +165,24 @@ class TorchTargetTests(unittest.TestCase):
                 learning_rate=1e-2,
                 device="cpu",
                 source_revision="a" * 40,
+                selection_indices=[0, 1],
+                fit_exclude_indices=[0, 1, 2],
+                validation_b_indices=[2],
+                selection_identity_hash="validation-a-id",
+                validation_b_identity_hash="validation-b-id",
             )
             self.assertIn(result["status"], {"TRAINED_VALIDATED", "VALIDATION_FAILED"})
             self.assertTrue(Path(result["metadata"]).exists())
             self.assertTrue(Path(result["tensor_file"]).exists())
+            config = result["training_config"]
+            self.assertEqual(config["selection_count"], 2)
+            self.assertEqual(config["validation_a_count"], 2)
+            self.assertEqual(config["validation_b_count"], 1)
+            self.assertEqual(config["fit_count"], 9)
+            self.assertEqual(config["fit_excluded_count"], 3)
+            self.assertEqual(config["validation_a_identity_hash"], "validation-a-id")
+            self.assertEqual(config["validation_b_identity_hash"], "validation-b-id")
+            self.assertEqual(result["validation_b_metrics"]["split"], "validation-b")
 
 
 if __name__ == "__main__":
