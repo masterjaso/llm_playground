@@ -7,7 +7,7 @@
     "current_research_path": "p16_top4_selector_generalization_blocked_after_exact_holdout_capacity_confirmation",
     "replay_gate": "PAUSED_NO_GREEN_GE70_CANDIDATE"
   },
-  "code_commit": "bb0beeaf6823c383886d020c68e894b33226b00a",
+  "code_commit": "11098c0f02296cce5825a8433d9caf600737afdc",
   "created": "2026-08-15T22:46:52.495949Z",
   "dataset_hash": "46b278a85b4cb31a8fe659be2dd146bd9206eb491268220e25440981d06c0a03",
   "default_profile": "qwen38_p16s1_top4",
@@ -159,7 +159,7 @@
   "windows_native": true,
   "takeover_extension": {
     "status": "HIGH_SPARSITY_RESEARCH_COMPLETE_REPLAY_BLOCKED",
-    "code_commit": "bb0beeaf6823c383886d020c68e894b33226b00a",
+    "code_commit": "11098c0f02296cce5825a8433d9caf600737afdc",
     "report": "reports/p16-top4-research-synthesis.json",
     "best_ge70_validation": {
       "profile": "qwen38_p16s1_top4",

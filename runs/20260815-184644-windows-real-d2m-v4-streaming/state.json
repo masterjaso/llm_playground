@@ -11,7 +11,7 @@
     "fact_ledger": "runs\\20260815-184644-windows-real-d2m-v4-streaming\\repository-fact-ledger.json",
     "source_manifest": "runs\\20260815-184644-windows-real-d2m-v4-streaming\\source-manifest.json"
   },
-  "code_commit": "bb0beeaf6823c383886d020c68e894b33226b00a",
+  "code_commit": "11098c0f02296cce5825a8433d9caf600737afdc",
   "current_phase": "selector-generalization-blocked",
   "last_successful_command": "confirm_refined_course_correction_holdout.py",
   "next_exact_command": "FIT/validation-only selector generalization research; no holdout tuning or replay",
@@ -280,7 +280,7 @@
   },
   "takeover_extension": {
     "status": "HIGH_SPARSITY_RESEARCH_COMPLETE_REPLAY_BLOCKED",
-    "code_commit": "bb0beeaf6823c383886d020c68e894b33226b00a",
+    "code_commit": "11098c0f02296cce5825a8433d9caf600737afdc",
     "current_phase": "selector-generalization-blocked",
     "last_successful_command": "confirm_refined_course_correction_holdout.py",
     "best_ge70_checkpoint": "layer-checkpoints/clean-validation/p16-top4-refined-course-correction-continue",

@@ -71,7 +71,7 @@
     "next_work": "develop a selector with stronger cross-domain generalization using FIT only, or explicitly revisit the product quality/reduction tradeoff; do not tune on the holdout"
   },
   "provenance": {
-    "current_code_commit_at_synthesis": "bb0beeaf6823c383886d020c68e894b33226b00a",
+    "current_code_commit_at_synthesis": "11098c0f02296cce5825a8433d9caf600737afdc",
     "reports": [
       "reports/p16-top4-refined-course-correction-continuation.json",
       "reports/p16-top4-refined-course-correction-holdout-confirmation.json",

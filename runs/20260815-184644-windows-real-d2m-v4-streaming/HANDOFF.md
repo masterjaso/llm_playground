@@ -5,7 +5,7 @@
 - Last completed gate: `p16-top4-refined-course-correction-holdout-confirmation`
 - Active blocker: the best >=70% candidate fails the full green gate on holdout (cosine `0.977044` < `0.98`), despite a sufficient exact holdout oracle (`0.982185`).
 - Exact next command: develop a more robust selector using FIT/validation only; do not tune on the opened holdout and do not start representative or 64-layer replay.
-- Current code commit at handoff: `bb0beeaf6823c383886d020c68e894b33226b00a`
+- Current code commit at handoff: `11098c0f02296cce5825a8433d9caf600737afdc`
 - Safe replay checkpoint: train rolling replay remains durable through layer 29 (stage-0030 manifest); layer 30 was intentionally stopped.
 
 ## Fixed protocol
