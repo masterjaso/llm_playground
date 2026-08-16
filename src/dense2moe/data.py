@@ -118,6 +118,14 @@ class _SourceRecord:
     source_record_index: int
 
 
+# Resolving a manifest record must reopen the source for verification, but a
+# large fresh JSONL source should not be parsed once per selected record.  The
+# cache key includes size and mtime so a changed source cannot reuse stale
+# records; the bounded table keeps long-lived CLI processes from accumulating
+# arbitrary corpus files.
+_SOURCE_RECORD_CACHE: dict[tuple[str, int, int], tuple[_SourceRecord, ...]] = {}
+
+
 def sha256_file(path: str | Path) -> str:
     """Return the SHA-256 digest of a file without loading it all at once."""
 
@@ -262,7 +270,15 @@ def _record_text(value: Mapping[str, Any], source_file: Path, source_record_inde
 
 
 def _locate_external_record(path: Path, record_index: int, record_id: str | None) -> dict[str, Any]:
-    records, _ = _read_source_records(path)
+    stat = path.stat()
+    cache_key = (str(path.resolve()), int(stat.st_mtime_ns), int(stat.st_size))
+    records_tuple = _SOURCE_RECORD_CACHE.get(cache_key)
+    if records_tuple is None:
+        records_tuple = tuple(_read_source_records(path)[0])
+        if len(_SOURCE_RECORD_CACHE) >= 32:
+            _SOURCE_RECORD_CACHE.pop(next(iter(_SOURCE_RECORD_CACHE)))
+        _SOURCE_RECORD_CACHE[cache_key] = records_tuple
+    records = list(records_tuple)
     for item in records:
         if item.source_record_index == record_index:
             if record_id is None:
