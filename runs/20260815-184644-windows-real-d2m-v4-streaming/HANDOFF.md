@@ -18,7 +18,7 @@
 - Validation rows: `16384`, identity hash
   `5a7739c753dae98698a8c1a22c6a10409230f0750b33cfc9631594f16d8b8e1c`.
 - Holdout rows: `16598`. It was opened only for post-selection finalist
-  confirmation and a non-gradient exact capacity diagnostic; it was never
+  confirmations and a non-gradient exact capacity diagnostic; it was never
   used for optimizer updates.
 - Green gate: normalized MSE `<=0.05`, cosine `>=0.98`, dead experts `=0`,
   load CV `<=0.50`.
@@ -37,7 +37,7 @@ Checkpoint:
 | holdout | 0.027239 | 0.977044 | 0 | 0.4713 |
 
 The validation checkpoint was strictly reloaded and was selected with the
-gate-aware rule. The single holdout confirmation is recorded in
+gate-aware rule. The finalist holdout confirmations are recorded in
 `reports/p16-top4-refined-course-correction-holdout-confirmation.json`.
 
 ## Capacity and selector evidence

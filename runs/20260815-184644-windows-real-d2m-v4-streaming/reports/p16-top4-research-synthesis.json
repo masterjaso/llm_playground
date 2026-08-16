@@ -14,7 +14,7 @@
     "validation_rows": 16384,
     "validation_identity_hash": "5a7739c753dae98698a8c1a22c6a10409230f0750b33cfc9631594f16d8b8e1c",
     "holdout_rows": 16598,
-    "holdout_policy": "opened only for post-selection finalist confirmation and a post-failure exact capacity diagnostic; never used for optimizer updates"
+    "holdout_policy": "opened only for post-selection finalist confirmations and a post-failure exact capacity diagnostic; never used for optimizer updates"
   },
   "product_geometry": {
     "profile": "qwen38_p16s1_top4",
