@@ -16,6 +16,8 @@ env/
 *.ckpt
 *.onnx
 *.npz
+*.npy
+*.mmap
 
 runs/*/source/
 runs/*/text-checkpoint/
