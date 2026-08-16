@@ -76,7 +76,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         "load_cv_pass": bool(metrics["load_cv"] <= 0.50),
     }
     gate_result["all_pass"] = all(gate_result[key] for key in ("nmse_pass", "cosine_pass", "dead_experts_pass", "load_cv_pass"))
-    validation_report = run_dir / "reports/p16-top4-refined-course-correction-continuation.json"
+    validation_report = run_dir / "reports" / args.validation_report_name
     validation_payload = json.loads(validation_report.read_text(encoding="utf-8")) if validation_report.exists() else {}
     payload = {
         "schema_version": 1,
@@ -106,7 +106,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         },
         "code_commit": current_git_commit(),
     }
-    report_path = run_dir / "reports/p16-top4-refined-course-correction-holdout-confirmation.json"
+    report_path = run_dir / "reports" / args.report_name
     report_path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     return payload
 
@@ -116,6 +116,8 @@ def main() -> None:
     parser.add_argument("--run-dir", type=Path, default=DEFAULT_RUN)
     parser.add_argument("--source-dir", type=Path, default=DEFAULT_SOURCE)
     parser.add_argument("--checkpoint-dir", default=DEFAULT_CHECKPOINT)
+    parser.add_argument("--validation-report-name", default="p16-top4-refined-course-correction-continuation.json")
+    parser.add_argument("--report-name", default="p16-top4-refined-course-correction-holdout-confirmation.json")
     parser.add_argument("--device", default="cuda:1")
     parser.add_argument("--microbatch", type=int, default=512)
     args = parser.parse_args()
