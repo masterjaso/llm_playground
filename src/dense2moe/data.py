@@ -82,6 +82,7 @@ _PERMISSIVE_LICENSES = {
     "BSD-2-Clause",
     "BSD-3-Clause",
     "CC-BY-4.0",
+    "CC-BY-SA-3.0",
     "CC-BY-SA-4.0",
     "CDLA-Permissive-1.0",
     "CDLA-Permissive-2.0",
