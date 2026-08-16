@@ -373,6 +373,14 @@ def _optimizer_parameter_groups(
         ("amplitude_router", list(model.amplitude_router.parameters()) if model.routing_mode == "independent_positive" else []),
         ("expert_scales", [model.expert_scales]),
         (
+            "shared",
+            [
+                parameter
+                for module in (model.shared_gate_proj, model.shared_up_proj, model.shared_down_proj)
+                for parameter in module.parameters()
+            ],
+        ),
+        (
             "experts",
             [parameter for module in (*model.expert_gate_proj, *model.expert_up_proj, *model.expert_down_proj) for parameter in module.parameters()],
         ),
@@ -403,6 +411,7 @@ def _train_stage_streaming(
     learning_rate: float,
     train_scales: bool,
     train_experts: bool,
+    train_shared: bool = False,
     device: str,
     stage: str,
     use_oracle_targets: bool = False,
@@ -421,6 +430,10 @@ def _train_stage_streaming(
         model.expert_scales.requires_grad = True
     if train_experts:
         for module in (*model.expert_gate_proj, *model.expert_up_proj, *model.expert_down_proj):
+            for parameter in module.parameters():
+                parameter.requires_grad = True
+    if train_shared:
+        for module in (model.shared_gate_proj, model.shared_up_proj, model.shared_down_proj):
             for parameter in module.parameters():
                 parameter.requires_grad = True
     model.to(device)
@@ -485,6 +498,7 @@ def _train_stage_streaming(
         "epoch": epoch + 1,
         "train_selection_router": train_selection_router,
         "train_amplitude_router": train_amplitude_router,
+        "train_shared": train_shared,
         "learning_rates": {group["group"]: group["lr"] for group in parameter_groups},
     }
 
@@ -723,6 +737,7 @@ def train_torch_layer(
                 "epochs": stage_epochs,
                 "train_scales": bool(raw_stage.get("train_scales", False)),
                 "train_experts": bool(raw_stage.get("train_experts", False)),
+                "train_shared": bool(raw_stage.get("train_shared", False)),
                 "use_oracle_targets": bool(raw_stage.get("use_oracle_targets", False)),
                 "train_selection_router": bool(raw_stage.get("train_selection_router", True)),
                 "train_amplitude_router": bool(raw_stage.get("train_amplitude_router", True)),
@@ -744,6 +759,7 @@ def train_torch_layer(
             learning_rate=float(stage_spec["learning_rate"]),
             train_scales=bool(stage_spec["train_scales"]),
             train_experts=bool(stage_spec["train_experts"]),
+            train_shared=bool(stage_spec["train_shared"]),
             device=device,
             stage=stage_name,
             use_oracle_targets=bool(stage_spec["use_oracle_targets"]),
