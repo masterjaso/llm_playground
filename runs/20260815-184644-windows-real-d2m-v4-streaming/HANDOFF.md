@@ -1,19 +1,20 @@
 # Handoff for `20260815-184644-windows-real-d2m-v4-streaming`
 
-- Current status: `HIGH_SPARSITY_FINALIST_HOLDOUT_COMPLETE_REPLAY_PAUSED`
-- Current phase: `high-sparsity-finalist-holdout-confirmation`
-- Last completed gate: `HIGH_SPARSITY_FINALIST_HOLDOUT_CONFIRMATION_COMPLETE`
+- Current status: `HIGH_SPARSITY_ROUTING_COURSE_CORRECTION_COMPLETE_REPLAY_PAUSED`
+- Current phase: `high-sparsity-routing-course-correction`
+- Last completed gate: `HIGH_SPARSITY_ROUTING_COURSE_CORRECTION_HOLDOUT_COMPLETE`
 - Active blocker: no >=70% reduction candidate meets the green gate (`NMSE <= 0.05`, `cosine >= 0.98`, `dead_experts = 0`, `load_cv <= 0.50`).
-- Exact next command: investigate sparse basis/angular error and routing load; do not start representative or 64-layer replay.
-- Code commit: `7e375c4c9d92646ab9b15d65b12b9ffc8373b225`
+- Exact next command: investigate holdout angular generalization; do not start representative or 64-layer replay.
+- Code commit: `4272fc26df6e232373868284b6ae84b7d3b5419b`
 - Safe replay checkpoint: train rolling replay is durable through layer 29 (stage-0030 manifest); layer 30 was intentionally stopped after steering.
 
 ## Completed high-sparsity evidence
 
 The deterministic 16,384-row TRAIN/dev subset is identified by hash
 `5a7739c753dae98698a8c1a22c6a10409230f0750b33cfc9631594f16d8b8e1c`.
-Partition/oracle selection used TRAIN/dev only. The full holdout was read once,
-after finalist training, by `reports/high-sparsity-finalist-holdout-confirmation.json`.
+Partition/oracle selection used TRAIN/dev only. The full holdout was read only
+for frozen dev-green finalists, with receipts in the original finalist report
+and the routing course-correction confirmations below.
 
 | candidate | active width | reduction | holdout NMSE | holdout cosine | dead | load CV | role |
 |---|---:|---:|---:|---:|---:|---:|---|
@@ -27,6 +28,17 @@ used the same schedule, seed, optimizer budget, and dev selector. Trained
 students improved NMSE relative to their frozen positive oracles, but angular
 fidelity remains below the `0.98` gate. The required basis investigation is
 therefore still open; no deeper replay is authorized.
+
+The routing course correction added an opt-in residual-correlation oracle-label
+mode and bounded positive-amplitude supervision while preserving the existing
+normalized-softmax and contribution-norm baselines. The best p16/top4 dev
+result (load weight `0.25`) was NMSE `0.03685`, cosine `0.98137`, dead `0`,
+load CV `0.467`; strict holdout confirmation was NMSE `0.03996`, cosine
+`0.97144`, dead `0`, load CV `0.497`. A cosine-weight `0.75` variant gave
+holdout cosine `0.97142`. Thus routing supervision improved the prior
+approximately `0.9702` holdout cosine but did not clear `0.98`; keep the
+replay gate blocked. The consolidated receipt is
+`reports/p16-top4-routing-course-correction.json`.
 
 `qwen38_p8s1_top6` remains a `TRAINABILITY_ROUTER_QUALITY_CONTROL` only
 (holdout NMSE `0.01890`, cosine `0.98338`). The prior p8s14/top2 artifact is

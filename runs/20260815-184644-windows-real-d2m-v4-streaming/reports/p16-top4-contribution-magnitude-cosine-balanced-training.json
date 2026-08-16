@@ -1,0 +1,341 @@
+{
+  "classification": "TRAIN_DEV_PARTITION_COMPARISON_HOLDOUT_DEFERRED",
+  "code_commit": "7f325bcf23da3cd92c448f982095b16ff77effd4",
+  "holdout_policy": "full holdout remains closed until this candidate is selected for confirmation",
+  "output_dir": "runs\\20260815-184644-windows-real-d2m-v4-streaming\\layer-checkpoints\\high-sparsity-basis-training\\p16-top4-contribution-magnitude-cosine-balanced",
+  "partition": "runs\\20260815-184644-windows-real-d2m-v4-streaming\\partitions\\high-sparsity-p16-top4-contribution-magnitude.json",
+  "partition_strategy": "high-sparsity-p16-top4-contribution-magnitude.json",
+  "profile": "qwen38_p16s1_top4",
+  "result": {
+    "code_commit": "7f325bcf23da3cd92c448f982095b16ff77effd4",
+    "final_selection": {
+      "cosine": 0.9797860868275166,
+      "dead_experts": 0,
+      "load_cv": 0.4312778951081694,
+      "mse": 4.161399967870238e-05,
+      "normalized_mse": 0.04697426356148367,
+      "router_entropy": 2.7268231976777315,
+      "selected_count": 16384,
+      "selected_counts": [
+        4618.0,
+        5840.0,
+        6556.0,
+        5973.0,
+        4845.0,
+        4475.0,
+        4627.0,
+        4373.0,
+        3680.0,
+        4023.0,
+        1577.0,
+        905.0,
+        871.0,
+        2118.0,
+        4872.0,
+        6183.0
+      ],
+      "split": "train",
+      "streaming": true,
+      "token_count": 16384
+    },
+    "holdout_metrics": {
+      "cosine": null,
+      "dead_experts": null,
+      "load_cv": null,
+      "normalized_mse": null,
+      "selected_counts": [],
+      "split": "holdout",
+      "status": "DEFERRED_UNTIL_FINALIST_CONFIRMATION",
+      "streaming": true
+    },
+    "initial_selection": {
+      "cosine": 0.9366046162322164,
+      "dead_experts": 4,
+      "load_cv": 1.4516699130143889,
+      "mse": 8.413954351453868e-05,
+      "normalized_mse": 0.0949774865072068,
+      "router_entropy": 2.6620076317340136,
+      "selected_count": 16384,
+      "selected_counts": [
+        16329.0,
+        15672.0,
+        13930.0,
+        9903.0,
+        4078.0,
+        3339.0,
+        967.0,
+        229.0,
+        83.0,
+        993.0,
+        10.0,
+        3.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "split": "train",
+      "streaming": true,
+      "token_count": 16384
+    },
+    "layer": 0,
+    "metadata": "runs\\20260815-184644-windows-real-d2m-v4-streaming\\layer-checkpoints\\high-sparsity-basis-training\\p16-top4-contribution-magnitude-cosine-balanced\\layer-0000.json",
+    "oracle_holdout": {
+      "cosine": null,
+      "normalized_mse": null,
+      "status": "bounded-oracle-summary-pending",
+      "streaming": true
+    },
+    "status": "TRAINED_DEV_SELECTED",
+    "tensor_file": "runs\\20260815-184644-windows-real-d2m-v4-streaming\\layer-checkpoints\\high-sparsity-basis-training\\p16-top4-contribution-magnitude-cosine-balanced\\layer-0000.safetensors",
+    "training_config": {
+      "best_selection_stage": "joint_shared_basis_cosine_balanced",
+      "device": "cuda:1",
+      "epochs": 1,
+      "holdout_evaluation": "deferred",
+      "initial_expert_scales": [
+        0.9999997658624808,
+        0.9999999979694599,
+        1.0000017475366143,
+        1.0000008956979305,
+        1.0000022453060677,
+        1.0000026796487969,
+        1.0000040682873308,
+        1.0000044581564698,
+        1.0000039780108452,
+        1.0000034714593309,
+        1.0000038631552706,
+        1.0000033548030398,
+        1.000005810377502,
+        0.9999991089040323,
+        1.0000028397380747,
+        0.001
+      ],
+      "learning_rate": 0.0001,
+      "loss_coefficients": {
+        "cosine": 0.05,
+        "load_balance": 0.05,
+        "mse": 1.0,
+        "router_z_loss": 0.001
+      },
+      "loss_version": "torch-distill-v1",
+      "microbatch": 512,
+      "optimizer": "AdamW",
+      "partition_path": "runs\\20260815-184644-windows-real-d2m-v4-streaming\\partitions\\high-sparsity-p16-top4-contribution-magnitude.json",
+      "router_initialization": "bounded_train_contribution_lstsq",
+      "routing_mode": "independent_positive",
+      "selection_count": 16384,
+      "selection_indices_hash": "7b2ff822febb9191b88d04cacfa6bb80aec3c6dd42f9210683c6b9fd2167b15f",
+      "selection_split": "train_dev_subset",
+      "stage_schedule": [
+        {
+          "epochs": 1,
+          "learning_rate": 0.0001,
+          "learning_rates": {},
+          "loss_coefficients": {
+            "cosine": 0.05,
+            "load_balance": 0.1,
+            "mse": 1.0,
+            "oracle": 0.1,
+            "router_z_loss": 0.001
+          },
+          "name": "router_warm_start",
+          "train_amplitude_router": true,
+          "train_experts": false,
+          "train_scales": false,
+          "train_selection_router": true,
+          "train_shared": false,
+          "use_oracle_targets": true
+        },
+        {
+          "epochs": 4,
+          "learning_rate": 0.0001,
+          "learning_rates": {
+            "amplitude_router": 2e-05,
+            "expert_scales": 2e-05,
+            "experts": 0.0001,
+            "selection_router": 2e-05,
+            "shared": 5e-05
+          },
+          "loss_coefficients": {
+            "cosine": 0.5,
+            "load_balance": 0.1,
+            "mse": 1.0,
+            "oracle": 0.0,
+            "router_z_loss": 0.001
+          },
+          "name": "joint_shared_basis_cosine_balanced",
+          "train_amplitude_router": true,
+          "train_experts": true,
+          "train_scales": true,
+          "train_selection_router": true,
+          "train_shared": true,
+          "use_oracle_targets": false
+        }
+      ],
+      "stage_selection_metrics": [
+        {
+          "cosine": 0.9400324253365397,
+          "dead_experts": 4,
+          "load_cv": 1.4292138492837594,
+          "mse": 5.947921620190755e-05,
+          "normalized_mse": 0.06714068342074822,
+          "router_entropy": 2.6390690514817834,
+          "selected_count": 16384,
+          "selected_counts": [
+            16325.0,
+            15689.0,
+            13694.0,
+            8926.0,
+            5051.0,
+            2751.0,
+            1752.0,
+            729.0,
+            166.0,
+            444.0,
+            4.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            5.0
+          ],
+          "split": "train",
+          "stage": "router_warm_start",
+          "streaming": true,
+          "token_count": 16384
+        },
+        {
+          "cosine": 0.9797860868275166,
+          "dead_experts": 0,
+          "load_cv": 0.4312778951081694,
+          "mse": 4.161399967870238e-05,
+          "normalized_mse": 0.04697426356148367,
+          "router_entropy": 2.7268231976777315,
+          "selected_count": 16384,
+          "selected_counts": [
+            4618.0,
+            5840.0,
+            6556.0,
+            5973.0,
+            4845.0,
+            4475.0,
+            4627.0,
+            4373.0,
+            3680.0,
+            4023.0,
+            1577.0,
+            905.0,
+            871.0,
+            2118.0,
+            4872.0,
+            6183.0
+          ],
+          "split": "train",
+          "stage": "joint_shared_basis_cosine_balanced",
+          "streaming": true,
+          "token_count": 16384
+        }
+      ],
+      "stages": [
+        {
+          "epoch": 1,
+          "epochs": 1,
+          "learning_rates": {
+            "amplitude_router": 0.0001,
+            "selection_router": 0.0001
+          },
+          "loss": 0.3615732789039612,
+          "loss_coefficients": {
+            "cosine": 0.05,
+            "load_balance": 0.1,
+            "mse": 1.0,
+            "oracle": 0.1,
+            "router_z_loss": 0.001
+          },
+          "stage": "router_warm_start",
+          "streaming": true,
+          "train_amplitude_router": true,
+          "train_selection_router": true,
+          "train_shared": false,
+          "updates": 288
+        },
+        {
+          "epoch": 4,
+          "epochs": 4,
+          "learning_rates": {
+            "amplitude_router": 2e-05,
+            "expert_scales": 2e-05,
+            "experts": 0.0001,
+            "selection_router": 2e-05,
+            "shared": 5e-05
+          },
+          "loss": 0.12257036566734314,
+          "loss_coefficients": {
+            "cosine": 0.5,
+            "load_balance": 0.1,
+            "mse": 1.0,
+            "oracle": 0.0,
+            "router_z_loss": 0.001
+          },
+          "stage": "joint_shared_basis_cosine_balanced",
+          "streaming": true,
+          "train_amplitude_router": true,
+          "train_selection_router": true,
+          "train_shared": true,
+          "updates": 1152
+        }
+      ],
+      "streaming_dataset": {
+        "holdout_count": 16598,
+        "holdout_manifest": "runs/20260815-184644-windows-real-d2m-v4-streaming/capture/layer-0000.json",
+        "train_count": 131508,
+        "train_manifest": "runs/20260815-184644-windows-real-d2m-v4-streaming/capture/layer-0000.json"
+      }
+    }
+  },
+  "schema_version": 1,
+  "selection_count": 16384,
+  "selection_hash": "5a7739c753dae98698a8c1a22c6a10409230f0750b33cfc9631594f16d8b8e1c",
+  "selection_split": "train_dev",
+  "stage_schedule": [
+    {
+      "epochs": 1,
+      "loss_coefficients": {
+        "cosine": 0.05,
+        "load_balance": 0.1,
+        "mse": 1.0,
+        "oracle": 0.1,
+        "router_z_loss": 0.001
+      },
+      "name": "router_warm_start",
+      "train_experts": false,
+      "train_scales": false,
+      "train_shared": false,
+      "use_oracle_targets": true
+    },
+    {
+      "epochs": 4,
+      "learning_rates": {
+        "amplitude_router": 2e-05,
+        "expert_scales": 2e-05,
+        "experts": 0.0001,
+        "selection_router": 2e-05,
+        "shared": 5e-05
+      },
+      "loss_coefficients": {
+        "cosine": 0.5,
+        "load_balance": 0.1,
+        "mse": 1.0,
+        "oracle": 0.0,
+        "router_z_loss": 0.001
+      },
+      "name": "joint_shared_basis_cosine_balanced",
+      "train_experts": true,
+      "train_scales": true,
+      "train_shared": true,
+      "use_oracle_targets": false
+    }
+  ],
+  "status": "ALTERNATIVE_HIGH_SPARSITY_TRAIN_DEV_COMPLETE"
+}

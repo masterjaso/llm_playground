@@ -1,0 +1,37 @@
+{
+  "checkpoint": "runs\\20260815-184644-windows-real-d2m-v4-streaming\\layer-checkpoints\\high-sparsity-basis-training\\p16-top4-shared-basis-long\\layer-0000.json",
+  "checkpoint_code_commit": "f54b9b9f93d2c4e75818de3c628fcf5c6a5e4944",
+  "evaluator_code_commit": "f54b9b9f93d2c4e75818de3c628fcf5c6a5e4944",
+  "metrics": {
+    "cosine": 0.9691852367790453,
+    "dead_experts": 0,
+    "load_cv": 0.5621690600708095,
+    "mse": 3.864866758717272e-05,
+    "normalized_mse": 0.036960461293831764,
+    "router_entropy": 2.6969306707698215,
+    "selected_count": 16598,
+    "selected_counts": [
+      9386.0,
+      8923.0,
+      7165.0,
+      5185.0,
+      4597.0,
+      4362.0,
+      3640.0,
+      2805.0,
+      3097.0,
+      3371.0,
+      3156.0,
+      2343.0,
+      2746.0,
+      2262.0,
+      2250.0,
+      1104.0
+    ],
+    "split": "holdout",
+    "streaming": true,
+    "token_count": 16598
+  },
+  "status": "P16_TOP4_SHARED_BASIS_HOLDOUT_CONFIRMATION",
+  "strict_reload": true
+}

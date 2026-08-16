@@ -4,10 +4,10 @@
     "falsifier": "layer-streaming cannot reproduce the known native/text-only diagnostic",
     "reason": "teacher correctness is established; failure is whole-model residency/throughput",
     "production_objective": ">=70% active dense-FFN reduction with strongest achievable quality",
-    "current_research_path": "independent_positive high_sparsity_finalist_holdout_confirmation_then_basis_investigation_before_representative_replay",
+    "current_research_path": "independent_positive residual_oracle_routing_holdout_confirmation_then_angular_generalization_investigation_before_representative_replay",
     "replay_gate": "PAUSED_NO_GREEN_GE70_CANDIDATE"
   },
-  "code_commit": "7e375c4c9d92646ab9b15d65b12b9ffc8373b225",
+  "code_commit": "4272fc26df6e232373868284b6ae84b7d3b5419b",
   "created": "2026-08-15T22:46:52.495949Z",
   "dataset_hash": "46b278a85b4cb31a8fe659be2dd146bd9206eb491268220e25440981d06c0a03",
   "default_profile": "qwen38_p16s1_top4",
@@ -56,6 +56,15 @@
       "qwen38_p16s1_top3",
       "qwen38_p32s1_top6"
     ]
+  },
+  "routing_course_correction": {
+    "status": "COMPLETE_HOLDOUT_STILL_BLOCKED",
+    "report": "reports/p16-top4-routing-course-correction.json",
+    "routing_mode": "independent_positive",
+    "best_dev": {"normalized_mse": 0.03685096892126619, "cosine": 0.9813705421984196, "dead_experts": 0, "load_cv": 0.46707213039416084},
+    "best_holdout": {"normalized_mse": 0.03995906208655764, "cosine": 0.9714432792328024, "dead_experts": 0, "load_cv": 0.497228731410101, "strict_reload": true},
+    "production_green_candidate": false,
+    "reason": "residual-correlation labels and positive-amplitude supervision improve angular quality but holdout cosine remains below 0.98"
   },
   "p8_control": {
     "profile": "qwen38_p8s1_top6",

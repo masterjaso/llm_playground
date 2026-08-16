@@ -1,0 +1,290 @@
+{
+  "code_commit": "f54b9b9f93d2c4e75818de3c628fcf5c6a5e4944",
+  "profile": "qwen38_p16s1_top4",
+  "result": {
+    "code_commit": "f54b9b9f93d2c4e75818de3c628fcf5c6a5e4944",
+    "final_selection": {
+      "cosine": 0.9781261417083442,
+      "dead_experts": 0,
+      "load_cv": 0.5053444675673764,
+      "mse": 2.987891298289469e-05,
+      "normalized_mse": 0.03372759033560162,
+      "router_entropy": 2.695359189994633,
+      "selected_count": 16384,
+      "selected_counts": [
+        8610.0,
+        8306.0,
+        6821.0,
+        5132.0,
+        4492.0,
+        4323.0,
+        3650.0,
+        2747.0,
+        3348.0,
+        3642.0,
+        3370.0,
+        2460.0,
+        2667.0,
+        2384.0,
+        2080.0,
+        1504.0
+      ],
+      "split": "train",
+      "streaming": true,
+      "token_count": 16384
+    },
+    "holdout_metrics": {
+      "cosine": null,
+      "dead_experts": null,
+      "load_cv": null,
+      "normalized_mse": null,
+      "selected_counts": [],
+      "split": "holdout",
+      "status": "DEFERRED_UNTIL_FINALIST_CONFIRMATION",
+      "streaming": true
+    },
+    "initial_selection": {
+      "cosine": 0.9276943891309202,
+      "dead_experts": 0,
+      "load_cv": 1.3019502473210516,
+      "mse": 7.489183149118616e-05,
+      "normalized_mse": 0.08453858456844444,
+      "router_entropy": 2.6507784659042954,
+      "selected_count": 16384,
+      "selected_counts": [
+        16112.0,
+        14714.0,
+        11488.0,
+        7187.0,
+        5574.0,
+        4546.0,
+        3297.0,
+        404.0,
+        464.0,
+        560.0,
+        561.0,
+        265.0,
+        140.0,
+        131.0,
+        92.0,
+        1.0
+      ],
+      "split": "train",
+      "streaming": true,
+      "token_count": 16384
+    },
+    "layer": 0,
+    "metadata": "runs\\20260815-184644-windows-real-d2m-v4-streaming\\layer-checkpoints\\high-sparsity-basis-training\\p16-top4-shared-basis-long\\layer-0000.json",
+    "oracle_holdout": {
+      "cosine": null,
+      "normalized_mse": null,
+      "status": "bounded-oracle-summary-pending",
+      "streaming": true
+    },
+    "status": "TRAINED_DEV_SELECTED",
+    "tensor_file": "runs\\20260815-184644-windows-real-d2m-v4-streaming\\layer-checkpoints\\high-sparsity-basis-training\\p16-top4-shared-basis-long\\layer-0000.safetensors",
+    "training_config": {
+      "best_selection_stage": "joint_expert_shared_basis_long",
+      "device": "cuda:1",
+      "epochs": 1,
+      "holdout_evaluation": "deferred",
+      "initial_expert_scales": [
+        0.9999998932564707,
+        1.0000012221294605,
+        1.0000010781804758,
+        1.0000016247872652,
+        1.0000016350541296,
+        1.0000017011228253,
+        1.0000017447824492,
+        1.000001155533654,
+        1.0000011066008727,
+        1.0000010510359565,
+        1.0000009286755949,
+        1.0000019483954736,
+        1.000001818107384,
+        1.00000178843709,
+        1.0000025380145483,
+        1.000002161773717
+      ],
+      "learning_rate": 0.0001,
+      "loss_coefficients": {
+        "cosine": 0.05,
+        "load_balance": 0.05,
+        "mse": 1.0,
+        "router_z_loss": 0.001
+      },
+      "loss_version": "torch-distill-v1",
+      "microbatch": 512,
+      "optimizer": "AdamW",
+      "partition_path": "runs\\20260815-184644-windows-real-d2m-v4-streaming\\partitions\\high-sparsity-p16-top4.json",
+      "router_initialization": "bounded_train_contribution_lstsq",
+      "routing_mode": "independent_positive",
+      "selection_count": 16384,
+      "selection_indices_hash": "7b2ff822febb9191b88d04cacfa6bb80aec3c6dd42f9210683c6b9fd2167b15f",
+      "selection_split": "train_dev_subset",
+      "stage_schedule": [
+        {
+          "epochs": 1,
+          "learning_rate": 0.0001,
+          "learning_rates": {},
+          "name": "router_warm_start",
+          "train_amplitude_router": true,
+          "train_experts": false,
+          "train_scales": false,
+          "train_selection_router": true,
+          "train_shared": false,
+          "use_oracle_targets": true
+        },
+        {
+          "epochs": 4,
+          "learning_rate": 0.0001,
+          "learning_rates": {
+            "amplitude_router": 2e-05,
+            "expert_scales": 2e-05,
+            "experts": 0.0001,
+            "selection_router": 2e-05,
+            "shared": 5e-05
+          },
+          "name": "joint_expert_shared_basis_long",
+          "train_amplitude_router": true,
+          "train_experts": true,
+          "train_scales": true,
+          "train_selection_router": true,
+          "train_shared": true,
+          "use_oracle_targets": false
+        }
+      ],
+      "stage_selection_metrics": [
+        {
+          "cosine": 0.9335018577985466,
+          "dead_experts": 1,
+          "load_cv": 1.372675523964573,
+          "mse": 5.5490272688984985e-05,
+          "normalized_mse": 0.06263792748873928,
+          "router_entropy": 2.5370764238759875,
+          "selected_count": 16384,
+          "selected_counts": [
+            16318.0,
+            15600.0,
+            12245.0,
+            8303.0,
+            5204.0,
+            3319.0,
+            2635.0,
+            501.0,
+            432.0,
+            321.0,
+            166.0,
+            302.0,
+            79.0,
+            90.0,
+            21.0,
+            0.0
+          ],
+          "split": "train",
+          "stage": "router_warm_start",
+          "streaming": true,
+          "token_count": 16384
+        },
+        {
+          "cosine": 0.9781261417083442,
+          "dead_experts": 0,
+          "load_cv": 0.5053444675673764,
+          "mse": 2.987891298289469e-05,
+          "normalized_mse": 0.03372759033560162,
+          "router_entropy": 2.695359189994633,
+          "selected_count": 16384,
+          "selected_counts": [
+            8610.0,
+            8306.0,
+            6821.0,
+            5132.0,
+            4492.0,
+            4323.0,
+            3650.0,
+            2747.0,
+            3348.0,
+            3642.0,
+            3370.0,
+            2460.0,
+            2667.0,
+            2384.0,
+            2080.0,
+            1504.0
+          ],
+          "split": "train",
+          "stage": "joint_expert_shared_basis_long",
+          "streaming": true,
+          "token_count": 16384
+        }
+      ],
+      "stages": [
+        {
+          "epoch": 1,
+          "epochs": 1,
+          "learning_rates": {
+            "amplitude_router": 0.0001,
+            "selection_router": 0.0001
+          },
+          "loss": 0.30696946382522583,
+          "stage": "router_warm_start",
+          "streaming": true,
+          "train_amplitude_router": true,
+          "train_selection_router": true,
+          "train_shared": false,
+          "updates": 288
+        },
+        {
+          "epoch": 4,
+          "epochs": 4,
+          "learning_rates": {
+            "amplitude_router": 2e-05,
+            "expert_scales": 2e-05,
+            "experts": 0.0001,
+            "selection_router": 2e-05,
+            "shared": 5e-05
+          },
+          "loss": 0.05981812998652458,
+          "stage": "joint_expert_shared_basis_long",
+          "streaming": true,
+          "train_amplitude_router": true,
+          "train_selection_router": true,
+          "train_shared": true,
+          "updates": 1152
+        }
+      ],
+      "streaming_dataset": {
+        "holdout_count": 16598,
+        "holdout_manifest": "runs/20260815-184644-windows-real-d2m-v4-streaming/capture/layer-0000.json",
+        "train_count": 131508,
+        "train_manifest": "runs/20260815-184644-windows-real-d2m-v4-streaming/capture/layer-0000.json"
+      }
+    }
+  },
+  "schedule": [
+    {
+      "epochs": 1,
+      "name": "router_warm_start",
+      "train_experts": false,
+      "train_scales": false,
+      "train_shared": false,
+      "use_oracle_targets": true
+    },
+    {
+      "epochs": 4,
+      "learning_rates": {
+        "amplitude_router": 2e-05,
+        "expert_scales": 2e-05,
+        "experts": 0.0001,
+        "selection_router": 2e-05,
+        "shared": 5e-05
+      },
+      "name": "joint_expert_shared_basis_long",
+      "train_experts": true,
+      "train_scales": true,
+      "train_shared": true,
+      "use_oracle_targets": false
+    }
+  ],
+  "status": "P16_TOP4_SHARED_BASIS_TRAIN_DEV_ONLY"
+}

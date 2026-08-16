@@ -11,10 +11,10 @@
     "fact_ledger": "runs\\20260815-184644-windows-real-d2m-v4-streaming\\repository-fact-ledger.json",
     "source_manifest": "runs\\20260815-184644-windows-real-d2m-v4-streaming\\source-manifest.json"
   },
-  "code_commit": "7e375c4c9d92646ab9b15d65b12b9ffc8373b225",
-  "current_phase": "high-sparsity-finalist-holdout-confirmation",
-  "last_successful_command": "confirm_high_sparsity_holdout.py",
-  "next_exact_command": "investigate sparse basis/angular error and routing load before any representative replay",
+  "code_commit": "4272fc26df6e232373868284b6ae84b7d3b5419b",
+  "current_phase": "high-sparsity-routing-course-correction",
+  "last_successful_command": "confirm_high_sparsity_candidate.py",
+  "next_exact_command": "investigate holdout angular generalization before any representative replay",
   "parent_run_id": "20260815-180505-windows-real-d2m-v3",
   "phase_status": "quality_gate_not_met_replay_paused",
   "prediction_contract": {
@@ -88,6 +88,12 @@
     "finalist_holdout_confirmation": {
       "status": "COMPLETE",
       "report": "reports/high-sparsity-finalist-holdout-confirmation.json",
+      "replay_gate": "BLOCKED_NO_GREEN_CANDIDATE"
+    },
+    "routing_course_correction": {
+      "status": "COMPLETE_HOLDOUT_STILL_BLOCKED",
+      "report": "reports/p16-top4-routing-course-correction.json",
+      "best_holdout_cosine": 0.9714432792328024,
       "replay_gate": "BLOCKED_NO_GREEN_CANDIDATE"
     },
     "train_layer": {

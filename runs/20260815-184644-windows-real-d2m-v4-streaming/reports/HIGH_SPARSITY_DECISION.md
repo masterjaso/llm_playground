@@ -23,6 +23,23 @@ quality upper bound. Do not resume the durable layer-29 replay checkpoint or
 start 64-layer execution until basis/routing work produces a green >=70%
 candidate.
 
+## Routing course correction
+
+The opt-in independent-positive router now supports train-only residual-
+correlation selection labels and bounded nonnegative amplitude supervision;
+the existing contribution-norm and normalized-softmax baselines remain
+available. On the same 16,384-row TRAIN/dev subset, p16/top4 reached a green
+dev result (NMSE `0.03685`, cosine `0.98137`, dead `0`, load CV `0.467`) with
+load weight `0.25`. Strict full-holdout confirmation passed NMSE, dead-expert,
+and load gates (`0.03996`, `0`, `0.497`) but cosine was only `0.97144`. A
+cosine-weight `0.75` variant was similarly dev-green and holdout cosine was
+`0.97142`. The frozen positive oracle is not the limiting factor (holdout
+oracle cosine `0.95231`); learned-router angular generalization remains the
+blocker. Preserve these receipts, but keep representative replay paused.
+
+See `p16-top4-routing-course-correction.json` and the corresponding training
+and holdout reports for strict reload and provenance details.
+
 Evidence:
 
 - `high-sparsity-partition-search.json`
