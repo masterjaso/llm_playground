@@ -131,6 +131,27 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         "schema_version": 2,
         "status": "CLEAN_VALIDATION_TRAINING_COMPLETE",
         "classification": "TRUE_FIT_VALIDATION_HOLDOUT_PROTOCOL",
+        "hypothesis": (
+            f"The {profile.name} topology-specific partition and staged residual-correlation "
+            "router training can approach or clear the fixed green layer gate on FIT/validation "
+            "without opening holdout."
+        ),
+        "falsifier": (
+            "No validation checkpoint reaches normalized MSE <= 0.05, cosine >= 0.98, "
+            "dead experts = 0, and load CV <= 0.50, or the topology-specific run regresses "
+            "the prior partition baseline."
+        ),
+        "decision_enabled": (
+            "retain as a bounded p32 research finalist only if validation is near-target; "
+            "authorize post-selection holdout confirmation only after a genuinely green checkpoint"
+        ),
+        "budget": {
+            "epochs": 1,
+            "microbatch": args.microbatch,
+            "device": args.device,
+            "oracle_loss_mode": args.oracle_loss_mode,
+            "holdout_opened": False,
+        },
         "profile": profile.name,
         "routing_mode": profile.routing_mode,
         "partition": str(partition),
