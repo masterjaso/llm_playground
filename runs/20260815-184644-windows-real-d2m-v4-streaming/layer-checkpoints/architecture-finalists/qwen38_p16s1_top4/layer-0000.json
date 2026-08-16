@@ -1,0 +1,670 @@
+{
+  "code_commit": "964dcc6d3c90f3af7b60c11ddb9e7f5827320ee5",
+  "created_at": "2026-08-16T02:42:28.143801Z",
+  "dataset_hash": "46b278a85b4cb31a8fe659be2dd146bd9206eb491268220e25440981d06c0a03",
+  "holdout_metrics": {
+    "cosine": 0.9396539162492046,
+    "dead_experts": 0,
+    "load_cv": 0.2920947792791424,
+    "mse": 0.00011397120460341789,
+    "normalized_mse": 0.1089928465672149,
+    "router_entropy": 2.687547686703594,
+    "selected_counts": [
+      5682.0,
+      6006.0,
+      5294.0,
+      3034.0,
+      3339.0,
+      3546.0,
+      2308.0,
+      2063.0,
+      3822.0,
+      4689.0,
+      3176.0,
+      3462.0,
+      4189.0,
+      5370.0,
+      5857.0,
+      4555.0
+    ],
+    "streaming": true,
+    "token_count": 16598
+  },
+  "layer": 0,
+  "metrics": {},
+  "partition_hash": "34f5eba9d30fa2ab1647c8b13430143a4634e510d9cf78cab8ce42e3fe6ef879",
+  "partition_strategy": "artifact",
+  "profile": "qwen38_p16s1_top4",
+  "profile_hash": "0482fae2f52e7e951e97a32e06aa58eb49c111769705389c17a904a51e1fd4b6",
+  "quality_gate": {
+    "metrics": {
+      "cosine": 0.9396539162492046,
+      "dead_experts": 0,
+      "load_cv": 0.2920947792791424,
+      "mse": 0.00011397120460341789,
+      "normalized_mse": 0.1089928465672149,
+      "router_entropy": 2.687547686703594,
+      "selected_counts": [
+        5682.0,
+        6006.0,
+        5294.0,
+        3034.0,
+        3339.0,
+        3546.0,
+        2308.0,
+        2063.0,
+        3822.0,
+        4689.0,
+        3176.0,
+        3462.0,
+        4189.0,
+        5370.0,
+        5857.0,
+        4555.0
+      ],
+      "streaming": true,
+      "token_count": 16598
+    },
+    "overall": "red",
+    "thresholds_version": "initial-2026-08-15"
+  },
+  "router_architecture": "torch-linear-topk-normalized-v1",
+  "router_metrics": {
+    "actual_improvement": 0.19186102571578717,
+    "dead_experts": 0,
+    "load_cv": 0.2920947792791424,
+    "selected_counts": [
+      5682.0,
+      6006.0,
+      5294.0,
+      3034.0,
+      3339.0,
+      3546.0,
+      2308.0,
+      2063.0,
+      3822.0,
+      4689.0,
+      3176.0,
+      3462.0,
+      4189.0,
+      5370.0,
+      5857.0,
+      4555.0
+    ]
+  },
+  "schema_version": 2,
+  "source_config_hash": "191e0af232104ed8b65258cf3fb2b842e288008baca7633c11b82a1ac7203aab",
+  "source_index_hash": "77042094076611b69791a610065f28b7013b8c621795fa86ddccc8bac7d1b9df",
+  "source_revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
+  "status": "VALIDATION_FAILED",
+  "tensor_file": "layer-0000.safetensors",
+  "tensor_inventory": {
+    "model.layers.0.expert_down_proj.0.weight": {
+      "dtype": "float32",
+      "shape": [
+        5120,
+        1024
+      ]
+    },
+    "model.layers.0.expert_down_proj.1.weight": {
+      "dtype": "float32",
+      "shape": [
+        5120,
+        1024
+      ]
+    },
+    "model.layers.0.expert_down_proj.10.weight": {
+      "dtype": "float32",
+      "shape": [
+        5120,
+        1024
+      ]
+    },
+    "model.layers.0.expert_down_proj.11.weight": {
+      "dtype": "float32",
+      "shape": [
+        5120,
+        1024
+      ]
+    },
+    "model.layers.0.expert_down_proj.12.weight": {
+      "dtype": "float32",
+      "shape": [
+        5120,
+        1024
+      ]
+    },
+    "model.layers.0.expert_down_proj.13.weight": {
+      "dtype": "float32",
+      "shape": [
+        5120,
+        1024
+      ]
+    },
+    "model.layers.0.expert_down_proj.14.weight": {
+      "dtype": "float32",
+      "shape": [
+        5120,
+        1024
+      ]
+    },
+    "model.layers.0.expert_down_proj.15.weight": {
+      "dtype": "float32",
+      "shape": [
+        5120,
+        1024
+      ]
+    },
+    "model.layers.0.expert_down_proj.2.weight": {
+      "dtype": "float32",
+      "shape": [
+        5120,
+        1024
+      ]
+    },
+    "model.layers.0.expert_down_proj.3.weight": {
+      "dtype": "float32",
+      "shape": [
+        5120,
+        1024
+      ]
+    },
+    "model.layers.0.expert_down_proj.4.weight": {
+      "dtype": "float32",
+      "shape": [
+        5120,
+        1024
+      ]
+    },
+    "model.layers.0.expert_down_proj.5.weight": {
+      "dtype": "float32",
+      "shape": [
+        5120,
+        1024
+      ]
+    },
+    "model.layers.0.expert_down_proj.6.weight": {
+      "dtype": "float32",
+      "shape": [
+        5120,
+        1024
+      ]
+    },
+    "model.layers.0.expert_down_proj.7.weight": {
+      "dtype": "float32",
+      "shape": [
+        5120,
+        1024
+      ]
+    },
+    "model.layers.0.expert_down_proj.8.weight": {
+      "dtype": "float32",
+      "shape": [
+        5120,
+        1024
+      ]
+    },
+    "model.layers.0.expert_down_proj.9.weight": {
+      "dtype": "float32",
+      "shape": [
+        5120,
+        1024
+      ]
+    },
+    "model.layers.0.expert_gate_proj.0.weight": {
+      "dtype": "float32",
+      "shape": [
+        1024,
+        5120
+      ]
+    },
+    "model.layers.0.expert_gate_proj.1.weight": {
+      "dtype": "float32",
+      "shape": [
+        1024,
+        5120
+      ]
+    },
+    "model.layers.0.expert_gate_proj.10.weight": {
+      "dtype": "float32",
+      "shape": [
+        1024,
+        5120
+      ]
+    },
+    "model.layers.0.expert_gate_proj.11.weight": {
+      "dtype": "float32",
+      "shape": [
+        1024,
+        5120
+      ]
+    },
+    "model.layers.0.expert_gate_proj.12.weight": {
+      "dtype": "float32",
+      "shape": [
+        1024,
+        5120
+      ]
+    },
+    "model.layers.0.expert_gate_proj.13.weight": {
+      "dtype": "float32",
+      "shape": [
+        1024,
+        5120
+      ]
+    },
+    "model.layers.0.expert_gate_proj.14.weight": {
+      "dtype": "float32",
+      "shape": [
+        1024,
+        5120
+      ]
+    },
+    "model.layers.0.expert_gate_proj.15.weight": {
+      "dtype": "float32",
+      "shape": [
+        1024,
+        5120
+      ]
+    },
+    "model.layers.0.expert_gate_proj.2.weight": {
+      "dtype": "float32",
+      "shape": [
+        1024,
+        5120
+      ]
+    },
+    "model.layers.0.expert_gate_proj.3.weight": {
+      "dtype": "float32",
+      "shape": [
+        1024,
+        5120
+      ]
+    },
+    "model.layers.0.expert_gate_proj.4.weight": {
+      "dtype": "float32",
+      "shape": [
+        1024,
+        5120
+      ]
+    },
+    "model.layers.0.expert_gate_proj.5.weight": {
+      "dtype": "float32",
+      "shape": [
+        1024,
+        5120
+      ]
+    },
+    "model.layers.0.expert_gate_proj.6.weight": {
+      "dtype": "float32",
+      "shape": [
+        1024,
+        5120
+      ]
+    },
+    "model.layers.0.expert_gate_proj.7.weight": {
+      "dtype": "float32",
+      "shape": [
+        1024,
+        5120
+      ]
+    },
+    "model.layers.0.expert_gate_proj.8.weight": {
+      "dtype": "float32",
+      "shape": [
+        1024,
+        5120
+      ]
+    },
+    "model.layers.0.expert_gate_proj.9.weight": {
+      "dtype": "float32",
+      "shape": [
+        1024,
+        5120
+      ]
+    },
+    "model.layers.0.expert_scales": {
+      "dtype": "float32",
+      "shape": [
+        16
+      ]
+    },
+    "model.layers.0.expert_up_proj.0.weight": {
+      "dtype": "float32",
+      "shape": [
+        1024,
+        5120
+      ]
+    },
+    "model.layers.0.expert_up_proj.1.weight": {
+      "dtype": "float32",
+      "shape": [
+        1024,
+        5120
+      ]
+    },
+    "model.layers.0.expert_up_proj.10.weight": {
+      "dtype": "float32",
+      "shape": [
+        1024,
+        5120
+      ]
+    },
+    "model.layers.0.expert_up_proj.11.weight": {
+      "dtype": "float32",
+      "shape": [
+        1024,
+        5120
+      ]
+    },
+    "model.layers.0.expert_up_proj.12.weight": {
+      "dtype": "float32",
+      "shape": [
+        1024,
+        5120
+      ]
+    },
+    "model.layers.0.expert_up_proj.13.weight": {
+      "dtype": "float32",
+      "shape": [
+        1024,
+        5120
+      ]
+    },
+    "model.layers.0.expert_up_proj.14.weight": {
+      "dtype": "float32",
+      "shape": [
+        1024,
+        5120
+      ]
+    },
+    "model.layers.0.expert_up_proj.15.weight": {
+      "dtype": "float32",
+      "shape": [
+        1024,
+        5120
+      ]
+    },
+    "model.layers.0.expert_up_proj.2.weight": {
+      "dtype": "float32",
+      "shape": [
+        1024,
+        5120
+      ]
+    },
+    "model.layers.0.expert_up_proj.3.weight": {
+      "dtype": "float32",
+      "shape": [
+        1024,
+        5120
+      ]
+    },
+    "model.layers.0.expert_up_proj.4.weight": {
+      "dtype": "float32",
+      "shape": [
+        1024,
+        5120
+      ]
+    },
+    "model.layers.0.expert_up_proj.5.weight": {
+      "dtype": "float32",
+      "shape": [
+        1024,
+        5120
+      ]
+    },
+    "model.layers.0.expert_up_proj.6.weight": {
+      "dtype": "float32",
+      "shape": [
+        1024,
+        5120
+      ]
+    },
+    "model.layers.0.expert_up_proj.7.weight": {
+      "dtype": "float32",
+      "shape": [
+        1024,
+        5120
+      ]
+    },
+    "model.layers.0.expert_up_proj.8.weight": {
+      "dtype": "float32",
+      "shape": [
+        1024,
+        5120
+      ]
+    },
+    "model.layers.0.expert_up_proj.9.weight": {
+      "dtype": "float32",
+      "shape": [
+        1024,
+        5120
+      ]
+    },
+    "model.layers.0.router.weight": {
+      "dtype": "float32",
+      "shape": [
+        16,
+        5120
+      ]
+    },
+    "model.layers.0.shared_down_proj.weight": {
+      "dtype": "float32",
+      "shape": [
+        5120,
+        1024
+      ]
+    },
+    "model.layers.0.shared_gate_proj.weight": {
+      "dtype": "float32",
+      "shape": [
+        1024,
+        5120
+      ]
+    },
+    "model.layers.0.shared_up_proj.weight": {
+      "dtype": "float32",
+      "shape": [
+        1024,
+        5120
+      ]
+    }
+  },
+  "tensor_sha256": "11b01b9296b343e25fab6d17dca0070e884ed168fdc899c91ffe166ed4eed987",
+  "tensors": {},
+  "train_metrics": {
+    "all_expert_reconstruction_mse": 0.0,
+    "initial_holdout": {
+      "cosine": 0.8552916917848018,
+      "dead_experts": 0,
+      "load_cv": 1.0863980796513042,
+      "mse": 0.00031459567589650086,
+      "normalized_mse": 0.3008538722830021,
+      "router_entropy": 2.606080668075126,
+      "selected_counts": [
+        10880.0,
+        6744.0,
+        5210.0,
+        869.0,
+        1202.0,
+        490.0,
+        450.0,
+        148.0,
+        782.0,
+        1803.0,
+        878.0,
+        1735.0,
+        3665.0,
+        5425.0,
+        10264.0,
+        15847.0
+      ],
+      "streaming": true,
+      "token_count": 16598
+    },
+    "oracle_holdout": {
+      "cosine": null,
+      "normalized_mse": null,
+      "status": "bounded-oracle-summary-pending",
+      "streaming": true
+    }
+  },
+  "training_config": {
+    "best_holdout_stage": "joint_expert_router",
+    "device": "cuda:1",
+    "epochs": 1,
+    "initial_expert_scales": [
+      1.0000007484649416,
+      1.0000011489994376,
+      1.0000005758510666,
+      1.0000006115700142,
+      1.0000003793926222,
+      1.0000009782853767,
+      1.0000003511528288,
+      1.000000785876997,
+      1.000000997923107,
+      1.0000011006887979,
+      1.0000011062100518,
+      1.0000005484013315,
+      1.0000008363977593,
+      1.000001544304869,
+      1.00000040753706,
+      1.000000442573158
+    ],
+    "learning_rate": 0.0001,
+    "loss_coefficients": {
+      "cosine": 0.05,
+      "load_balance": 0.05,
+      "mse": 1.0,
+      "router_z_loss": 0.001
+    },
+    "loss_version": "torch-distill-v1",
+    "microbatch": 512,
+    "optimizer": "AdamW",
+    "partition_path": "runs\\20260815-184644-windows-real-d2m-v4-streaming\\partitions\\layer-0000-p16-top4-architecture-finalist.json",
+    "router_initialization": "bounded_train_contribution_lstsq",
+    "stage_holdout_metrics": [
+      {
+        "cosine": 0.8626296018919236,
+        "dead_experts": 0,
+        "load_cv": 1.159723833388033,
+        "mse": 0.00030944348279360274,
+        "normalized_mse": 0.2959267313064471,
+        "router_entropy": 2.5354234470432244,
+        "selected_counts": [
+          10977.0,
+          7233.0,
+          3349.0,
+          915.0,
+          610.0,
+          562.0,
+          358.0,
+          343.0,
+          316.0,
+          1224.0,
+          755.0,
+          1409.0,
+          3733.0,
+          7286.0,
+          10850.0,
+          16472.0
+        ],
+        "stage": "router_warm_start",
+        "streaming": true,
+        "token_count": 16598
+      },
+      {
+        "cosine": 0.8307152313846524,
+        "dead_experts": 0,
+        "load_cv": 0.49540515874575863,
+        "mse": 0.0003337029445342291,
+        "normalized_mse": 0.31912651936256115,
+        "router_entropy": 2.6704595712656456,
+        "selected_counts": [
+          6213.0,
+          5472.0,
+          4615.0,
+          3071.0,
+          2909.0,
+          2479.0,
+          2074.0,
+          1755.0,
+          3319.0,
+          3937.0,
+          2812.0,
+          2973.0,
+          3741.0,
+          4622.0,
+          6109.0,
+          10291.0
+        ],
+        "stage": "router_plus_scale",
+        "streaming": true,
+        "token_count": 16598
+      },
+      {
+        "cosine": 0.9396539162492046,
+        "dead_experts": 0,
+        "load_cv": 0.2920947792791424,
+        "mse": 0.00011397120460341789,
+        "normalized_mse": 0.1089928465672149,
+        "router_entropy": 2.687547686703594,
+        "selected_counts": [
+          5682.0,
+          6006.0,
+          5294.0,
+          3034.0,
+          3339.0,
+          3546.0,
+          2308.0,
+          2063.0,
+          3822.0,
+          4689.0,
+          3176.0,
+          3462.0,
+          4189.0,
+          5370.0,
+          5857.0,
+          4555.0
+        ],
+        "stage": "joint_expert_router",
+        "streaming": true,
+        "token_count": 16598
+      }
+    ],
+    "stages": [
+      {
+        "epoch": 1,
+        "epochs": 1,
+        "loss": 0.3197411298751831,
+        "stage": "router_warm_start",
+        "streaming": true,
+        "updates": 288
+      },
+      {
+        "epoch": 1,
+        "epochs": 1,
+        "loss": 0.06711133569478989,
+        "stage": "router_plus_scale",
+        "streaming": true,
+        "updates": 288
+      },
+      {
+        "epoch": 1,
+        "epochs": 1,
+        "loss": 0.05839301645755768,
+        "stage": "joint_expert_router",
+        "streaming": true,
+        "updates": 288
+      }
+    ],
+    "streaming_dataset": {
+      "holdout_count": 16598,
+      "holdout_manifest": "runs/20260815-184644-windows-real-d2m-v4-streaming/capture/layer-0000.json",
+      "train_count": 131508,
+      "train_manifest": "runs/20260815-184644-windows-real-d2m-v4-streaming/capture/layer-0000.json"
+    }
+  },
+  "training_seed": 17,
+  "updated_at": "2026-08-16T02:42:28.143801Z"
+}

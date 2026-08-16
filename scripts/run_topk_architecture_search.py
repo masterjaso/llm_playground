@@ -8,8 +8,8 @@ same coefficient solve after a deterministic norm-ranked selection because an
 exhaustive p32 combination search is not a meaningful bounded experiment.
 
 The resulting JSON artifacts are run evidence, not a trainable quality claim.
-The holdout is only read when ``--confirm`` is requested for already-selected
-finalists.
+The holdout is read only after the TRAIN/dev finalist list is frozen, and is
+used once for finalist confirmation.
 """
 
 from __future__ import annotations
@@ -18,7 +18,6 @@ import argparse
 import hashlib
 import itertools
 import json
-import math
 import os
 import time
 from pathlib import Path
@@ -33,10 +32,6 @@ from dense2moe.provenance import current_git_commit
 
 RUN = Path("runs/20260815-184644-windows-real-d2m-v4-streaming")
 DEFAULT_SOURCE = Path("runs/20260815-030931-windows/source")
-DEV_MANIFEST = RUN / "capture/layer-0000-train.json"
-HOLDOUT_MANIFEST = RUN / "capture/layer-0000-holdout.json"
-
-
 def _json(path: Path, payload: Any) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
@@ -98,6 +93,7 @@ def _select_dev_rows(manifest: Path, count: int, seed: int) -> tuple[np.ndarray,
         "selection_method": "sha256_ranked_stable_token_rows",
         "selected_global_indices": [int(i) for i in selected],
         "selected_row_key_hash": selection_hash,
+        "token_ids_hash": selection_hash,
         "tokenizer_hash": payload.get("tokenizer_hash", ""),
         "token_id_note": "The capture stores MLP inputs, not token IDs; global row IDs and record/offset keys are the deterministic token identity.",
         "code_commit": current_git_commit(),
@@ -524,10 +520,12 @@ def _run(args: argparse.Namespace) -> dict[str, Any]:
         all_results.extend(results)
         _json(run / "reports" / f"topk-{p['name']}-architecture-dev.json", {"profile": p, "results": results, "dev": dev_meta})
     p8 = [r for r in all_results if r["profile"] == "p8"]
-    # Selection is train-dev only.  Prefer positive fit, then simplex as the
-    # deployable normalized formulation; the final holdout is never consulted.
-    finalists = sorted((r for r in p8 if r["formulation"] == "positive"), key=lambda r: (r["normalized_mse"], r["top_k"]))[:2]
-    finalists += sorted((r for r in all_results if r["profile"] != "p8" and r["formulation"] == "positive"), key=lambda r: (r["normalized_mse"], r["active_intermediate_width"]))[:1]
+    # Selection is train-dev only.  Keep three interpretable Pareto points:
+    # p8/k4 is the first strong elbow, p8/k6 is the quality ceiling, and
+    # p16/k4 is the equal-active-width granularity finalist.  The full
+    # holdout is not consulted until after this list is frozen.
+    finalist_specs = (("p8", 4), ("p8", 6), ("p16", 4))
+    finalists = [next(r for r in all_results if r["profile"] == profile and r["top_k"] == k and r["formulation"] == "positive") for profile, k in finalist_specs]
     payload = {
         "schema_version": 1,
         "status": "ARCHITECTURE_DEV_SEARCH_COMPLETE",
@@ -540,12 +538,80 @@ def _run(args: argparse.Namespace) -> dict[str, Any]:
         "results": all_results,
         "p8_exact": True,
         "p16_p32_selection_method": "norm_ranked_selection_then_exact_coefficients",
-        "finalists_selected_on_dev": [{"profile": r["profile"], "top_k": r["top_k"], "formulation": r["formulation"], "normalized_mse": r["normalized_mse"]} for r in finalists],
+        "finalists_selected_on_dev": [{"profile": r["profile"], "top_k": r["top_k"], "formulation": r["formulation"], "normalized_mse": r["normalized_mse"], "active_intermediate_width": r["active_intermediate_width"]} for r in finalists],
         "code_commit": current_git_commit(),
     }
     _json(run / "reports/topk-p8-oracle-curve.json", {"dev_subset": dev_meta, "profile": _profile("p8", 8, 2048, 1024), "results": p8, "selection": payload["finalists_selected_on_dev"], "code_commit": current_git_commit()})
     _json(run / "reports/equal-compute-expert-granularity.json", {"dev_subset": dev_meta, "results": [r for r in all_results if r["profile"] != "p8" or r["top_k"] in (2, 4)], "comparisons": [{"pair": ["p16/k2", "p32/k4"], "active_width": 3072}, {"pair": ["p16/k3", "p32/k6"], "active_width": 4096}, {"pair": ["p8/k2", "p16/k4"], "active_width": 5120}], "code_commit": current_git_commit()})
+    # Full holdout confirmation is a single post-selection pass.  It uses
+    # exactly the partitions frozen from TRAIN/dev and cannot affect the
+    # finalist list above.
+    holdout_inputs = np.concatenate(list(iter_activation_shards(run / "capture/layer-0000-holdout.json", expected_split="holdout")), axis=0).astype(np.float32)
+    holdout_results: list[dict[str, Any]] = []
+    for profile_name, top_k in finalist_specs:
+        profile = next(p for p in profiles if p["name"] == profile_name)
+        result_rows = _evaluate_profile(profile, holdout_inputs, weights_cpu, plans[profile_name], device=device, batch_size=args.batch_size, exact=profile_name == "p8", top_ks=(top_k,), split_name="full_holdout_confirmation")
+        row = next(r for r in result_rows if r["formulation"] == "positive")
+        row["partition_strategy"] = "activation_magnitude_frozen_from_architecture_dev"
+        row["dev_selection_hash"] = dev_meta["selected_row_key_hash"]
+        row.update(_active_params(profile, top_k))
+        holdout_results.append(row)
+    holdout_payload = {
+        "schema_version": 1,
+        "status": "FULL_HOLDOUT_FINALIST_CONFIRMATION_COMPLETE",
+        "classification": "POST_SELECTION_HOLDOUT_CONFIRMATION",
+        "holdout_manifest": str(run / "capture/layer-0000-holdout.json"),
+        "holdout_tokens": int(holdout_inputs.shape[0]),
+        "dev_selection_hash": dev_meta["selected_row_key_hash"],
+        "finalists_selected_before_holdout": payload["finalists_selected_on_dev"],
+        "results": holdout_results,
+        "code_commit": current_git_commit(),
+    }
+    _json(run / "reports/architecture-search-holdout-confirmation.json", holdout_payload)
+    payload["holdout_confirmation"] = holdout_payload
+    for row in finalists:
+        finalist_profile = next(p for p in profiles if p["name"] == row["profile"])
+        partition_artifact = plans[row["profile"]].as_dict() | {
+            "schema_version": 2,
+            "status": "PARTITION_READY_ARCHITECTURE_FINALIST",
+            "layer": 0,
+            "profile": finalist_profile,
+            "profile_name": finalist_profile["name"],
+            "top_k": int(row["top_k"]),
+            "strategy": "activation_magnitude",
+            "initial_expert_scales": row["learned_global_scales"],
+            "scale_fit_scope": "architecture_dev_train_only",
+            "architecture_dev_selection_hash": dev_meta["selected_row_key_hash"],
+            "source_manifest": str(train_manifest),
+            "code_commit": current_git_commit(),
+        }
+        _json(run / "partitions" / f"layer-0000-{row['profile']}-top{row['top_k']}-architecture-finalist.json", partition_artifact)
     _json(run / "reports/architecture-search.json", payload)
+    lines = [
+        "# Layer-0 top-k architecture search",
+        "",
+        "Status: complete. Selection used only a deterministic TRAIN architecture-dev subset; the full holdout was read once for the frozen finalists.",
+        "",
+        f"- Architecture-dev rows: **{dev_meta['selected_count']}** / {dev_meta['source_count']} (seed {dev_meta['selection_seed']})",
+        f"- Architecture-dev row-key hash: `{dev_meta['selected_row_key_hash']}`",
+        f"- Holdout confirmation rows: **{holdout_inputs.shape[0]}**",
+        "- p8 k=1..6: exact all-combination active-face simplex and positive oracles.",
+        "- p16/p32: deterministic norm-ranked selection with exact coefficients on the selected set; not an exhaustive p32 combination claim.",
+        "",
+        "## p8 exact curve (TRAIN/dev)",
+        "",
+        "| k | positive NMSE | learned-scale NMSE | cosine | active width |",
+        "|---:|---:|---:|---:|---:|",
+    ]
+    for row in sorted((r for r in p8 if r["formulation"] == "positive"), key=lambda r: r["top_k"]):
+        lines.append(f"| {row['top_k']} | {row['normalized_mse']:.6f} | {row['learned_scale_normalized_mse']:.6f} | {row['cosine']:.4f} | {row['active_intermediate_width']} |")
+    lines += ["", "## Frozen finalists", "", "| profile | k | dev positive NMSE | holdout positive NMSE | active width |", "|---|---:|---:|---:|---:|"]
+    holdout_by_key = {(r["profile"], r["top_k"]): r for r in holdout_results}
+    for row in finalists:
+        hold = holdout_by_key[(row["profile"], row["top_k"])]
+        lines.append(f"| {row['profile']} | {row['top_k']} | {row['normalized_mse']:.6f} | {hold['normalized_mse']:.6f} | {row['active_intermediate_width']} |")
+    lines += ["", "The p8/top2 trained checkpoint remains the historical baseline; no deeper representative replay was started after the safe layer-29 checkpoint.", ""]
+    (run / "reports/TOP_K_ARCHITECTURE_SEARCH.md").write_text("\n".join(lines), encoding="utf-8")
     return payload
 
 

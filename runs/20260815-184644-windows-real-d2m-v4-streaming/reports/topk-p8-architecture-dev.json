@@ -1,6 +1,6 @@
 {
   "dev": {
-    "code_commit": "5f6f55aa6778b7a88aebfe355a5212615b6e58ec",
+    "code_commit": "964dcc6d3c90f3af7b60c11ddb9e7f5827320ee5",
     "schema_version": 1,
     "selected_count": 16384,
     "selected_global_indices": [
@@ -16417,7 +16417,7 @@
       "coefficient_sum_mse_from_one": 0.0,
       "cosine": 0.8965493738651276,
       "dense_ffn_parameters": 267386880,
-      "elapsed_seconds": 0.5619742999551818,
+      "elapsed_seconds": 0.582944699912332,
       "expert_usage_cv": 2.111562075432112,
       "expert_usage_fraction": [
         0.07208251953125,
@@ -33903,7 +33903,7 @@
       "coefficient_sum_mse_from_one": null,
       "cosine": 0.8905653096735477,
       "dense_ffn_parameters": 267386880,
-      "elapsed_seconds": 0.24704470002325252,
+      "elapsed_seconds": 0.23830150009598583,
       "expert_usage_cv": 2.120261069273506,
       "expert_usage_fraction": [
         0.08489990234375,
@@ -51389,7 +51389,7 @@
       "coefficient_sum_mse_from_one": 0.0,
       "cosine": 0.9081367701292038,
       "dense_ffn_parameters": 267386880,
-      "elapsed_seconds": 1.5153475999250077,
+      "elapsed_seconds": 1.5230632998864166,
       "expert_usage_cv": 1.4668726895139008,
       "expert_usage_fraction": [
         0.41802978515625,
@@ -68875,7 +68875,7 @@
       "coefficient_sum_mse_from_one": null,
       "cosine": 0.9379244036972523,
       "dense_ffn_parameters": 267386880,
-      "elapsed_seconds": 1.3512863998766989,
+      "elapsed_seconds": 1.3788343998603523,
       "expert_usage_cv": 1.2954352901592834,
       "expert_usage_fraction": [
         0.29486083984375,
@@ -86361,7 +86361,7 @@
       "coefficient_sum_mse_from_one": 0.0,
       "cosine": 0.9087037220597267,
       "dense_ffn_parameters": 267386880,
-      "elapsed_seconds": 4.429459900013171,
+      "elapsed_seconds": 4.2957046999945305,
       "expert_usage_cv": 1.1342952889424065,
       "expert_usage_fraction": [
         0.32696533203125,
@@ -103847,7 +103847,7 @@
       "coefficient_sum_mse_from_one": null,
       "cosine": 0.9589768126606941,
       "dense_ffn_parameters": 267386880,
-      "elapsed_seconds": 3.9667539998772554,
+      "elapsed_seconds": 3.7929527001688257,
       "expert_usage_cv": 0.9127299783939934,
       "expert_usage_fraction": [
         0.27734375,
@@ -121333,7 +121333,7 @@
       "coefficient_sum_mse_from_one": 0.0,
       "cosine": 0.9087549187242985,
       "dense_ffn_parameters": 267386880,
-      "elapsed_seconds": 7.210729200101923,
+      "elapsed_seconds": 6.9463165999623016,
       "expert_usage_cv": 0.8933569079533095,
       "expert_usage_fraction": [
         0.2491302490234375,
@@ -138819,7 +138819,7 @@
       "coefficient_sum_mse_from_one": null,
       "cosine": 0.9720384553074837,
       "dense_ffn_parameters": 267386880,
-      "elapsed_seconds": 6.299605799897108,
+      "elapsed_seconds": 6.098242099920753,
       "expert_usage_cv": 0.643865787986193,
       "expert_usage_fraction": [
         0.233306884765625,
@@ -156305,7 +156305,7 @@
       "coefficient_sum_mse_from_one": 0.0,
       "cosine": 0.9087596908211708,
       "dense_ffn_parameters": 267386880,
-      "elapsed_seconds": 7.052060699905269,
+      "elapsed_seconds": 6.89157470013015,
       "expert_usage_cv": 0.693699010057693,
       "expert_usage_fraction": [
         0.19989013671875,
@@ -173791,7 +173791,7 @@
       "coefficient_sum_mse_from_one": null,
       "cosine": 0.9815639555454254,
       "dense_ffn_parameters": 267386880,
-      "elapsed_seconds": 6.321923199982848,
+      "elapsed_seconds": 6.068824000132736,
       "expert_usage_cv": 0.4401006812083653,
       "expert_usage_fraction": [
         0.1956787109375,
@@ -191277,7 +191277,7 @@
       "coefficient_sum_mse_from_one": 0.0,
       "cosine": 0.9087598770856857,
       "dense_ffn_parameters": 267386880,
-      "elapsed_seconds": 4.185154099948704,
+      "elapsed_seconds": 4.059317100036424,
       "expert_usage_cv": 0.5096546927711506,
       "expert_usage_fraction": [
         0.16666666666666666,
@@ -208763,7 +208763,7 @@
       "coefficient_sum_mse_from_one": null,
       "cosine": 0.9890307113528252,
       "dense_ffn_parameters": 267386880,
-      "elapsed_seconds": 3.761694299930241,
+      "elapsed_seconds": 3.62077970005339,
       "expert_usage_cv": 0.28001413375419276,
       "expert_usage_fraction": [
         0.16608683268229166,

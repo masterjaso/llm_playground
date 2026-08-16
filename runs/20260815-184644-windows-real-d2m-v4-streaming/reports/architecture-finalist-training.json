@@ -1,0 +1,611 @@
+{
+  "budget": {
+    "device": "cuda:1",
+    "epochs": 1,
+    "learning_rate": 0.0001,
+    "microbatch": 512,
+    "seed": 17
+  },
+  "classification": "IDENTICAL_LAYER0_FINALIST_BUDGET",
+  "code_commit": "964dcc6d3c90f3af7b60c11ddb9e7f5827320ee5",
+  "holdout_reserved_for_confirmation": "runs\\20260815-184644-windows-real-d2m-v4-streaming\\capture\\layer-0000-holdout.json",
+  "results": [
+    {
+      "output_dir": "runs\\20260815-184644-windows-real-d2m-v4-streaming\\layer-checkpoints\\architecture-finalists\\qwen38_p8s1_top4",
+      "partition": "runs\\20260815-184644-windows-real-d2m-v4-streaming\\partitions\\layer-0000-p8-top4-architecture-finalist.json",
+      "profile": "qwen38_p8s1_top4",
+      "result": {
+        "code_commit": "964dcc6d3c90f3af7b60c11ddb9e7f5827320ee5",
+        "holdout_metrics": {
+          "cosine": 0.9659823840433523,
+          "dead_experts": 0,
+          "load_cv": 0.21667485722739493,
+          "mse": 8.660600600235145e-05,
+          "normalized_mse": 0.08282298284781404,
+          "router_entropy": 1.9959015322817508,
+          "selected_counts": [
+            11114.0,
+            7446.0,
+            7041.0,
+            7136.0,
+            7178.0,
+            6353.0,
+            8833.0,
+            11291.0
+          ],
+          "streaming": true,
+          "token_count": 16598
+        },
+        "initial_holdout": {
+          "cosine": 0.9000887183026098,
+          "dead_experts": 0,
+          "load_cv": 0.6770602677381683,
+          "mse": 0.00027853009829766523,
+          "normalized_mse": 0.266363669435133,
+          "router_entropy": 1.9447205016405873,
+          "selected_counts": [
+            16013.0,
+            8588.0,
+            2325.0,
+            2288.0,
+            3208.0,
+            5009.0,
+            12480.0,
+            16481.0
+          ],
+          "streaming": true,
+          "token_count": 16598
+        },
+        "layer": 0,
+        "metadata": "runs\\20260815-184644-windows-real-d2m-v4-streaming\\layer-checkpoints\\architecture-finalists\\qwen38_p8s1_top4\\layer-0000.json",
+        "oracle_holdout": {
+          "cosine": null,
+          "normalized_mse": null,
+          "status": "bounded-oracle-summary-pending",
+          "streaming": true
+        },
+        "status": "RESEARCH_CANDIDATE",
+        "tensor_file": "runs\\20260815-184644-windows-real-d2m-v4-streaming\\layer-checkpoints\\architecture-finalists\\qwen38_p8s1_top4\\layer-0000.safetensors",
+        "training_config": {
+          "best_holdout_stage": "joint_expert_router",
+          "device": "cuda:1",
+          "epochs": 1,
+          "initial_expert_scales": [
+            1.0000007627914071,
+            1.000001062258195,
+            1.0000008936210791,
+            1.0000006688600753,
+            1.0000011984981092,
+            1.0000014957086873,
+            1.000001488612376,
+            0.9999991768492993
+          ],
+          "learning_rate": 0.0001,
+          "loss_coefficients": {
+            "cosine": 0.05,
+            "load_balance": 0.05,
+            "mse": 1.0,
+            "router_z_loss": 0.001
+          },
+          "loss_version": "torch-distill-v1",
+          "microbatch": 512,
+          "optimizer": "AdamW",
+          "partition_path": "runs\\20260815-184644-windows-real-d2m-v4-streaming\\partitions\\layer-0000-p8-top4-architecture-finalist.json",
+          "router_initialization": "bounded_train_contribution_lstsq",
+          "stage_holdout_metrics": [
+            {
+              "cosine": 0.9056589209555086,
+              "dead_experts": 0,
+              "load_cv": 0.7150694137869462,
+              "mse": 0.0002727471880057243,
+              "normalized_mse": 0.26083336152661607,
+              "router_entropy": 1.9272498077822817,
+              "selected_counts": [
+                16411.0,
+                8040.0,
+                2342.0,
+                2163.0,
+                2625.0,
+                4611.0,
+                13613.0,
+                16587.0
+              ],
+              "stage": "router_warm_start",
+              "streaming": true,
+              "token_count": 16598
+            },
+            {
+              "cosine": 0.8910645152706886,
+              "dead_experts": 0,
+              "load_cv": 0.3975573782042334,
+              "mse": 0.0002892808542723885,
+              "normalized_mse": 0.2766448233503865,
+              "router_entropy": 1.9864340061767372,
+              "selected_counts": [
+                11846.0,
+                6640.0,
+                5990.0,
+                6098.0,
+                6284.0,
+                5735.0,
+                8363.0,
+                15436.0
+              ],
+              "stage": "router_plus_scale",
+              "streaming": true,
+              "token_count": 16598
+            },
+            {
+              "cosine": 0.9659823840433523,
+              "dead_experts": 0,
+              "load_cv": 0.21667485722739493,
+              "mse": 8.660600600235145e-05,
+              "normalized_mse": 0.08282298284781404,
+              "router_entropy": 1.9959015322817508,
+              "selected_counts": [
+                11114.0,
+                7446.0,
+                7041.0,
+                7136.0,
+                7178.0,
+                6353.0,
+                8833.0,
+                11291.0
+              ],
+              "stage": "joint_expert_router",
+              "streaming": true,
+              "token_count": 16598
+            }
+          ],
+          "stages": [
+            {
+              "epoch": 1,
+              "epochs": 1,
+              "loss": 0.25823599100112915,
+              "stage": "router_warm_start",
+              "streaming": true,
+              "updates": 288
+            },
+            {
+              "epoch": 1,
+              "epochs": 1,
+              "loss": 0.060143984854221344,
+              "stage": "router_plus_scale",
+              "streaming": true,
+              "updates": 288
+            },
+            {
+              "epoch": 1,
+              "epochs": 1,
+              "loss": 0.05434080958366394,
+              "stage": "joint_expert_router",
+              "streaming": true,
+              "updates": 288
+            }
+          ],
+          "streaming_dataset": {
+            "holdout_count": 16598,
+            "holdout_manifest": "runs/20260815-184644-windows-real-d2m-v4-streaming/capture/layer-0000.json",
+            "train_count": 131508,
+            "train_manifest": "runs/20260815-184644-windows-real-d2m-v4-streaming/capture/layer-0000.json"
+          }
+        }
+      }
+    },
+    {
+      "output_dir": "runs\\20260815-184644-windows-real-d2m-v4-streaming\\layer-checkpoints\\architecture-finalists\\qwen38_p8s1_top6",
+      "partition": "runs\\20260815-184644-windows-real-d2m-v4-streaming\\partitions\\layer-0000-p8-top6-architecture-finalist.json",
+      "profile": "qwen38_p8s1_top6",
+      "result": {
+        "code_commit": "964dcc6d3c90f3af7b60c11ddb9e7f5827320ee5",
+        "holdout_metrics": {
+          "cosine": 0.9776205891858442,
+          "dead_experts": 0,
+          "load_cv": 0.2706453852959816,
+          "mse": 8.508666303017324e-05,
+          "normalized_mse": 0.08137000605401933,
+          "router_entropy": 1.9632527854359572,
+          "selected_counts": [
+            16328.0,
+            14743.0,
+            10006.0,
+            8377.0,
+            8077.0,
+            10250.0,
+            16161.0,
+            15646.0
+          ],
+          "streaming": true,
+          "token_count": 16598
+        },
+        "initial_holdout": {
+          "cosine": 0.8848845429816351,
+          "dead_experts": 0,
+          "load_cv": 0.3028737219128499,
+          "mse": 0.0003060420470318747,
+          "normalized_mse": 0.2926738731184838,
+          "router_entropy": 1.9328935593061383,
+          "selected_counts": [
+            16598.0,
+            14996.0,
+            9594.0,
+            8023.0,
+            7598.0,
+            9871.0,
+            16348.0,
+            16560.0
+          ],
+          "streaming": true,
+          "token_count": 16598
+        },
+        "layer": 0,
+        "metadata": "runs\\20260815-184644-windows-real-d2m-v4-streaming\\layer-checkpoints\\architecture-finalists\\qwen38_p8s1_top6\\layer-0000.json",
+        "oracle_holdout": {
+          "cosine": null,
+          "normalized_mse": null,
+          "status": "bounded-oracle-summary-pending",
+          "streaming": true
+        },
+        "status": "RESEARCH_CANDIDATE",
+        "tensor_file": "runs\\20260815-184644-windows-real-d2m-v4-streaming\\layer-checkpoints\\architecture-finalists\\qwen38_p8s1_top6\\layer-0000.safetensors",
+        "training_config": {
+          "best_holdout_stage": "joint_expert_router",
+          "device": "cuda:1",
+          "epochs": 1,
+          "initial_expert_scales": [
+            0.9999998665330977,
+            1.0000000046351245,
+            1.0000013313339173,
+            1.0000014115635474,
+            1.0000015736517966,
+            1.0000024207070288,
+            1.0000014755414406,
+            0.9999992688219852
+          ],
+          "learning_rate": 0.0001,
+          "loss_coefficients": {
+            "cosine": 0.05,
+            "load_balance": 0.05,
+            "mse": 1.0,
+            "router_z_loss": 0.001
+          },
+          "loss_version": "torch-distill-v1",
+          "microbatch": 512,
+          "optimizer": "AdamW",
+          "partition_path": "runs\\20260815-184644-windows-real-d2m-v4-streaming\\partitions\\layer-0000-p8-top6-architecture-finalist.json",
+          "router_initialization": "bounded_train_contribution_lstsq",
+          "stage_holdout_metrics": [
+            {
+              "cosine": 0.8929018727812886,
+              "dead_experts": 0,
+              "load_cv": 0.32913212353865473,
+              "mse": 0.00029982145054683094,
+              "normalized_mse": 0.2867249975177551,
+              "router_entropy": 1.953978043347184,
+              "selected_counts": [
+                16597.0,
+                15647.0,
+                8780.0,
+                7187.0,
+                6906.0,
+                11353.0,
+                16521.0,
+                16597.0
+              ],
+              "stage": "router_warm_start",
+              "streaming": true,
+              "token_count": 16598
+            },
+            {
+              "cosine": 0.8921133837278729,
+              "dead_experts": 0,
+              "load_cv": 0.2888001261556,
+              "mse": 0.00030079492281281613,
+              "normalized_mse": 0.28765594769673375,
+              "router_entropy": 1.9584165638161648,
+              "selected_counts": [
+                16490.0,
+                14551.0,
+                9791.0,
+                8107.0,
+                7821.0,
+                10171.0,
+                16217.0,
+                16440.0
+              ],
+              "stage": "router_plus_scale",
+              "streaming": true,
+              "token_count": 16598
+            },
+            {
+              "cosine": 0.9776205891858442,
+              "dead_experts": 0,
+              "load_cv": 0.2706453852959816,
+              "mse": 8.508666303017324e-05,
+              "normalized_mse": 0.08137000605401933,
+              "router_entropy": 1.9632527854359572,
+              "selected_counts": [
+                16328.0,
+                14743.0,
+                10006.0,
+                8377.0,
+                8077.0,
+                10250.0,
+                16161.0,
+                15646.0
+              ],
+              "stage": "joint_expert_router",
+              "streaming": true,
+              "token_count": 16598
+            }
+          ],
+          "stages": [
+            {
+              "epoch": 1,
+              "epochs": 1,
+              "loss": 0.27722129225730896,
+              "stage": "router_warm_start",
+              "streaming": true,
+              "updates": 288
+            },
+            {
+              "epoch": 1,
+              "epochs": 1,
+              "loss": 0.06057658791542053,
+              "stage": "router_plus_scale",
+              "streaming": true,
+              "updates": 288
+            },
+            {
+              "epoch": 1,
+              "epochs": 1,
+              "loss": 0.05455818399786949,
+              "stage": "joint_expert_router",
+              "streaming": true,
+              "updates": 288
+            }
+          ],
+          "streaming_dataset": {
+            "holdout_count": 16598,
+            "holdout_manifest": "runs/20260815-184644-windows-real-d2m-v4-streaming/capture/layer-0000.json",
+            "train_count": 131508,
+            "train_manifest": "runs/20260815-184644-windows-real-d2m-v4-streaming/capture/layer-0000.json"
+          }
+        }
+      }
+    },
+    {
+      "output_dir": "runs\\20260815-184644-windows-real-d2m-v4-streaming\\layer-checkpoints\\architecture-finalists\\qwen38_p16s1_top4",
+      "partition": "runs\\20260815-184644-windows-real-d2m-v4-streaming\\partitions\\layer-0000-p16-top4-architecture-finalist.json",
+      "profile": "qwen38_p16s1_top4",
+      "result": {
+        "code_commit": "964dcc6d3c90f3af7b60c11ddb9e7f5827320ee5",
+        "holdout_metrics": {
+          "cosine": 0.9396539162492046,
+          "dead_experts": 0,
+          "load_cv": 0.2920947792791424,
+          "mse": 0.00011397120460341789,
+          "normalized_mse": 0.1089928465672149,
+          "router_entropy": 2.687547686703594,
+          "selected_counts": [
+            5682.0,
+            6006.0,
+            5294.0,
+            3034.0,
+            3339.0,
+            3546.0,
+            2308.0,
+            2063.0,
+            3822.0,
+            4689.0,
+            3176.0,
+            3462.0,
+            4189.0,
+            5370.0,
+            5857.0,
+            4555.0
+          ],
+          "streaming": true,
+          "token_count": 16598
+        },
+        "initial_holdout": {
+          "cosine": 0.8552916917848018,
+          "dead_experts": 0,
+          "load_cv": 1.0863980796513042,
+          "mse": 0.00031459567589650086,
+          "normalized_mse": 0.3008538722830021,
+          "router_entropy": 2.606080668075126,
+          "selected_counts": [
+            10880.0,
+            6744.0,
+            5210.0,
+            869.0,
+            1202.0,
+            490.0,
+            450.0,
+            148.0,
+            782.0,
+            1803.0,
+            878.0,
+            1735.0,
+            3665.0,
+            5425.0,
+            10264.0,
+            15847.0
+          ],
+          "streaming": true,
+          "token_count": 16598
+        },
+        "layer": 0,
+        "metadata": "runs\\20260815-184644-windows-real-d2m-v4-streaming\\layer-checkpoints\\architecture-finalists\\qwen38_p16s1_top4\\layer-0000.json",
+        "oracle_holdout": {
+          "cosine": null,
+          "normalized_mse": null,
+          "status": "bounded-oracle-summary-pending",
+          "streaming": true
+        },
+        "status": "VALIDATION_FAILED",
+        "tensor_file": "runs\\20260815-184644-windows-real-d2m-v4-streaming\\layer-checkpoints\\architecture-finalists\\qwen38_p16s1_top4\\layer-0000.safetensors",
+        "training_config": {
+          "best_holdout_stage": "joint_expert_router",
+          "device": "cuda:1",
+          "epochs": 1,
+          "initial_expert_scales": [
+            1.0000007484649416,
+            1.0000011489994376,
+            1.0000005758510666,
+            1.0000006115700142,
+            1.0000003793926222,
+            1.0000009782853767,
+            1.0000003511528288,
+            1.000000785876997,
+            1.000000997923107,
+            1.0000011006887979,
+            1.0000011062100518,
+            1.0000005484013315,
+            1.0000008363977593,
+            1.000001544304869,
+            1.00000040753706,
+            1.000000442573158
+          ],
+          "learning_rate": 0.0001,
+          "loss_coefficients": {
+            "cosine": 0.05,
+            "load_balance": 0.05,
+            "mse": 1.0,
+            "router_z_loss": 0.001
+          },
+          "loss_version": "torch-distill-v1",
+          "microbatch": 512,
+          "optimizer": "AdamW",
+          "partition_path": "runs\\20260815-184644-windows-real-d2m-v4-streaming\\partitions\\layer-0000-p16-top4-architecture-finalist.json",
+          "router_initialization": "bounded_train_contribution_lstsq",
+          "stage_holdout_metrics": [
+            {
+              "cosine": 0.8626296018919236,
+              "dead_experts": 0,
+              "load_cv": 1.159723833388033,
+              "mse": 0.00030944348279360274,
+              "normalized_mse": 0.2959267313064471,
+              "router_entropy": 2.5354234470432244,
+              "selected_counts": [
+                10977.0,
+                7233.0,
+                3349.0,
+                915.0,
+                610.0,
+                562.0,
+                358.0,
+                343.0,
+                316.0,
+                1224.0,
+                755.0,
+                1409.0,
+                3733.0,
+                7286.0,
+                10850.0,
+                16472.0
+              ],
+              "stage": "router_warm_start",
+              "streaming": true,
+              "token_count": 16598
+            },
+            {
+              "cosine": 0.8307152313846524,
+              "dead_experts": 0,
+              "load_cv": 0.49540515874575863,
+              "mse": 0.0003337029445342291,
+              "normalized_mse": 0.31912651936256115,
+              "router_entropy": 2.6704595712656456,
+              "selected_counts": [
+                6213.0,
+                5472.0,
+                4615.0,
+                3071.0,
+                2909.0,
+                2479.0,
+                2074.0,
+                1755.0,
+                3319.0,
+                3937.0,
+                2812.0,
+                2973.0,
+                3741.0,
+                4622.0,
+                6109.0,
+                10291.0
+              ],
+              "stage": "router_plus_scale",
+              "streaming": true,
+              "token_count": 16598
+            },
+            {
+              "cosine": 0.9396539162492046,
+              "dead_experts": 0,
+              "load_cv": 0.2920947792791424,
+              "mse": 0.00011397120460341789,
+              "normalized_mse": 0.1089928465672149,
+              "router_entropy": 2.687547686703594,
+              "selected_counts": [
+                5682.0,
+                6006.0,
+                5294.0,
+                3034.0,
+                3339.0,
+                3546.0,
+                2308.0,
+                2063.0,
+                3822.0,
+                4689.0,
+                3176.0,
+                3462.0,
+                4189.0,
+                5370.0,
+                5857.0,
+                4555.0
+              ],
+              "stage": "joint_expert_router",
+              "streaming": true,
+              "token_count": 16598
+            }
+          ],
+          "stages": [
+            {
+              "epoch": 1,
+              "epochs": 1,
+              "loss": 0.3197411298751831,
+              "stage": "router_warm_start",
+              "streaming": true,
+              "updates": 288
+            },
+            {
+              "epoch": 1,
+              "epochs": 1,
+              "loss": 0.06711133569478989,
+              "stage": "router_plus_scale",
+              "streaming": true,
+              "updates": 288
+            },
+            {
+              "epoch": 1,
+              "epochs": 1,
+              "loss": 0.05839301645755768,
+              "stage": "joint_expert_router",
+              "streaming": true,
+              "updates": 288
+            }
+          ],
+          "streaming_dataset": {
+            "holdout_count": 16598,
+            "holdout_manifest": "runs/20260815-184644-windows-real-d2m-v4-streaming/capture/layer-0000.json",
+            "train_count": 131508,
+            "train_manifest": "runs/20260815-184644-windows-real-d2m-v4-streaming/capture/layer-0000.json"
+          }
+        }
+      }
+    }
+  ],
+  "schema_version": 1,
+  "status": "ARCHITECTURE_FINALIST_TRAINING_COMPLETE",
+  "train_manifest": "runs\\20260815-184644-windows-real-d2m-v4-streaming\\capture\\layer-0000.json"
+}

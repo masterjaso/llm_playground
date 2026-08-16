@@ -1,0 +1,30 @@
+{
+  "status": "COMPLETE",
+  "selection_split": "train_architecture_dev",
+  "architecture_dev_tokens": 16384,
+  "architecture_dev_source_tokens": 131508,
+  "architecture_dev_selection_hash": "5a7739c753dae98698a8c1a22c6a10409230f0750b33cfc9631594f16d8b8e1c",
+  "token_ids_hash": "5a7739c753dae98698a8c1a22c6a10409230f0750b33cfc9631594f16d8b8e1c",
+  "holdout_confirmation_tokens": 16598,
+  "p8_exact_curve_positive_nmse": {
+    "1": 0.10680670227348699,
+    "2": 0.056879805216511425,
+    "3": 0.03727877544952721,
+    "4": 0.025401637356608355,
+    "5": 0.01687352450439692,
+    "6": 0.010126070227102305
+  },
+  "finalists_selected_before_holdout": [
+    {"profile": "p8", "top_k": 4, "dev_nmse": 0.025401637356608355, "holdout_nmse": 0.022180944110429163},
+    {"profile": "p8", "top_k": 6, "dev_nmse": 0.010126070227102305, "holdout_nmse": 0.008752492145587761},
+    {"profile": "p16", "top_k": 4, "dev_nmse": 0.051105876151999456, "holdout_nmse": 0.045592499930941416}
+  ],
+  "identical_layer0_training": [
+    {"profile": "qwen38_p8s1_top4", "status": "RESEARCH_CANDIDATE", "holdout_nmse": 0.08282298284781404, "cosine": 0.9659823840433523},
+    {"profile": "qwen38_p8s1_top6", "status": "RESEARCH_CANDIDATE", "holdout_nmse": 0.08137000605401933, "cosine": 0.9776205891858442},
+    {"profile": "qwen38_p16s1_top4", "status": "VALIDATION_FAILED", "holdout_nmse": 0.1089928465672149, "cosine": 0.9396539162492046}
+  ],
+  "training_budget": {"epochs": 1, "microbatch": 512, "learning_rate": 0.0001, "seed": 17},
+  "holdout_policy": "full holdout read once after the dev finalist list was frozen",
+  "safe_replay_checkpoint": "train rolling replay durable through layer 29; layer 30 partial work stopped"
+}

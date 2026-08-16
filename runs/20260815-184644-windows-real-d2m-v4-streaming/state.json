@@ -7,10 +7,10 @@
     "fact_ledger": "runs\\20260815-184644-windows-real-d2m-v4-streaming\\repository-fact-ledger.json",
     "source_manifest": "runs\\20260815-184644-windows-real-d2m-v4-streaming\\source-manifest.json"
   },
-  "code_commit": "5f6f55aa6778b7a88aebfe355a5212615b6e58ec",
-  "current_phase": "training",
-  "last_successful_command": "inspect-source",
-  "next_exact_command": "d2m validate-layer --run-dir runs/20260815-184644-windows-real-d2m-v4-streaming --layer 0 --profile qwen38_p8s14_top2",
+  "code_commit": "964dcc6d3c90f3af7b60c11ddb9e7f5827320ee5",
+  "current_phase": "finalist-training",
+  "last_successful_command": "architecture-search-and-finalist-training",
+  "next_exact_command": "review runs/20260815-184644-windows-real-d2m-v4-streaming/reports/TOP_K_ARCHITECTURE_SEARCH.md",
   "parent_run_id": "20260815-180505-windows-real-d2m-v3",
   "phase_status": "complete",
   "prediction_contract": {
@@ -39,6 +39,14 @@
     "updated": "2026-08-16T01:53:10.393667Z"
   },
   "validation_results": {
+    "architecture_search": {
+      "status": "ARCHITECTURE_FINALIST_TRAINING_COMPLETE",
+      "dev_tokens": 16384,
+      "dev_selection_hash": "5a7739c753dae98698a8c1a22c6a10409230f0750b33cfc9631594f16d8b8e1c",
+      "holdout_confirmation": "reports/architecture-search-holdout-confirmation.json",
+      "finalist_training": "reports/architecture-finalist-training.json",
+      "finalists": ["qwen38_p8s1_top4", "qwen38_p8s1_top6", "qwen38_p16s1_top4"]
+    },
     "train_layer": {
       "code_commit": "5f6f55aa6778b7a88aebfe355a5212615b6e58ec",
       "holdout_metrics": {
