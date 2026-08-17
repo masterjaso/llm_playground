@@ -5,7 +5,7 @@ import json
 from dense2moe.config import load_config
 from scripts.evaluate_promotion import run_promotion
 from scripts.merge_development_finalists import merge_finalists
-from scripts.run_candidate_search import run_candidate_search
+from scripts.run_candidate_search import _p32_expert_pool_size, run_candidate_search
 from scripts.run_full64_training import _layer_lineage
 
 
@@ -127,3 +127,10 @@ def test_full64_layer_lineage_invalidates_changed_inputs(tmp_path) -> None:
         learning_rate=1e-3,
     )
     assert first["dev_manifest_sha256"] != second["dev_manifest_sha256"]
+
+
+def test_p32_pool_budgets_expand_real_expert_search_space() -> None:
+    budgets = (1024, 2048, 4096, 8192)
+    pools = [_p32_expert_pool_size(routed_experts=32, top_k=5, candidate_budget=budget) for budget in budgets]
+    assert pools == sorted(set(pools))
+    assert pools == [13, 15, 16, 18]

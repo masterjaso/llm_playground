@@ -15,6 +15,7 @@ import argparse
 import hashlib
 import itertools
 import json
+import math
 import sys
 from collections.abc import Iterable
 from pathlib import Path
@@ -55,6 +56,23 @@ METHOD_VERSION_DEFAULT = "moe-v22-m01"
 THRESHOLD_FINGERPRINT_DEFAULT = "sealed-qwen38-promotion-v1"
 SEEDS = (17, 29, 41)
 P32_POOL_SIZES = (1024, 2048, 4096, 8192)
+
+
+def _p32_expert_pool_size(*, routed_experts: int, top_k: int, candidate_budget: int) -> int:
+    """Map a bounded combination budget to a real correlation expert pool.
+
+    The oracle's ``pool_size`` parameter is a number of expert IDs, whereas
+    the science protocol freezes p32 budgets as candidate route combinations.
+    Mapping via ``C(pool, top_k)`` keeps the receipt's 1024/2048/4096/8192
+    rounds meaningful instead of silently clipping every round to 32 experts.
+    """
+
+    if candidate_budget <= 0:
+        raise ValueError("p32 candidate budget must be positive")
+    for expert_pool in range(top_k, routed_experts + 1):
+        if math.comb(expert_pool, top_k) >= candidate_budget:
+            return expert_pool
+    return routed_experts
 
 
 def _record_count(path: Path) -> int:
@@ -293,10 +311,15 @@ def _execute_candidate_search(*, run_dir: Path, activation_manifest: Path, dev_m
     stable_rounds = 0
     for requested_pool in pool_values:
         round_rows: list[dict[str, Any]] = []
+        effective_expert_pool = (
+            _p32_expert_pool_size(routed_experts=experts, top_k=top_k, candidate_budget=int(requested_pool))
+            if topology == "p32/top5"
+            else None
+        )
         for strategy, plan in list(plans.items()):
-            result = _evaluate_positive_oracle(profile, dev_inputs, weights_cpu, plan, top_k=top_k, device=actual_device, batch_size=batch_size, exact=topology == "p16/top4", beam_width=8, pool_size=requested_pool, return_route_assignments=topology == "p32/top5")
+            result = _evaluate_positive_oracle(profile, dev_inputs, weights_cpu, plan, top_k=top_k, device=actual_device, batch_size=batch_size, exact=topology == "p16/top4", beam_width=8, pool_size=effective_expert_pool if effective_expert_pool is not None else requested_pool, return_route_assignments=topology == "p32/top5")
             routes = result.pop("route_assignments", [])
-            result.update({"partition_strategy": strategy, "partition": plan.as_dict(), "requested_pool_size": requested_pool, "effective_pool_size": result.get("candidate_pool_size"), "split": "FIT-DEV"})
+            result.update({"partition_strategy": strategy, "partition": plan.as_dict(), "requested_pool_size": requested_pool, "effective_pool_size": result.get("candidate_pool_size"), "effective_candidate_combinations": math.comb(int(result.get("candidate_pool_size", 0)), top_k) if topology == "p32/top5" else None, "split": "FIT-DEV"})
             result["route_fingerprint"] = hashlib.sha256(json.dumps(routes, separators=(",", ":")).encode()).hexdigest() if routes else None
             result["_routes"] = routes
             round_rows.append(result)
@@ -319,7 +342,7 @@ def _execute_candidate_search(*, run_dir: Path, activation_manifest: Path, dev_m
                     movement = max(movement, abs(new - old) / max(abs(old), 1e-12))
             stable = previous_finalists == finalists and (not jaccards or min(jaccards) >= 0.98) and movement <= 0.01
             stable_rounds = stable_rounds + 1 if stable else 0
-            pool_rounds.append({"requested_pool_size": requested_pool, "rows": [{key: value for key, value in row.items() if key != "_routes"} for row in round_rows], "pareto_finalists": list(finalists), "route_jaccard": min(jaccards) if jaccards else None, "metric_movement": movement, "stable": stable, "stable_rounds": stable_rounds})
+            pool_rounds.append({"requested_pool_size": requested_pool, "effective_expert_pool_size": effective_expert_pool, "rows": [{key: value for key, value in row.items() if key != "_routes"} for row in round_rows], "pareto_finalists": list(finalists), "route_jaccard": min(jaccards) if jaccards else None, "metric_movement": movement, "stable": stable, "stable_rounds": stable_rounds})
             previous_finalists = finalists
             if stable_rounds >= 2:
                 break
@@ -332,14 +355,15 @@ def _execute_candidate_search(*, run_dir: Path, activation_manifest: Path, dev_m
     if topology == "p32/top5":
         final_rows = []
         for strategy, plan in plans.items():
-            result = _evaluate_positive_oracle(profile, dev_inputs, weights_cpu, plan, top_k=top_k, device=actual_device, batch_size=batch_size, exact=False, beam_width=8, pool_size=pool_rounds[-1]["requested_pool_size"])
+            result = _evaluate_positive_oracle(profile, dev_inputs, weights_cpu, plan, top_k=top_k, device=actual_device, batch_size=batch_size, exact=False, beam_width=8, pool_size=pool_rounds[-1]["effective_expert_pool_size"])
             result.update({"partition_strategy": strategy, "partition": plan.as_dict(), "requested_pool_size": pool_rounds[-1]["requested_pool_size"], "split": "FIT-DEV"})
             final_rows.append(result)
         initial_rows = final_rows
     best_seed = min(initial_rows, key=lambda row: (float(row["normalized_mse"]), -float(row["cosine"])))
     refined, refine_history = _refine_plan(plans[best_seed["partition_strategy"]], scores["residual_aware_greedy"], train_inputs, weights_cpu, profile, top_k=top_k, device=actual_device, batch_size=batch_size)
     plans["residual_swap_refined"] = refined
-    refined_result = _evaluate_positive_oracle(profile, dev_inputs, weights_cpu, refined, top_k=top_k, device=actual_device, batch_size=batch_size, exact=topology == "p16/top4", pool_size=pool_values[-1])
+    refined_pool = _p32_expert_pool_size(routed_experts=experts, top_k=top_k, candidate_budget=P32_POOL_SIZES[-1]) if topology == "p32/top5" else None
+    refined_result = _evaluate_positive_oracle(profile, dev_inputs, weights_cpu, refined, top_k=top_k, device=actual_device, batch_size=batch_size, exact=topology == "p16/top4", pool_size=refined_pool)
     refined_result.update({"partition_strategy": "residual_swap_refined", "partition": refined.as_dict(), "split": "FIT-DEV", "refinement_history": refine_history})
     rows = initial_rows + [refined_result]
     finalists = _pareto_rows(rows)[:2]
