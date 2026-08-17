@@ -190,6 +190,26 @@ V21_BENCHMARK_TERMS = frozenset(
     }
 )
 
+# Corpus V2.2 is deliberately a new protocol rather than a relabeling of the
+# historical V2.1 artifacts.  Development and evaluation identities are
+# frozen separately so a later method revision cannot silently reuse an opened
+# promotion corpus.
+V22_TIER_ORDER = (
+    "FIT-TRAIN",
+    "FIT-DEV",
+    "GATE-A",
+    "SHADOW-B",
+    "SHADOW-C",
+    "G1",
+    "G2",
+    "PRESERVATION-CANARY",
+    "BENCHMARK-CANARY-EXCLUDED",
+)
+V22_DEVELOPMENT_TIERS = ("FIT-TRAIN", "FIT-DEV")
+V22_INTERNAL_PROMOTION_TIERS = ("GATE-A", "SHADOW-B", "SHADOW-C")
+V22_EXTERNAL_TIERS = ("G1", "G2")
+V22_EVALUATION_TIERS = V22_INTERNAL_PROMOTION_TIERS + V22_EXTERNAL_TIERS
+
 
 class _TokenizerLike(Protocol):
     def encode(self, text: str, **kwargs: Any) -> Any: ...
@@ -1272,6 +1292,413 @@ def audit_split_disjointness(
     }
 
 
+def _tier_identity(record: Mapping[str, Any], kind: str) -> str:
+    """Resolve a V2.2 grouping identity without falling back to row text."""
+
+    if kind == "source_record":
+        values = _v21_values(record, "source_name", "source", "dataset")
+        revision = _v21_values(record, "source_revision", "revision", "repo_commit", "source_commit_sha")
+        record_id = _v21_values(record, "source_record_id", "record_id", "id")
+        if values and revision and record_id:
+            return "|".join((values[0].casefold(), revision[0], record_id[0])).casefold()
+        return ""
+    if kind == "trajectory":
+        values = _v21_values(record, "trajectory_id", "trajectory", "source_trajectory_id")
+        return values[0].casefold() if values else ""
+    if kind == "split_group":
+        values = _v21_values(record, "split_group", "group_id", "lineage_group")
+        return values[0].casefold() if values else ""
+    if kind == "source_family_group":
+        # A source *family* is a balancing label and may occur in several
+        # tiers.  Only an explicit family-group/lineage identity is a
+        # forbidden cross-tier grouping key.
+        values = _v21_values(record, "source_family_group", "source_lineage", "source_family_id")
+        return values[0].casefold() if values else ""
+    if kind in {"repository", "task", "document"}:
+        return _v21_identity(record, kind)
+    raise ValueError(f"unknown tier identity kind: {kind}")
+
+
+def _normalized_record_text(record: Mapping[str, Any]) -> str:
+    return _normalize_text(str(record.get("text", record.get("content", ""))))
+
+
+def _minhash_signature(text: str, *, shingle_size: int = 5, permutations: int = 32) -> tuple[int, ...]:
+    """Return a deterministic, bounded signature for near-duplicate checks.
+
+    This is intentionally not a probabilistic external dependency.  The
+    signature is only a screening index; candidate pairs are verified with
+    exact shingle Jaccard similarity before being reported.
+    """
+
+    tokens = text.split()
+    if len(tokens) < shingle_size:
+        tokens = list(text)
+        shingle_size = min(shingle_size, max(1, len(tokens)))
+    if not tokens:
+        return tuple(0 for _ in range(permutations))
+    shingles = {
+        " ".join(tokens[index : index + shingle_size])
+        for index in range(max(1, len(tokens) - shingle_size + 1))
+    }
+    values = [int(hashlib.sha256(shingle.encode("utf-8")).hexdigest()[:16], 16) for shingle in shingles]
+    signature: list[int] = []
+    for permutation in range(permutations):
+        salt = f"d2m-minhash-{permutation}:".encode()
+        signature.append(min(int(hashlib.sha256(salt + value.to_bytes(8, "big")).hexdigest()[:16], 16) for value in values))
+    return tuple(signature)
+
+
+def _shingle_jaccard(left: str, right: str, *, shingle_size: int = 5) -> float:
+    def shingles(value: str) -> set[str]:
+        tokens = value.split()
+        if len(tokens) < shingle_size:
+            tokens = list(value)
+            size = min(shingle_size, max(1, len(tokens)))
+        else:
+            size = shingle_size
+        return {" ".join(tokens[index : index + size]) for index in range(max(1, len(tokens) - size + 1))}
+
+    first, second = shingles(left), shingles(right)
+    if not first and not second:
+        return 1.0
+    return len(first & second) / max(1, len(first | second))
+
+
+def audit_corpus_tier_disjointness(
+    records: Iterable[Mapping[str, Any]],
+    *,
+    tiers: Sequence[str] = V22_TIER_ORDER,
+    near_duplicate_threshold: float = 0.80,
+    max_near_duplicate_pairs: int = 10_000,
+) -> dict[str, Any]:
+    """Audit exact, grouped, source-record, and near-duplicate tier leakage.
+
+    The audit is fail-closed: any normalized-content collision, source record
+    reuse, lineage/group reuse, or verified near duplicate across two active
+    tiers is a failure.  Rows without an explicit tier are reported as
+    malformed instead of being guessed into development data.
+    """
+
+    allowed = {str(item) for item in tiers}
+    rows: list[dict[str, Any]] = []
+    malformed: list[str] = []
+    for raw in records:
+        row = dict(raw)
+        tier = str(row.get("tier", row.get("split", ""))).strip()
+        row_id = stable_corpus_record_id(row)
+        if tier not in allowed:
+            malformed.append(row_id)
+            continue
+        text = _normalized_record_text(row)
+        raw_hash, normalized_hash = _content_hashes(str(row.get("text", row.get("content", ""))))
+        row.update(
+            {
+                "tier": tier,
+                "_row_id": row_id,
+                "_raw_content_sha256": raw_hash,
+                "_normalized_content_sha256": normalized_hash,
+                "_minhash": _minhash_signature(text),
+                "_normalized_text": text,
+            }
+        )
+        rows.append(row)
+
+    identity_kinds = ("repository", "task", "trajectory", "document", "source_record", "split_group", "source_family_group")
+    indexed: dict[str, dict[str, dict[str, set[str]]]] = {kind: defaultdict(lambda: defaultdict(set)) for kind in identity_kinds}
+    for row in rows:
+        for kind in identity_kinds:
+            identity = _tier_identity(row, kind)
+            if identity:
+                indexed[kind][identity][row["tier"]].add(row["_row_id"])
+
+    grouped_conflicts: list[dict[str, Any]] = []
+    for kind, values in indexed.items():
+        for identity, by_tier in values.items():
+            if len(by_tier) > 1:
+                grouped_conflicts.append(
+                    {"kind": kind, "identity": identity, "tiers": {tier: sorted(ids) for tier, ids in sorted(by_tier.items())}}
+                )
+
+    exact_indexes: dict[str, dict[str, dict[str, set[str]]]] = {
+        "raw_content_sha256": defaultdict(lambda: defaultdict(set)),
+        "normalized_content_sha256": defaultdict(lambda: defaultdict(set)),
+    }
+    for row in rows:
+        for key in exact_indexes:
+            exact_indexes[key][row[f"_{key}"]][row["tier"]].add(row["_row_id"])
+    exact_conflicts: list[dict[str, Any]] = []
+    for key, values in exact_indexes.items():
+        for digest, by_tier in values.items():
+            if len(by_tier) > 1:
+                exact_conflicts.append({"kind": key, "digest": digest, "tiers": {tier: sorted(ids) for tier, ids in sorted(by_tier.items())}})
+
+    # MinHash bands reduce comparisons on large manifests while the final
+    # Jaccard calculation remains deterministic and exact for each candidate.
+    bands: dict[tuple[int, tuple[int, ...]], list[dict[str, Any]]] = defaultdict(list)
+    for row in rows:
+        signature = row["_minhash"]
+        for band in range(0, len(signature), 4):
+            bands[(band // 4, signature[band : band + 4])].append(row)
+    near_duplicates: list[dict[str, Any]] = []
+    seen_pairs: set[tuple[str, str]] = set()
+    for bucket in bands.values():
+        for index, left in enumerate(bucket):
+            for right in bucket[index + 1 :]:
+                if left["tier"] == right["tier"]:
+                    continue
+                pair = tuple(sorted((left["_row_id"], right["_row_id"])))
+                if pair in seen_pairs:
+                    continue
+                seen_pairs.add(pair)
+                similarity = _shingle_jaccard(left["_normalized_text"], right["_normalized_text"])
+                if similarity >= float(near_duplicate_threshold):
+                    near_duplicates.append(
+                        {
+                            "left_id": left["_row_id"],
+                            "right_id": right["_row_id"],
+                            "left_tier": left["tier"],
+                            "right_tier": right["tier"],
+                            "jaccard": similarity,
+                        }
+                    )
+                    if len(near_duplicates) >= max_near_duplicate_pairs:
+                        break
+            if len(near_duplicates) >= max_near_duplicate_pairs:
+                break
+        if len(near_duplicates) >= max_near_duplicate_pairs:
+            break
+
+    conflicts = grouped_conflicts + exact_conflicts + near_duplicates
+    return {
+        "schema_version": 2,
+        "status": "PASS" if not malformed and not conflicts else "FAIL",
+        "checked_tiers": sorted(allowed),
+        "records_checked": len(rows),
+        "malformed_record_ids": sorted(malformed),
+        "group_conflicts": grouped_conflicts,
+        "exact_conflicts": exact_conflicts,
+        "near_duplicate_conflicts": near_duplicates,
+        "near_duplicate_threshold": float(near_duplicate_threshold),
+        "zero_forbidden_overlap": not malformed and not conflicts,
+    }
+
+
+def audit_grouped_split_disjointness(
+    records: Iterable[Mapping[str, Any]], **kwargs: Any
+) -> dict[str, Any]:
+    """Compatibility alias with an explicit grouped-split name."""
+
+    return audit_corpus_tier_disjointness(records, **kwargs)
+
+
+def assign_grouped_tiers(
+    records: Iterable[Mapping[str, Any]],
+    *,
+    tier_fractions: Mapping[str, float],
+    seed: int = 17,
+    explicit_tier_key: str = "tier",
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    """Assign whole lineage groups to deterministic, disjoint tiers.
+
+    Existing explicit tier labels are honored but conflicting labels for one
+    group fail closed.  Unlabeled groups are assigned by a stable hash bucket;
+    no row-level random split is used.
+    """
+
+    fractions = {str(key): float(value) for key, value in tier_fractions.items()}
+    if not fractions or any(value < 0 for value in fractions.values()) or abs(sum(fractions.values()) - 1.0) > 1e-6:
+        raise ValueError("tier_fractions must be non-negative and sum to one")
+    rows = [dict(row) for row in records]
+    groups: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    explicit: dict[str, str] = {}
+    conflicts: list[dict[str, Any]] = []
+    for row in rows:
+        group = (
+            _tier_identity(row, "split_group")
+            or _tier_identity(row, "trajectory")
+            or _tier_identity(row, "task")
+            or _tier_identity(row, "repository")
+            or _tier_identity(row, "document")
+            or f"row:{stable_corpus_record_id(row)}"
+        )
+        groups[group].append(row)
+        label = str(row.get(explicit_tier_key, row.get("split", ""))).strip()
+        if label:
+            if label not in fractions:
+                raise ValueError(f"explicit tier {label!r} is not in tier_fractions")
+            previous = explicit.get(group)
+            if previous is not None and previous != label:
+                conflicts.append({"group": group, "tiers": sorted({previous, label})})
+            explicit[group] = label
+    if conflicts:
+        raise ValueError(f"conflicting grouped tier assignments: {conflicts[:3]}")
+
+    ordered = sorted(fractions.items())
+    cumulative: list[tuple[str, int]] = []
+    total = 10_000
+    cursor = 0
+    for tier, fraction in ordered:
+        cursor += round(fraction * total)
+        cumulative.append((tier, cursor))
+    cumulative[-1] = (cumulative[-1][0], total)
+    assignment: dict[str, str] = {}
+    for group in sorted(groups):
+        if group in explicit:
+            assignment[group] = explicit[group]
+            continue
+        bucket = int(hashlib.sha256(f"{seed}:{group}".encode()).hexdigest()[:8], 16) % total
+        assignment[group] = next(tier for tier, limit in cumulative if bucket < limit)
+    output: list[dict[str, Any]] = []
+    for row in rows:
+        group = (
+            _tier_identity(row, "split_group")
+            or _tier_identity(row, "trajectory")
+            or _tier_identity(row, "task")
+            or _tier_identity(row, "repository")
+            or _tier_identity(row, "document")
+            or f"row:{stable_corpus_record_id(row)}"
+        )
+        row["tier"] = assignment[group]
+        row["split"] = assignment[group]
+        row["split_group"] = group
+        output.append(row)
+    counts = Counter(assignment.values())
+    return output, {
+        "schema_version": 1,
+        "method": "sha256-group-bucket",
+        "seed": int(seed),
+        "tier_fractions": fractions,
+        "groups": len(groups),
+        "assignment_counts": dict(sorted(counts.items())),
+        "group_assignments": {group: assignment[group] for group in sorted(assignment)},
+        "status": "PASS",
+    }
+
+
+def validate_pinned_source_records(records: Iterable[Mapping[str, Any]]) -> dict[str, Any]:
+    """Require source revision, license, and record identity for every row."""
+
+    failures: list[dict[str, Any]] = []
+    checked = 0
+    for raw in records:
+        checked += 1
+        missing = []
+        if not str(raw.get("source_revision", raw.get("revision", ""))).strip():
+            missing.append("source_revision")
+        if not str(raw.get("source_license", raw.get("license", raw.get("upstream_license", "")))).strip():
+            missing.append("source_license")
+        if not _tier_identity(raw, "source_record"):
+            missing.append("source_record_identity")
+        if missing:
+            failures.append({"id": stable_corpus_record_id(raw), "missing": missing})
+    return {"status": "PASS" if not failures else "FAIL", "records_checked": checked, "failures": failures}
+
+
+def new_contamination_ledger(
+    *,
+    method_version: str,
+    code_commit: str,
+    thresholds_fingerprint: str,
+    runtime_lock_sha256: str,
+    corpus_hashes: Mapping[str, str],
+) -> dict[str, Any]:
+    """Create an empty one-way evaluation-tier contamination ledger."""
+
+    if not method_version.strip() or not code_commit.strip() or not thresholds_fingerprint.strip():
+        raise ValueError("method_version, code_commit, and thresholds_fingerprint are required")
+    return {
+        "schema_version": 1,
+        "ledger_type": "dense2moe-evaluation-contamination",
+        "status": "SEALED",
+        "method_version": method_version,
+        "code_commit": code_commit,
+        "thresholds_fingerprint": thresholds_fingerprint,
+        "runtime_lock_sha256": runtime_lock_sha256,
+        "corpus_hashes": {str(key): str(value) for key, value in sorted(corpus_hashes.items())},
+        "tiers": {},
+        "history": [],
+    }
+
+
+def open_evaluation_tier(
+    ledger: Mapping[str, Any],
+    *,
+    tier: str,
+    dataset_hash: str,
+    method_version: str,
+    code_commit: str,
+    thresholds_fingerprint: str,
+) -> dict[str, Any]:
+    """Open a promotion/generalization tier exactly once.
+
+    Reopening an already opened or retired tier is rejected, even when the
+    caller supplies the same method.  This prevents repeated tuning against a
+    supposedly untouched corpus.
+    """
+
+    name = str(tier)
+    if name not in V22_EVALUATION_TIERS:
+        raise ValueError(f"only promotion/external tiers may be opened: {name}")
+    result = json.loads(json.dumps(dict(ledger), sort_keys=True))
+    tiers = dict(result.get("tiers", {}))
+    existing = tiers.get(name)
+    if existing is not None:
+        raise ValueError(f"evaluation tier {name} is already opened and cannot be reused")
+    locked = {"method_version": str(result.get("method_version", "")), "code_commit": str(result.get("code_commit", "")), "thresholds_fingerprint": str(result.get("thresholds_fingerprint", ""))}
+    supplied = {"method_version": str(method_version), "code_commit": str(code_commit), "thresholds_fingerprint": str(thresholds_fingerprint)}
+    if supplied != locked:
+        raise ValueError("method/threshold identity differs from the sealed contamination ledger")
+    entry = {
+        "tier": name,
+        "dataset_hash": str(dataset_hash),
+        **supplied,
+        "status": "OPENED",
+        "sequence": len(result.get("history", [])) + 1,
+    }
+    tiers[name] = entry
+    result["tiers"] = tiers
+    result.setdefault("history", []).append({"event": "OPENED", **entry})
+    result["status"] = "OPENED"
+    return result
+
+
+def retire_evaluation_tier(ledger: Mapping[str, Any], *, tier: str, reason: str) -> dict[str, Any]:
+    """Retire an opened tier permanently after a failure or method change."""
+
+    result = json.loads(json.dumps(dict(ledger), sort_keys=True))
+    entry = dict(result.get("tiers", {}).get(str(tier), {}))
+    if not entry:
+        raise ValueError(f"cannot retire unopened evaluation tier {tier}")
+    if entry.get("status") == "RETIRED":
+        raise ValueError(f"evaluation tier {tier} is already retired")
+    entry["status"] = "RETIRED"
+    entry["retirement_reason"] = str(reason)
+    result["tiers"][str(tier)] = entry
+    result.setdefault("history", []).append({"event": "RETIRED", "tier": str(tier), "reason": str(reason), "sequence": len(result.get("history", [])) + 1})
+    result["status"] = "RETIRED"
+    return result
+
+
+def validate_contamination_ledger(ledger: Mapping[str, Any]) -> dict[str, Any]:
+    """Validate that the ledger is internally consistent and fail-closed."""
+
+    failures: list[str] = []
+    if ledger.get("ledger_type") != "dense2moe-evaluation-contamination":
+        failures.append("ledger_type")
+    for tier, entry in dict(ledger.get("tiers", {})).items():
+        if tier not in V22_EVALUATION_TIERS:
+            failures.append(f"unknown_tier:{tier}")
+        if entry.get("status") not in {"OPENED", "RETIRED"}:
+            failures.append(f"invalid_status:{tier}")
+        for key in ("dataset_hash", "method_version", "code_commit", "thresholds_fingerprint"):
+            if not str(entry.get(key, "")):
+                failures.append(f"missing:{tier}:{key}")
+        if any(entry.get(key) != ledger.get(key) for key in ("method_version", "code_commit", "thresholds_fingerprint")):
+            failures.append(f"method_identity_mismatch:{tier}")
+    return {"status": "PASS" if not failures else "FAIL", "failures": failures, "opened_tiers": sorted(ledger.get("tiers", {}))}
+
+
 def audit_agent_task_diversity(
     records: Iterable[Mapping[str, Any]],
     *,
@@ -1705,16 +2132,29 @@ __all__ = [
     "V21_QUARANTINE_SPLIT",
     "V21_SPLITS",
     "V21_TARGET_FRACTIONS",
+    "V22_DEVELOPMENT_TIERS",
+    "V22_EVALUATION_TIERS",
+    "V22_EXTERNAL_TIERS",
+    "V22_INTERNAL_PROMOTION_TIERS",
+    "V22_TIER_ORDER",
+    "assign_grouped_tiers",
     "audit_agent_task_diversity",
+    "audit_corpus_tier_disjointness",
+    "audit_grouped_split_disjointness",
     "audit_split_disjointness",
     "audit_tokenizer_records",
     "build_balanced_activation_plan",
     "is_benchmark_derived",
+    "new_contamination_ledger",
+    "open_evaluation_tier",
     "prepare_calibration_manifest",
     "quarantine_benchmark_records",
     "resolve_corpus_record",
+    "retire_evaluation_tier",
     "sha256_file",
     "stable_corpus_record_id",
+    "validate_contamination_ledger",
+    "validate_pinned_source_records",
     "verify_corpus_manifest",
     "verify_immutable_artifacts",
     "write_corpus_receipt",

@@ -555,6 +555,52 @@ METHOD_PROOF_COMMANDS = (
     PHASE_01_COMMANDS[3],
 )
 
+# Production commands are profile-aware and consume the sealed V2.2 protocol.
+# They are intentionally concrete (no ``--help`` probes): a command that does
+# not have its required receipt inputs must fail closed at runtime.
+PHASE_02_COMMANDS = (
+    WINDOWS_PYTHON + r"scripts\freeze_corpus_v22.py --source <acquired-fit-source> --source <acquired-gate-source> --source <acquired-shadow-source> --source <acquired-g1-source> --source <acquired-g2-source> --output <phase-02-run-dir>\corpus-v2.2 --require-agent-tasks 96 --planned-tokens 750000 --method-version <locked-method-version> --json",
+    WINDOWS_CLI + r" prepare-data --run-dir <phase-02-run-dir> --corpus-manifest <phase-02-run-dir>\corpus-v2.2\corpus-v2.2.jsonl --train-tokens 128000 --tokenizer-path <pinned-qwen-source>\tokenizer.json --tokenizer-revision 1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0 --json",
+    WINDOWS_CLI + r" train-layer --run-dir <phase-02-run-dir> --layer 0 --profile qwen38_p16s1_top4 --partition <phase-02-run-dir>\partitions\p16-top4.json --epochs 1 --device cuda:0 --json",
+    WINDOWS_CLI + r" train-layer --run-dir <phase-02-run-dir> --layer 0 --profile qwen38_p32s1_top5 --partition <phase-02-run-dir>\partitions\p32-top5.json --epochs 1 --device cuda:0 --json",
+)
+PHASE_03_COMMANDS = (
+    WINDOWS_PYTHON + r"scripts\run_candidate_search.py --run-dir <phase-03-run-dir> --activation-manifest <phase-02-run-dir>\activations\FIT-TRAIN.json --dev-manifest <phase-02-run-dir>\activations\FIT-DEV.json --topology p16/top4 --exhaustive --expected-combinations 1820 --json",
+    WINDOWS_PYTHON + r"scripts\run_candidate_search.py --run-dir <phase-03-run-dir> --activation-manifest <phase-02-run-dir>\activations\FIT-TRAIN.json --dev-manifest <phase-02-run-dir>\activations\FIT-DEV.json --topology p32/top5 --candidate-pool-size 1024 --bounded --json",
+    WINDOWS_CLI + r" evaluate --run-dir <phase-03-run-dir> --config qwen38_p16s1_top4 --json",
+    WINDOWS_CLI + r" evaluate --run-dir <phase-03-run-dir> --config qwen38_p32s1_top5 --json",
+)
+PHASE_04_COMMANDS = (
+    WINDOWS_PYTHON + r"scripts\evaluate_promotion.py --run-dir <phase-04-run-dir> --method-version <locked-method-version> --tier GATE-A --tier SHADOW-B --tier SHADOW-C --json",
+    WINDOWS_CLI + r" report --run-dir <phase-04-run-dir> --config qwen38_p16s1_top4 --json",
+    WINDOWS_CLI + r" report --run-dir <phase-04-run-dir> --config qwen38_p32s1_top5 --json",
+)
+PHASE_05_COMMANDS = (
+    WINDOWS_PYTHON + r"scripts\lock_candidate_methods.py --run-dir <phase-05-run-dir> --profiles qwen38_p16s1_top4 qwen38_p32s1_top5 --json",
+    WINDOWS_PYTHON + r"scripts\run_representative_transfer.py --run-dir <phase-05-run-dir> --layers 0-3,28-31,60-63 --profiles qwen38_p16s1_top4 qwen38_p32s1_top5 --seeds 17,29,41 --json",
+)
+PHASE_06_COMMANDS = (
+    WINDOWS_PYTHON + r"scripts\run_full64_training.py --run-dir <phase-06-run-dir> --profile qwen38_p16s1_top4 --layers 0-63 --resume --json",
+    WINDOWS_PYTHON + r"scripts\run_full64_training.py --run-dir <phase-06-run-dir> --profile qwen38_p32s1_top5 --layers 0-63 --resume --json",
+    WINDOWS_CLI + r" assemble --run-dir <phase-06-run-dir> --config qwen38_p16s1_top4 --strict --json",
+    WINDOWS_CLI + r" assemble --run-dir <phase-06-run-dir> --config qwen38_p32s1_top5 --strict --json",
+)
+PHASE_07_COMMANDS = (
+    WINDOWS_PYTHON + r"scripts\assemble_qwen35_full.py --run-dir <phase-07-run-dir> --profile qwen38_p16s1_top4 --strict --json",
+    WINDOWS_PYTHON + r"scripts\assemble_qwen35_full.py --run-dir <phase-07-run-dir> --profile qwen38_p32s1_top5 --strict --json",
+    WINDOWS_PYTHON + r"scripts\validate_reload_parity.py --run-dir <phase-07-run-dir> --profiles qwen38_p16s1_top4 qwen38_p32s1_top5 --fresh-process --json",
+)
+PHASE_08_COMMANDS = (
+    WINDOWS_PYTHON + r"scripts\evaluate_whole_model.py --run-dir <phase-08-run-dir> --profile qwen38_p16s1_top4 --tier PRESERVATION-CANARY --tier POST-ASSEMBLY-FRESH --json",
+    WINDOWS_PYTHON + r"scripts\evaluate_whole_model.py --run-dir <phase-08-run-dir> --profile qwen38_p32s1_top5 --tier PRESERVATION-CANARY --tier POST-ASSEMBLY-FRESH --json",
+)
+PHASE_09_COMMANDS = (
+    WINDOWS_PYTHON + r"scripts\validate_hf_sparse_runtime.py --run-dir <phase-09-run-dir> --profiles qwen38_p16s1_top4 qwen38_p32s1_top5 --json",
+    WINDOWS_PYTHON + r"scripts\export_qwen35_gguf.py --run-dir <phase-09-run-dir> --profiles qwen38_p16s1_top4 qwen38_p32s1_top5 --llama-cpp-revision <pinned-llama-cpp-revision> --json",
+    WINDOWS_PYTHON + r"scripts\build_expert_imatrix.py --run-dir <phase-09-run-dir> --profile <winning-profile> --json",
+    WINDOWS_PYTHON + r"scripts\validate_llama_cpp_runtime.py --run-dir <phase-09-run-dir> --profile <winning-profile> --json",
+)
+
 
 def phase_00_contract() -> PhaseContract:
     """Return the active Phase 0 contract from the epic ATDD gates."""
@@ -852,61 +898,132 @@ def _canonical_phase_contracts() -> dict[str, PhaseContract]:
         gates=(
             GateContract("runtime-lock-green", "The current Windows runtime lock remains green.", (PHASE_00A_COMMANDS[4],), ("runs/windows-runtime-lock.json",)),
             GateContract("method-proof-green", "Phase 01 reports a real capture-backed METHOD_PROOF_GREEN result; synthetic smoke is never sufficient.", (WINDOWS_CLI + " status --run-dir <phase-02-run-dir> --json",), ("phase-01-real-method-proof-receipt.json",)),
-            GateContract("production-corpus-green", "Corpus V2.2 contains the required independent non-benchmark agent-task distribution.", (WINDOWS_PYTHON + r"scripts\freeze_corpus_v21.py --help",), ("corpus-v2.2-receipt.json",)),
-            GateContract("production-p16-training", "The bounded 128k production p16 continuation completes with receipt-backed metrics.", (WINDOWS_CLI + " train-layer --run-dir <phase-02-run-dir> --layer 0 --profile qwen38_p16s1_top4 --json",), ("metrics/p16-production.json",)),
+            GateContract("production-corpus-green", "The immutable V2.2 development, internal, and untouched external tiers pass pinned-source, grouped-disjointness, near-duplicate, and benchmark-exclusion checks.", (PHASE_02_COMMANDS[0],), ("corpus-v2.2/corpus-v2.2-receipt.json", "corpus-v2.2/corpus-v2.2-tier-ledger.json")),
+            GateContract("production-p16-training", "The bounded 128k production p16 continuation completes with receipt-backed metrics and no evaluation-tier fitting.", (PHASE_02_COMMANDS[2],), ("metrics/p16-production.json",)),
+            GateContract("production-p32-training", "The bounded 128k production p32 continuation completes with receipt-backed metrics and no evaluation-tier fitting.", (PHASE_02_COMMANDS[3],), ("metrics/p32-production.json",)),
         ),
-        validation_commands=(PHASE_00A_COMMANDS[4], WINDOWS_CLI + " status --run-dir <phase-02-run-dir> --json", WINDOWS_PYTHON + r"scripts\freeze_corpus_v21.py --help", WINDOWS_CLI + " train-layer --run-dir <phase-02-run-dir> --layer 0 --profile qwen38_p16s1_top4 --json"),
-        prediction_depth="compact",
-        expected_artifacts=("corpus-v2.2-receipt.json", "metrics/p16-production.json"),
+        validation_commands=(PHASE_00A_COMMANDS[4], *PHASE_02_COMMANDS),
+        prediction_depth="expanded",
+        expected_artifacts=("corpus-v2.2/corpus-v2.2-receipt.json", "metrics/p16-production.json", "metrics/p32-production.json"),
         next_phase=PHASE_03_ID,
-        handoff_commands=(WINDOWS_CLI + " status --run-dir <phase-02-run-dir> --json",),
+        handoff_commands=PHASE_03_COMMANDS,
         predecessor_phase=PHASE_01_ID,
     )
-    phase_03 = _variant(legacy[PHASE_02_ID], phase_id=PHASE_03_ID, predecessor_phase=PHASE_02_ID, next_phase=PHASE_04_ID, objective="Train the p16 selector and validate joint load/generalization across FIT-DEV, GATE-A, SHADOW-B, and SHADOW-C.")
-    phase_04 = _variant(legacy[PHASE_03_ID], phase_id=PHASE_04_ID, predecessor_phase=PHASE_03_ID, next_phase=PHASE_05_ID, objective="Transfer the proven method to the primary p32/top5 product without blocking the p16 fallback.")
-    phase_05 = _variant(legacy[PHASE_04_ID], phase_id=PHASE_05_ID, predecessor_phase=PHASE_04_ID, next_phase=PHASE_06_ID)
-    phase_06 = _variant(legacy[PHASE_05_ID], phase_id=PHASE_06_ID, predecessor_phase=PHASE_05_ID, next_phase=PHASE_07_ID)
-    phase_07 = _variant(
-        legacy[PHASE_06_ID],
-        phase_id=PHASE_07_ID,
-        predecessor_phase=PHASE_06_ID,
-        next_phase=PHASE_08_ID,
-        gates=legacy[PHASE_06_ID].gates
-        + (
-            GateContract(
-                "full64-input",
-                "The guarded full64 p16 queue and layer checkpoints are the sole input to BF16 assembly.",
-                (WINDOWS_CLI + " status --run-dir <phase-07-run-dir> --json",),
-                ("full64/checkpoints-manifest.json",),
-            ),
+    phase_03 = PhaseContract(
+        phase_id=PHASE_03_ID,
+        objective="Select p16/top4 exhaustive and p32/top5 bounded development finalists from FIT-TRAIN/FIT-DEV without opening promotion tiers.",
+        gates=(
+            GateContract("development-only-input", "Candidate search consumes only frozen development tiers; evaluation tiers remain sealed.", (PHASE_03_COMMANDS[0], PHASE_03_COMMANDS[1]), ("development/candidate-search-receipt.json",)),
+            GateContract("p16-exhaustive-oracle", "All C(16,4)=1820 projected-positive p16 assignments are ranked with load-priced Pareto evidence.", (PHASE_03_COMMANDS[0],), ("development/p16-exhaustive-receipt.json",)),
+            GateContract("p32-bounded-pool", "The p32/top5 correlation-ranked pool is explicitly bounded and expanded until selections stabilize.", (PHASE_03_COMMANDS[1],), ("development/p32-bounded-pool-receipt.json",)),
+            GateContract("seeded-selector-finalists", "Frozen bases receive three fixed-seed selector/amplitude fits and only the top two quality/load Pareto candidates survive.", (PHASE_03_COMMANDS[2], PHASE_03_COMMANDS[3]), ("development/finalists.json",)),
         ),
+        validation_commands=PHASE_03_COMMANDS,
+        prediction_depth="expanded",
+        expected_artifacts=("development/p16-exhaustive-receipt.json", "development/p32-bounded-pool-receipt.json", "development/finalists.json"),
+        next_phase=PHASE_04_ID,
+        handoff_commands=PHASE_04_COMMANDS,
+        predecessor_phase=PHASE_02_ID,
     )
-    # The canonical graph collapses the historical assembly/validation pair
-    # into Phase 08 and the historical runtime/quantization pair into Phase
-    # 09.  Preserve every required gate when translating those legacy
-    # contracts; otherwise a canonical phase could report green while silently
-    # dropping whole-model, serialization, or imatrix evidence.
-    phase_08_assembly_validation_gates = legacy[PHASE_07_ID].gates + legacy[PHASE_08_ID].gates
-    phase_08 = _variant(
-        legacy[PHASE_07_ID],
+    phase_04 = PhaseContract(
+        phase_id=PHASE_04_ID,
+        objective="Run one-way internal promotion on frozen p16/top4 and p32/top5 finalists, then evaluate untouched G1/G2 without tuning.",
+        gates=(
+            GateContract("finalist-freeze", "Development finalists, method version, thresholds, seeds, and router checkpoints are immutable before evaluation opens.", (PHASE_04_COMMANDS[0],), ("promotion/finalist-lock.json",)),
+            GateContract("internal-promotion", "GATE-A, SHADOW-B, and SHADOW-C are opened sequentially and retired on any method-driven revision.", (PHASE_04_COMMANDS[0],), ("promotion/contamination-ledger.json",)),
+            GateContract("external-generalization", "Independently acquired G1 and G2 are evaluated without optimizer, router, partition, checkpoint, or threshold updates.", (PHASE_04_COMMANDS[0],), ("promotion/external-generalization.json",)),
+            GateContract("amplitude-and-domain-gates", "Every untouched corpus meets quality, load, amplitude, repeat, and domain-slice gates or the finalist is rejected.", (PHASE_04_COMMANDS[1], PHASE_04_COMMANDS[2]), ("promotion/p16-decision.json", "promotion/p32-decision.json")),
+        ),
+        validation_commands=PHASE_04_COMMANDS,
+        prediction_depth="expanded",
+        expected_artifacts=("promotion/contamination-ledger.json", "promotion/external-generalization.json", "promotion/p16-decision.json", "promotion/p32-decision.json"),
+        next_phase=PHASE_05_ID,
+        handoff_commands=PHASE_05_COMMANDS,
+        predecessor_phase=PHASE_03_ID,
+    )
+    phase_05 = PhaseContract(
+        phase_id=PHASE_05_ID,
+        objective="Freeze separate p16 and p32 method locks and validate transfer on the 12-layer representative matrix with untouched external data.",
+        gates=(
+            GateContract("method-locks", "Both active topologies have content-addressed method locks bound to the finalist and contamination ledger.", (PHASE_05_COMMANDS[0],), ("method-locks/p16.json", "method-locks/p32.json")),
+            GateContract("representative-matrix", "Layers 0–3, 28–31, and 60–63 run with locked seeds and sentinel repeat seeds.", (PHASE_05_COMMANDS[1],), ("representative/matrix.json",)),
+            GateContract("representative-generalization", "Representative development and untouched external results are reported separately; layer-0 transfer is never assumed.", (PHASE_05_COMMANDS[1],), ("representative/external-generalization.json",)),
+            GateContract("winner-rule", "p32 wins only when fully green; otherwise p16 may win; neither green stops product promotion.", (PHASE_05_COMMANDS[1],), ("representative/decision.json",)),
+        ),
+        validation_commands=PHASE_05_COMMANDS,
+        prediction_depth="expanded",
+        expected_artifacts=("method-locks/p16.json", "method-locks/p32.json", "representative/matrix.json", "representative/decision.json"),
+        next_phase=PHASE_06_ID,
+        handoff_commands=PHASE_06_COMMANDS,
+        predecessor_phase=PHASE_04_ID,
+    )
+    phase_06 = PhaseContract(
+        phase_id=PHASE_06_ID,
+        objective="Convert all 64 layers using exactly one active winner at a time with resumable, hash-addressed checkpoints.",
+        gates=(
+            GateContract("winner-input", "The representative winner receipt authorizes exactly one active topology; the other remains a frozen fallback recipe.", (PHASE_06_COMMANDS[0], PHASE_06_COMMANDS[1]), ("representative/decision.json",)),
+            GateContract("full64-layer-queue", "All 64 layers have deterministic queues, profile identity, dataset hashes, and resumable checkpoints.", (PHASE_06_COMMANDS[0], PHASE_06_COMMANDS[1]), ("full64/layer-queue.json",)),
+            GateContract("full64-quality", "Every layer passes locked layer gates, sparse dispatch telemetry, and external canary checks.", (PHASE_06_COMMANDS[2], PHASE_06_COMMANDS[3]), ("full64/quality-report.json",)),
+        ),
+        validation_commands=PHASE_06_COMMANDS,
+        prediction_depth="expanded",
+        expected_artifacts=("full64/layer-queue.json", "full64/quality-report.json"),
+        next_phase=PHASE_07_ID,
+        handoff_commands=PHASE_07_COMMANDS,
+        predecessor_phase=PHASE_05_ID,
+    )
+    phase_07 = PhaseContract(
+        phase_id=PHASE_07_ID,
+        objective="Assemble the selected winner into a BF16 Hugging Face Qwen3.5 checkpoint while preserving every non-FFN tensor.",
+        gates=(
+            GateContract("full64-input", "The guarded full64 winner queue and all 64 layer checkpoints are the sole assembly input.", (PHASE_07_COMMANDS[0], PHASE_07_COMMANDS[1]), ("full64/checkpoints-manifest.json",)),
+            GateContract("tensor-inventory", "All 64 intended FFNs are replaced and the strict non-FFN inventory is unchanged.", (PHASE_07_COMMANDS[0], PHASE_07_COMMANDS[1]), ("BF16_SPARSE_MASTER/manifest.json",)),
+            GateContract("backbone-preservation", "Tokenizer, chat template, embeddings, attention/Gated DeltaNet, norms, residual path, and language head are preserved and hashed.", (PHASE_07_COMMANDS[0], PHASE_07_COMMANDS[1]), ("BF16_SPARSE_MASTER/preservation-receipt.json",)),
+            GateContract("bf16-reload", "A fresh process strictly reloads the BF16 model and reproduces deterministic logits before runtime conversion.", (PHASE_07_COMMANDS[2],), ("BF16_SPARSE_MASTER/reload-receipt.json",)),
+        ),
+        validation_commands=PHASE_07_COMMANDS,
+        prediction_depth="expanded",
+        expected_artifacts=("full64/checkpoints-manifest.json", "BF16_SPARSE_MASTER/manifest.json", "BF16_SPARSE_MASTER/preservation-receipt.json", "BF16_SPARSE_MASTER/reload-receipt.json"),
+        next_phase=PHASE_08_ID,
+        handoff_commands=PHASE_08_COMMANDS,
+        predecessor_phase=PHASE_06_ID,
+    )
+    phase_08 = PhaseContract(
         phase_id=PHASE_08_ID,
-        predecessor_phase=PHASE_07_ID,
+        objective="Validate the BF16 sparse master against dense whole-model distribution, coding-agent behavior, preservation canaries, and a fresh post-assembly corpus.",
+        gates=(
+            GateContract("bf16-master-input", "The canonical BF16 sparse master is frozen and bound to the winning method lock.", (PHASE_08_COMMANDS[0], PHASE_08_COMMANDS[1]), ("BF16_SPARSE_MASTER/manifest.json",)),
+            GateContract("bf16-reload", "The fresh-process BF16 reload receipt is green before whole-model comparison.", (PHASE_08_COMMANDS[0], PHASE_08_COMMANDS[1]), ("BF16_SPARSE_MASTER/reload-receipt.json",)),
+            GateContract("distribution-quality", "Per-token KL, perplexity delta, teacher top-1 agreement, and output amplitude meet the fixed envelope.", (PHASE_08_COMMANDS[0], PHASE_08_COMMANDS[1]), ("validation/distribution.json",)),
+            GateContract("coding-agent-quality", "Unseen coding-agent workflows cover generation, debugging, navigation, tools, retries, and long context with no benchmark contamination.", (PHASE_08_COMMANDS[0], PHASE_08_COMMANDS[1]), ("validation/coding-agent.json",)),
+            GateContract("preservation-quality", "General, technical, structured, and OOD canaries have no failed critical slice.", (PHASE_08_COMMANDS[0], PHASE_08_COMMANDS[1]), ("validation/preservation.json",)),
+            GateContract("fresh-post-assembly-generalization", "A post-assembly corpus never used during layer selection remains within the dense-teacher envelope.", (PHASE_08_COMMANDS[0], PHASE_08_COMMANDS[1]), ("validation/post-assembly-fresh.json",)),
+        ),
+        validation_commands=PHASE_08_COMMANDS,
+        prediction_depth="expanded",
+        expected_artifacts=("validation/distribution.json", "validation/coding-agent.json", "validation/preservation.json", "validation/post-assembly-fresh.json"),
         next_phase=PHASE_09_ID,
-        objective="Assemble the BF16 sparse model and validate whole-model preservation and quality.",
-        gates=phase_08_assembly_validation_gates,
-        validation_commands=tuple(command for gate in phase_08_assembly_validation_gates for command in gate.validation_commands),
-        expected_artifacts=legacy[PHASE_07_ID].expected_artifacts + legacy[PHASE_08_ID].expected_artifacts,
+        handoff_commands=PHASE_09_COMMANDS,
+        predecessor_phase=PHASE_07_ID,
     )
-    phase_09_runtime_quantization_gates = legacy[PHASE_09_ID].gates + legacy[PHASE_10_ID].gates
-    phase_09 = _variant(
-        legacy[PHASE_09_ID],
+    phase_09 = PhaseContract(
         phase_id=PHASE_09_ID,
-        predecessor_phase=PHASE_08_ID,
+        objective="Prove HF/PyTorch sparse equivalence, complete GGUF/llama.cpp runtime support, and validate conservative quantization without relaxing external gates.",
+        gates=(
+            GateContract("bf16-validation-input", "BF16 whole-model validation is green before serialization or quantization.", (PHASE_09_COMMANDS[0],), ("validation/distribution.json",)),
+            GateContract("hf-sparse-runtime", "Masked-reference and sparse-dispatch HF paths agree, including gradients, empty experts, and dispatch counts.", (PHASE_09_COMMANDS[0],), ("runtime/hf-sparse-receipt.json",)),
+            GateContract("runtime-discovery", "The pinned native-Windows llama.cpp revision loads the active topology and emits sparse-dispatch evidence.", (PHASE_09_COMMANDS[1], PHASE_09_COMMANDS[3]), ("quant/runtime-discovery.json",)),
+            GateContract("serialization-contract", "All expert/router/shared-branch tensors and metadata round-trip HF↔GGUF with BF16/F16 parity.", (PHASE_09_COMMANDS[1],), ("quant/serialization-contract.json",)),
+            GateContract("imatrix-contract", "An expert-covering imatrix is bound to the frozen calibration corpus and BF16 master.", (PHASE_09_COMMANDS[2],), ("quant/imatrix-receipt.json",)),
+            GateContract("bf16-freeze", "Quantization starts only from the exact validated BF16 sparse master.", (PHASE_09_COMMANDS[2],), ("BF16_SPARSE_MASTER/manifest.json",)),
+            GateContract("conservative-quantization", "A Q8-like candidate reloads and remains within the dense-teacher and external-generalization envelope.", (PHASE_09_COMMANDS[3],), ("quant/candidate-q8/receipt.json",)),
+        ),
+        validation_commands=PHASE_09_COMMANDS,
+        prediction_depth="expanded",
+        expected_artifacts=("runtime/hf-sparse-receipt.json", "quant/runtime-discovery.json", "quant/serialization-contract.json", "quant/imatrix-receipt.json", "quant/candidate-q8/receipt.json"),
         next_phase="complete",
-        objective="Prove sparse runtime/serialization compatibility, then quantize the frozen BF16 sparse master and validate incremental degradation.",
-        gates=phase_09_runtime_quantization_gates,
-        validation_commands=tuple(command for gate in phase_09_runtime_quantization_gates for command in gate.validation_commands),
-        expected_artifacts=legacy[PHASE_09_ID].expected_artifacts + legacy[PHASE_10_ID].expected_artifacts,
+        handoff_commands=(WINDOWS_CLI + r" report --run-dir <phase-09-run-dir> --json",),
+        predecessor_phase=PHASE_08_ID,
     )
     return {PHASE_00A_ID: phase_00a_contract(), PHASE_00B_ID: phase_00b_contract(), PHASE_01_ID: phase_01, PHASE_02_ID: phase_02, PHASE_03_ID: phase_03, PHASE_04_ID: phase_04, PHASE_05_ID: phase_05, PHASE_06_ID: phase_06, PHASE_07_ID: phase_07, PHASE_08_ID: phase_08, PHASE_09_ID: phase_09}
 
@@ -953,13 +1070,21 @@ __all__ = [
     "PHASE_01_REAL_METHOD_PROOF_RUNNING",
     "PHASE_01_REQUIRED_EVIDENCE_CLASS",
     "PHASE_01_SCIENTIFIC_STATES",
+    "PHASE_02_COMMANDS",
     "PHASE_02_ID",
+    "PHASE_03_COMMANDS",
     "PHASE_03_ID",
+    "PHASE_04_COMMANDS",
     "PHASE_04_ID",
+    "PHASE_05_COMMANDS",
     "PHASE_05_ID",
+    "PHASE_06_COMMANDS",
     "PHASE_06_ID",
+    "PHASE_07_COMMANDS",
     "PHASE_07_ID",
+    "PHASE_08_COMMANDS",
     "PHASE_08_ID",
+    "PHASE_09_COMMANDS",
     "PHASE_09_ID",
     "PHASE_10_ID",
     "PHASE_CONTRACTS",

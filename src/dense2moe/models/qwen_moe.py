@@ -76,9 +76,10 @@ class DenseSwiGLU:
 class Qwen35SwiGLUMoE:
     """Capacity-preserving shared+routed SwiGLU MoE.
 
-    The partition is exhaustive.  `all_experts=True` is therefore an exact
-    dense reconstruction (within the input dtype); sparse mode is normalized
-    top-k routing with no token dropping.
+    The partition is exhaustive.  `all_experts=True` is therefore an explicit
+    diagnostic dense reconstruction (within the input dtype); ordinary sparse
+    mode gathers only selected token rows for each expert and never evaluates
+    an unselected expert.
     """
 
     architecture = "qwen3_5_text_swiglu_moe_v1"
@@ -142,6 +143,26 @@ class Qwen35SwiGLUMoE:
         hidden = gated * up
         return np.einsum("tei,eoi->teo", hidden, self.expert_down_proj)
 
+    def _sparse_routed(self, x: Any, indices: Any, weights: Any) -> tuple[Any, Any]:
+        """Evaluate only selected token buckets and scatter-add outputs."""
+
+        np = _np()
+        token_count = int(x.shape[0])
+        routed = np.zeros((token_count, self.hidden_size), dtype=x.dtype)
+        counts = np.zeros(self.routed_experts, dtype=np.int64)
+        for expert in range(self.routed_experts):
+            token_ids, slots = np.where(indices == expert)
+            if token_ids.size == 0:
+                continue
+            bucket = x[token_ids]
+            gate = _silu(bucket @ self.expert_gate_proj[expert].T)
+            up = bucket @ self.expert_up_proj[expert].T
+            expert_output = (gate * up) @ self.expert_down_proj[expert].T
+            contribution = expert_output * weights[token_ids, slots, None]
+            routed[token_ids] += contribution
+            counts[expert] = int(token_ids.size)
+        return routed, counts
+
     def __call__(self, inputs: Any, *, all_experts: bool = False, return_router: bool = False) -> Any:
         np = _np()
         x = np.asarray(inputs)
@@ -149,17 +170,30 @@ class Qwen35SwiGLUMoE:
             raise ValueError("inputs must have a hidden dimension")
         original_shape = x.shape
         x = x.reshape(-1, original_shape[-1])
-        outputs = self.expert_outputs(x)
         if all_experts:
+            outputs = self.expert_outputs(x)
             routed = outputs.sum(axis=1)
-            router_info: dict[str, Any] = {"indices": np.tile(np.arange(self.routed_experts), (x.shape[0], 1)), "weights": np.ones((x.shape[0], self.routed_experts), dtype=np.float32) / self.routed_experts}
+            router_info: dict[str, Any] = {
+                "indices": np.tile(np.arange(self.routed_experts), (x.shape[0], 1)),
+                "weights": np.ones((x.shape[0], self.routed_experts), dtype=np.float32) / self.routed_experts,
+                "dispatch_mode": "dense_all_experts",
+                "dense_fallback_used": True,
+                "expert_token_counts": [int(x.shape[0]) for _ in range(self.routed_experts)],
+            }
         else:
             indices, weights = _topk(x @ self.router, self.top_k)
-            routed = np.zeros((x.shape[0], self.hidden_size), dtype=outputs.dtype)
-            for token in range(x.shape[0]):
-                for slot in range(self.top_k):
-                    routed[token] += weights[token, slot] * outputs[token, indices[token, slot]]
-            router_info = {"indices": indices, "weights": weights}
+            routed, counts = self._sparse_routed(x, indices, weights)
+            router_info = {
+                "indices": indices,
+                "weights": weights,
+                "dispatch_mode": "sparse_token_dispatch",
+                "dense_fallback_used": False,
+                "dispatch_token_count": int(x.shape[0]),
+                "selected_dispatches": int(x.shape[0] * self.top_k),
+                "expert_token_counts": counts.tolist(),
+                "nonempty_experts": int(np.count_nonzero(counts)),
+                "estimated_ffn_reduction": 1.0 - ((self.partition.shared_intermediate_size + self.top_k * self.partition.expert_intermediate_size) / self.intermediate_size),
+            }
         result = (routed + self._shared(x)).reshape(*original_shape[:-1], self.hidden_size)
         if return_router:
             router_info["indices"] = router_info["indices"].reshape(*original_shape[:-1], -1)

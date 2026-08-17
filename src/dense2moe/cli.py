@@ -22,7 +22,7 @@ from .config import active_topology_contract, load_active_config
 from .data import prepare_calibration_manifest, write_corpus_receipt
 from .discovery.source import inspect_hub_source, inspect_local_source, verify_qwen_geometry
 from .estimates import estimate_resources
-from .evaluation import quality_gate
+from .evaluation import evaluate_promotion_metrics
 from .export.gguf import export_gguf, validate_gguf
 from .hardware import collect_environment, run_environment_doctor
 from .logging import read_jsonl
@@ -1010,12 +1010,19 @@ def _train_layers(args: argparse.Namespace, store: StateStore) -> dict[str, Any]
     queue = JobQueue(store.run_dir / "jobs.sqlite")
     profile = _profile_from_args(args)
     queue.enqueue_layers(list(range(profile.num_hidden_layers)))
-    result = {"status": "QUEUE_READY", "profile": profile.name, "queue": queue.summary(), "message": "Layer workers require captured activations and a verified source checkpoint."}
+    result = {
+        "status": "QUEUE_READY",
+        "profile": profile.name,
+        "topology": profile.topology_id,
+        "queue": queue.summary(),
+        "message": "Layer queue is ready; workers remain blocked until every activation manifest and source checkpoint is verified.",
+        "dense_fallback_used": False,
+    }
     atomic_write_json(store.run_dir / "metrics" / "training-queue.json", result)
     queue.close()
-    next_command = f"& .\\.venv\\Scripts\\python.exe -m dense2moe.cli assemble --run-dir {args.run_dir} --profile {args.profile} --strict"
+    next_command = f"& .\\.venv\\Scripts\\python.exe -m dense2moe.cli worker --run-dir {args.run_dir} --layer 0 --profile {args.profile} --resume"
     store.transition(current_phase="training", phase_status="pending", next_exact_command=next_command, validation_results={"train_layers": result})
-    store.write_handoff(next_command=next_command, expected_output="complete trained layer checkpoints", blocker="Layer workers require captured activations and a verified source checkpoint")
+    store.write_handoff(next_command=next_command, expected_output="validated sparse layer checkpoint", blocker="Layer workers require captured activations and a verified source checkpoint")
     return result
 
 
@@ -1050,30 +1057,74 @@ def _repair(args: argparse.Namespace, store: StateStore) -> dict[str, Any]:
 
 
 def _evaluate(args: argparse.Namespace, store: StateStore) -> dict[str, Any]:
-    metrics = {"layer_loss": 0.0, "router_collapse": 1.0}
-    gate = quality_gate(metrics, {"layer_loss": {"green": 0.01, "yellow": 0.1, "lower_is_better": True}, "router_collapse": {"green": 0.9, "yellow": 0.5, "lower_is_better": False}})
-    result = {"status": "EVALUATION_PENDING", "gate": gate, "message": "Synthetic metrics are not substituted for a real-model quality result."}
+    profile = _profile_from_args(args)
+    manifest_path = store.run_dir / "artifacts" / "hf-moe" / "manifest.json"
+    candidate_paths = (
+        store.run_dir / "validation" / "promotion.json",
+        store.run_dir / "metrics" / "promotion.json",
+        store.run_dir / "metrics" / "whole-model.json",
+    )
+    receipt_path = next((path for path in candidate_paths if path.exists()), None)
+    if not manifest_path.exists():
+        result = {
+            "status": "BLOCKED",
+            "profile": profile.name,
+            "topology": profile.topology_id,
+            "message": "evaluation requires a complete HF sparse assembly; no synthetic metrics are emitted",
+            "blocker_code": "ASSEMBLY_REQUIRED",
+        }
+    elif receipt_path is None:
+        result = {
+            "status": "BLOCKED",
+            "profile": profile.name,
+            "topology": profile.topology_id,
+            "message": "evaluation requires a receipt-bearing real-model metric artifact",
+            "blocker_code": "REAL_METRICS_REQUIRED",
+        }
+    else:
+        try:
+            payload = json.loads(receipt_path.read_text(encoding="utf-8"))
+            metrics = payload.get("metrics")
+            if not isinstance(metrics, dict):
+                raise TypeError("metric receipt has no metrics object")
+            gate = evaluate_promotion_metrics(
+                metrics,
+                domain_slices=payload.get("domain_slices") if isinstance(payload.get("domain_slices"), dict) else None,
+                development_metrics=payload.get("development_metrics") if isinstance(payload.get("development_metrics"), dict) else None,
+            )
+            result = {
+                "status": "EVALUATION_GREEN" if gate["overall"] == "green" else "EVALUATION_REJECTED",
+                "profile": profile.name,
+                "topology": profile.topology_id,
+                "receipt": str(receipt_path),
+                "gate": gate,
+                "message": "real receipt-backed promotion metrics evaluated; no threshold relaxation applied",
+            }
+        except (OSError, TypeError, ValueError, json.JSONDecodeError) as exc:
+            result = {"status": "BLOCKED", "profile": profile.name, "topology": profile.topology_id, "message": str(exc), "blocker_code": "INVALID_METRIC_RECEIPT"}
     atomic_write_json(store.run_dir / "metrics" / "evaluation.json", result)
-    next_command = f"& .\\.venv\\Scripts\\python.exe -m dense2moe.cli export-gguf --run-dir {args.run_dir}"
-    store.transition(current_phase="export", phase_status="pending", next_exact_command=next_command, validation_results={"evaluation": result})
-    store.write_handoff(next_command=next_command, expected_output="validated high-precision GGUF", blocker=str(result["message"]))
+    next_command = f"& .\\.venv\\Scripts\\python.exe -m dense2moe.cli export-gguf --run-dir {args.run_dir} --config {profile.name}"
+    green = result.get("status") == "EVALUATION_GREEN"
+    store.transition(current_phase="export" if green else "evaluation", phase_status="pending" if green else "blocked", active_blocker=None if green else str(result["message"]), next_exact_command=next_command, validation_results={"evaluation": result})
+    store.write_handoff(next_command=next_command, expected_output="validated high-precision GGUF" if green else "real receipt-backed evaluation metrics", blocker=None if green else str(result["message"]))
     return result
 
 
 def _export(args: argparse.Namespace, store: StateStore) -> dict[str, Any]:
+    profile = _profile_from_args(args)
     path = store.run_dir / "artifacts" / "moe-f16.gguf"
     manifest_path = store.run_dir / "artifacts" / "hf-moe" / "manifest.json"
     if not manifest_path.exists():
         result = {"status": "BLOCKED", "path": str(path), "message": "GGUF export is gated on a validated real Hugging Face assembly; no structural smoke file is emitted."}
         atomic_write_json(store.run_dir / "metrics" / "gguf.json", result)
-        store.transition(current_phase="export", phase_status="blocked", active_blocker=result["message"], next_exact_command=f"& .\\.venv\\Scripts\\python.exe -m dense2moe.cli assemble --run-dir {args.run_dir} --profile {DEFAULT_ACTIVE_PROFILE} --strict", validation_results={"gguf": result})
+        store.transition(current_phase="export", phase_status="blocked", active_blocker=result["message"], next_exact_command=f"& .\\.venv\\Scripts\\python.exe -m dense2moe.cli assemble --run-dir {args.run_dir} --profile {profile.name} --strict", validation_results={"gguf": result})
         store.write_handoff(next_command=store.load().next_exact_command, expected_output="validated HF assembly before GGUF", blocker=result["message"])
         return result
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     if not manifest.get("complete"):
         result = {"status": "BLOCKED", "path": str(path), "message": "GGUF export is gated on a complete, reloaded real Hugging Face assembly; structural smoke output is not evidence."}
         atomic_write_json(store.run_dir / "metrics" / "gguf.json", result)
-        store.transition(current_phase="export", phase_status="blocked", active_blocker=result["message"], next_exact_command=f"& .\\.venv\\Scripts\\python.exe -m dense2moe.cli assemble --run-dir {args.run_dir} --profile {DEFAULT_ACTIVE_PROFILE} --strict", validation_results={"gguf": result})
+        store.transition(current_phase="export", phase_status="blocked", active_blocker=result["message"], next_exact_command=f"& .\\.venv\\Scripts\\python.exe -m dense2moe.cli assemble --run-dir {args.run_dir} --profile {profile.name} --strict", validation_results={"gguf": result})
         store.write_handoff(next_command=store.load().next_exact_command, expected_output="complete HF assembly before GGUF", blocker=result["message"])
         return result
     try:
@@ -1084,7 +1135,7 @@ def _export(args: argparse.Namespace, store: StateStore) -> dict[str, Any]:
             exported = export_gguf(
                 manifest_path,
                 path,
-                metadata={"run_id": str(args.run_dir), "artifact_scope": "phase-07-productization"},
+                metadata={"run_id": str(args.run_dir), "artifact_scope": "phase-07-productization", "profile": profile.name, "topology": profile.topology_id},
             )
             validation = exported["validation"]
     except (OSError, RuntimeError, TypeError, ValueError) as exc:
@@ -1103,7 +1154,12 @@ def _export(args: argparse.Namespace, store: StateStore) -> dict[str, Any]:
 
 def _imatrix(args: argparse.Namespace, store: StateStore) -> dict[str, Any]:
     path = store.run_dir / "artifacts" / "imatrix.json"
-    result = {"status": "IMATRIX_PENDING", "path": str(path), "expert_coverage": {}, "message": "Calibration corpus is required to build an expert-covering imatrix."}
+    gguf_path = store.run_dir / "artifacts" / "moe-f16.gguf"
+    corpus_receipt = store.run_dir / "corpus-v2.2-receipt.json"
+    if not gguf_path.exists() or not corpus_receipt.exists():
+        result = {"status": "BLOCKED", "path": str(path), "expert_coverage": {}, "message": "imatrix requires a validated GGUF and sealed Corpus V2.2 receipt; no placeholder matrix is emitted.", "blocker_code": "IMATRIX_INPUTS_REQUIRED"}
+    else:
+        result = {"status": "BLOCKED", "path": str(path), "expert_coverage": {}, "message": "native llama.cpp imatrix execution is not yet available in this checkout; install the pinned runtime before quantization.", "blocker_code": "LLAMA_CPP_IMATRIX_RUNTIME_REQUIRED"}
     atomic_write_json(path, result)
     next_command = f"& .\\.venv\\Scripts\\python.exe -m dense2moe.cli quantize --run-dir {args.run_dir} --type {args.type}"
     store.transition(next_exact_command=next_command, validation_results={"imatrix": result})
@@ -1113,14 +1169,19 @@ def _imatrix(args: argparse.Namespace, store: StateStore) -> dict[str, Any]:
 
 def _quantize(args: argparse.Namespace, store: StateStore) -> dict[str, Any]:
     path = store.run_dir / "artifacts" / f"moe-{args.type.lower()}.gguf"
-    result = {"status": "QUANTIZATION_PENDING", "path": str(path), "type": args.type, "message": "Quantization is gated on a validated high-precision GGUF and imatrix."}
+    imatrix = store.run_dir / "artifacts" / "imatrix.json"
+    source = store.run_dir / "artifacts" / "moe-f16.gguf"
+    if not source.exists() or not imatrix.exists():
+        result = {"status": "BLOCKED", "path": str(path), "type": args.type, "message": "quantization requires a validated F16 GGUF and expert-covering imatrix; no placeholder is emitted.", "blocker_code": "QUANTIZATION_INPUTS_REQUIRED"}
+    else:
+        result = {"status": "BLOCKED", "path": str(path), "type": args.type, "message": "quantization backend is not installed; run the pinned native-Windows llama.cpp quantizer before claiming a candidate.", "blocker_code": "QUANTIZER_RUNTIME_REQUIRED"}
     atomic_write_json(store.run_dir / "metrics" / "quantization.json", result)
     store.write_handoff(next_command=f"& .\\.venv\\Scripts\\python.exe -m dense2moe.cli benchmark --run-dir {args.run_dir}", expected_output="dense-vs-MoE benchmark", blocker=result["message"])
     return result
 
 
 def _benchmark(args: argparse.Namespace, store: StateStore) -> dict[str, Any]:
-    result = {"status": "BENCHMARK_PENDING", "message": "Requires dense and MoE GGUF artifacts on the same Windows runtime."}
+    result = {"status": "BLOCKED", "message": "benchmarking requires dense and sparse artifacts plus a fresh, untouched evaluation corpus; no synthetic benchmark is emitted.", "blocker_code": "BENCHMARK_INPUTS_REQUIRED"}
     atomic_write_json(store.run_dir / "metrics" / "benchmark.json", result)
     store.write_handoff(next_command=f"& .\\.venv\\Scripts\\python.exe -m dense2moe.cli report --run-dir {args.run_dir} --json", expected_output="final report", blocker=result["message"])
     return result
@@ -1295,7 +1356,8 @@ def main(argv: list[str] | None = None) -> int:
         payload = HANDLERS[args.command](args, store)
         _record(store, args, payload, ok=True)
         _emit(payload, bool(args.json_output))
-        return 0 if payload.get("status") not in {"BLOCKED", "FAILED"} else 2
+        status = str(payload.get("status", ""))
+        return 0 if status not in {"BLOCKED", "FAILED", "EVALUATION_REJECTED", "REJECTED"} else 2
     except (OSError, RuntimeError, ValueError, TypeError) as exc:
         payload = {"status": "FAILED", "error": str(exc), "command": args.command}
         _record(store, args, payload, ok=False)

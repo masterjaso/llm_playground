@@ -124,9 +124,11 @@ class TorchQwen35SwiGLUMoE(nn.Module):
 
     ``from_dense`` initializes every routed and shared parameter from one
     immutable dense layer according to the supplied :class:`PartitionPlan`.
-    The forward pass computes every expert and masks the unselected outputs;
-    this is deliberately token-safe and easy to audit.  A production kernel
-    can later replace the loop without changing checkpoint semantics.
+    Ordinary forward uses token-bucket dispatch: each routed expert sees only
+    the rows selected for it and the result is scatter-added back into the
+    flattened token output.  The explicit ``return_contributions=True`` path
+    remains an all-expert diagnostic mode because oracle refinement needs the
+    complete contribution tensor; its telemetry marks that dense fallback.
     """
 
     architecture = "qwen3_5_text_torch_swiglu_moe_v1"
@@ -323,6 +325,58 @@ class TorchQwen35SwiGLUMoE(nn.Module):
         hidden = F.silu(self.expert_gate_proj[expert](x)) * self.expert_up_proj[expert](x)
         return self.expert_down_proj[expert](hidden)
 
+    def _routed_dense(
+        self,
+        x: Tensor,
+        indices: Tensor,
+        weights: Tensor,
+        *,
+        return_contributions: bool,
+    ) -> tuple[Tensor, list[Tensor]]:
+        """Reference all-expert route used only by contribution diagnostics."""
+
+        runtime = _require_torch()
+        routed = runtime.zeros((x.shape[0], self.hidden_size), dtype=x.dtype, device=x.device)
+        contributions: list[Tensor] = []
+        for expert in range(self.routed_experts):
+            contribution = self._expert_output(x, expert) * self.expert_scales[expert]
+            if return_contributions:
+                contributions.append(contribution.detach())
+            selected = (indices == expert).to(contribution.dtype)
+            coefficient = (weights * selected).sum(dim=-1, keepdim=True)
+            routed = routed + contribution * coefficient
+        return routed, contributions
+
+    def _routed_sparse(
+        self,
+        x: Tensor,
+        indices: Tensor,
+        weights: Tensor,
+    ) -> tuple[Tensor, list[int]]:
+        """Dispatch only selected token rows to each routed expert.
+
+        ``index_add`` is out-of-place so gradients flow through the selected
+        expert outputs and coefficients while token indices remain a pure
+        routing decision.  Empty expert buckets are skipped entirely.
+        """
+
+        runtime = _require_torch()
+        routed = runtime.zeros((x.shape[0], self.hidden_size), dtype=x.dtype, device=x.device)
+        expert_token_counts: list[int] = []
+        for expert in range(self.routed_experts):
+            selected_mask = (indices == expert).any(dim=-1)
+            token_ids = runtime.nonzero(selected_mask, as_tuple=False).flatten()
+            count = int(token_ids.numel())
+            expert_token_counts.append(count)
+            if count == 0:
+                continue
+            expert_inputs = x.index_select(0, token_ids)
+            contribution = self._expert_output(expert_inputs, expert) * self.expert_scales[expert]
+            selected_slots = (indices.index_select(0, token_ids) == expert).to(weights.dtype)
+            coefficient = (weights.index_select(0, token_ids) * selected_slots).sum(dim=-1, keepdim=True)
+            routed = routed.index_add(0, token_ids, contribution * coefficient)
+        return routed, expert_token_counts
+
     @property
     def router_parameter_count(self) -> int:
         """Number of selector/amplitude parameters added by the router."""
@@ -364,15 +418,16 @@ class TorchQwen35SwiGLUMoE(nn.Module):
         else:
             amplitude_logits = self.amplitude_router(x)
             weights = F.softplus(runtime.gather(amplitude_logits, dim=-1, index=indices))
-        routed = runtime.zeros_like(shared)
-        contributions: list[Tensor] = []
-        for expert in range(self.routed_experts):
-            contribution = self._expert_output(x, expert) * self.expert_scales[expert]
-            if return_contributions:
-                contributions.append(contribution.detach())
-            selected = (indices == expert).to(contribution.dtype)
-            coefficient = (weights * selected).sum(dim=-1, keepdim=True)
-            routed = routed + contribution * coefficient
+        if return_contributions:
+            routed, contributions = self._routed_dense(x, indices, weights, return_contributions=True)
+            expert_token_counts = [int(x.shape[0])] * self.routed_experts
+            dispatch_mode = "dense_contributions"
+            dense_fallback_used = True
+        else:
+            routed, expert_token_counts = self._routed_sparse(x, indices, weights)
+            contributions = []
+            dispatch_mode = "sparse_token_dispatch"
+            dense_fallback_used = False
         result = (shared + routed).reshape(*original_shape[:-1], self.hidden_size)
         if not return_router:
             return result
@@ -390,6 +445,19 @@ class TorchQwen35SwiGLUMoE(nn.Module):
             "router_feature_mode": self.router_feature_mode,
             "router_parameter_count": self.router_parameter_count,
             "router_parameter_fraction": self.router_parameter_fraction,
+            "dispatch_mode": dispatch_mode,
+            "dense_fallback_used": dense_fallback_used,
+            "dispatch_token_count": int(x.shape[0]),
+            "expert_token_counts": expert_token_counts,
+            "selected_dispatches": int(x.shape[0] * self.top_k),
+            "nonempty_experts": int(sum(count > 0 for count in expert_token_counts)),
+            "dense_intermediate_width": int(self.intermediate_size),
+            "active_intermediate_width": int(self.shared_intermediate_size + self.top_k * self.expert_intermediate_size),
+            "estimated_ffn_reduction": float(
+                1.0
+                - (self.shared_intermediate_size + self.top_k * self.expert_intermediate_size)
+                / max(self.intermediate_size, 1)
+            ),
         }
         if return_contributions:
             # The detached shared branch is used only for optional
