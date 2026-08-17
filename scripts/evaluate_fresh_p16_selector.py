@@ -21,6 +21,7 @@ from scripts.train_fresh_p16_selector import (
     _load_checkpoint_model,
     _load_dense_mlp,
     _hash_indices,
+    _Heartbeat,
     _route_metrics,
     current_git_commit,
 )
@@ -38,6 +39,8 @@ def main() -> None:
 
     fresh_dir = Path(args.fresh_dir)
     run_dir = Path(args.run_dir)
+    heartbeat = _Heartbeat(fresh_dir / "logs/fresh-selector-eval-heartbeat.json", command="evaluate-fresh-p16-selector")
+    heartbeat.__enter__()
     checkpoint = args.checkpoint or run_dir / "layer-checkpoints/fresh-selector/p16-top4-hard-regret-bce"
     activation = fresh_dir / "capture/layer-0000-train.json"
     ab_path = fresh_dir / "capture/fresh-selector-validation-ab.json"
@@ -74,6 +77,7 @@ def main() -> None:
     payload["validation_protocol"]["selection_indices_hash"] = _hash_indices(a_indices)
     payload["validation_protocol"]["validation_b_indices_hash"] = _hash_indices(b_indices)
     report_path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    heartbeat.__exit__(None, None, None)
     print(json.dumps({"status": "FRESH_P16_SELECTOR_EVALUATION_COMPLETE", "route_validation_a": route_a, "route_validation_b": route_b, "code_commit": payload["evaluation_code_commit"]}, indent=2, sort_keys=True))
 
 
