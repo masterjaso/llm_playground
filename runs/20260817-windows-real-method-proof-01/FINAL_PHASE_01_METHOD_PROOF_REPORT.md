@@ -3,7 +3,7 @@
 Date: 2026-08-17
 Host: native Windows 11 / PowerShell 5.1
 Scientific execution commit: `b8524095fc4d078dbd0a6494a07dceae42422699`
-Final repository head: `6ff187966ab92553418d58338234ae3b4cbe2839`
+Repository head at final setup receipt: `6ff187966ab92553418d58338234ae3b4cbe2839`
 
 ## Provenance gates
 
