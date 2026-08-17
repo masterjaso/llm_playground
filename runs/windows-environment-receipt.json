@@ -1,10 +1,10 @@
 {
-  "environment_receipt_path": "runs\\windows-environment-receipt.json",
+  "environment_receipt_path": "C:\\workplace\\llm_playground\\runs\\windows-environment-receipt.json",
   "environment_variables": {},
   "memory": {
-    "available": 19917869056,
-    "free": 19917869056,
-    "swap_free": 20387041281,
+    "available": 20313014272,
+    "free": 20313014272,
+    "swap_free": 20430970881,
     "swap_total": 23419461632,
     "total": 67767750656
   },
@@ -104,7 +104,7 @@
         "C:\\Program Files\\CMake\\bin\\cmake.EXE",
         "--version"
       ],
-      "elapsed_seconds": 0.1319634999963455,
+      "elapsed_seconds": 0.13800759997684509,
       "returncode": 0,
       "status": "DONE",
       "stderr": "",
@@ -116,7 +116,7 @@
         "C:\\Program Files\\Git\\cmd\\git.EXE",
         "--version"
       ],
-      "elapsed_seconds": 0.12571509997360408,
+      "elapsed_seconds": 0.13431069999933243,
       "returncode": 0,
       "status": "DONE",
       "stderr": "",
@@ -148,7 +148,7 @@
         "C:\\WINDOWS\\system32\\nvidia-smi.EXE",
         "-L"
       ],
-      "elapsed_seconds": 0.1511853999691084,
+      "elapsed_seconds": 0.163794299995061,
       "returncode": 0,
       "status": "DONE",
       "stderr": "",
@@ -161,11 +161,11 @@
         "--query-gpu=index,name,memory.total,driver_version,pci.bus_id,temperature.gpu,power.limit",
         "--format=csv"
       ],
-      "elapsed_seconds": 0.15682989999186248,
+      "elapsed_seconds": 0.1697089999797754,
       "returncode": 0,
       "status": "DONE",
       "stderr": "",
-      "stdout": "index, name, memory.total [MiB], driver_version, pci.bus_id, temperature.gpu, power.limit [W]\n0, NVIDIA GeForce RTX 5060 Ti, 16311 MiB, 610.88, 00000000:01:00.0, 49, 180.00 W\n1, NVIDIA GeForce RTX 4060, 8188 MiB, 610.88, 00000000:06:00.0, 39, 115.00 W\n",
+      "stdout": "index, name, memory.total [MiB], driver_version, pci.bus_id, temperature.gpu, power.limit [W]\n0, NVIDIA GeForce RTX 5060 Ti, 16311 MiB, 610.88, 00000000:01:00.0, 48, 180.00 W\n1, NVIDIA GeForce RTX 4060, 8188 MiB, 610.88, 00000000:06:00.0, 37, 115.00 W\n",
       "unavailable": false
     },
     "python": {
@@ -173,7 +173,7 @@
         "C:\\workplace\\llm_playground\\.venv\\Scripts\\python.exe",
         "--version"
       ],
-      "elapsed_seconds": 0.12105640000663698,
+      "elapsed_seconds": 0.1310891000321135,
       "returncode": 0,
       "status": "DONE",
       "stderr": "",
