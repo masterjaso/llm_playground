@@ -156,8 +156,9 @@ The current source head is `81f278460c1e70f9682befa047c75aee608612f7`.
   amplitude tensors; the basis hash before/after is identical.
 - Hard-dispatch/regret-weighted BCE produced fresh A/B cosine `0.937225` /
   `0.937856`, load CV `0.23298` / `0.23575`, and zero dead experts. Soft-load
-  CV was `0.03753` / `0.04074`; the candidate remains below the green gate and
-  is research-only.
+  CV was `0.03753` / `0.04074`. Hard-quartile cosine was `0.87419` /
+  `0.87471` and oracle route recall was `0.62453` / `0.62646`; the candidate
+  remains below the green gate and is research-only.
 - The FIT-only p16/top4 load-constrained oracle Pareto (1,024-token mmap
   store; penalties `0` through `2`) reached cosine `0.946803`, NMSE
   `0.045752`, and load CV `1.25233` with no dead experts. It did not meet the

@@ -378,8 +378,8 @@
       "report": "fresh-selector-layer0/reports/p16-top4-fresh-selector-hard-regret-bce.json",
       "checkpoint": "layer-checkpoints/fresh-selector/p16-top4-hard-regret-bce",
       "basis_unchanged": true,
-      "validation_a": {"normalized_mse": 0.13519899272476502, "cosine": 0.937224889989011, "load_cv": 0.23297837895655868, "dead_experts": 0},
-      "validation_b": {"normalized_mse": 0.1332869296680614, "cosine": 0.9378559359465726, "load_cv": 0.23574659032115616, "dead_experts": 0},
+      "validation_a": {"normalized_mse": 0.13519899272476502, "cosine": 0.937224889989011, "load_cv": 0.23297837895655868, "dead_experts": 0, "hard_quartile_recall": 0.45001220703125, "hard_quartile_cosine": 0.8741879463195801},
+      "validation_b": {"normalized_mse": 0.1332869296680614, "cosine": 0.9378559359465726, "load_cv": 0.23574659032115616, "dead_experts": 0, "hard_quartile_recall": 0.450653076171875, "hard_quartile_cosine": 0.8747104406356812},
       "decision": "research_candidate_only"
     },
     "load_constrained_oracle": {
