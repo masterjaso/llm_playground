@@ -57,9 +57,10 @@ def main() -> None:
     payload["evaluation_code_commit"] = current_git_commit()
     payload["metrics"]["route_validation_a"] = route_a
     payload["metrics"]["route_validation_b"] = route_b
+    route_keys = ("hard_quartile_recall", "hard_quartile_cosine", "hard_quartile_mean_jaccard", "hard_quartile_count", "hard_quartile_threshold")
     payload["fresh_selector_metrics"] = {
-        "validation_a": {**payload["fresh_selector_metrics"]["validation_a"], **{key: route_a[key] for key in ("hard_quartile_recall", "hard_quartile_cosine", "hard_quartile_mean_jaccard", "hard_quartile_count", "hard_quartile_threshold")}},
-        "validation_b": {**payload["fresh_selector_metrics"]["validation_b"], **{key: route_b[key] for key in ("hard_quartile_recall", "hard_quartile_cosine", "hard_quartile_mean_jaccard", "hard_quartile_count", "hard_quartile_threshold")}},
+        "validation_a": {**payload["metrics"]["validation_a"], **{key: route_a[key] for key in route_keys}},
+        "validation_b": {**payload["metrics"]["validation_b"], **{key: route_b[key] for key in route_keys}},
     }
     payload["telemetry"] = {
         "cosine": "metrics.validation_a/validation_b",
