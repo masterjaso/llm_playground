@@ -61,7 +61,11 @@ def _load_dense_mlp(source: Path, layer: int = 0) -> dict[str, Any]:
     values: dict[str, Any] = {}
     for name, shard in names.items():
         kwargs = {"backend": "pread"} if os.name == "nt" else {}
-        with safe_open(str(source / shard), framework="pt", device="cpu", **kwargs) as handle:
+        try:
+            handle_context = safe_open(str(source / shard), framework="pt", device="cpu", **kwargs)
+        except TypeError:  # older native-Windows safetensors lacks ``backend``
+            handle_context = safe_open(str(source / shard), framework="pt", device="cpu")
+        with handle_context as handle:
             values[name] = handle.get_tensor(prefix + name).float()
     return values
 
