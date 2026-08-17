@@ -30,7 +30,11 @@ from dense2moe.phase import (
     phase_01_promotion_state,
     validate_phase_01_promotion,
 )
-from dense2moe.training.real_method_proof import _method_proof_decision, preflight_real_method_proof, run_real_method_proof
+from dense2moe.training.real_method_proof import (
+    _method_proof_decision,
+    preflight_real_method_proof,
+    run_real_method_proof,
+)
 
 
 def _write_method_receipt(root: Path) -> Path:

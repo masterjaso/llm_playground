@@ -41,10 +41,10 @@ __all__ = [
     "oracle_routed_forward",
     "preflight_real_method_proof",
     "run_real_method_proof",
-    "validate_result_receipt",
     "train_oracle_routed_basis",
     "train_real_layer",
     "train_tiny_layer",
     "train_torch_layer",
+    "validate_result_receipt",
     "validate_split_contract",
 ]
