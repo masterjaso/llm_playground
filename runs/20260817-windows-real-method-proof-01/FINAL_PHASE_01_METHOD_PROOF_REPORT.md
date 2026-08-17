@@ -3,6 +3,7 @@
 Date: 2026-08-17
 Host: native Windows 11 / PowerShell 5.1
 Scientific execution commit: `b8524095fc4d078dbd0a6494a07dceae42422699`
+Final repository head: `6ff187966ab92553418d58338234ae3b4cbe2839`
 
 ## Provenance gates
 
@@ -54,3 +55,6 @@ No production Corpus V2.2 run, selector optimization, p32 transfer, historical
 holdout, historical replay, representative-layer run, or full64 conversion was
 performed. Candidate training and selection remain blocked pending a separately
 accepted follow-up plan.
+
+Final bounded-maintenance closeout: 16/16 direct paths complete with
+`maintain_ready=true`; code and context deterministic failure counts are zero.
