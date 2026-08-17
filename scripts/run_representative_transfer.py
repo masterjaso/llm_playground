@@ -19,6 +19,7 @@ if __package__ in {None, ""}:
 
 from dense2moe.config import load_config
 from dense2moe.data import sha256_file, write_immutable_json
+from scripts.run_full64_training import _layer_lineage
 
 REPRESENTATIVE_LAYERS = tuple(list(range(4)) + list(range(28, 32)) + list(range(60, 64)))
 SENTINEL_LAYERS = (3, 31, 63)
@@ -65,15 +66,19 @@ def _partition_for(lock: dict[str, Any], *, profile: str, development_run_dir: P
     return matches[0] if matches else None
 
 
-def _run_one(*, source_dir: Path, train_manifest: Path, dev_manifest: Path, output_dir: Path, layer: int, profile: Any, partition: Path, seed: int, device: str, epochs: int, microbatch: int, learning_rate: float) -> dict[str, Any]:
+def _run_one(*, method_lock_sha256: str, source_dir: Path, train_manifest: Path, dev_manifest: Path, output_dir: Path, layer: int, profile: Any, partition: Path, seed: int, device: str, epochs: int, microbatch: int, learning_rate: float) -> dict[str, Any]:
     from dense2moe.training import train_torch_layer
 
     metadata_path = output_dir / f"layer-{layer:04d}.json"
-    if metadata_path.exists() and (output_dir / f"layer-{layer:04d}.safetensors").exists():
+    lineage_path = output_dir / f"layer-{layer:04d}.lineage.json"
+    expected_lineage = _layer_lineage(method_lock_sha256=method_lock_sha256, train_manifest=train_manifest, dev_manifest=dev_manifest, profile=profile, partition=partition, layer=layer, seed=seed, device=device, epochs=epochs, microbatch=microbatch, learning_rate=learning_rate)
+    if metadata_path.exists() and (output_dir / f"layer-{layer:04d}.safetensors").exists() and lineage_path.exists():
         payload = json.loads(metadata_path.read_text(encoding="utf-8"))
-        if int(payload.get("training_seed", -1)) == seed and payload.get("partition_hash"):
-            return {"status": "REUSED", "layer": layer, "seed": seed, "metadata": str(metadata_path), "manifest_hashes": {"train": sha256_file(train_manifest), "dev": sha256_file(dev_manifest)}}
+        lineage = json.loads(lineage_path.read_text(encoding="utf-8"))
+        if lineage == expected_lineage and int(payload.get("training_seed", -1)) == seed and payload.get("partition_hash"):
+            return {"status": "REUSED", "layer": layer, "seed": seed, "metadata": str(metadata_path), "lineage": str(lineage_path), "manifest_hashes": {"train": expected_lineage["train_manifest_sha256"], "dev": expected_lineage["dev_manifest_sha256"]}}
     result = train_torch_layer(source_dir=source_dir, activation_manifest=train_manifest, selection_manifest=dev_manifest, output_dir=output_dir, layer=layer, profile=profile, partition_path=partition, epochs=epochs, microbatch=microbatch, learning_rate=learning_rate, device=device, seed=seed, source_revision=profile.revision, evaluate_holdout=False)
+    write_immutable_json(lineage_path, expected_lineage)
     result.update({"seed": seed, "manifest_hashes": {"train": sha256_file(train_manifest), "dev": sha256_file(dev_manifest)}})
     return result
 
@@ -102,6 +107,7 @@ def run_transfer(*, run_dir: Path, layers: str, profiles: list[str], seeds: list
         if partition is None:
             return {"status": "BLOCKED", "blocker_code": "REPRESENTATIVE_PARTITION_REQUIRED", "profile": profile_name}
         config = load_config(Path(__file__).resolve().parents[1] / "configs" / f"{profile_name}.yaml")
+        method_lock_sha256 = sha256_file(run_dir / "method-locks" / f"{profile_name}.json")
         for layer in layer_ids:
             train_manifest = _find_manifest(activation_root, layer, "FIT-TRAIN")
             dev_manifest = _find_manifest(activation_root, layer, "FIT-DEV")
@@ -110,7 +116,7 @@ def run_transfer(*, run_dir: Path, layers: str, profiles: list[str], seeds: list
             layer_seeds = seeds if layer in SENTINEL_LAYERS else [seeds[0]]
             for seed in layer_seeds:
                 output = run_dir / "representative" / profile_name / f"layer-{layer:04d}" / f"seed-{seed:02d}"
-                results.append(_run_one(source_dir=source_dir, train_manifest=train_manifest, dev_manifest=dev_manifest, output_dir=output, layer=layer, profile=config, partition=partition, seed=seed, device=device, epochs=epochs, microbatch=microbatch, learning_rate=learning_rate))
+                results.append(_run_one(method_lock_sha256=method_lock_sha256, source_dir=source_dir, train_manifest=train_manifest, dev_manifest=dev_manifest, output_dir=output, layer=layer, profile=config, partition=partition, seed=seed, device=device, epochs=epochs, microbatch=microbatch, learning_rate=learning_rate))
     payload.update({"status": "TRANSFER_COMPLETE", "results": results, "checkpoint_count": len(results), "shared_activation_hashes": {str(layer): {"train": sha256_file(_find_manifest(activation_root, layer, "FIT-TRAIN")), "dev": sha256_file(_find_manifest(activation_root, layer, "FIT-DEV"))} for layer in layer_ids}})
     path = run_dir / "representative" / "matrix-execution.json"
     write_immutable_json(path, payload)

@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import sys
 from pathlib import Path
@@ -36,16 +37,36 @@ def _find_partition(run_dir: Path, profile: str, layer: int, development_run_dir
     return next((path for path in candidates if path.exists()), None)
 
 
-def _train_layer(*, source_dir: Path, train_manifest: Path, dev_manifest: Path, output_dir: Path, layer: int, profile: Any, partition: Path, seed: int, device: str, epochs: int, microbatch: int, learning_rate: float) -> dict[str, Any]:
+def _layer_lineage(*, method_lock_sha256: str, train_manifest: Path, dev_manifest: Path, profile: Any, partition: Path, layer: int, seed: int, device: str, epochs: int, microbatch: int, learning_rate: float) -> dict[str, Any]:
+    profile_hash = hashlib.sha256(json.dumps(profile.as_dict(), sort_keys=True, separators=(",", ":")).encode("utf-8")).hexdigest()
+    return {
+        "schema_version": 1,
+        "layer": layer,
+        "method_lock_sha256": method_lock_sha256,
+        "profile": profile.name,
+        "profile_hash": profile_hash,
+        "partition_sha256": sha256_file(partition),
+        "train_manifest_sha256": sha256_file(train_manifest),
+        "dev_manifest_sha256": sha256_file(dev_manifest),
+        "seed": seed,
+        "optimizer": {"device": device, "epochs": epochs, "microbatch": microbatch, "learning_rate": learning_rate},
+    }
+
+
+def _train_layer(*, method_lock_sha256: str, source_dir: Path, train_manifest: Path, dev_manifest: Path, output_dir: Path, layer: int, profile: Any, partition: Path, seed: int, device: str, epochs: int, microbatch: int, learning_rate: float) -> dict[str, Any]:
     from dense2moe.training import train_torch_layer
 
     metadata_path = output_dir / f"layer-{layer:04d}.json"
     tensor_path = output_dir / f"layer-{layer:04d}.safetensors"
-    if metadata_path.exists() and tensor_path.exists():
+    lineage_path = output_dir / f"layer-{layer:04d}.lineage.json"
+    expected_lineage = _layer_lineage(method_lock_sha256=method_lock_sha256, train_manifest=train_manifest, dev_manifest=dev_manifest, profile=profile, partition=partition, layer=layer, seed=seed, device=device, epochs=epochs, microbatch=microbatch, learning_rate=learning_rate)
+    if metadata_path.exists() and tensor_path.exists() and lineage_path.exists():
         payload = json.loads(metadata_path.read_text(encoding="utf-8"))
-        if int(payload.get("training_seed", -1)) == seed and payload.get("partition_hash"):
-            return {"status": "REUSED", "layer": layer, "metadata": str(metadata_path), "train_manifest_sha256": sha256_file(train_manifest), "dev_manifest_sha256": sha256_file(dev_manifest)}
+        lineage = json.loads(lineage_path.read_text(encoding="utf-8"))
+        if lineage == expected_lineage and int(payload.get("training_seed", -1)) == seed and payload.get("partition_hash"):
+            return {"status": "REUSED", "layer": layer, "metadata": str(metadata_path), "lineage": str(lineage_path), "train_manifest_sha256": expected_lineage["train_manifest_sha256"], "dev_manifest_sha256": expected_lineage["dev_manifest_sha256"]}
     result = train_torch_layer(source_dir=source_dir, activation_manifest=train_manifest, selection_manifest=dev_manifest, output_dir=output_dir, layer=layer, profile=profile, partition_path=partition, epochs=epochs, microbatch=microbatch, learning_rate=learning_rate, device=device, seed=seed, source_revision=profile.revision, evaluate_holdout=False)
+    write_immutable_json(lineage_path, expected_lineage)
     result.update({"layer": layer, "train_manifest_sha256": sha256_file(train_manifest), "dev_manifest_sha256": sha256_file(dev_manifest)})
     return result
 
@@ -70,7 +91,8 @@ def run_full64(*, run_dir: Path, profile: str, layers: str, execute: bool = Fals
         active = json.loads(marker.read_text(encoding="utf-8"))
         if active.get("profile") != profile:
             return {"status": "BLOCKED", "blocker_code": "FULL64_BUILD_ALREADY_ACTIVE", "active_profile": active.get("profile")}
-    write_immutable_json(marker, {"profile": profile, "status": "ACTIVE", "method_lock_sha256": sha256_file(lock)})
+    method_lock_sha256 = sha256_file(lock)
+    write_immutable_json(marker, {"profile": profile, "status": "ACTIVE", "method_lock_sha256": method_lock_sha256})
     results: list[dict[str, Any]] = []
     for layer in range(config.num_hidden_layers):
         train_manifest = _find_manifest(activation_root, layer, "FIT-TRAIN")
@@ -81,7 +103,7 @@ def run_full64(*, run_dir: Path, profile: str, layers: str, execute: bool = Fals
         if partition is None:
             return {"status": "BLOCKED", "blocker_code": "FULL64_PARTITION_REQUIRED", "layer": layer, "queue": str(queue_path)}
         output_dir = run_dir / "full64" / profile / "layer-checkpoints"
-        results.append(_train_layer(source_dir=source_dir, train_manifest=train_manifest, dev_manifest=dev_manifest, output_dir=output_dir, layer=layer, profile=load_config(config_path), partition=partition, seed=17, device=device, epochs=epochs, microbatch=microbatch, learning_rate=learning_rate))
+        results.append(_train_layer(method_lock_sha256=method_lock_sha256, source_dir=source_dir, train_manifest=train_manifest, dev_manifest=dev_manifest, output_dir=output_dir, layer=layer, profile=load_config(config_path), partition=partition, seed=17, device=device, epochs=epochs, microbatch=microbatch, learning_rate=learning_rate))
     receipt = {"schema_version": 2, "receipt_type": "dense2moe-full64-training-execution", "status": "FULL64_TRAINING_COMPLETE", "profile": profile, "topology": config.topology_id, "layers": list(range(config.num_hidden_layers)), "resumed": resume, "results": results, "checkpoint_count": len(results), "one_active_full64_build": True, "external_evaluation_tuning": False, "method_lock_sha256": sha256_file(lock)}
     path = run_dir / "full64" / f"{profile}-execution.json"
     write_immutable_json(path, receipt)

@@ -587,23 +587,19 @@ PHASE_05_COMMANDS = (
     WINDOWS_PYTHON + r"scripts\run_representative_transfer.py --run-dir <phase-05-run-dir> --layers 0-3,28-31,60-63 --profiles qwen38_p16s1_top4 qwen38_p32s1_top5 --seeds 17,29,41 --execute --source-dir <pinned-qwen-source> --activation-root <phase-05-run-dir>\activations\representative --development-run-dir <phase-04-run-dir> --device cuda:0 --json",
 )
 PHASE_06_COMMANDS = (
-    WINDOWS_PYTHON + r"scripts\run_full64_training.py --run-dir <phase-06-run-dir> --profile qwen38_p16s1_top4 --layers 0-63 --resume --execute --source-dir <pinned-qwen-source> --activation-root <phase-06-run-dir>\activations\FIT-TRAIN --dev-activation-root <phase-06-run-dir>\activations\FIT-DEV --development-run-dir <phase-05-run-dir> --device cuda:0 --json",
-    WINDOWS_PYTHON + r"scripts\run_full64_training.py --run-dir <phase-06-run-dir> --profile qwen38_p32s1_top5 --layers 0-63 --resume --execute --source-dir <pinned-qwen-source> --activation-root <phase-06-run-dir>\activations\FIT-TRAIN --dev-activation-root <phase-06-run-dir>\activations\FIT-DEV --development-run-dir <phase-05-run-dir> --device cuda:0 --json",
-    WINDOWS_CLI + r" assemble --run-dir <phase-06-run-dir> --config qwen38_p16s1_top4 --strict --json",
-    WINDOWS_CLI + r" assemble --run-dir <phase-06-run-dir> --config qwen38_p32s1_top5 --strict --json",
+    WINDOWS_PYTHON + r"scripts\run_full64_training.py --run-dir <phase-06-run-dir> --profile <winning-profile> --layers 0-63 --resume --execute --source-dir <pinned-qwen-source> --activation-root <phase-06-run-dir>\activations\FIT-TRAIN --dev-activation-root <phase-06-run-dir>\activations\FIT-DEV --development-run-dir <phase-05-run-dir> --device cuda:0 --json",
+    WINDOWS_CLI + r" assemble --run-dir <phase-06-run-dir> --config <winning-profile> --strict --json",
 )
 PHASE_07_COMMANDS = (
-    WINDOWS_PYTHON + r"scripts\assemble_qwen35_full.py --run-dir <phase-07-run-dir> --profile qwen38_p16s1_top4 --strict --json",
-    WINDOWS_PYTHON + r"scripts\assemble_qwen35_full.py --run-dir <phase-07-run-dir> --profile qwen38_p32s1_top5 --strict --json",
-    WINDOWS_PYTHON + r"scripts\validate_reload_parity.py --run-dir <phase-07-run-dir> --profiles qwen38_p16s1_top4 qwen38_p32s1_top5 --fresh-process --json",
+    WINDOWS_PYTHON + r"scripts\assemble_qwen35_full.py --run-dir <phase-07-run-dir> --profile <winning-profile> --strict --json",
+    WINDOWS_PYTHON + r"scripts\validate_reload_parity.py --run-dir <phase-07-run-dir> --profiles <winning-profile> --fresh-process --json",
 )
 PHASE_08_COMMANDS = (
-    WINDOWS_PYTHON + r"scripts\evaluate_whole_model.py --run-dir <phase-08-run-dir> --profile qwen38_p16s1_top4 --tier PRESERVATION-CANARY --tier POST-ASSEMBLY-FRESH --json",
-    WINDOWS_PYTHON + r"scripts\evaluate_whole_model.py --run-dir <phase-08-run-dir> --profile qwen38_p32s1_top5 --tier PRESERVATION-CANARY --tier POST-ASSEMBLY-FRESH --json",
+    WINDOWS_PYTHON + r"scripts\evaluate_whole_model.py --run-dir <phase-08-run-dir> --profile <winning-profile> --tier PRESERVATION-CANARY --tier POST-ASSEMBLY-FRESH --json",
 )
 PHASE_09_COMMANDS = (
-    WINDOWS_PYTHON + r"scripts\validate_hf_sparse_runtime.py --run-dir <phase-09-run-dir> --profiles qwen38_p16s1_top4 qwen38_p32s1_top5 --json",
-    WINDOWS_PYTHON + r"scripts\export_qwen35_gguf.py --run-dir <phase-09-run-dir> --profiles qwen38_p16s1_top4 qwen38_p32s1_top5 --llama-cpp-revision <pinned-llama-cpp-revision> --json",
+    WINDOWS_PYTHON + r"scripts\validate_hf_sparse_runtime.py --run-dir <phase-09-run-dir> --profiles <winning-profile> --json",
+    WINDOWS_PYTHON + r"scripts\export_qwen35_gguf.py --run-dir <phase-09-run-dir> --profiles <winning-profile> --llama-cpp-revision <pinned-llama-cpp-revision> --json",
     WINDOWS_PYTHON + r"scripts\build_expert_imatrix.py --run-dir <phase-09-run-dir> --profile <winning-profile> --json",
     WINDOWS_PYTHON + r"scripts\validate_llama_cpp_runtime.py --run-dir <phase-09-run-dir> --profile <winning-profile> --json",
 )
@@ -970,7 +966,7 @@ def _canonical_phase_contracts() -> dict[str, PhaseContract]:
         gates=(
             GateContract("winner-input", "The representative winner receipt authorizes exactly one active topology; the other remains a frozen fallback recipe.", (PHASE_06_COMMANDS[0], PHASE_06_COMMANDS[1]), ("representative/decision.json",)),
             GateContract("full64-layer-queue", "All 64 layers have deterministic queues, profile identity, dataset hashes, and resumable checkpoints.", (PHASE_06_COMMANDS[0], PHASE_06_COMMANDS[1]), ("full64/layer-queue.json",)),
-            GateContract("full64-quality", "Every layer passes locked layer gates, sparse dispatch telemetry, and external canary checks.", (PHASE_06_COMMANDS[2], PHASE_06_COMMANDS[3]), ("full64/quality-report.json",)),
+            GateContract("full64-quality", "Every layer passes locked layer gates, sparse dispatch telemetry, and external canary checks.", (PHASE_06_COMMANDS[0], PHASE_06_COMMANDS[1]), ("full64/quality-report.json",)),
         ),
         validation_commands=PHASE_06_COMMANDS,
         prediction_depth="expanded",
@@ -986,7 +982,7 @@ def _canonical_phase_contracts() -> dict[str, PhaseContract]:
             GateContract("full64-input", "The guarded full64 winner queue and all 64 layer checkpoints are the sole assembly input.", (PHASE_07_COMMANDS[0], PHASE_07_COMMANDS[1]), ("full64/checkpoints-manifest.json",)),
             GateContract("tensor-inventory", "All 64 intended FFNs are replaced and the strict non-FFN inventory is unchanged.", (PHASE_07_COMMANDS[0], PHASE_07_COMMANDS[1]), ("BF16_SPARSE_MASTER/manifest.json",)),
             GateContract("backbone-preservation", "Tokenizer, chat template, embeddings, attention/Gated DeltaNet, norms, residual path, and language head are preserved and hashed.", (PHASE_07_COMMANDS[0], PHASE_07_COMMANDS[1]), ("BF16_SPARSE_MASTER/preservation-receipt.json",)),
-            GateContract("bf16-reload", "A fresh process strictly reloads the BF16 model and reproduces deterministic logits before runtime conversion.", (PHASE_07_COMMANDS[2],), ("BF16_SPARSE_MASTER/reload-receipt.json",)),
+            GateContract("bf16-reload", "A fresh process strictly reloads the BF16 model and reproduces deterministic logits before runtime conversion.", (PHASE_07_COMMANDS[1],), ("BF16_SPARSE_MASTER/reload-receipt.json",)),
         ),
         validation_commands=PHASE_07_COMMANDS,
         prediction_depth="expanded",
@@ -999,12 +995,12 @@ def _canonical_phase_contracts() -> dict[str, PhaseContract]:
         phase_id=PHASE_08_ID,
         objective="Validate the BF16 sparse master against dense whole-model distribution, coding-agent behavior, preservation canaries, and a fresh post-assembly corpus.",
         gates=(
-            GateContract("bf16-master-input", "The canonical BF16 sparse master is frozen and bound to the winning method lock.", (PHASE_08_COMMANDS[0], PHASE_08_COMMANDS[1]), ("BF16_SPARSE_MASTER/manifest.json",)),
-            GateContract("bf16-reload", "The fresh-process BF16 reload receipt is green before whole-model comparison.", (PHASE_08_COMMANDS[0], PHASE_08_COMMANDS[1]), ("BF16_SPARSE_MASTER/reload-receipt.json",)),
-            GateContract("distribution-quality", "Per-token KL, perplexity delta, teacher top-1 agreement, and output amplitude meet the fixed envelope.", (PHASE_08_COMMANDS[0], PHASE_08_COMMANDS[1]), ("validation/distribution.json",)),
-            GateContract("coding-agent-quality", "Unseen coding-agent workflows cover generation, debugging, navigation, tools, retries, and long context with no benchmark contamination.", (PHASE_08_COMMANDS[0], PHASE_08_COMMANDS[1]), ("validation/coding-agent.json",)),
-            GateContract("preservation-quality", "General, technical, structured, and OOD canaries have no failed critical slice.", (PHASE_08_COMMANDS[0], PHASE_08_COMMANDS[1]), ("validation/preservation.json",)),
-            GateContract("fresh-post-assembly-generalization", "A post-assembly corpus never used during layer selection remains within the dense-teacher envelope.", (PHASE_08_COMMANDS[0], PHASE_08_COMMANDS[1]), ("validation/post-assembly-fresh.json",)),
+            GateContract("bf16-master-input", "The canonical BF16 sparse master is frozen and bound to the winning method lock.", (PHASE_08_COMMANDS[0],), ("BF16_SPARSE_MASTER/manifest.json",)),
+            GateContract("bf16-reload", "The fresh-process BF16 reload receipt is green before whole-model comparison.", (PHASE_08_COMMANDS[0],), ("BF16_SPARSE_MASTER/reload-receipt.json",)),
+            GateContract("distribution-quality", "Per-token KL, perplexity delta, teacher top-1 agreement, and output amplitude meet the fixed envelope.", (PHASE_08_COMMANDS[0],), ("validation/distribution.json",)),
+            GateContract("coding-agent-quality", "Unseen coding-agent workflows cover generation, debugging, navigation, tools, retries, and long context with no benchmark contamination.", (PHASE_08_COMMANDS[0],), ("validation/coding-agent.json",)),
+            GateContract("preservation-quality", "General, technical, structured, and OOD canaries have no failed critical slice.", (PHASE_08_COMMANDS[0],), ("validation/preservation.json",)),
+            GateContract("fresh-post-assembly-generalization", "A post-assembly corpus never used during layer selection remains within the dense-teacher envelope.", (PHASE_08_COMMANDS[0],), ("validation/post-assembly-fresh.json",)),
         ),
         validation_commands=PHASE_08_COMMANDS,
         prediction_depth="expanded",

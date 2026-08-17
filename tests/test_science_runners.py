@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import json
 
+from dense2moe.config import load_config
 from scripts.evaluate_promotion import run_promotion
 from scripts.merge_development_finalists import merge_finalists
 from scripts.run_candidate_search import run_candidate_search
+from scripts.run_full64_training import _layer_lineage
 
 
 def _write(path, payload) -> None:
@@ -87,3 +89,41 @@ def test_development_finalists_merge_is_sealed(tmp_path) -> None:
     assert result["status"] == "DEV_FINALISTS"
     merged = json.loads((run_dir / "development" / "finalists.json").read_text(encoding="utf-8"))
     assert sorted(merged["profiles"]) == ["qwen38_p16s1_top4", "qwen38_p32s1_top5"]
+
+
+def test_full64_layer_lineage_invalidates_changed_inputs(tmp_path) -> None:
+    train = tmp_path / "FIT-TRAIN.json"
+    dev = tmp_path / "FIT-DEV.json"
+    partition = tmp_path / "partition.json"
+    train.write_text("train-v1", encoding="utf-8")
+    dev.write_text("dev-v1", encoding="utf-8")
+    partition.write_text("partition-v1", encoding="utf-8")
+    profile = load_config("configs/qwen38_p16s1_top4.yaml")
+    first = _layer_lineage(
+        method_lock_sha256="lock-v1",
+        train_manifest=train,
+        dev_manifest=dev,
+        profile=profile,
+        partition=partition,
+        layer=0,
+        seed=17,
+        device="cpu",
+        epochs=1,
+        microbatch=8,
+        learning_rate=1e-3,
+    )
+    dev.write_text("dev-v2", encoding="utf-8")
+    second = _layer_lineage(
+        method_lock_sha256="lock-v1",
+        train_manifest=train,
+        dev_manifest=dev,
+        profile=profile,
+        partition=partition,
+        layer=0,
+        seed=17,
+        device="cpu",
+        epochs=1,
+        microbatch=8,
+        learning_rate=1e-3,
+    )
+    assert first["dev_manifest_sha256"] != second["dev_manifest_sha256"]
