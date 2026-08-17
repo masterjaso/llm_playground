@@ -75,6 +75,24 @@ PUBLIC_DATASET_CATALOG: tuple[dict[str, str], ...] = (
         "url": "https://www.gutenberg.org/",
         "rationale": "Long public-domain books selected by stable ebook ID and measured token length.",
     },
+    {
+        "name": "nvidia/Open-SWE-Traces",
+        "revision": "ad4805a5aa7de70d99cab0bb8f99b15304c76de0",
+        "license": "CC-BY-4.0",
+        "domain": "agentic/software-engineering",
+        "access": "public-ungated",
+        "url": "https://huggingface.co/datasets/nvidia/Open-SWE-Traces",
+        "rationale": "Pinned Qwen3.5 non-thinking OpenHands/SWE-agent trajectories used only as visible activation contexts.",
+    },
+    {
+        "name": "permissive pinned repository files",
+        "revision": "commit-pinned-per-record",
+        "license": "MIT/Apache-2.0/BSD-3-Clause/PSF-2.0",
+        "domain": "code/repository",
+        "access": "public-ungated",
+        "url": "https://github.com/",
+        "rationale": "Selected implementation, test, documentation, and configuration files retain repository commit and path provenance.",
+    },
 )
 
 _PERMISSIVE_LICENSES = {
@@ -91,6 +109,7 @@ _PERMISSIVE_LICENSES = {
     "PSF-2.0",
     "Public Domain",
     "public-domain",
+    "MIT/Apache-2.0/BSD-3-Clause/PSF-2.0",
 }
 _PINNED_REVISION = re.compile(r"^[0-9a-f]{40}$", re.IGNORECASE)
 _TOKENIZER_FILENAMES = {
@@ -102,6 +121,37 @@ _TOKENIZER_FILENAMES = {
     "tokenizer_config.json",
     "vocab.json",
 }
+
+# Provenance fields that are meaningful to the corpus-v2 audit in addition to
+# the source identity fields used by the original two-way calibration split.
+# They are intentionally carried through into each normalized record instead
+# of being dropped when a source row is reopened.
+_CORPUS_V2_METADATA_FIELDS = (
+    "source_family",
+    "task_family",
+    "trajectory_framework",
+    "trajectory_model",
+    "trajectory_reasoning",
+    "language",
+    "repository_id",
+    "repo",
+    "repo_commit",
+    "repo_path",
+    "split_group",
+    "document_id",
+    "task_id",
+    "trajectory_id",
+    "segment_index",
+    "segment_count",
+    "source_commit_sha",
+    "source_path",
+    "benchmark_membership",
+    "benchmark_context",
+    "benchmark_denylist",
+    "terms",
+    "upstream_license",
+    "source_artifact_url",
+)
 
 
 class _TokenizerLike(Protocol):
@@ -416,6 +466,11 @@ def _encode(tokenizer: Tokenizer, text: str, *, add_special_tokens: bool) -> lis
             result = tokenizer(text)  # type: ignore[operator]
     if hasattr(result, "input_ids"):
         result = result.input_ids
+    # The lightweight ``tokenizers.Tokenizer`` used by the frozen corpus
+    # receipt returns an Encoding object whose exact IDs live on ``.ids``;
+    # Hugging Face tokenizers commonly return a list or BatchEncoding.
+    if hasattr(result, "ids"):
+        result = result.ids
     if isinstance(result, Mapping):
         result = result.get("input_ids")
     if hasattr(result, "tolist"):
@@ -453,10 +508,13 @@ def _source_metadata_for_record(value: Mapping[str, Any], inherited: Mapping[str
     for key in ("name", "revision", "version", "license", "url", "download_sha256", "rationale", "domain"):
         if key in value and value[key] is not None:
             metadata[key] = value[key]
+    for key in _CORPUS_V2_METADATA_FIELDS:
+        if key in value and value[key] is not None:
+            metadata[key] = value[key]
     return metadata
 
 
-def _validate_source_metadata(metadata: Mapping[str, Any], *, strict: bool) -> dict[str, str]:
+def _validate_source_metadata(metadata: Mapping[str, Any], *, strict: bool) -> dict[str, Any]:
     name = str(metadata.get("name", "")).strip()
     revision = str(metadata.get("revision", metadata.get("version", ""))).strip()
     license_name = str(metadata.get("license", "")).strip()
@@ -486,7 +544,7 @@ def _validate_source_metadata(metadata: Mapping[str, Any], *, strict: bool) -> d
     rationale = str(metadata.get("rationale", "")).strip()
     if not rationale:
         raise ValueError(f"source {name!r} has no selection rationale")
-    return {
+    result: dict[str, Any] = {
         "name": name,
         "revision": revision,
         "license": license_name,
@@ -494,6 +552,10 @@ def _validate_source_metadata(metadata: Mapping[str, Any], *, strict: bool) -> d
         "rationale": rationale,
         "domain": str(metadata.get("domain", "general")),
     }
+    for key in _CORPUS_V2_METADATA_FIELDS:
+        if key in metadata and metadata[key] is not None:
+            result[key] = metadata[key]
+    return result
 
 
 def _relative_locator(source_file: Path, base_dir: Path) -> str:
@@ -654,25 +716,27 @@ def write_corpus_receipt(
         for record in entries:
             if not isinstance(record, Mapping):
                 continue
-            selected.append(
-                {
-                    "id": str(record.get("id", "")),
-                    "split": split,
-                    "source": str(record.get("source_name", record.get("source", ""))),
-                    "source_revision": str(record.get("source_revision", record.get("revision", ""))),
-                    "license": str(record.get("license", "")),
-                    "download_sha256": str(record.get("download_sha256", record.get("source_file_sha256", ""))),
-                    "rationale": str(record.get("selection_rationale", record.get("rationale", ""))),
-                    "source_record_id": str(record.get("source_record_id", "")),
-                    "source_record_index": int(record.get("source_record_index", 0)),
-                    "source_file": str(record.get("source_file", "")),
-                    "source_file_sha256": str(record.get("source_file_sha256", "")),
-                    "content_sha256": str(record.get("content_sha256", record.get("text_sha256", ""))),
-                    "normalized_content_sha256": str(record.get("normalized_content_sha256", "")),
-                    "token_count": int(record.get("token_count", 0)),
-                    "domain": str(record.get("domain", "general")),
-                }
-            )
+            selected_record: dict[str, Any] = {
+                "id": str(record.get("id", "")),
+                "split": split,
+                "source": str(record.get("source_name", record.get("source", ""))),
+                "source_revision": str(record.get("source_revision", record.get("revision", ""))),
+                "license": str(record.get("license", "")),
+                "download_sha256": str(record.get("download_sha256", record.get("source_file_sha256", ""))),
+                "rationale": str(record.get("selection_rationale", record.get("rationale", ""))),
+                "source_record_id": str(record.get("source_record_id", "")),
+                "source_record_index": int(record.get("source_record_index", 0)),
+                "source_file": str(record.get("source_file", "")),
+                "source_file_sha256": str(record.get("source_file_sha256", "")),
+                "content_sha256": str(record.get("content_sha256", record.get("text_sha256", ""))),
+                "normalized_content_sha256": str(record.get("normalized_content_sha256", "")),
+                "token_count": int(record.get("token_count", 0)),
+                "domain": str(record.get("domain", "general")),
+            }
+            for key in _CORPUS_V2_METADATA_FIELDS:
+                if key in record:
+                    selected_record[key] = record[key]
+            selected.append(selected_record)
     receipt: dict[str, Any] = {
         "schema_version": 1,
         "receipt_type": "dense2moe-corpus-receipt",
@@ -774,7 +838,7 @@ def prepare_calibration_manifest(
 
     normalized: list[dict[str, Any]] = []
     seen_content: set[str] = set()
-    source_catalog: dict[str, dict[str, str]] = {}
+    source_catalog: dict[str, dict[str, Any]] = {}
     for source_record in source_records:
         item = source_record.value
         metadata = _source_metadata_for_record(item, inherited_source)
@@ -817,34 +881,40 @@ def prepare_calibration_manifest(
         supplied_download_digest = str(metadata.get("download_sha256", ""))
         stable_seed = f"{source_name}@{source_info['revision']}:{source_record_id}:{raw_hash}"
         stable_id = hashlib.sha256(stable_seed.encode("utf-8")).hexdigest()[:32]
-        source_catalog[f"{source_name}@{source_info['revision']}"] = {
+        catalog_key = (
+            f"{source_name}@{source_info['revision']}:{supplied_download_digest or source_file_digest}:"
+            f"{source_info.get('source_family', '')}"
+        )
+        source_catalog[catalog_key] = {
             **source_info,
             "download_sha256": supplied_download_digest or source_file_digest,
         }
-        normalized.append(
-            {
-                "id": stable_id,
-                "stable_id": stable_id,
-                "source_name": source_name,
-                "source_revision": source_info["revision"],
-                "license": source_info["license"],
-                "source_url": source_info["url"],
-                "selection_rationale": source_info["rationale"],
-                "rationale": source_info["rationale"],
-                "source_record_id": source_record_id,
-                "source_record_index": source_index,
-                "source_file": _relative_locator(resolved_file, source.parent),
-                "source_file_sha256": source_file_digest,
-                "download_sha256": supplied_download_digest or source_file_digest,
-                "content_sha256": raw_hash,
-                "text_sha256": raw_hash,
-                "normalized_content_sha256": normalized_hash,
-                "token_count": token_count,
-                "domain": source_info["domain"],
-                "sequence_length": min(sequence_length, int(item.get("sequence_length", sequence_length))),
-                "add_special_tokens": bool(add_special_tokens),
-            }
-        )
+        normalized_record: dict[str, Any] = {
+            "id": stable_id,
+            "stable_id": stable_id,
+            "source_name": source_name,
+            "source_revision": source_info["revision"],
+            "license": source_info["license"],
+            "source_url": source_info["url"],
+            "selection_rationale": source_info["rationale"],
+            "rationale": source_info["rationale"],
+            "source_record_id": source_record_id,
+            "source_record_index": source_index,
+            "source_file": _relative_locator(resolved_file, source.parent),
+            "source_file_sha256": source_file_digest,
+            "download_sha256": supplied_download_digest or source_file_digest,
+            "content_sha256": raw_hash,
+            "text_sha256": raw_hash,
+            "normalized_content_sha256": normalized_hash,
+            "token_count": token_count,
+            "domain": source_info["domain"],
+            "sequence_length": min(sequence_length, int(item.get("sequence_length", sequence_length))),
+            "add_special_tokens": bool(add_special_tokens),
+        }
+        for key in _CORPUS_V2_METADATA_FIELDS:
+            if key in source_info:
+                normalized_record[key] = source_info[key]
+        normalized.append(normalized_record)
     if not normalized:
         raise ValueError("corpus contains no non-empty, licensed examples")
     required = {str(item) for item in (required_domains or ())}

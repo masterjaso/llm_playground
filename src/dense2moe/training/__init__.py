@@ -8,6 +8,12 @@ from .torch_distill import (
     train_torch_layer,
     validate_split_contract,
 )
+from .oracle_refinement import (
+    OracleAssignments,
+    oracle_assignments,
+    oracle_routed_forward,
+    train_oracle_routed_basis,
+)
 from .worker import OOMBackoff, train_tiny_layer
 
 __all__ = [
@@ -19,4 +25,8 @@ __all__ = [
     "train_tiny_layer",
     "train_torch_layer",
     "validate_split_contract",
+    "OracleAssignments",
+    "oracle_assignments",
+    "oracle_routed_forward",
+    "train_oracle_routed_basis",
 ]
