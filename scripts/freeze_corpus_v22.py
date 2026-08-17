@@ -42,6 +42,11 @@ ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_OUTPUT = ROOT / "data/public_v22"
 DEFAULT_METHOD_VERSION = "qwen38-dense2moe-v22-method-1"
 
+V22_COMPONENT_TIERS: dict[str, tuple[str, ...]] = {
+    "development-internal": V22_DEVELOPMENT_TIERS + ("GATE-A", "SHADOW-B", "SHADOW-C"),
+    "all": V22_TIER_ORDER,
+}
+
 
 def _read_jsonl(path: Path) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
@@ -115,7 +120,11 @@ def freeze_v22(
     planned_tokens: int = 750_000,
     method_version: str = DEFAULT_METHOD_VERSION,
     threshold_fingerprint: str = "sealed-qwen38-promotion-v1",
+    component: str = "all",
 ) -> dict[str, Any]:
+    if component not in V22_COMPONENT_TIERS:
+        raise ValueError(f"component must be one of {sorted(V22_COMPONENT_TIERS)}")
+    required_tiers = V22_COMPONENT_TIERS[component]
     source_paths = [Path(path) for path in sources]
     if not source_paths:
         raise ValueError("at least one acquired JSONL source is required")
@@ -165,9 +174,8 @@ def freeze_v22(
     diversity = audit_agent_task_diversity(rows, minimum_tasks=require_agent_tasks, eligible_splits=V22_DEVELOPMENT_TIERS + V22_EVALUATION_TIERS)
     plan = build_balanced_activation_plan(rows, planned_tokens=planned_tokens, eligible_splits=V22_DEVELOPMENT_TIERS)
     tier_counts = Counter(str(row["tier"]) for row in rows)
-    missing_external = [tier for tier in V22_EXTERNAL_TIERS if tier_counts[tier] == 0]
-    missing_internal = [tier for tier in ("GATE-A", "SHADOW-B", "SHADOW-C") if tier_counts[tier] == 0]
-    gate_status = "PASS" if not missing_external and not missing_internal and diversity["status"] == "PASS" and plan["status"] == "READY_FOR_BALANCED_CAPTURE" else "BLOCKED"
+    missing_required = [tier for tier in required_tiers if tier_counts[tier] == 0]
+    gate_status = "PASS" if not missing_required and diversity["status"] == "PASS" and plan["status"] == "READY_FOR_BALANCED_CAPTURE" else "BLOCKED"
     manifest_text = "".join(json.dumps(row, ensure_ascii=False, sort_keys=True, separators=(",", ":")) + "\n" for row in rows)
     manifest_hash = hashlib.sha256(manifest_text.encode("utf-8")).hexdigest()
     splits = {
@@ -189,6 +197,8 @@ def freeze_v22(
             tier: {
                 "records": tier_counts[tier],
                 "dataset_sha256": hashlib.sha256("".join(row["id"] for row in rows if row["tier"] == tier).encode()).hexdigest(),
+                "component": component if tier in required_tiers else "unattached",
+                "status": "FROZEN" if tier_counts[tier] else "UNATTACHED",
                 "opened": False,
                 "retired": False,
                 "optimizer_updates": tier in V22_DEVELOPMENT_TIERS,
@@ -224,6 +234,8 @@ def freeze_v22(
         "schema_version": 2,
         "receipt_type": "dense2moe-corpus-v2.2-freeze-receipt",
         "status": "CORPUS_V22_FROZEN",
+        "component": component,
+        "required_tiers": list(required_tiers),
         "phase_gate": gate_status,
         "immutable": True,
         "method_version": method_version,
@@ -231,7 +243,7 @@ def freeze_v22(
         "manifest": artifacts["corpus-v2.2.jsonl"],
         "artifacts": artifacts,
         "tier_order": list(V22_TIER_ORDER),
-        "tier_counts": dict(sorted(tier_counts.items())),
+        "tier_counts": {tier: int(tier_counts[tier]) for tier in V22_TIER_ORDER},
         "duplicate_rows_removed_within_tier": sorted(duplicate_ids),
         "pinned_provenance": pinned,
         "overlap_audit": overlap,
@@ -239,6 +251,7 @@ def freeze_v22(
         "activation_plan": plan,
         "internal_promotion_tiers": ["GATE-A", "SHADOW-B", "SHADOW-C"],
         "external_generalization_tiers": list(V22_EXTERNAL_TIERS),
+        "external_attachment_required": not set(V22_EXTERNAL_TIERS).issubset(required_tiers),
         "historical_holdout": "CLOSED",
         "promotion_policy": "all untouched corpora and major domain slices must be green; no G1/G2 tuning",
     }
@@ -247,7 +260,7 @@ def freeze_v22(
     evidence = verify_immutable_artifacts(output, artifacts)
     if evidence["status"] != "PASS":
         raise ValueError(f"V2.2 artifact verification failed: {evidence['failures']}")
-    return {"status": receipt["status"], "phase_gate": gate_status, "receipt": artifacts["corpus-v2.2-receipt.json"], "tier_counts": dict(sorted(tier_counts.items())), "activation_plan": {"status": plan["status"], "selected_tokens": plan["selected_tokens"]}}
+    return {"status": receipt["status"], "phase_gate": gate_status, "receipt": artifacts["corpus-v2.2-receipt.json"], "tier_counts": {tier: int(tier_counts[tier]) for tier in V22_TIER_ORDER}, "activation_plan": {"status": plan["status"], "selected_tokens": plan["selected_tokens"]}}
 
 
 def main() -> int:
@@ -259,6 +272,7 @@ def main() -> int:
     parser.add_argument("--planned-tokens", type=int, default=750_000)
     parser.add_argument("--method-version", default=DEFAULT_METHOD_VERSION)
     parser.add_argument("--threshold-fingerprint", default="sealed-qwen38-promotion-v1")
+    parser.add_argument("--component", choices=tuple(V22_COMPONENT_TIERS), default="all")
     parser.add_argument("--json", action="store_true")
     args = parser.parse_args()
     result = freeze_v22(
@@ -269,6 +283,7 @@ def main() -> int:
         planned_tokens=args.planned_tokens,
         method_version=args.method_version,
         threshold_fingerprint=args.threshold_fingerprint,
+        component=args.component,
     )
     print(json.dumps(result, indent=2, sort_keys=True) if args.json else result["status"])
     return 0 if result["phase_gate"] == "PASS" else 2
@@ -276,4 +291,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

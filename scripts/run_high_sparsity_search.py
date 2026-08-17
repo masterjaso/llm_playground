@@ -21,6 +21,7 @@ import numpy as np
 
 from dense2moe.partition import PartitionPlan, partition_indices
 from dense2moe.provenance import current_git_commit
+
 try:
     from scripts.run_topk_architecture_search import (
         _accumulate_scales,
@@ -222,6 +223,7 @@ def _evaluate_positive_oracle(
     exact: bool = False,
     beam_width: int = 8,
     pool_size: int | None = None,
+    return_route_assignments: bool = False,
 ) -> dict[str, Any]:
     """Evaluate positive coefficients and a fitted global-scale diagnostic."""
 
@@ -327,6 +329,16 @@ def _evaluate_positive_oracle(
         "finite_coefficients_and_scales": finite,
         "elapsed_seconds": float(elapsed),
     }
+    if return_route_assignments:
+        # Keep this opt-in because a full 128k screen can otherwise inflate a
+        # receipt with one Python object per token.  The candidate runner uses
+        # the assignments only long enough to compute the declared p32 route
+        # stabilization statistic, then removes them before publishing.
+        result["route_assignments"] = [
+            [sorted(int(value) for value in ids_row) for ids_row in ids]
+            for ids, _weights in route_cache
+            for ids_row in ids
+        ]
     result.update(_active_params(profile, top_k))
     return result
 

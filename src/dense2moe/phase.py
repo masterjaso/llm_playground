@@ -559,29 +559,36 @@ METHOD_PROOF_COMMANDS = (
 # They are intentionally concrete (no ``--help`` probes): a command that does
 # not have its required receipt inputs must fail closed at runtime.
 PHASE_02_COMMANDS = (
-    WINDOWS_PYTHON + r"scripts\freeze_corpus_v22.py --source <acquired-fit-source> --source <acquired-gate-source> --source <acquired-shadow-source> --source <acquired-g1-source> --source <acquired-g2-source> --output <phase-02-run-dir>\corpus-v2.2 --require-agent-tasks 96 --planned-tokens 750000 --method-version <locked-method-version> --json",
-    WINDOWS_CLI + r" prepare-data --run-dir <phase-02-run-dir> --corpus-manifest <phase-02-run-dir>\corpus-v2.2\corpus-v2.2.jsonl --train-tokens 128000 --tokenizer-path <pinned-qwen-source>\tokenizer.json --tokenizer-revision 1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0 --json",
+    WINDOWS_PYTHON + r"scripts\freeze_corpus_v22.py --source <acquired-development-source> --source <acquired-internal-source> --output <phase-02-run-dir>\corpus-v2.2\development-internal --component development-internal --require-agent-tasks 96 --planned-tokens 750000 --method-version moe-v22-m01 --json",
+    WINDOWS_PYTHON + r"scripts\build_science_lineage_index.py --run-id <science-run-id> --method-version moe-v22-m01 --runtime-lock runs\windows-runtime-lock.json --artifact-spec <phase-02-run-dir>\lineage\teacher-source.json --artifact-spec <phase-02-run-dir>\lineage\corpus-development-internal.json --output <phase-02-run-dir>\lineage\index.json --json",
+    WINDOWS_CLI + r" prepare-data --run-dir <phase-02-run-dir> --corpus-manifest <phase-02-run-dir>\corpus-v2.2\development-internal\corpus-v2.2.jsonl --train-tokens 128000 --tokenizer-path <pinned-qwen-source>\tokenizer.json --tokenizer-revision 1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0 --json",
     WINDOWS_CLI + r" train-layer --run-dir <phase-02-run-dir> --layer 0 --profile qwen38_p16s1_top4 --partition <phase-02-run-dir>\partitions\p16-top4.json --epochs 1 --device cuda:0 --json",
     WINDOWS_CLI + r" train-layer --run-dir <phase-02-run-dir> --layer 0 --profile qwen38_p32s1_top5 --partition <phase-02-run-dir>\partitions\p32-top5.json --epochs 1 --device cuda:0 --json",
 )
 PHASE_03_COMMANDS = (
-    WINDOWS_PYTHON + r"scripts\run_candidate_search.py --run-dir <phase-03-run-dir> --activation-manifest <phase-02-run-dir>\activations\FIT-TRAIN.json --dev-manifest <phase-02-run-dir>\activations\FIT-DEV.json --topology p16/top4 --exhaustive --expected-combinations 1820 --json",
-    WINDOWS_PYTHON + r"scripts\run_candidate_search.py --run-dir <phase-03-run-dir> --activation-manifest <phase-02-run-dir>\activations\FIT-TRAIN.json --dev-manifest <phase-02-run-dir>\activations\FIT-DEV.json --topology p32/top5 --candidate-pool-size 1024 --bounded --json",
+    WINDOWS_PYTHON + r"scripts\run_candidate_search.py --run-dir <phase-03-run-dir> --activation-manifest <phase-02-run-dir>\activations\FIT-TRAIN.json --dev-manifest <phase-02-run-dir>\activations\FIT-DEV.json --topology p16/top4 --exhaustive --expected-combinations 1820 --execute --source-dir <pinned-qwen-source> --screen-tokens 128000 --device cuda:0 --json",
+    WINDOWS_PYTHON + r"scripts\run_candidate_search.py --run-dir <phase-03-run-dir> --activation-manifest <phase-02-run-dir>\activations\FIT-TRAIN.json --dev-manifest <phase-02-run-dir>\activations\FIT-DEV.json --topology p32/top5 --candidate-pool-size 1024 --bounded --execute --source-dir <pinned-qwen-source> --screen-tokens 128000 --device cuda:0 --json",
+    WINDOWS_PYTHON + r"scripts\merge_development_finalists.py --run-dir <phase-03-run-dir> --method-version moe-v22-m01 --json",
     WINDOWS_CLI + r" evaluate --run-dir <phase-03-run-dir> --config qwen38_p16s1_top4 --json",
     WINDOWS_CLI + r" evaluate --run-dir <phase-03-run-dir> --config qwen38_p32s1_top5 --json",
 )
 PHASE_04_COMMANDS = (
-    WINDOWS_PYTHON + r"scripts\evaluate_promotion.py --run-dir <phase-04-run-dir> --method-version <locked-method-version> --tier GATE-A --tier SHADOW-B --tier SHADOW-C --json",
+    WINDOWS_PYTHON + r"scripts\lock_development_finalists.py --run-dir <phase-04-run-dir> --finalists <phase-03-run-dir>\development\finalists.json --profiles qwen38_p16s1_top4 qwen38_p32s1_top5 --method-version <locked-method-version> --json",
+    WINDOWS_PYTHON + r"scripts\evaluate_promotion.py --run-dir <phase-04-run-dir> --method-version <locked-method-version> --tier GATE-A --tier SHADOW-B --tier SHADOW-C --execute --source-dir <pinned-qwen-source> --activation-root <phase-04-run-dir>\activations\promotion --json",
+    WINDOWS_PYTHON + r"scripts\attach_corpus_v22_external.py --parent-receipt <phase-02-run-dir>\corpus-v2.2\development-internal\corpus-v2.2-receipt.json --source <acquired-g1-source> --tier G1 --method-lock <phase-04-run-dir>\development\finalist-lock.json --method-version <locked-method-version> --output <phase-04-run-dir>\corpus-v2.2\G1 --json",
+    WINDOWS_PYTHON + r"scripts\evaluate_promotion.py --run-dir <phase-04-run-dir> --method-version <locked-method-version> --tier G1 --execute --source-dir <pinned-qwen-source> --activation-root <phase-04-run-dir>\activations\promotion --json",
+    WINDOWS_PYTHON + r"scripts\attach_corpus_v22_external.py --parent-receipt <phase-04-run-dir>\corpus-v2.2\G1\corpus-v2.2-receipt.json --source <acquired-g2-source> --tier G2 --method-lock <phase-04-run-dir>\development\finalist-lock.json --method-version <locked-method-version> --output <phase-04-run-dir>\corpus-v2.2\G2 --json",
+    WINDOWS_PYTHON + r"scripts\evaluate_promotion.py --run-dir <phase-04-run-dir> --method-version <locked-method-version> --tier G2 --execute --source-dir <pinned-qwen-source> --activation-root <phase-04-run-dir>\activations\promotion --json",
     WINDOWS_CLI + r" report --run-dir <phase-04-run-dir> --config qwen38_p16s1_top4 --json",
     WINDOWS_CLI + r" report --run-dir <phase-04-run-dir> --config qwen38_p32s1_top5 --json",
 )
 PHASE_05_COMMANDS = (
     WINDOWS_PYTHON + r"scripts\lock_candidate_methods.py --run-dir <phase-05-run-dir> --profiles qwen38_p16s1_top4 qwen38_p32s1_top5 --json",
-    WINDOWS_PYTHON + r"scripts\run_representative_transfer.py --run-dir <phase-05-run-dir> --layers 0-3,28-31,60-63 --profiles qwen38_p16s1_top4 qwen38_p32s1_top5 --seeds 17,29,41 --json",
+    WINDOWS_PYTHON + r"scripts\run_representative_transfer.py --run-dir <phase-05-run-dir> --layers 0-3,28-31,60-63 --profiles qwen38_p16s1_top4 qwen38_p32s1_top5 --seeds 17,29,41 --execute --source-dir <pinned-qwen-source> --activation-root <phase-05-run-dir>\activations\representative --development-run-dir <phase-04-run-dir> --device cuda:0 --json",
 )
 PHASE_06_COMMANDS = (
-    WINDOWS_PYTHON + r"scripts\run_full64_training.py --run-dir <phase-06-run-dir> --profile qwen38_p16s1_top4 --layers 0-63 --resume --json",
-    WINDOWS_PYTHON + r"scripts\run_full64_training.py --run-dir <phase-06-run-dir> --profile qwen38_p32s1_top5 --layers 0-63 --resume --json",
+    WINDOWS_PYTHON + r"scripts\run_full64_training.py --run-dir <phase-06-run-dir> --profile qwen38_p16s1_top4 --layers 0-63 --resume --execute --source-dir <pinned-qwen-source> --activation-root <phase-06-run-dir>\activations\FIT-TRAIN --dev-activation-root <phase-06-run-dir>\activations\FIT-DEV --development-run-dir <phase-05-run-dir> --device cuda:0 --json",
+    WINDOWS_PYTHON + r"scripts\run_full64_training.py --run-dir <phase-06-run-dir> --profile qwen38_p32s1_top5 --layers 0-63 --resume --execute --source-dir <pinned-qwen-source> --activation-root <phase-06-run-dir>\activations\FIT-TRAIN --dev-activation-root <phase-06-run-dir>\activations\FIT-DEV --development-run-dir <phase-05-run-dir> --device cuda:0 --json",
     WINDOWS_CLI + r" assemble --run-dir <phase-06-run-dir> --config qwen38_p16s1_top4 --strict --json",
     WINDOWS_CLI + r" assemble --run-dir <phase-06-run-dir> --config qwen38_p32s1_top5 --strict --json",
 )

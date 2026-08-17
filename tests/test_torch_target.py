@@ -184,6 +184,53 @@ class TorchTargetTests(unittest.TestCase):
             self.assertEqual(config["validation_b_identity_hash"], "validation-b-id")
             self.assertEqual(result["validation_b_metrics"]["split"], "validation-b")
 
+            # FIT-DEV and a confirmation split may be independent frozen
+            # manifests; neither identity is allowed to become a positional
+            # row from FIT-TRAIN or an optimizer input.
+            dev_x = rng.normal(size=(5, 4)).astype("float32")
+            shadow_x = rng.normal(size=(4, 4)).astype("float32")
+            capture_activation_shards(
+                dev_x,
+                captures,
+                layer=0,
+                split="train",
+                manifest_name="layer-0000-fit-dev.json",
+                shard_tokens=8,
+                metadata={"dataset_hash": "fixture-fit-dev"},
+            )
+            capture_activation_shards(
+                shadow_x,
+                captures,
+                layer=0,
+                split="train",
+                manifest_name="layer-0000-shadow-b.json",
+                shard_tokens=8,
+                metadata={"dataset_hash": "fixture-shadow-b"},
+            )
+            independent = train_torch_layer(
+                source_dir=source,
+                activation_manifest=wrapper,
+                selection_manifest=captures / "layer-0000-fit-dev.json",
+                validation_b_manifest=captures / "layer-0000-shadow-b.json",
+                output_dir=root / "trained-independent",
+                layer=0,
+                profile=profile,
+                partition_path=partition,
+                epochs=0,
+                microbatch=4,
+                learning_rate=1e-2,
+                device="cpu",
+                source_revision="a" * 40,
+                evaluate_holdout=False,
+            )
+            independent_config = independent["training_config"]
+            self.assertEqual(independent_config["selection_split"], "independent-manifest")
+            self.assertEqual(independent_config["selection_count"], 5)
+            self.assertEqual(independent_config["validation_b_count"], 4)
+            self.assertEqual(independent_config["selection_identity_hash"], "fixture-fit-dev")
+            self.assertEqual(independent_config["validation_b_identity_hash"], "fixture-shadow-b")
+            self.assertFalse(independent_config["split_opened_for"]["validation_a"]["gradient_updates"])
+
 
 if __name__ == "__main__":
     unittest.main()

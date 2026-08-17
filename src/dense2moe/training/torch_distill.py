@@ -227,7 +227,7 @@ class ActivationShardDataset:
         reference = payload.get(f"{self.split}_manifest")
         if isinstance(reference, str) and reference not in {"", "pending"}:
             return _load_manifest(_resolve(self.manifest_path, reference))
-        if self.manifest_path.stem.endswith("-" + self.split):
+        if payload.get("split") == self.split or self.manifest_path.stem.endswith("-" + self.split):
             return payload
         raise ValueError(
             f"aggregate activation manifest has no explicit {self.split}_manifest reference"
@@ -244,7 +244,7 @@ class ActivationShardDataset:
         reference = payload.get(f"{self.split}_manifest")
         if isinstance(reference, str) and reference not in {"", "pending"}:
             return _resolve(self.manifest_path, reference)
-        if self.manifest_path.stem.endswith("-" + self.split):
+        if payload.get("split") == self.split or self.manifest_path.stem.endswith("-" + self.split):
             return self.manifest_path
         raise ValueError(f"no explicit {self.split} activation manifest")
 
@@ -942,6 +942,10 @@ def train_torch_layer(
     selection_identity_hash: str | None = None,
     validation_b_indices: Sequence[int] | None = None,
     validation_b_identity_hash: str | None = None,
+    selection_manifest: str | Path | None = None,
+    selection_split: str = "train",
+    validation_b_manifest: str | Path | None = None,
+    validation_b_split: str = "train",
     evaluate_holdout: bool = True,
     initial_checkpoint_dir: str | Path | None = None,
     router_hidden_size: int | None = None,
@@ -962,6 +966,9 @@ def train_torch_layer(
     ``selection_union_indices`` argument is accepted only when it is exactly
     validation-A; an A+B union raises instead of allowing B to influence
     checkpoint selection.
+    ``selection_manifest`` and ``validation_b_manifest`` provide independent
+    FIT-DEV/SHADOW manifests. Their dataset identities are intentionally
+    allowed to differ from FIT-TRAIN; they are never optimizer inputs.
     """
 
     import torch
@@ -1002,25 +1009,49 @@ def train_torch_layer(
         dataset_hash = train_dataset.dataset_hash
     if holdout_dataset is not None and holdout_dataset.dataset_hash != dataset_hash:
         raise ValueError("train and holdout activation manifests have different dataset_hash values")
+    selection_dataset = (
+        ActivationShardDataset(selection_manifest, split=selection_split, microbatch=microbatch)
+        if selection_manifest is not None
+        else None
+    )
+    validation_b_dataset = (
+        ActivationShardDataset(validation_b_manifest, split=validation_b_split, microbatch=microbatch)
+        if validation_b_manifest is not None
+        else None
+    )
+    if selection_dataset is not None and any(value is not None for value in (selection_indices, selection_union_indices, validation_b_indices, fit_exclude_indices)):
+        raise ValueError("independent selection manifests cannot be combined with positional selection indices")
+    if validation_b_dataset is not None and validation_b_indices is not None:
+        raise ValueError("independent validation-B manifest cannot be combined with positional validation-B indices")
     split_contract = validate_split_contract(
         train_dataset.count,
-        selection_indices=selection_indices,
-        validation_b_indices=validation_b_indices,
+        selection_indices=None if selection_dataset is not None else selection_indices,
+        validation_b_indices=None if validation_b_dataset is not None else validation_b_indices,
         fit_exclude_indices=fit_exclude_indices,
-        selection_union_indices=selection_union_indices,
+        selection_union_indices=None if selection_dataset is not None else selection_union_indices,
     )
     selection_rows = split_contract["selection_indices"]
     validation_b_rows = split_contract["validation_b_indices"] or ()
     fit_excluded_rows = split_contract["fit_exclude_indices"] or ()
     fit_indices = split_contract["fit_indices"] or ()
-    selection_hash = _hash_indices(selection_rows) if selection_rows is not None else None
+    # Independent manifests are streamed exactly like the training manifest,
+    # but they must never be represented as positional rows from FIT-TRAIN.
+    # Keep the legacy positional path intact when no independent manifest was
+    # supplied so existing checkpoints retain their byte-compatible metadata.
+    selection_source = selection_dataset or train_dataset
+    selection_indices_for_metrics = None if selection_dataset is not None else selection_rows
+    validation_b_source = validation_b_dataset or train_dataset
+    validation_b_indices_for_metrics = None if validation_b_dataset is not None else validation_b_rows
+    has_selection = selection_dataset is not None or selection_rows is not None
+    has_validation_b = validation_b_dataset is not None or bool(validation_b_rows)
+    selection_hash = selection_dataset.dataset_hash if selection_dataset is not None else _hash_indices(selection_rows) if selection_rows is not None else None
     # This remains a metadata key for old consumers, but is deliberately null:
     # there is no second split in the checkpoint-selection metric.
     selection_union_hash = None
     fit_hash = _hash_indices(fit_indices)
     fit_exclusion_hash = _hash_indices(fit_excluded_rows) if fit_excluded_rows else None
     validation_a_hash = selection_identity_hash or selection_hash
-    computed_validation_b_hash = _hash_indices(validation_b_rows) if validation_b_rows else None
+    computed_validation_b_hash = validation_b_dataset.dataset_hash if validation_b_dataset is not None else _hash_indices(validation_b_rows) if validation_b_rows else None
     validation_b_hash = validation_b_identity_hash or computed_validation_b_hash
     plan = _plan_from_path(Path(partition_path))
     if plan.dense_intermediate_size != int(values["gate_proj.weight"].shape[0]):
@@ -1100,13 +1131,13 @@ def train_torch_layer(
         del warmup_values, warmup_inputs, warmup_contributions, warmup_labels, warmup_targets, warmup_solution
     initial_selection = _stream_metrics(
         model,
-        train_dataset,
+        selection_source,
         gate=gate_tensor,
         up=up_tensor,
         down=down_tensor,
         microbatch=microbatch,
         device=device,
-        selected_indices=selection_rows,
+        selected_indices=selection_indices_for_metrics,
     )
     initial_fit = _stream_metrics(
         model,
@@ -1251,13 +1282,13 @@ def train_torch_layer(
                 callback_epoch,
                 _stream_metrics(
                     current_model,
-                    train_dataset,
+                    selection_source,
                     gate=gate_tensor,
                     up=up_tensor,
                     down=down_tensor,
                     microbatch=microbatch,
                     device=device,
-                    selected_indices=selection_rows,
+                    selected_indices=selection_indices_for_metrics,
                 ),
             )
 
@@ -1288,33 +1319,33 @@ def train_torch_layer(
             oracle_regret_weight=float(stage_spec["oracle_regret_weight"]),
             expert_use_prices=stage_spec["expert_use_prices"],
             excluded_indices=fit_excluded_rows if fit_excluded_rows else None,
-            epoch_callback=validation_epoch_callback if selection_rows is not None else None,
+            epoch_callback=validation_epoch_callback if has_selection else None,
         )
         stages.append(stage_result)
         if stage_result.get("epoch_validation_metrics"):
             stage_metrics.append({"stage": stage_name, **stage_result["epoch_validation_metrics"][-1]})
-        elif selection_rows is not None:
+        elif has_selection:
             measured = _stream_metrics(
                 model,
-                train_dataset,
+                selection_source,
                 gate=gate_tensor,
                 up=up_tensor,
                 down=down_tensor,
                 microbatch=microbatch,
                 device=device,
-                selected_indices=selection_rows,
+                selected_indices=selection_indices_for_metrics,
             )
             stage_metrics.append({"stage": stage_name, "epoch": 0, **measured, "feasible": _gate_feasible(measured)})
     model.load_state_dict(best_state, strict=True)
     final_selection = _stream_metrics(
         model,
-        train_dataset,
+        selection_source,
         gate=gate_tensor,
         up=up_tensor,
         down=down_tensor,
         microbatch=microbatch,
         device=device,
-        selected_indices=selection_rows,
+        selected_indices=selection_indices_for_metrics,
     )
     final_fit = _stream_metrics(
         model,
@@ -1326,16 +1357,16 @@ def train_torch_layer(
         device=device,
         excluded_indices=fit_excluded_rows if fit_excluded_rows else None,
     )
-    if validation_b_rows:
+    if has_validation_b:
         validation_b_metrics = _stream_metrics(
             model,
-            train_dataset,
+            validation_b_source,
             gate=gate_tensor,
             up=up_tensor,
             down=down_tensor,
             microbatch=microbatch,
             device=device,
-            selected_indices=validation_b_rows,
+            selected_indices=validation_b_indices_for_metrics,
         )
         validation_b_metrics = {
             **validation_b_metrics,
@@ -1456,45 +1487,49 @@ def train_torch_layer(
             "best_selection_stage": best_stage,
             "best_selection_epoch": best_epoch,
             "best_selection_reason": best_record.get("selection_reason"),
-            "selection_split": "validation-A" if selection_rows is not None else "train_split",
+            "selection_split": "independent-manifest" if selection_dataset is not None else "validation-A" if selection_rows is not None else "train_split",
             "selection_indices_hash": selection_hash,
             "selection_union_indices_hash": selection_union_hash,
             "selection_identity_hash": validation_a_hash,
-            "selection_count": len(selection_rows) if selection_rows is not None else train_dataset.count,
-            "validation_count": len(selection_rows) if selection_rows is not None else None,
+            "selection_count": selection_dataset.count if selection_dataset is not None else len(selection_rows) if selection_rows is not None else train_dataset.count,
+            "validation_count": selection_dataset.count if selection_dataset is not None else len(selection_rows) if selection_rows is not None else None,
             "validation_hash": validation_a_hash,
             "validation_a_indices_hash": selection_hash,
             "validation_a_identity_hash": validation_a_hash,
-            "validation_a_count": len(selection_rows) if selection_rows is not None else 0,
+            "validation_a_count": selection_dataset.count if selection_dataset is not None else len(selection_rows) if selection_rows is not None else 0,
             "selection_union_count": 0,
             "validation_b_indices_hash": computed_validation_b_hash,
             "validation_b_identity_hash": validation_b_hash,
-            "validation_b_count": len(validation_b_rows),
+            "validation_b_count": validation_b_dataset.count if validation_b_dataset is not None else len(validation_b_rows),
             "fit_count": len(fit_indices),
             "fit_index_hash": fit_hash,
             "fit_excluded_indices_hash": fit_exclusion_hash,
             "fit_excluded_count": len(fit_excluded_rows),
             "fit_exclusion_contract": (
                 "train rows excluding validation-A and validation-B"
-                if validation_b_rows and selection_rows is not None
+                if has_validation_b and has_selection
                 else "train rows excluding validation-A"
-                if selection_rows is not None
+                if has_selection
                 else "train rows excluding validation-B"
-                if validation_b_rows
+                if has_validation_b
                 else "no exclusion"
             ),
             "holdout_evaluation": holdout_status,
             "split_opened_for": {
                 "fit": {"gradient_updates": True, "checkpoint_selection": False, "final_confirmation": False},
-                "validation": {"gradient_updates": False, "checkpoint_selection": selection_rows is not None, "final_confirmation": False},
-                "validation_a": {"gradient_updates": False, "checkpoint_selection": selection_rows is not None, "final_confirmation": False},
-                "validation_b": {"gradient_updates": False, "checkpoint_selection": False, "final_confirmation": bool(validation_b_rows)},
+                "validation": {"gradient_updates": False, "checkpoint_selection": has_selection, "final_confirmation": False},
+                "validation_a": {"gradient_updates": False, "checkpoint_selection": has_selection, "final_confirmation": False},
+                "validation_b": {"gradient_updates": False, "checkpoint_selection": False, "final_confirmation": has_validation_b},
                 "holdout": {"gradient_updates": False, "checkpoint_selection": False, "final_confirmation": evaluate_holdout},
             },
             "streaming_dataset": {
                 "train_manifest": train_dataset.manifest_path.as_posix(),
+                "selection_manifest": selection_dataset.manifest_path.as_posix() if selection_dataset is not None else None,
+                "validation_b_manifest": validation_b_dataset.manifest_path.as_posix() if validation_b_dataset is not None else None,
                 "holdout_manifest": holdout_dataset.manifest_path.as_posix() if holdout_dataset is not None else None,
                 "train_count": train_dataset.count,
+                "selection_count": selection_dataset.count if selection_dataset is not None else None,
+                "validation_b_count": validation_b_dataset.count if validation_b_dataset is not None else None,
                 "holdout_count": holdout_dataset.count if holdout_dataset is not None else None,
             },
             "partition_path": str(partition_path),
@@ -1510,7 +1545,7 @@ def train_torch_layer(
         train_metrics={"initial_fit": initial_fit, "final_fit": final_fit, "initial_selection": initial_selection, "final_selection": final_selection, "oracle_holdout": oracle_holdout, "all_expert_reconstruction_mse": 0.0},
         holdout_metrics=trained,
         router_metrics={"load_cv": gate_metrics["load_cv"], "dead_experts": gate_metrics["dead_experts"], "selected_counts": gate_metrics["selected_counts"], "actual_improvement": float(initial_selection["normalized_mse"] - gate_metrics["normalized_mse"]) if gate_metrics["normalized_mse"] is not None else None},
-        quality_gate={"overall": gate_overall if epochs > 0 else "untrained", "thresholds_version": "gate-aware-2026-08-16", "evaluation_scope": "full_holdout" if evaluate_holdout else "validation-a" if selection_rows is not None else "fit", "metrics": gate_metrics},
+        quality_gate={"overall": gate_overall if epochs > 0 else "untrained", "thresholds_version": "gate-aware-2026-08-16", "evaluation_scope": "full_holdout" if evaluate_holdout else "validation-a" if has_selection else "fit", "metrics": gate_metrics},
         code_commit=recorded_commit,
     )
     metadata_path = output / f"layer-{layer:04d}.json"
