@@ -1,7 +1,7 @@
 # Phase 01 real Qwen layer-0 method-proof report
 
-Date: 2026-08-17  
-Host: native Windows 11 / PowerShell 5.1  
+Date: 2026-08-17
+Host: native Windows 11 / PowerShell 5.1
 Scientific execution commit: `b8524095fc4d078dbd0a6494a07dceae42422699`
 
 ## Provenance gates
