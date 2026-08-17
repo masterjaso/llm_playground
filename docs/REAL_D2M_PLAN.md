@@ -72,7 +72,7 @@ The bounded method-proof data gate is independent of production Corpus V2.2:
   --runtime-lock runs\windows-runtime-lock.json `
   --source-snapshot <pinned-qwen-source> `
   --topology p16/top4 --max-tokens 32768 --epochs 1 --device cuda:0 `
-  --batch-rows 2048 --learning-rate 0.0001 `
+  --batch-rows 512 --learning-rate 0.0001 `
   --result-receipt <phase-01-run-dir>\metrics\p16-32k.json `
   --checkpoint-dir <phase-01-run-dir>\checkpoints\p16-32k --json
 
