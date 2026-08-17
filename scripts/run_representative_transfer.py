@@ -19,7 +19,11 @@ if __package__ in {None, ""}:
 
 from dense2moe.config import load_config
 from dense2moe.data import sha256_file, write_immutable_json
-from scripts.run_full64_training import _layer_lineage
+
+try:
+    from scripts.run_full64_training import _layer_lineage
+except ModuleNotFoundError:  # direct ``python scripts/<file>.py`` execution
+    from run_full64_training import _layer_lineage  # type: ignore
 
 REPRESENTATIVE_LAYERS = tuple(list(range(4)) + list(range(28, 32)) + list(range(60, 64)))
 SENTINEL_LAYERS = (3, 31, 63)
