@@ -17,7 +17,9 @@ from pathlib import Path
 from typing import Any
 
 if __package__ in {None, ""}:
-    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+    _repository_root = Path(__file__).resolve().parents[1]
+    sys.path.insert(0, str(_repository_root))
+    sys.path.insert(0, str(_repository_root / "src"))
 
 from dense2moe.config import load_config
 from dense2moe.data import sha256_file, write_immutable_json
