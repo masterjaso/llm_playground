@@ -699,7 +699,7 @@ _LATER_PHASE_BLUEPRINTS: dict[str, dict[str, Any]] = {
         "expected_artifacts": ("TRAINING_METHOD_LOCK.json", "TRAINING_METHOD_LOCK.sha256", "transfer-boundary.json"),
     },
     PHASE_05_ID: {
-        "objective": "Validate transfer across the 12-layer representative matrix and all attention-cycle classes.",
+        "objective": "Validate both locked topologies across the 12-layer representative matrix and all attention-cycle classes.",
         "prediction_depth": "expanded",
         "next_phase": PHASE_06_ID,
         "gates": (
@@ -707,18 +707,18 @@ _LATER_PHASE_BLUEPRINTS: dict[str, dict[str, Any]] = {
             ("representative-layer-set", "Exactly layers 0–3, 28–31, and 60–63 are captured and evaluated.", (), ("representative/layers.json",)),
             ("cycle-coverage", "LINEAR_A/B/C and FULL_ATTENTION cycle classes are represented.", (), ("representative/cycle-coverage.json",)),
             ("transfer-quality", "The locked method meets layer quality/load gates across early, middle, and late layers.", (WINDOWS_CLI + " report --run-dir <phase-05-run-dir> --json",), ("representative/quality.json",)),
-            ("representative-decision", "The p16 method transfers or a bounded corrective PIV is recorded.", (), ("representative/decision.json",)),
+            ("representative-decision", "p32 wins only when fully green; otherwise green p16 may win; neither green stops product promotion.", (), ("representative/decision.json",)),
         ),
         "expected_artifacts": ("representative/layers.json", "representative/cycle-coverage.json", "representative/quality.json", "representative/decision.json"),
     },
     PHASE_06_ID: {
-        "objective": "Convert all 64 layers with guarded, resumable p16 execution and selective escalation.",
+        "objective": "Convert all 64 layers with guarded, resumable execution of exactly one representative-approved winner.",
         "prediction_depth": "expanded",
         "next_phase": PHASE_07_ID,
         "gates": (
-            ("representative-green", "The representative matrix authorizes full64 p16 conversion.", (WINDOWS_CLI + " status --run-dir <phase-06-run-dir> --json",), ("representative/decision.json",)),
+            ("representative-green", "The representative matrix authorizes full64 conversion for exactly one locked winner.", (WINDOWS_CLI + " status --run-dir <phase-06-run-dir> --json",), ("representative/decision.json",)),
             ("layer-queue", "All 64 layers have deterministic queue receipts and bounded budgets.", (), ("full64/layer-queue.json",)),
-            ("layer-checkpoints", "Every layer has a validated checkpoint, hash, source pin, and dataset fingerprint.", (WINDOWS_CLI + " assemble --run-dir <phase-06-run-dir> --profile qwen38_p16s1_top4 --strict --json",), ("full64/checkpoints-manifest.json",)),
+            ("layer-checkpoints", "Every winner layer has a validated checkpoint, hash, source pin, and dataset fingerprint.", (WINDOWS_CLI + " assemble --run-dir <phase-06-run-dir> --profile <winning-profile> --strict --json",), ("full64/checkpoints-manifest.json",)),
             ("full64-quality", "All layer-level quality gates pass or have an explicit bounded blocker; no silent substitution occurs.", (), ("full64/quality-report.json",)),
         ),
         "expected_artifacts": ("full64/layer-queue.json", "full64/checkpoints-manifest.json", "full64/quality-report.json"),
@@ -728,8 +728,8 @@ _LATER_PHASE_BLUEPRINTS: dict[str, dict[str, Any]] = {
         "prediction_depth": "expanded",
         "next_phase": PHASE_08_ID,
         "gates": (
-            ("full64-input", "All 64 p16 layer checkpoints are complete and hash-consistent.", (WINDOWS_CLI + " status --run-dir <phase-07-run-dir> --json",), ("full64/checkpoints-manifest.json",)),
-            ("tensor-inventory", "All intended FFNs are replaced and non-FFN tensor inventory is preserved.", (WINDOWS_CLI + " assemble --run-dir <phase-07-run-dir> --profile qwen38_p16s1_top4 --strict --json",), ("BF16_SPARSE_MASTER/manifest.json",)),
+            ("full64-input", "All 64 winner layer checkpoints are complete and hash-consistent.", (WINDOWS_CLI + " status --run-dir <phase-07-run-dir> --json",), ("full64/checkpoints-manifest.json",)),
+            ("tensor-inventory", "All intended winner FFNs are replaced and non-FFN tensor inventory is preserved.", (WINDOWS_CLI + " assemble --run-dir <phase-07-run-dir> --profile <winning-profile> --strict --json",), ("BF16_SPARSE_MASTER/manifest.json",)),
             ("backbone-preservation", "Attention, norms, residual, embeddings, LM head, tokenizer, chat template, and generation metadata are verified.", (), ("BF16_SPARSE_MASTER/preservation-receipt.json",)),
             ("bf16-reload", "The assembled BF16 master reloads and passes representative forward checks.", (), ("BF16_SPARSE_MASTER/reload-receipt.json",)),
         ),
