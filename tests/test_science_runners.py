@@ -6,7 +6,8 @@ from dense2moe.config import load_config
 from scripts.evaluate_promotion import run_promotion
 from scripts.merge_development_finalists import merge_finalists
 from scripts.run_candidate_search import _p32_expert_pool_size, run_candidate_search
-from scripts.run_full64_training import _layer_lineage
+from scripts.run_full64_training import _layer_lineage, run_full64
+from scripts.run_representative_transfer import run_transfer
 
 
 def _write(path, payload) -> None:
@@ -134,3 +135,38 @@ def test_p32_pool_budgets_expand_real_expert_search_space() -> None:
     pools = [_p32_expert_pool_size(routed_experts=32, top_k=5, candidate_budget=budget) for budget in budgets]
     assert pools == sorted(set(pools))
     assert pools == [13, 15, 16, 18]
+
+
+def test_representative_execution_requires_distinct_untouched_external_root(tmp_path) -> None:
+    run_dir = tmp_path / "run"
+    for profile in ("qwen38_p16s1_top4", "qwen38_p32s1_top5"):
+        path = run_dir / "method-locks" / f"{profile}.json"
+        _write(path, {"external_tuning_forbidden": True})
+    result = run_transfer(
+        run_dir=run_dir,
+        layers="0-3,28-31,60-63",
+        profiles=["qwen38_p16s1_top4", "qwen38_p32s1_top5"],
+        seeds=[17, 29, 41],
+        execute=True,
+        source_dir=tmp_path / "source",
+        activation_root=tmp_path / "development",
+    )
+    assert result["status"] == "BLOCKED"
+    assert result["blocker_code"] == "REPRESENTATIVE_EXTERNAL_INPUTS_REQUIRED"
+
+
+def test_full64_execution_requires_the_frozen_representative_winner(tmp_path) -> None:
+    run_dir = tmp_path / "run"
+    lock = run_dir / "method-locks" / "qwen38_p16s1_top4.json"
+    _write(lock, {"profile": "qwen38_p16s1_top4"})
+    result = run_full64(
+        run_dir=run_dir,
+        profile="qwen38_p16s1_top4",
+        layers="0-63",
+        execute=True,
+        source_dir=tmp_path / "source",
+        activation_root=tmp_path / "fit",
+        dev_activation_root=tmp_path / "dev",
+    )
+    assert result["status"] == "BLOCKED"
+    assert result["blocker_code"] == "FULL64_WINNER_RECEIPT_REQUIRED"

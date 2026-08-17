@@ -584,10 +584,10 @@ PHASE_04_COMMANDS = (
 )
 PHASE_05_COMMANDS = (
     WINDOWS_PYTHON + r"scripts\lock_candidate_methods.py --run-dir <phase-05-run-dir> --profiles qwen38_p16s1_top4 qwen38_p32s1_top5 --json",
-    WINDOWS_PYTHON + r"scripts\run_representative_transfer.py --run-dir <phase-05-run-dir> --layers 0-3,28-31,60-63 --profiles qwen38_p16s1_top4 qwen38_p32s1_top5 --seeds 17,29,41 --execute --source-dir <pinned-qwen-source> --activation-root <phase-05-run-dir>\activations\representative --development-run-dir <phase-04-run-dir> --device cuda:0 --json",
+    WINDOWS_PYTHON + r"scripts\run_representative_transfer.py --run-dir <phase-05-run-dir> --layers 0-3,28-31,60-63 --profiles qwen38_p16s1_top4 qwen38_p32s1_top5 --seeds 17,29,41 --execute --source-dir <pinned-qwen-source> --activation-root <phase-05-run-dir>\activations\representative --external-activation-root <phase-05-run-dir>\activations\R1-R2 --development-run-dir <phase-04-run-dir> --device cuda:0 --json",
 )
 PHASE_06_COMMANDS = (
-    WINDOWS_PYTHON + r"scripts\run_full64_training.py --run-dir <phase-06-run-dir> --profile <winning-profile> --layers 0-63 --resume --execute --source-dir <pinned-qwen-source> --activation-root <phase-06-run-dir>\activations\FIT-TRAIN --dev-activation-root <phase-06-run-dir>\activations\FIT-DEV --development-run-dir <phase-05-run-dir> --device cuda:0 --json",
+    WINDOWS_PYTHON + r"scripts\run_full64_training.py --run-dir <phase-06-run-dir> --profile <winning-profile> --representative-run-dir <phase-05-run-dir> --layers 0-63 --resume --execute --source-dir <pinned-qwen-source> --activation-root <phase-06-run-dir>\activations\FIT-TRAIN --dev-activation-root <phase-06-run-dir>\activations\FIT-DEV --development-run-dir <phase-05-run-dir> --device cuda:0 --json",
     WINDOWS_CLI + r" assemble --run-dir <phase-06-run-dir> --config <winning-profile> --strict --json",
 )
 PHASE_07_COMMANDS = (

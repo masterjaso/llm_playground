@@ -71,7 +71,7 @@ def _train_layer(*, method_lock_sha256: str, source_dir: Path, train_manifest: P
     return result
 
 
-def run_full64(*, run_dir: Path, profile: str, layers: str, execute: bool = False, source_dir: Path | None = None, activation_root: Path | None = None, dev_activation_root: Path | None = None, development_run_dir: Path | None = None, device: str = "cpu", epochs: int = 1, microbatch: int = 8, learning_rate: float = 1e-3, resume: bool = False) -> dict[str, Any]:
+def run_full64(*, run_dir: Path, profile: str, layers: str, execute: bool = False, source_dir: Path | None = None, activation_root: Path | None = None, dev_activation_root: Path | None = None, development_run_dir: Path | None = None, representative_run_dir: Path | None = None, device: str = "cpu", epochs: int = 1, microbatch: int = 8, learning_rate: float = 1e-3, resume: bool = False) -> dict[str, Any]:
     lock = run_dir / "method-locks" / f"{profile}.json"
     if not lock.exists():
         return {"status": "BLOCKED", "blocker_code": "METHOD_LOCK_REQUIRED", "message": f"no method lock for {profile}"}
@@ -86,6 +86,14 @@ def run_full64(*, run_dir: Path, profile: str, layers: str, execute: bool = Fals
         return queue_payload | {"path": str(queue_path)}
     if source_dir is None or activation_root is None or dev_activation_root is None:
         return {"status": "BLOCKED", "blocker_code": "FULL64_EXECUTION_INPUTS_REQUIRED", "message": "--source-dir, --activation-root, and --dev-activation-root are required with --execute", "queue": str(queue_path)}
+    if representative_run_dir is None:
+        return {"status": "BLOCKED", "blocker_code": "FULL64_WINNER_RECEIPT_REQUIRED", "message": "--representative-run-dir is required so full64 can verify the frozen representative winner", "queue": str(queue_path)}
+    winner_path = representative_run_dir / "representative" / "decision.json"
+    if not winner_path.exists():
+        return {"status": "BLOCKED", "blocker_code": "FULL64_WINNER_RECEIPT_REQUIRED", "message": f"representative winner receipt is missing: {winner_path}", "queue": str(queue_path)}
+    winner = json.loads(winner_path.read_text(encoding="utf-8"))
+    if winner.get("status") != "WINNER_SELECTED" or winner.get("winner_profile") != profile:
+        return {"status": "BLOCKED", "blocker_code": "FULL64_PROFILE_NOT_REPRESENTATIVE_WINNER", "profile": profile, "winner_profile": winner.get("winner_profile"), "winner_status": winner.get("status"), "winner_receipt": str(winner_path), "queue": str(queue_path)}
     marker = run_dir / "full64" / "active-build.json"
     if marker.exists():
         active = json.loads(marker.read_text(encoding="utf-8"))
@@ -104,7 +112,7 @@ def run_full64(*, run_dir: Path, profile: str, layers: str, execute: bool = Fals
             return {"status": "BLOCKED", "blocker_code": "FULL64_PARTITION_REQUIRED", "layer": layer, "queue": str(queue_path)}
         output_dir = run_dir / "full64" / profile / "layer-checkpoints"
         results.append(_train_layer(method_lock_sha256=method_lock_sha256, source_dir=source_dir, train_manifest=train_manifest, dev_manifest=dev_manifest, output_dir=output_dir, layer=layer, profile=load_config(config_path), partition=partition, seed=17, device=device, epochs=epochs, microbatch=microbatch, learning_rate=learning_rate))
-    receipt = {"schema_version": 2, "receipt_type": "dense2moe-full64-training-execution", "status": "FULL64_TRAINING_COMPLETE", "profile": profile, "topology": config.topology_id, "layers": list(range(config.num_hidden_layers)), "resumed": resume, "results": results, "checkpoint_count": len(results), "one_active_full64_build": True, "external_evaluation_tuning": False, "method_lock_sha256": sha256_file(lock)}
+    receipt = {"schema_version": 2, "receipt_type": "dense2moe-full64-training-execution", "status": "FULL64_TRAINING_COMPLETE", "profile": profile, "topology": config.topology_id, "layers": list(range(config.num_hidden_layers)), "resumed": resume, "results": results, "checkpoint_count": len(results), "one_active_full64_build": True, "external_evaluation_tuning": False, "method_lock_sha256": sha256_file(lock), "representative_winner_receipt": str(winner_path), "representative_winner_receipt_sha256": sha256_file(winner_path)}
     path = run_dir / "full64" / f"{profile}-execution.json"
     write_immutable_json(path, receipt)
     marker.unlink(missing_ok=True)
@@ -122,13 +130,14 @@ def main() -> int:
     parser.add_argument("--activation-root", type=Path)
     parser.add_argument("--dev-activation-root", type=Path)
     parser.add_argument("--development-run-dir", type=Path)
+    parser.add_argument("--representative-run-dir", type=Path)
     parser.add_argument("--device", default="cpu")
     parser.add_argument("--epochs", type=int, default=1)
     parser.add_argument("--microbatch", type=int, default=8)
     parser.add_argument("--learning-rate", type=float, default=1e-3)
     parser.add_argument("--json", action="store_true")
     args = parser.parse_args()
-    result = run_full64(run_dir=args.run_dir, profile=args.profile, layers=args.layers, execute=args.execute, source_dir=args.source_dir, activation_root=args.activation_root, dev_activation_root=args.dev_activation_root, development_run_dir=args.development_run_dir, device=args.device, epochs=args.epochs, microbatch=args.microbatch, learning_rate=args.learning_rate, resume=args.resume)
+    result = run_full64(run_dir=args.run_dir, profile=args.profile, layers=args.layers, execute=args.execute, source_dir=args.source_dir, activation_root=args.activation_root, dev_activation_root=args.dev_activation_root, development_run_dir=args.development_run_dir, representative_run_dir=args.representative_run_dir, device=args.device, epochs=args.epochs, microbatch=args.microbatch, learning_rate=args.learning_rate, resume=args.resume)
     print(json.dumps(result, indent=2, sort_keys=True, default=str))
     return 0 if result["status"] in {"QUEUE_READY", "FULL64_TRAINING_COMPLETE"} else 2
 
