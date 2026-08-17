@@ -153,17 +153,31 @@ def _route_metrics(
     student_usage = np.zeros(model.routed_experts, dtype=np.int64)
     oracle_usage = np.zeros(model.routed_experts, dtype=np.int64)
     token_count = 0
+    residual_norms: list[np.ndarray] = []
+    route_recalls: list[np.ndarray] = []
+    jaccards: list[np.ndarray] = []
+    student_cosines: list[np.ndarray] = []
     with torch.inference_mode():
         for values in dataset.iter_selected_batches(indices, microbatch):
             inputs = torch.as_tensor(values, dtype=torch.float32, device=device)
             target = (torch.nn.functional.silu(inputs @ gate.T) * (inputs @ up.T)) @ down.T
             _prediction, info = model(inputs, return_router=True, return_contributions=True)
+            student_prediction = _prediction.reshape(-1, target.shape[-1])
             student_ids = info["indices"].reshape(-1, model.top_k)
             residual = target - info["shared"].reshape(-1, target.shape[-1])
             contributions = info["contributions"].reshape(-1, model.routed_experts, target.shape[-1])
             norms = torch.linalg.vector_norm(contributions, dim=-1)
             scores = torch.sum(contributions * residual.unsqueeze(1), dim=-1) / (norms + 1e-12)
             oracle_ids = torch.topk(scores, model.top_k, dim=-1).indices
+            residual_norms.append(torch.linalg.vector_norm(residual, dim=-1).detach().cpu().numpy())
+            student_cosines.append(
+                (
+                    torch.sum(student_prediction * target, dim=-1)
+                    / (torch.linalg.vector_norm(student_prediction, dim=-1) * torch.linalg.vector_norm(target, dim=-1) + 1e-12)
+                ).detach().cpu().numpy()
+            )
+            batch_recalls: list[float] = []
+            batch_jaccards: list[float] = []
             for student, oracle in zip(student_ids.detach().cpu().numpy(), oracle_ids.detach().cpu().numpy()):
                 student_set = set(int(value) for value in student)
                 oracle_set = set(int(value) for value in oracle)
@@ -171,16 +185,33 @@ def _route_metrics(
                 overlap_sum += overlap / model.top_k
                 exact_count += int(overlap == model.top_k)
                 jaccard_sum += overlap / max(len(student_set | oracle_set), 1)
+                batch_recalls.append(overlap / model.top_k)
+                batch_jaccards.append(overlap / max(len(student_set | oracle_set), 1))
+            route_recalls.append(np.asarray(batch_recalls, dtype=np.float64))
+            jaccards.append(np.asarray(batch_jaccards, dtype=np.float64))
             student_usage += np.bincount(student_ids.detach().cpu().reshape(-1).numpy(), minlength=model.routed_experts)
             oracle_usage += np.bincount(oracle_ids.detach().cpu().reshape(-1).numpy(), minlength=model.routed_experts)
             token_count += int(student_ids.shape[0])
     if token_count <= 0:
         raise ValueError("route metric split is empty")
+    all_residual_norms = np.concatenate(residual_norms)
+    all_route_recalls = np.concatenate(route_recalls)
+    all_jaccards = np.concatenate(jaccards)
+    all_student_cosines = np.concatenate(student_cosines)
+    hard_threshold = float(np.quantile(all_residual_norms, 0.75))
+    hard_mask = all_residual_norms >= hard_threshold
+    if not np.any(hard_mask):
+        raise ValueError("hard residual quartile is empty")
     return {
         "token_count": token_count,
         "oracle_route_recall": overlap_sum / token_count,
         "oracle_exact_set_match": exact_count / token_count,
         "oracle_mean_jaccard": jaccard_sum / token_count,
+        "hard_quartile_threshold": hard_threshold,
+        "hard_quartile_count": int(np.sum(hard_mask)),
+        "hard_quartile_recall": float(np.mean(all_route_recalls[hard_mask])),
+        "hard_quartile_mean_jaccard": float(np.mean(all_jaccards[hard_mask])),
+        "hard_quartile_cosine": float(np.mean(all_student_cosines[hard_mask])),
         "student_selected_counts": student_usage.tolist(),
         "student_load_cv": float(student_usage.std() / max(student_usage.mean(), 1e-12)),
         "student_dead_experts": int(np.sum(student_usage == 0)),
