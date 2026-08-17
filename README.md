@@ -1,3 +1,21 @@
+<!-- nsp:meta
+id: readme
+kind: readme
+scope: root
+persona: governance-package
+status: active
+source: human
+confidence: high
+reviewStatus: reviewed
+graphNode: document:README.md
+graphTags: 
+validation: manifest-check,secret-scan
+owner: root
+lastReviewed: 2026-05-23
+replaces: 
+replacedBy: 
+-->
+
 # dense2moe
 
 `dense2moe` is a Windows-first, resumable control plane for experiments that

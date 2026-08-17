@@ -1,0 +1,129 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://nehemiah-steward-protocol.local/contracts/work-capsule.schema.json",
+  "title": "NSP Work Capsule",
+  "description": "Capsule contract for a bounded execution task. Must not include model/provider/harness assignment fields.",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "capsuleId",
+    "projectId",
+    "runId",
+    "installMode",
+    "parentPackageId",
+    "parentEpicId",
+    "baseRef",
+    "objective",
+    "nonGoals",
+    "activeInvariants",
+    "requiredReads",
+    "optionalReads",
+    "doNotReadUnlessExpanded",
+    "allowedWriteScopes",
+    "acceptanceGates",
+    "validationCommands",
+    "requiredCapabilities",
+    "preferredCapabilities",
+    "taskDemand",
+    "failurePolicy",
+    "returnContract"
+  ],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "capsuleId": { "type": "string" },
+    "projectId": { "type": "string" },
+    "runId": { "type": "string" },
+    "installMode": { "type": "string", "enum": ["global", "local-only"] },
+    "parentPackageId": { "type": ["string", "null"] },
+    "parentEpicId": { "type": ["string", "null"] },
+    "baseRef": { "type": "string" },
+    "objective": { "type": "string" },
+    "nonGoals": { "type": "array", "items": { "type": "string" } },
+    "activeInvariants": { "type": "array", "items": { "type": "string" } },
+    "requiredReads": { "type": "array", "items": { "type": "string" } },
+    "optionalReads": { "type": "array", "items": { "type": "string" } },
+    "doNotReadUnlessExpanded": { "type": "array", "items": { "type": "string" } },
+    "allowedWriteScopes": { "type": "array", "items": { "type": "string" } },
+    "acceptanceGates": { "type": "array", "items": { "type": "string" } },
+    "validationCommands": { "type": "array", "items": { "type": "string" } },
+    "requiredCapabilities": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "instruction-bridge-global",
+          "instruction-bridge-local",
+          "headless-invocation",
+          "fresh-context",
+          "read-files",
+          "edit-files",
+          "execute-commands",
+          "structured-result",
+          "structured-events",
+          "streaming-events",
+          "session-identity",
+          "resumable-session",
+          "detached-execution",
+          "background-execution",
+          "isolated-workspace",
+          "cancellation",
+          "checkpointing",
+          "parallel-workers",
+          "read-only-worker",
+          "write-scope-enforcement",
+          "network-policy",
+          "model-selection-harness-owned"
+        ]
+      }
+    },
+    "preferredCapabilities": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "instruction-bridge-global",
+          "instruction-bridge-local",
+          "headless-invocation",
+          "fresh-context",
+          "read-files",
+          "edit-files",
+          "execute-commands",
+          "structured-result",
+          "structured-events",
+          "streaming-events",
+          "session-identity",
+          "resumable-session",
+          "detached-execution",
+          "background-execution",
+          "isolated-workspace",
+          "cancellation",
+          "checkpointing",
+          "parallel-workers",
+          "read-only-worker",
+          "write-scope-enforcement",
+          "network-policy",
+          "model-selection-harness-owned"
+        ]
+      }
+    },
+    "roleDemand": { "$ref": "role-demand.schema.json" },
+    "assuranceRequirements": { "$ref": "assurance.schema.json#/$defs/requirements" },
+    "taskDemand": {
+      "type": "object",
+      "properties": {
+        "reasoningComplexity": { "type": "string", "enum": ["low", "medium", "high"] },
+        "contextProfile": { "type": "string", "enum": ["tight", "standard", "wide"] },
+        "expectedAutonomy": { "type": "string", "enum": ["assist", "complete-until-gates"] },
+        "latencyPreference": {
+          "type": "string",
+          "enum": ["speed-over-quality", "balanced", "quality-over-speed"]
+        },
+        "structuredResultRequired": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    },
+    "failurePolicy": { "type": "object" },
+    "returnContract": { "type": "string" }
+  },
+  "additionalProperties": false
+}

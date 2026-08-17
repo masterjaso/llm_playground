@@ -1,0 +1,113 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://nehemiah-steward-protocol.local/contracts/prediction-experiment.schema.json",
+  "title": "NSP Prediction Experiment",
+  "description": "Optional bounded discriminating experiment with one probe by default and two at hard maximum.",
+  "type": "object",
+  "required": [
+    "schemaVersion", "kind", "nspProvenance", "runId", "phaseOrPivId", "trigger", "question",
+    "hypotheses", "probes", "budget", "decisionRule", "status", "nextAction", "evidenceRefs"
+  ],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "kind": { "const": "prediction-experiment" },
+    "nspProvenance": { "$ref": "#/$defs/provenance" },
+    "runId": { "$ref": "#/$defs/identifier" },
+    "phaseOrPivId": { "$ref": "#/$defs/identifier" },
+    "trigger": { "enum": ["competing-hypotheses", "conflicting-evidence", "unlocalized-root-cause", "expensive-or-irreversible-change", "cheap-probe-avoids-expensive-work", "prior-contradiction"] },
+    "question": { "$ref": "#/$defs/string600" },
+    "hypotheses": {
+      "type": "array", "minItems": 2, "maxItems": 3,
+      "items": {
+        "type": "object", "required": ["id", "hypothesis", "predictedObservations"],
+        "properties": {
+          "id": { "$ref": "#/$defs/identifier" },
+          "hypothesis": { "type": "string", "minLength": 1, "maxLength": 400 },
+          "predictedObservations": { "type": "array", "minItems": 1, "maxItems": 5, "items": { "$ref": "#/$defs/string300" } }
+        },
+        "additionalProperties": false
+      }
+    },
+    "probes": {
+      "type": "array", "minItems": 1, "maxItems": 2,
+      "items": {
+        "type": "object", "required": ["id", "description", "readOnly", "writesRequired"],
+        "properties": {
+          "id": { "$ref": "#/$defs/identifier" }, "description": { "$ref": "#/$defs/string300" },
+          "readOnly": { "type": "boolean" }, "writesRequired": { "type": "boolean" },
+          "evidenceRef": { "$ref": "#/$defs/string240" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "budget": {
+      "type": "object", "required": ["readOnly"],
+      "properties": { "readOnly": { "type": "boolean" }, "maxProbes": { "enum": [1, 2], "default": 1 } },
+      "additionalProperties": false
+    },
+    "decisionRule": { "$ref": "#/$defs/string600" },
+    "status": { "enum": ["pending", "resolved"] },
+    "nextAction": { "enum": ["run-probe", "inspect", "stop"] },
+    "decision": { "$ref": "#/$defs/string600" },
+    "evidenceRefs": { "$ref": "#/$defs/evidenceRefs" }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "budget": {
+            "properties": { "maxProbes": { "const": 2 } },
+            "required": ["maxProbes"]
+          }
+        }
+      },
+      "else": { "properties": { "probes": { "maxItems": 1 } } }
+    },
+    {
+      "if": {
+        "properties": {
+          "budget": {
+            "properties": { "readOnly": { "const": true } },
+            "required": ["readOnly"]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "probes": {
+            "items": {
+              "properties": {
+                "readOnly": { "const": true },
+                "writesRequired": { "const": false }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "status": { "const": "resolved" } }, "required": ["status"] },
+      "then": { "required": ["decision"], "properties": { "nextAction": { "const": "stop" } } }
+    }
+  ],
+  "additionalProperties": false,
+  "$defs": {
+    "identifier": { "type": "string", "minLength": 1, "maxLength": 80, "pattern": "^(?!\\.{1,2}$)[a-z0-9][a-z0-9._-]*$" },
+    "string240": { "type": "string", "minLength": 1, "maxLength": 240 },
+    "string300": { "type": "string", "minLength": 1, "maxLength": 300 },
+    "string600": { "type": "string", "minLength": 1, "maxLength": 600 },
+    "evidenceRefs": { "type": "array", "maxItems": 5, "items": { "$ref": "#/$defs/string240" } },
+    "provenance": {
+      "type": "object",
+      "required": ["schemaVersion", "source", "semanticJudgmentByCli", "authority", "reviewStatus", "intendedSkillOwner", "modelProviderRequired"],
+      "properties": {
+        "schemaVersion": { "const": 1 }, "source": { "const": "deterministic-cli" },
+        "semanticJudgmentByCli": { "const": false },
+        "authority": { "enum": ["deterministic-validator", "deterministic-parser", "heuristic", "safe-repair-candidate"] },
+        "reviewStatus": { "enum": ["reviewed", "unreviewed"] },
+        "intendedSkillOwner": { "type": ["string", "null"] }, "modelProviderRequired": { "const": false }
+      },
+      "additionalProperties": false
+    }
+  }
+}

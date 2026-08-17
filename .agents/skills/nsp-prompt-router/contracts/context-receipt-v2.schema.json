@@ -1,0 +1,131 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://nehemiah-steward-protocol.local/contracts/context-receipt-v2.schema.json",
+  "title": "NSP Context Receipt v2",
+  "description": "Full context curation contract: deterministic CLI selection facts plus skill-owned semantic inference. The CLI never performs semantic judgment. semanticInference remains unreviewed until accepted.",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "request",
+    "semanticInference",
+    "deterministicSelection",
+    "contextBudget",
+    "freshness",
+    "requiredReads",
+    "optionalReads",
+    "doNotReadUnless",
+    "validationCommands",
+    "handoff",
+    "provenance"
+  ],
+  "properties": {
+    "schemaVersion": { "const": 2 },
+    "nspProvenance": {
+      "type": "object",
+      "required": ["source", "semanticJudgmentByCli", "authority", "reviewStatus", "modelProviderRequired"],
+      "properties": {
+        "source": { "const": "deterministic-cli" },
+        "semanticJudgmentByCli": { "const": false },
+        "authority": { "enum": ["deterministic-validator", "deterministic-parser", "heuristic", "safe-repair-candidate"] },
+        "reviewStatus": { "enum": ["reviewed", "unreviewed"] },
+        "intendedSkillOwner": { "type": ["string", "null"] },
+        "modelProviderRequired": { "const": false }
+      }
+    },
+    "request": {
+      "type": "object",
+      "required": ["raw", "normalized"],
+      "properties": {
+        "raw": { "type": "string" },
+        "normalized": { "type": "string" }
+      }
+    },
+    "semanticInference": {
+      "type": "object",
+      "required": ["owner", "skill", "reviewStatus"],
+      "properties": {
+        "owner": { "const": "skill" },
+        "skill": { "const": "nsp-prompt-router" },
+        "persona": { "type": "string" },
+        "intent": { "type": "string" },
+        "risk": { "type": "string" },
+        "confidence": { "type": "string" },
+        "executionClass": { "type": "string", "default": "" },
+        "classificationReason": { "type": "string", "default": "" },
+        "nextWorkflow": { "type": "string", "default": "" },
+        "classificationRevision": {
+          "type": ["object", "null"],
+          "default": null
+        },
+        "reviewStatus": { "const": "unreviewed" }
+      }
+    },
+    "deterministicSelection": {
+      "type": "object",
+      "required": ["owner", "command", "candidateDocs", "candidateScopes", "excludedContext", "selectionReasons"],
+      "properties": {
+        "owner": { "const": "cli" },
+        "command": { "const": "_nsp context select" },
+        "candidateDocs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["path", "score", "reasons"],
+            "properties": {
+              "path": { "type": "string" },
+              "score": { "type": "number" },
+              "reasons": { "type": "array", "items": { "type": "string" } }
+            }
+          }
+        },
+        "candidateScopes": { "type": "array", "items": { "type": "string" } },
+        "candidateCodeAnchors": { "type": "array", "items": { "type": "string" } },
+        "excludedContext": { "type": "array", "items": { "type": "string" } },
+        "selectionReasons": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "contextBudget": {
+      "type": "object",
+      "required": ["estimatedBytes", "estimatedTokens", "governedDocsBytes", "selectedBytesRatio", "maxRecommendedTokens", "overBudget"],
+      "properties": {
+        "estimatedBytes": { "type": "number" },
+        "estimatedTokens": { "type": "number" },
+        "governedDocsBytes": { "type": "number" },
+        "selectedBytesRatio": { "type": "number" },
+        "maxRecommendedTokens": { "type": "number" },
+        "overBudget": { "type": "boolean" }
+      }
+    },
+    "freshness": {
+      "type": "object",
+      "required": ["mapFresh", "frontmatterIndexFresh", "ccbFresh", "codeGraphFresh", "staleReasons"],
+      "properties": {
+        "mapFresh": { "type": "boolean" },
+        "frontmatterIndexFresh": { "type": "boolean" },
+        "ccbFresh": { "type": "boolean" },
+        "codeGraphFresh": { "type": "boolean" },
+        "staleReasons": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "requiredReads": { "type": "array", "items": { "type": "string" } },
+    "optionalReads": { "type": "array", "items": { "type": "string" } },
+    "doNotReadUnless": { "type": "array", "items": { "type": "string" } },
+    "validationCommands": { "type": "array", "items": { "type": "string" } },
+    "handoff": {
+      "type": "object",
+      "required": ["nextSkill", "nextCliCommand", "receiptPath"],
+      "properties": {
+        "nextSkill": { "type": "string" },
+        "nextCliCommand": { "type": "string" },
+        "receiptPath": { "type": "string" }
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "required": ["semanticJudgmentByCli"],
+      "properties": {
+        "semanticJudgmentByCli": { "const": false }
+      }
+    }
+  }
+}

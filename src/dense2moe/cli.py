@@ -18,13 +18,13 @@ from typing import Any
 
 from .assembly import assemble_checkpoint
 from .capture import capture_activations, capture_text_teacher_activations
-from .config import load_config
+from .config import active_topology_contract, load_active_config
 from .data import prepare_calibration_manifest, write_corpus_receipt
 from .discovery.source import inspect_hub_source, inspect_local_source, verify_qwen_geometry
 from .estimates import estimate_resources
 from .evaluation import quality_gate
-from .export.gguf import validate_gguf
-from .hardware import collect_environment
+from .export.gguf import export_gguf, validate_gguf
+from .hardware import collect_environment, run_environment_doctor
 from .logging import read_jsonl
 from .partition import partition_indices
 from .provenance import current_git_commit
@@ -33,6 +33,9 @@ from .state import StateStore, atomic_write_json, bootstrap_run, merge_fact_ledg
 
 TERMINAL_STATES = {"SUCCEEDED", "RESEARCH_CANDIDATE", "FAILED_SAFELY"}
 DEFAULT_V3_PARENT_RUN_ID = "20260815-162258-windows-real-d2m-v2"
+DEFAULT_ACTIVE_PROFILE = "qwen38_p16s1_top4"
+DEFAULT_ACTIVE_CONFIG = f"configs/{DEFAULT_ACTIVE_PROFILE}.yaml"
+PRIMARY_ACTIVE_PROFILE = "qwen38_p32s1_top5"
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -60,6 +63,12 @@ def _parser() -> argparse.ArgumentParser:
         command.add_argument("--resume", action="store_true")
         command.add_argument("--force", action="store_true")
         command.add_argument("--execute", action="store_true", help="perform network/download work explicitly requested")
+
+    doctor = sub.choices["doctor"]
+    doctor.add_argument("--checkpoint", help="existing D2M safetensors or layer metadata path to load")
+    doctor.add_argument("--expected-gpu", action="append", dest="expected_gpus", help="expected GPU name (repeatable; defaults to the pinned recovery receipt)")
+    doctor.add_argument("--expected-gpu-count", type=int, help="expected visible GPU count (defaults to the pinned recovery receipt)")
+    doctor.add_argument("--recovery-pin", help="override the historical native-Windows environment receipt")
 
     spike = base("full-model-spike")
     spike.add_argument("--seed", type=int, default=17)
@@ -208,6 +217,15 @@ def _record(store: StateStore, args: argparse.Namespace, payload: Any, *, ok: bo
 
 def _doctor(args: argparse.Namespace, store: StateStore) -> dict[str, Any]:
     environment = collect_environment()
+    doctor = run_environment_doctor(
+        environment=environment,
+        repo_root=Path.cwd(),
+        checkpoint_path=getattr(args, "checkpoint", None),
+        expected_gpu_names=getattr(args, "expected_gpus", None),
+        expected_gpu_count=getattr(args, "expected_gpu_count", None),
+        recovery_pin_path=getattr(args, "recovery_pin", None),
+    )
+    environment["doctor"] = doctor
     environment["disk"] = {str(Path.cwd().anchor or Path.cwd()): {"total": shutil.disk_usage(Path.cwd()).total, "free": shutil.disk_usage(Path.cwd()).free, "used": shutil.disk_usage(Path.cwd()).used}}
     env_path = store.run_dir / "environment.json"
     atomic_write_json(env_path, environment)
@@ -222,7 +240,8 @@ def _doctor(args: argparse.Namespace, store: StateStore) -> dict[str, Any]:
         "disk": {"status": "verified", "value": environment["disk"]},
         "gpus": {"status": "verified" if environment.get("tools", {}).get("nvidia_smi_list", {}).get("returncode") == 0 else "unknown", "value": environment.get("tools", {}).get("nvidia_smi_list", {}).get("stdout", "")},
         "driver": {"status": "verified" if environment.get("tools", {}).get("nvidia_smi_query", {}).get("returncode") == 0 else "unknown"},
-        "pytorch_compatibility": {"status": "verified" if torch_info.get("cuda_available") else "unknown", "value": torch_info},
+        "pytorch_compatibility": {"status": "verified" if doctor.get("ok") else "blocked", "value": torch_info},
+        "environment_doctor": {"status": "verified" if doctor.get("ok") else "blocked", "value": doctor},
         "source_model_availability": {"status": "unknown"},
         "source_revision": {"status": "unknown"},
         "source_config_shape": {"status": "unknown"},
@@ -238,24 +257,36 @@ def _doctor(args: argparse.Namespace, store: StateStore) -> dict[str, Any]:
         "use_powershell": True,
         "source_checkpoint_immutable": True,
         "trust_remote_code": False,
-        "default_profile": "qwen38_p32s1_top2",
-        "fallback_profiles": ["qwen38_p16s1_top2", "qwen38_p8s1_top2"],
+        "default_profile": DEFAULT_ACTIVE_PROFILE,
+        "fallback_profiles": [PRIMARY_ACTIVE_PROFILE],
         "created": utc_now(),
     }
     decision_path = store.run_dir / "decision-register.json"
     atomic_write_json(decision_path, decision)
-    next_command = f"d2m inspect-source --run-dir {args.run_dir} --model {args.model}"
-    result = {"status": "DISCOVERY_READY", "environment": str(env_path), "fact_ledger": str(ledger), "decision_register": str(decision_path), "windows_native": system == "Windows", "wsl": bool(environment.get("wsl", False)), "torch_cuda": bool(torch_info.get("cuda_available")), "next_exact_command": next_command}
+    ready = bool(doctor.get("ok"))
+    next_command = f"d2m inspect-source --run-dir {args.run_dir} --model {args.model}" if ready else "powershell -ExecutionPolicy Bypass -File scripts\\Setup-Windows.ps1"
+    result = {
+        "status": "DISCOVERY_READY" if ready else "BLOCKED",
+        "message": "environment doctor passed" if ready else "environment doctor failed closed; native ML recovery is required",
+        "environment": str(env_path),
+        "fact_ledger": str(ledger),
+        "decision_register": str(decision_path),
+        "environment_doctor": doctor,
+        "windows_native": system == "Windows",
+        "wsl": bool(environment.get("wsl", False)),
+        "torch_cuda": bool(torch_info.get("cuda_available")),
+        "next_exact_command": next_command,
+    }
     current = store.load()
     if current.last_successful_command in (None, "doctor") and current.current_phase == "discovery":
-        store.transition(current_phase="discovery", phase_status="complete", last_successful_command="doctor", next_exact_command=next_command, validation_results={"doctor": result})
+        store.transition(current_phase="discovery", phase_status="complete" if ready else "blocked", last_successful_command="doctor" if ready else current.last_successful_command, active_blocker=None if ready else "; ".join(doctor.get("blockers", [])), next_exact_command=next_command, validation_results={"doctor": result})
     else:
         validations = dict(current.validation_results)
         validations["doctor"] = result
         store.transition(validation_results=validations)
-    store.write_prediction("discovery", {"expected_artifacts": ["environment.json", "repository-fact-ledger.json", "decision-register.json"], "expected_validation_results": ["DISCOVERY_READY"]}, "confirmed")
+    store.write_prediction("discovery", {"expected_artifacts": ["environment.json", "repository-fact-ledger.json", "decision-register.json"], "expected_validation_results": ["DISCOVERY_READY"]}, "confirmed" if ready else "blocked")
     if current.last_successful_command in (None, "doctor") and current.current_phase == "discovery":
-        store.write_handoff(next_command=result["next_exact_command"], expected_output="source-manifest.json with verified config and revision")
+        store.write_handoff(next_command=result["next_exact_command"], expected_output="source-manifest.json with verified config and revision", blocker=None if ready else "; ".join(doctor.get("blockers", [])))
     else:
         store.write_handoff(next_command=current.next_exact_command or result["next_exact_command"], expected_output="current phase artifact", blocker=current.active_blocker)
     return result
@@ -290,7 +321,7 @@ def _inspect_source(args: argparse.Namespace, store: StateStore) -> dict[str, An
     decisions.update({"source_revision": manifest.revision, "source_text_model_class": geometry.get("model_type"), "source_geometry": geometry, "text_tensor_count": len(manifest.text_tensor_names), "target_moe_class": decisions.get("target_moe_class", "unknown")})
     atomic_write_json(decision_path, decisions)
     status = "SOURCE_READY" if manifest.revision_pinned and manifest.config and "error" not in manifest.config else "SOURCE_DISCOVERY_INCOMPLETE"
-    next_command = f"d2m estimate --run-dir {args.run_dir} --config {args.config or 'configs/qwen38_p32s1_top2.yaml'}"
+    next_command = f"d2m estimate --run-dir {args.run_dir} --config {args.config or DEFAULT_ACTIVE_CONFIG}"
     result = {"status": status, "source_manifest": str(path), "revision": manifest.revision, "revision_pinned": manifest.revision_pinned, "config_keys": sorted(manifest.config), "tensor_count": len(manifest.tensor_names), "text_tensor_count": len(manifest.text_tensor_names), "next_exact_command": next_command}
     config_hash = None
     index_hash = None
@@ -309,7 +340,7 @@ def _inspect_source(args: argparse.Namespace, store: StateStore) -> dict[str, An
 
 
 def _estimate(args: argparse.Namespace, store: StateStore) -> dict[str, Any]:
-    profile = load_config(args.config or str(Path(__file__).resolve().parents[2] / "configs" / "qwen38_p32s1_top2.yaml"))
+    profile = _profile_from_args(args)
     source_bytes: int | None = None
     manifest_path = store.run_dir / "source-manifest.json"
     if manifest_path.exists():
@@ -338,17 +369,19 @@ def _estimate(args: argparse.Namespace, store: StateStore) -> dict[str, Any]:
 def _profile_from_args(args: argparse.Namespace) -> Any:
     configured = getattr(args, "profile", None) or getattr(args, "config", None)
     if configured:
+        if str(configured).lower() in {"p16/top4", "p32/top5"}:
+            configured = active_topology_contract(str(configured)).profile_name
         candidate = Path(str(configured))
         if not candidate.exists() and not candidate.is_absolute():
             candidate = Path(__file__).resolve().parents[2] / "configs" / str(configured)
         if candidate.exists():
-            return load_config(candidate)
+            return load_active_config(candidate)[0]
         # Accept a profile name as shorthand for the checked-in config.
         named = Path(__file__).resolve().parents[2] / "configs" / f"{configured}.yaml"
         if named.exists():
-            return load_config(named)
+            return load_active_config(named)[0]
         raise FileNotFoundError(f"profile config does not exist: {configured}")
-    return load_config(Path(__file__).resolve().parents[2] / "configs" / "qwen38_p8s1_top2.yaml")
+    return load_active_config(Path(__file__).resolve().parents[2] / DEFAULT_ACTIVE_CONFIG)[0]
 
 
 def _source_dir_for_run(store: StateStore) -> Path:
@@ -430,7 +463,7 @@ def _extract(args: argparse.Namespace, store: StateStore) -> dict[str, Any]:
 
 def _structural_smoke(args: argparse.Namespace, store: StateStore) -> dict[str, Any]:
     from .models.router import normalize_topk_weights, topk_router
-    profile = load_config(args.config or str(Path(__file__).resolve().parents[2] / "configs" / "qwen38_p32s1_top2.yaml"))
+    profile = _profile_from_args(args)
     plan = partition_indices(profile.dense_intermediate_size, profile.routed_experts, profile.expert_intermediate_size, profile.shared_intermediate_size)
     try:
         import numpy as np  # type: ignore
@@ -439,7 +472,7 @@ def _structural_smoke(args: argparse.Namespace, store: StateStore) -> dict[str, 
         weight_sums = np.sum(normalize_topk_weights(weights), axis=-1).tolist()
     except ImportError:
         weight_sums = []
-    next_command = f"d2m pilot --run-dir {args.run_dir} --config {args.config or 'configs/qwen38_p32s1_top2.yaml'}"
+    next_command = f"d2m pilot --run-dir {args.run_dir} --config {args.config or DEFAULT_ACTIVE_CONFIG}"
     result = {"status": "TESTS_GREEN", "profile": profile.name, "partition_exhaustive": len(plan.all_indices) == profile.dense_intermediate_size, "partition_disjoint": len(set(plan.all_indices)) == profile.dense_intermediate_size, "capacity": plan.total_capacity, "router_topk": profile.top_k, "router_weight_sums": weight_sums, "checks": ["config_profile_arithmetic", "partition_roundtrip_contract", "router_topk_count", "router_weights_normalized", "atomic_state_contract", "job_queue_contract"], "next_exact_command": next_command}
     atomic_write_json(store.run_dir / "evidence" / "phase-00" / "structural-smoke.json", result)
     store.transition(current_phase="partition", phase_status="complete", last_successful_command="test", next_exact_command=next_command, validation_results={"tests": result})
@@ -452,9 +485,8 @@ def _pilot(args: argparse.Namespace, store: StateStore) -> dict[str, Any]:
     real = source.exists() and bool(json.loads(source.read_text(encoding="utf-8")).get("text_tensor_names"))
     next_command = f"d2m prepare-data --run-dir {args.run_dir}"
     profile_paths = [
-        Path(__file__).resolve().parents[2] / "configs" / "qwen38_p32s1_top2.yaml",
-        Path(__file__).resolve().parents[2] / "configs" / "qwen38_p16s1_top2.yaml",
-        Path(__file__).resolve().parents[2] / "configs" / "qwen38_p8s1_top2.yaml",
+        Path(__file__).resolve().parents[2] / "configs" / "qwen38_p16s1_top4.yaml",
+        Path(__file__).resolve().parents[2] / "configs" / "qwen38_p32s1_top5.yaml",
     ]
     source_dir = None
     try:
@@ -465,11 +497,11 @@ def _pilot(args: argparse.Namespace, store: StateStore) -> dict[str, Any]:
     if real and source_dir is not None:
         from .evaluation.pilot import run_real_layer_pilot
 
-        measured = run_real_layer_pilot(source_dir, [load_config(path) for path in profile_paths])
+        measured = run_real_layer_pilot(source_dir, [load_active_config(path)[0] for path in profile_paths])
         state = store.load()
         result = {**measured, "real_layer": True, "next_exact_command": next_command, "source_repository": "Qwen/Qwen3.8-27B", "source_revision": state.source_revision, "source_config_hash": state.source_config_hash, "source_index_hash": state.source_index_hash, "code_commit": current_git_commit(), "seed": 17}
     else:
-        result = {"status": "BLOCKED", "real_layer": False, "profiles": ["qwen38_p32s1_top2", "qwen38_p16s1_top2", "qwen38_p8s1_top2"], "message": "Real-layer pilot is gated on a verified local text checkpoint; synthetic structural tests are not evidence of model quality.", "next_exact_command": next_command, "code_commit": current_git_commit()}
+        result = {"status": "BLOCKED", "real_layer": False, "profiles": [DEFAULT_ACTIVE_PROFILE, PRIMARY_ACTIVE_PROFILE], "message": "Real-layer pilot is gated on a verified local text checkpoint; synthetic structural tests are not evidence of model quality.", "next_exact_command": next_command, "code_commit": current_git_commit()}
     atomic_write_json(store.run_dir / "metrics" / "pilot.json", result)
     store.transition(current_phase="pilot", phase_status="pending" if result.get("status") == "PILOT_COMPLETE" else "blocked", last_successful_command="pilot" if result.get("status") == "PILOT_COMPLETE" else store.load().last_successful_command, next_exact_command=next_command, validation_results={"pilot": result})
     store.write_prediction("pilot", {"expected_artifacts": ["metrics/pilot.json"], "expected_validation_results": ["PILOT_COMPLETE"]}, "confirmed" if result.get("status") == "PILOT_COMPLETE" else "counterexample")
@@ -497,9 +529,9 @@ def _oracle_study(args: argparse.Namespace, store: StateStore) -> dict[str, Any]
             train_activation_manifest=train_activation_manifest,
         )
         state = store.load()
-        result.update({"source_repository": "Qwen/Qwen3.8-27B", "source_revision": state.source_revision, "source_config_hash": state.source_config_hash, "source_index_hash": state.source_index_hash, "profile": "qwen38_p8s1_top2", "seed": 17, "code_commit": current_git_commit()})
+        result.update({"source_repository": "Qwen/Qwen3.8-27B", "source_revision": state.source_revision, "source_config_hash": state.source_config_hash, "source_index_hash": state.source_index_hash, "profile": DEFAULT_ACTIVE_PROFILE, "seed": 17, "code_commit": current_git_commit()})
         best = result.get("best_variant")
-        blocker = None if result.get("gate", {}).get("green") else "p8 oracle ceiling is red; bounded fallback or capacity change is required before router training"
+        blocker = None if result.get("gate", {}).get("green") else "p16/top4 oracle gate is red; bounded fallback or capacity change is required before router training"
         if blocker is None and result.get("quality_gate_eligible"):
             next_command = f"d2m streaming-capture --run-dir {args.run_dir} --split train --layers 0 --dataset-manifest {store.run_dir / 'capture' / 'data-plan.json'} --resume"
         else:
@@ -856,7 +888,7 @@ def _streaming_capture(args: argparse.Namespace, store: StateStore) -> dict[str,
             max_examples=args.max_examples,
             attention_implementation=args.attention_implementation,
         )
-        profile = _profile_from_args(argparse.Namespace(profile="qwen38_p8s1_top2", config=None))
+        profile = _profile_from_args(argparse.Namespace(profile=DEFAULT_ACTIVE_PROFILE, config=None))
         expected_tokens = int(payload.get(f"{args.split}_tokens", 0))
         complete_split = args.max_examples is None and (expected_tokens <= 0 or int(result["tokens"]) == expected_tokens)
         quality_eligible = bool(args.split == "holdout" and complete_split and max(layers) >= 63)
@@ -888,7 +920,7 @@ def _streaming_capture(args: argparse.Namespace, store: StateStore) -> dict[str,
         store.transition(current_phase="streaming", phase_status="complete" if quality_eligible else "pending", selected_profile=profile.name, active_blocker=None, last_successful_command="streaming-capture", next_exact_command=next_command, validation_results={"streaming_capture": result})
         store.write_handoff(next_command=next_command, expected_output="real holdout oracle metrics" if quality_eligible else "validated rolling hidden-state stage", blocker=None)
     except (OSError, ValueError, TypeError, RuntimeError, KeyError, TeacherCaptureBlocked) as exc:
-        result = {"status": "BLOCKED", "blocker_code": getattr(exc, "code", "STREAMING_CAPTURE_FAILED"), "message": str(exc), "profile": "qwen38_p8s1_top2", "legacy_whole_model_capture_invoked": False, "next_exact_command": f"d2m streaming-capture --run-dir {args.run_dir} --split {args.split} --layers {args.layers} --dataset-manifest {args.dataset_manifest} --resume", "code_commit": current_git_commit()}
+        result = {"status": "BLOCKED", "blocker_code": getattr(exc, "code", "STREAMING_CAPTURE_FAILED"), "message": str(exc), "profile": DEFAULT_ACTIVE_PROFILE, "legacy_whole_model_capture_invoked": False, "next_exact_command": f"d2m streaming-capture --run-dir {args.run_dir} --split {args.split} --layers {args.layers} --dataset-manifest {args.dataset_manifest} --resume", "code_commit": current_git_commit()}
         atomic_write_json(store.run_dir / "metrics" / "streaming-capture.json", result)
         store.transition(current_phase="streaming", phase_status="blocked", active_blocker=result["message"], next_exact_command=result["next_exact_command"], validation_results={"streaming_capture": result})
         store.write_handoff(next_command=result["next_exact_command"], expected_output="resumable layer-major streaming corpus", blocker=result["message"])
@@ -896,7 +928,7 @@ def _streaming_capture(args: argparse.Namespace, store: StateStore) -> dict[str,
 
 
 def _partition_layer(args: argparse.Namespace, store: StateStore) -> dict[str, Any]:
-    profile = load_config(args.config or str(Path(__file__).resolve().parents[2] / "configs" / "qwen38_p32s1_top2.yaml"))
+    profile = _profile_from_args(args)
     layer = args.layer if args.layer is not None else 0
     plan = partition_indices(profile.dense_intermediate_size, profile.routed_experts, profile.expert_intermediate_size, profile.shared_intermediate_size)
     path = store.run_dir / "partitions" / f"layer-{layer:04d}.json"
@@ -1021,32 +1053,42 @@ def _evaluate(args: argparse.Namespace, store: StateStore) -> dict[str, Any]:
 
 def _export(args: argparse.Namespace, store: StateStore) -> dict[str, Any]:
     path = store.run_dir / "artifacts" / "moe-f16.gguf"
-    result: dict[str, Any]
     manifest_path = store.run_dir / "artifacts" / "hf-moe" / "manifest.json"
     if not manifest_path.exists():
         result = {"status": "BLOCKED", "path": str(path), "message": "GGUF export is gated on a validated real Hugging Face assembly; no structural smoke file is emitted."}
         atomic_write_json(store.run_dir / "metrics" / "gguf.json", result)
-        store.transition(current_phase="export", phase_status="blocked", active_blocker=result["message"], next_exact_command=f"d2m assemble --run-dir {args.run_dir} --profile qwen38_p8s1_top2 --strict", validation_results={"gguf": result})
+        store.transition(current_phase="export", phase_status="blocked", active_blocker=result["message"], next_exact_command=f"d2m assemble --run-dir {args.run_dir} --profile {DEFAULT_ACTIVE_PROFILE} --strict", validation_results={"gguf": result})
         store.write_handoff(next_command=store.load().next_exact_command, expected_output="validated HF assembly before GGUF", blocker=result["message"])
         return result
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     if not manifest.get("complete"):
         result = {"status": "BLOCKED", "path": str(path), "message": "GGUF export is gated on a complete, reloaded real Hugging Face assembly; structural smoke output is not evidence."}
         atomic_write_json(store.run_dir / "metrics" / "gguf.json", result)
-        store.transition(current_phase="export", phase_status="blocked", active_blocker=result["message"], next_exact_command=f"d2m assemble --run-dir {args.run_dir} --profile qwen38_p8s1_top2 --strict", validation_results={"gguf": result})
+        store.transition(current_phase="export", phase_status="blocked", active_blocker=result["message"], next_exact_command=f"d2m assemble --run-dir {args.run_dir} --profile {DEFAULT_ACTIVE_PROFILE} --strict", validation_results={"gguf": result})
         store.write_handoff(next_command=store.load().next_exact_command, expected_output="complete HF assembly before GGUF", blocker=result["message"])
         return result
-    if not path.exists():
-        result = {"status": "BLOCKED", "path": str(path), "message": "A real llama.cpp converter is not configured for the custom target; no tiny substitute is created."}
+    try:
+        if path.exists():
+            validation = validate_gguf(path, require_receipt=True)
+            exported = {"path": str(path), "receipt": validation.get("receipt_path"), "validation": validation}
+        else:
+            exported = export_gguf(
+                manifest_path,
+                path,
+                metadata={"run_id": str(args.run_dir), "artifact_scope": "phase-07-productization"},
+            )
+            validation = exported["validation"]
+    except (OSError, RuntimeError, TypeError, ValueError) as exc:
+        result = {"status": "BLOCKED", "path": str(path), "message": f"Strict GGUF export could not publish a validated tensor-bearing artifact: {exc}"}
         atomic_write_json(store.run_dir / "metrics" / "gguf.json", result)
-        store.transition(current_phase="export", phase_status="blocked", active_blocker=result["message"], validation_results={"gguf": result})
-        store.write_handoff(next_command=f"d2m export-gguf --run-dir {args.run_dir}", expected_output="real-model GGUF converter", blocker=result["message"])
+        store.transition(current_phase="export", phase_status="blocked", active_blocker=result["message"], next_exact_command=f"d2m export-gguf --run-dir {args.run_dir}", validation_results={"gguf": result})
+        store.write_handoff(next_command=f"d2m export-gguf --run-dir {args.run_dir}", expected_output="validated tensor-bearing GGUF", blocker=result["message"])
         return result
-    result = {"status": "GGUF_READY", "path": str(path), "validation": validate_gguf(path)}
+    result = {"status": "GGUF_READY", "path": str(path), "receipt": exported.get("receipt"), "validation": validation}
     atomic_write_json(store.run_dir / "metrics" / "gguf.json", result)
     next_command = f"d2m build-imatrix --run-dir {args.run_dir}"
     store.transition(current_phase="quantization", phase_status="pending", next_exact_command=next_command, validation_results={"gguf": result})
-    store.write_handoff(next_command=next_command, expected_output="expert-covering importance matrix", blocker="GGUF is structural smoke output; no assembled model was exported")
+    store.write_handoff(next_command=next_command, expected_output="expert-covering importance matrix", blocker=None)
     return result
 
 
@@ -1172,7 +1214,7 @@ def _run(args: argparse.Namespace, store: StateStore) -> dict[str, Any]:
         store.transition(phase_status="blocked", terminal_state="BLOCKED", active_blocker="No local safetensors tensor inventory is available for a real-layer pilot", next_exact_command=result["next_command"])
         store.write_handoff(next_command=result["next_command"], expected_output="a local immutable source snapshot", blocker=store.load().active_blocker)
         return result
-    return {"status": "READY_TO_CONTINUE", "message": "discovery and source gates are green; resume the next phase command", "next_command": f"d2m estimate --run-dir {args.run_dir} --config {args.config or 'configs/qwen38_p32s1_top2.yaml'}"}
+    return {"status": "READY_TO_CONTINUE", "message": "discovery and source gates are green; resume the next phase command", "next_command": f"d2m estimate --run-dir {args.run_dir} --config {args.config or DEFAULT_ACTIVE_CONFIG}"}
 
 
 HANDLERS: dict[str, Callable[[argparse.Namespace, StateStore], dict[str, Any]]] = {

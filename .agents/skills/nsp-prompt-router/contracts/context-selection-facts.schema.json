@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://nehemiah-steward-protocol.local/contracts/context-selection-facts.schema.json",
+  "title": "NSP Context Selection Facts",
+  "type": "object",
+  "required": ["schemaVersion", "mode", "target", "input", "selection", "excludedContextClasses", "policy"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "mode": { "type": "string", "enum": ["frontmatter-index", "explicit-block-scan", "legacy-prefix-scan"] },
+    "target": { "type": "string" },
+    "input": {
+      "type": "object",
+      "properties": {
+        "persona": { "type": "string" },
+        "scope": { "type": "string" },
+        "tags": { "type": "array", "items": { "type": "string" } },
+        "intent": { "type": "string" },
+        "request": { "type": "string" },
+        "limit": { "type": "number" }
+      }
+    },
+    "selection": {
+      "type": "object",
+      "required": ["primaryPersona", "primaryScopes", "candidateDocs"],
+      "properties": {
+        "primaryPersona": { "type": ["string", "null"] },
+        "primaryScopes": { "type": "array", "items": { "type": "string" } },
+        "candidateDocs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["path", "score", "reasons", "metadata"],
+            "properties": {
+              "path": { "type": "string" },
+              "score": { "type": "number" },
+              "reasons": { "type": "array", "items": { "type": "string" } },
+              "metadata": { "type": "object" },
+              "warnings": { "type": "array" },
+              "errors": { "type": "array" }
+            }
+          }
+        }
+      }
+    },
+    "excludedContextClasses": { "type": "array", "items": { "type": "string" } },
+    "policy": {
+      "type": "object",
+      "required": ["fullDocsRead", "fullRepoScan", "openSelectedDocsOnlyAfterRanking", "modelProviderRequired"],
+      "properties": {
+        "fullDocsRead": { "const": false },
+        "fullRepoScan": { "const": false },
+        "openSelectedDocsOnlyAfterRanking": { "const": true },
+        "modelProviderRequired": { "const": false }
+      }
+    }
+  }
+}

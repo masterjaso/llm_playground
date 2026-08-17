@@ -23,9 +23,12 @@ from __future__ import annotations
 
 import itertools
 import math
+import os
+import tempfile
 from collections import Counter
 from collections.abc import Callable, Iterable, Iterator, Mapping
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 
@@ -53,6 +56,17 @@ class OracleAssignments:
             "top_k": int(self.indices.shape[1]),
             "mean_residual_mse": float(self.residual_mse.detach().mean().cpu().item()),
         }
+
+    def save(self, path: str | Path) -> Path:
+        """Persist the E-step payload atomically for a later frozen M step."""
+
+        return save_oracle_assignments(self, path)
+
+    @classmethod
+    def load(cls, path: str | Path, *, device: str | None = None) -> OracleAssignments:
+        """Reload a saved E-step payload without consulting a selector."""
+
+        return load_oracle_assignments(path, device=device)
 
 
 def _torch() -> Any:
@@ -380,6 +394,78 @@ def oracle_routed_forward(
     return prediction.reshape(*values.shape[:-1], int(model.hidden_size))
 
 
+def save_oracle_assignments(assignments: OracleAssignments, path: str | Path) -> Path:
+    """Write assignment tensors and solver metadata with an atomic replace.
+
+    The saved object contains only detached CPU tensors and primitive metadata;
+    it never serializes the model or its learned selector. This makes an
+    assignment receipt safe to use as the frozen input to a later M step.
+    """
+
+    torch = _torch()
+    if not isinstance(assignments, OracleAssignments):
+        raise TypeError("assignments must be an OracleAssignments instance")
+    if assignments.indices.ndim != 2 or assignments.coefficients.shape != assignments.indices.shape:
+        raise ValueError("oracle assignment tensors must both be [batch, top_k]")
+    if assignments.residual_mse.ndim != 1 or assignments.residual_mse.shape[0] != assignments.indices.shape[0]:
+        raise ValueError("residual_mse must be [batch]")
+    target = Path(path)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "schema_version": 1,
+        "indices": assignments.indices.detach().cpu().to(dtype=torch.long),
+        "coefficients": assignments.coefficients.detach().cpu(),
+        "residual_mse": assignments.residual_mse.detach().cpu(),
+        "method": str(assignments.method),
+        "candidate_count": int(assignments.candidate_count),
+        "effective_candidate_pool_size": int(assignments.effective_candidate_pool_size),
+        "coefficient_constraint": str(assignments.coefficient_constraint),
+    }
+    descriptor, temporary = tempfile.mkstemp(prefix=f".{target.name}.", suffix=".tmp", dir=target.parent)
+    os.close(descriptor)
+    try:
+        torch.save(payload, temporary)
+        os.replace(temporary, target)
+    finally:
+        if os.path.exists(temporary):
+            os.unlink(temporary)
+    return target
+
+
+def load_oracle_assignments(path: str | Path, *, device: str | None = None) -> OracleAssignments:
+    """Load and validate a frozen assignment payload."""
+
+    torch = _torch()
+    target = Path(path)
+    if not target.exists():
+        raise FileNotFoundError(target)
+    payload = torch.load(str(target), map_location=device or "cpu")
+    if not isinstance(payload, Mapping) or int(payload.get("schema_version", 0)) != 1:
+        raise ValueError("unsupported oracle assignment payload")
+    required = ("indices", "coefficients", "residual_mse", "method", "candidate_count", "effective_candidate_pool_size", "coefficient_constraint")
+    missing = [name for name in required if name not in payload]
+    if missing:
+        raise ValueError(f"oracle assignment payload is missing: {', '.join(missing)}")
+    indices = torch.as_tensor(payload["indices"], device=device or "cpu", dtype=torch.long)
+    coefficients = torch.as_tensor(payload["coefficients"], device=device or "cpu")
+    residual_mse = torch.as_tensor(payload["residual_mse"], device=device or "cpu")
+    if indices.ndim != 2 or coefficients.shape != indices.shape:
+        raise ValueError("oracle assignment tensors must both be [batch, top_k]")
+    if residual_mse.ndim != 1 or residual_mse.shape[0] != indices.shape[0]:
+        raise ValueError("residual_mse must be [batch]")
+    if not torch.isfinite(coefficients).all() or not torch.isfinite(residual_mse).all():
+        raise ValueError("oracle assignment payload contains non-finite values")
+    return OracleAssignments(
+        indices=indices,
+        coefficients=coefficients,
+        residual_mse=residual_mse,
+        method=str(payload["method"]),
+        candidate_count=int(payload["candidate_count"]),
+        effective_candidate_pool_size=int(payload["effective_candidate_pool_size"]),
+        coefficient_constraint=str(payload["coefficient_constraint"]),
+    )
+
+
 def _iter_batches(source: Iterable[Any] | Callable[[], Iterable[Any]]) -> Iterator[Any]:
     values = source() if callable(source) else source
     return iter(values)
@@ -540,7 +626,9 @@ def train_oracle_routed_basis(
 
 __all__ = [
     "OracleAssignments",
+    "load_oracle_assignments",
     "oracle_assignments",
     "oracle_routed_forward",
+    "save_oracle_assignments",
     "train_oracle_routed_basis",
 ]

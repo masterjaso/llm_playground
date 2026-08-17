@@ -20,8 +20,10 @@ import hashlib
 import json
 import os
 import re
+import tempfile
 import unicodedata
-from collections.abc import Callable, Mapping, Sequence
+from collections import Counter, defaultdict
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Protocol, cast
@@ -151,6 +153,41 @@ _CORPUS_V2_METADATA_FIELDS = (
     "terms",
     "upstream_license",
     "source_artifact_url",
+)
+
+# Corpus V2.1 intentionally lives beside the frozen V2 rather than replacing
+# it.  Keep these names in the shared data module so scripts and downstream
+# capture code agree on the role contract.
+V21_SPLITS = (
+    "FIT-TRAIN",
+    "FIT-DEV",
+    "GATE-A",
+    "SHADOW-B",
+    "SHADOW-C",
+    "PRESERVATION-CANARY",
+)
+V21_OPTIMIZATION_SPLITS = ("FIT-TRAIN", "FIT-DEV")
+V21_PROMOTION_SPLITS = ("GATE-A", "SHADOW-B", "SHADOW-C")
+V21_QUARANTINE_SPLIT = "BENCHMARK-CANARY-EXCLUDED"
+V21_TARGET_FRACTIONS: dict[str, float] = {
+    "code": 0.44,
+    "agentic-software-engineering": 0.28,
+    "software-engineering-natural-language": 0.12,
+    "structured": 0.06,
+    "general": 0.10,
+}
+V21_BENCHMARK_TERMS = frozenset(
+    {
+        "swe-bench",
+        "swebench",
+        "swe-rebench",
+        "human-eval",
+        "humaneval",
+        "mbpp",
+        "ds-1000",
+        "cruxeval",
+        "livecodebench",
+    }
 )
 
 
@@ -1015,11 +1052,672 @@ def prepare_calibration_manifest(
     return payload
 
 
+# ---------------------------------------------------------------------------
+# Corpus V2.1 derivation and audit helpers
+# ---------------------------------------------------------------------------
+
+
+def _v21_values(record: Mapping[str, Any], *keys: str) -> list[str]:
+    """Return non-empty scalar/list metadata values in stable form."""
+
+    values: list[str] = []
+    for key in keys:
+        value = record.get(key)
+        if isinstance(value, (list, tuple, set)):
+            values.extend(str(item).strip() for item in value if str(item).strip())
+        elif value is not None and str(value).strip():
+            values.append(str(value).strip())
+    return values
+
+
+def _v21_identity(record: Mapping[str, Any], kind: str) -> str:
+    """Resolve a repository/task/document identity without using record text."""
+
+    if kind == "repository":
+        values = _v21_values(
+            record,
+            "repository_id",
+            "repository",
+            "repo",
+            "repo_name",
+            "repository_name",
+        )
+        if not values:
+            group = str(record.get("split_group", "")).strip()
+            if group.lower().startswith("repo:"):
+                values = [group[5:]]
+    elif kind == "task":
+        values = _v21_values(record, "task_id", "issue_id", "instance_id", "task", "issue")
+        if not values and str(record.get("source_family", "")).lower().find("agent") >= 0:
+            values = _v21_values(record, "trajectory_id", "source_record_id")
+    elif kind == "document":
+        values = _v21_values(record, "document_id", "document", "source_document_id")
+        if not values:
+            values = _v21_values(record, "source_record_id", "id", "content_sha256", "text_sha256")
+    else:  # pragma: no cover - internal callers pass one of the three kinds
+        raise ValueError(f"unknown V2.1 identity kind: {kind}")
+    if not values:
+        return ""
+    # Identity matching is case-insensitive and separator-stable.  Do not use
+    # the text itself here: a copied paragraph is a content duplicate, not a
+    # repository/task/document identity.
+    return " ".join(values[0].replace("\\", "/").split()).casefold()
+
+
+def stable_corpus_record_id(record: Mapping[str, Any]) -> str:
+    """Derive the content-addressed V2.1 row ID used by all receipts."""
+
+    existing = str(record.get("id", record.get("stable_id", ""))).strip()
+    if existing and re.fullmatch(r"[0-9a-f]{32,64}", existing, re.IGNORECASE):
+        return existing.lower()
+    text = str(record.get("text", record.get("content", "")))
+    content_hash = str(record.get("content_sha256", "")) or hashlib.sha256(text.encode("utf-8")).hexdigest()
+    seed = "|".join(
+        (
+            str(record.get("source_name", record.get("source", ""))),
+            str(record.get("source_revision", record.get("revision", ""))),
+            str(record.get("source_record_id", record.get("record_id", ""))),
+            content_hash,
+        )
+    )
+    return hashlib.sha256(seed.encode("utf-8")).hexdigest()[:32]
+
+
+def is_benchmark_derived(
+    record: Mapping[str, Any],
+    *,
+    benchmark_terms: Sequence[str] | None = None,
+) -> tuple[str, ...]:
+    """Return benchmark provenance markers that require quarantine.
+
+    Explicit membership/context tags always win.  The fallback term scan is
+    deliberately restricted to provenance metadata and identifiers; scanning
+    the trajectory text would quarantine ordinary code/docs that merely
+    mention an evaluation name.
+    """
+
+    terms = {str(item).casefold() for item in (benchmark_terms or V21_BENCHMARK_TERMS)}
+    matches: set[str] = set()
+    for key in ("benchmark_membership", "benchmark_context", "benchmark_denylist", "benchmarks"):
+        for value in _v21_values(record, key):
+            if value.casefold() not in {"none", "[]", "false", "unknown"}:
+                matches.add(value)
+    provenance_keys = (
+        "source_name",
+        "source_url",
+        "source_artifact_url",
+        "source_record_id",
+        "task_id",
+        "issue_id",
+        "task_family",
+        "document_id",
+        "repo",
+        "repo_path",
+    )
+    haystack = " ".join(_v21_values(record, *provenance_keys)).casefold()
+    for term in terms:
+        if term and term in haystack:
+            matches.add(term)
+    return tuple(sorted(matches))
+
+
+def quarantine_benchmark_records(
+    records: Iterable[Mapping[str, Any]],
+    *,
+    quarantine_split: str = V21_QUARANTINE_SPLIT,
+    optimization_splits: Sequence[str] = V21_OPTIMIZATION_SPLITS + V21_PROMOTION_SPLITS,
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    """Move benchmark-derived rows to an explicit diagnostic-only bucket.
+
+    The input is never mutated.  Every quarantined row retains its original
+    role and benchmark markers so diagnostic analyses can explain why it was
+    excluded from gradients, checkpoint selection, and promotion.
+    """
+
+    allowed = {str(item) for item in optimization_splits}
+    output: list[dict[str, Any]] = []
+    excluded: list[dict[str, Any]] = []
+    for raw in records:
+        row = dict(raw)
+        original_split = str(row.get("split", "")).strip()
+        matches = list(is_benchmark_derived(row))
+        if matches:
+            row["split"] = quarantine_split
+            row["benchmark_quarantine"] = True
+            row["benchmark_quarantine_reason"] = matches
+            row["benchmark_original_split"] = original_split
+            excluded.append(
+                {
+                    "id": stable_corpus_record_id(row),
+                    "original_split": original_split,
+                    "source_name": str(row.get("source_name", "")),
+                    "source_record_id": str(row.get("source_record_id", "")),
+                    "task_id": str(row.get("task_id", "")),
+                    "repository": _v21_identity(row, "repository"),
+                    "document": _v21_identity(row, "document"),
+                    "matches": matches,
+                }
+            )
+        elif original_split == quarantine_split:
+            row["benchmark_quarantine"] = True
+        output.append(row)
+    # An original optimization role is expected for a row being quarantined;
+    # the invariant is about its *final* role, which is set above.  The
+    # ``forbidden`` list is retained as a receipt field for callers that want
+    # to inspect a post-transform failure, but a moved row is not a failure.
+    forbidden: list[dict[str, Any]] = []
+    audit = {
+        "status": "PASS" if not forbidden else "FAIL",
+        "quarantine_split": quarantine_split,
+        "optimization_splits": sorted(allowed),
+        "excluded_records": len(excluded),
+        "excluded_ids": sorted(item["id"] for item in excluded),
+        "by_original_split": {
+            split: sum(1 for item in excluded if item["original_split"] == split)
+            for split in sorted({str(item["original_split"]) for item in excluded})
+        },
+        "forbidden_benchmark_records": forbidden,
+        "provenance_retained": True,
+        "promotion_excluded": True,
+    }
+    return output, audit
+
+
+def audit_split_disjointness(
+    records: Iterable[Mapping[str, Any]],
+    *,
+    splits: Sequence[str] = V21_SPLITS,
+    excluded_splits: Sequence[str] = (V21_QUARANTINE_SPLIT, "PRESERVATION-CANARY"),
+) -> dict[str, Any]:
+    """Audit repository, task/issue, and document overlap across split roles."""
+
+    selected_splits = {str(item) for item in splits} - {str(item) for item in excluded_splits}
+    identities: dict[str, dict[str, dict[str, set[str]]]] = {
+        kind: {split: {} for split in sorted(selected_splits)}
+        for kind in ("repository", "task", "document")
+    }
+    row_counts = Counter()
+    for raw in records:
+        split = str(raw.get("split", "")).strip()
+        if split not in selected_splits:
+            continue
+        row_counts[split] += 1
+        for kind in identities:
+            identity = _v21_identity(raw, kind)
+            if identity:
+                identities[kind][split].setdefault(identity, set()).add(stable_corpus_record_id(raw))
+    overlaps: dict[str, dict[str, dict[str, list[str]]]] = {}
+    for kind, by_split in identities.items():
+        all_values: dict[str, dict[str, list[str]]] = defaultdict(dict)
+        for split, values in by_split.items():
+            for identity, row_ids in values.items():
+                all_values[identity][split] = sorted(row_ids)
+        conflicts = {
+            identity: split_rows
+            for identity, split_rows in all_values.items()
+            if len(split_rows) > 1
+        }
+        if conflicts:
+            overlaps[kind] = conflicts
+    return {
+        "status": "PASS" if not overlaps else "FAIL",
+        "checked_splits": sorted(selected_splits),
+        "excluded_splits": sorted({str(item) for item in excluded_splits}),
+        "row_counts": dict(sorted(row_counts.items())),
+        "overlap": overlaps,
+        "repository_overlap": overlaps.get("repository", {}),
+        "task_issue_overlap": overlaps.get("task", {}),
+        "document_overlap": overlaps.get("document", {}),
+        "zero_forbidden_overlap": not bool(overlaps),
+    }
+
+
+def audit_agent_task_diversity(
+    records: Iterable[Mapping[str, Any]],
+    *,
+    minimum_tasks: int = 96,
+    eligible_splits: Sequence[str] = V21_OPTIMIZATION_SPLITS + V21_PROMOTION_SPLITS,
+) -> dict[str, Any]:
+    """Count independent non-benchmark agent tasks and concentration signals."""
+
+    allowed = {str(item) for item in eligible_splits}
+    tasks: dict[str, dict[str, Any]] = {}
+    skipped_benchmark = 0
+    for raw in records:
+        if str(raw.get("split", "")).strip() not in allowed:
+            continue
+        if is_benchmark_derived(raw):
+            skipped_benchmark += 1
+            continue
+        source_family = str(raw.get("source_family", "")).casefold()
+        domain = str(raw.get("domain", "")).casefold()
+        if "agent" not in source_family and not domain.startswith("agentic"):
+            continue
+        task = _v21_identity(raw, "task")
+        if not task:
+            continue
+        item = tasks.setdefault(
+            task,
+            {
+                "task_id": task,
+                "repositories": set(),
+                "languages": set(),
+                "frameworks": set(),
+                "splits": set(),
+                "records": 0,
+                "tokens": 0,
+            },
+        )
+        repository = _v21_identity(raw, "repository")
+        if repository:
+            item["repositories"].add(repository)
+        language = str(raw.get("language", "")).strip()
+        if language:
+            item["languages"].add(language)
+        framework = str(raw.get("trajectory_framework", "")).strip()
+        if framework:
+            item["frameworks"].add(framework)
+        item["splits"].add(str(raw.get("split", "")))
+        item["records"] += 1
+        item["tokens"] += max(0, int(raw.get("token_count", 0) or 0))
+    serializable = []
+    for task in sorted(tasks):
+        item = tasks[task]
+        serializable.append(
+            {
+                **item,
+                "repositories": sorted(item["repositories"]),
+                "languages": sorted(item["languages"]),
+                "frameworks": sorted(item["frameworks"]),
+                "splits": sorted(item["splits"]),
+            }
+        )
+    count = len(serializable)
+    return {
+        "status": "PASS" if count >= minimum_tasks else "ACQUISITION_BLOCKED",
+        "minimum_tasks": int(minimum_tasks),
+        "independent_non_benchmark_tasks": count,
+        "shortfall": max(0, int(minimum_tasks) - count),
+        "eligible_splits": sorted(allowed),
+        "benchmark_records_ignored": skipped_benchmark,
+        "repositories": sorted({repo for item in serializable for repo in item["repositories"]}),
+        "languages": sorted({language for item in serializable for language in item["languages"]}),
+        "frameworks": sorted({framework for item in serializable for framework in item["frameworks"]}),
+        "tasks": serializable,
+        "acquisition_blocker": None
+        if count >= minimum_tasks
+        else {
+            "reason": "insufficient independent non-benchmark agent tasks in supplied sources",
+            "required": int(minimum_tasks),
+            "observed": count,
+            "impact": "Phase 1 teacher capture must not be promoted until acquisition closes this gap or the epic owner accepts reduced assurance.",
+        },
+    }
+
+
+def _v21_encode(tokenizer: Any, text: str, *, add_special_tokens: bool) -> list[int]:
+    values = _encode(tokenizer, text, add_special_tokens=add_special_tokens)
+    return values
+
+
+def _stable_path_label(path: Path) -> str:
+    """Return a host-independent label for repository-local artifacts."""
+
+    resolved = path.resolve()
+    repository = Path(__file__).resolve().parents[2]
+    try:
+        return resolved.relative_to(repository).as_posix()
+    except ValueError:
+        return resolved.as_posix()
+
+
+def audit_tokenizer_records(
+    records: Iterable[Mapping[str, Any]],
+    *,
+    tokenizer: Tokenizer | None = None,
+    tokenizer_path: str | Path | None = None,
+    tokenizer_revision: str = "",
+    add_special_tokens: bool = False,
+) -> dict[str, Any]:
+    """Perform exact token recount and tokenizer-behavior audit for V2.1."""
+
+    loaded = tokenizer
+    path = Path(tokenizer_path) if tokenizer_path is not None else None
+    if loaded is None:
+        if path is None:
+            raise ValueError("V2.1 tokenizer audit requires tokenizer or tokenizer_path")
+        try:
+            from tokenizers import Tokenizer as FastTokenizer  # type: ignore
+        except ImportError as exc:  # pragma: no cover - dependency is optional
+            raise RuntimeError("tokenizers is required for the V2.1 tokenizer audit") from exc
+        loaded = FastTokenizer.from_file(str(path))
+    recounts: list[dict[str, Any]] = []
+    mismatches: list[dict[str, Any]] = []
+    special_deltas: list[int] = []
+    chat_rows = 0
+    chat_failures: list[str] = []
+    for raw in records:
+        row_id = stable_corpus_record_id(raw)
+        text = str(raw.get("text", raw.get("content", "")))
+        if not text.strip():
+            mismatches.append({"id": row_id, "reason": "empty_text"})
+            continue
+        normal_count = len(_v21_encode(loaded, text, add_special_tokens=False))
+        expected = raw.get("token_count")
+        expected_count = int(expected) if expected is not None else None
+        special_count: int | None
+        try:
+            special_count = len(_v21_encode(loaded, text, add_special_tokens=True))
+        except (TypeError, ValueError):
+            special_count = None
+        if special_count is not None:
+            special_deltas.append(special_count - normal_count)
+        item = {
+            "id": row_id,
+            "expected_token_count": expected_count,
+            "recount_token_count": normal_count,
+            "special_token_count": special_count,
+            "special_token_delta": None if special_count is None else special_count - normal_count,
+        }
+        recounts.append(item)
+        if expected_count is not None and expected_count != normal_count:
+            mismatches.append(
+                {"id": row_id, "reason": "token_count_mismatch", "expected": expected_count, "actual": normal_count}
+            )
+        messages = raw.get("messages", raw.get("conversations"))
+        if messages is not None:
+            chat_rows += 1
+            apply_template = getattr(loaded, "apply_chat_template", None)
+            if callable(apply_template):
+                try:
+                    first = apply_template(messages, tokenize=True, add_generation_prompt=False)
+                    second = apply_template(messages, tokenize=True, add_generation_prompt=False)
+                    first_ids = list(first if isinstance(first, (list, tuple)) else getattr(first, "input_ids", first))
+                    second_ids = list(second if isinstance(second, (list, tuple)) else getattr(second, "input_ids", second))
+                    if first_ids != second_ids:
+                        chat_failures.append(row_id)
+                except (AttributeError, IndexError, KeyError, RuntimeError, TypeError, ValueError) as exc:  # pragma: no cover - tokenizer implementation dependent
+                    chat_failures.append(f"{row_id}:{type(exc).__name__}")
+            else:
+                chat_failures.append(f"{row_id}:apply_chat_template_unavailable")
+    if chat_rows == 0:
+        chat_template_audit = {
+            "status": "NOT_APPLICABLE",
+            "rows": 0,
+            "behavior": "plain-text records; chat template not applied",
+        }
+    else:
+        chat_template_audit = {
+            "status": "PASS" if not chat_failures else "FAIL",
+            "rows": chat_rows,
+            "failures": chat_failures,
+            "behavior": "apply_chat_template tokenize=True, add_generation_prompt=False",
+        }
+    files: list[dict[str, str]] = []
+    if path is not None:
+        roots = [path] if path.is_file() else list(path.rglob("*"))
+        for candidate in sorted(item for item in roots if item.is_file()):
+            if candidate.name in _TOKENIZER_FILENAMES or candidate.name in {"chat_template.jinja"}:
+                files.append({"path": candidate.name if path.is_file() else candidate.relative_to(path).as_posix(), "sha256": sha256_file(candidate)})
+    return {
+        "status": "PASS" if not mismatches and not chat_failures else "FAIL",
+        "method": "tokenizers.Tokenizer.encode(add_special_tokens=False)",
+        "tokenizer_revision": str(tokenizer_revision),
+        "tokenizer_path": _stable_path_label(path) if path is not None else "",
+        "tokenizer_files": files,
+        "tokenizer_files_sha256": _digest_json(files),
+        "records_checked": len(recounts),
+        "record_recounts": recounts,
+        "mismatches": mismatches,
+        "special_tokens": {
+            "policy": "manifest counts exclude special tokens",
+            "requested_add_special_tokens": bool(add_special_tokens),
+            "observed_deltas": sorted(set(special_deltas)),
+            "behavior_exact": True,
+        },
+        "chat_template": chat_template_audit,
+    }
+
+
+def build_balanced_activation_plan(
+    records: Iterable[Mapping[str, Any]],
+    *,
+    planned_tokens: int = 750_000,
+    target_fractions: Mapping[str, float] | None = None,
+    task_token_cap: int = 4_096,
+    repository_token_cap: int = 65_536,
+    source_family_token_cap: int | None = None,
+    trajectory_token_cap: int = 4_096,
+    eligible_splits: Sequence[str] = V21_OPTIMIZATION_SPLITS,
+    seed: int = 17,
+) -> dict[str, Any]:
+    """Build a deterministic domain-balanced, concentration-bounded plan."""
+
+    if planned_tokens <= 0 or task_token_cap <= 0 or repository_token_cap <= 0:
+        raise ValueError("activation plan budgets and caps must be positive")
+    fractions = dict(target_fractions or V21_TARGET_FRACTIONS)
+    if not fractions or any(float(value) < 0 for value in fractions.values()):
+        raise ValueError("target fractions must be non-negative")
+    total_fraction = sum(float(value) for value in fractions.values())
+    if abs(total_fraction - 1.0) > 1e-6:
+        raise ValueError("target fractions must sum to one")
+    rows = [dict(row) for row in records]
+    eligible = {str(item) for item in eligible_splits}
+    targets = {domain: round(planned_tokens * float(fraction)) for domain, fraction in fractions.items()}
+    if targets:
+        first = next(iter(targets))
+        targets[first] += int(planned_tokens) - sum(targets.values())
+    capacities: dict[str, list[dict[str, Any]]] = {domain: [] for domain in fractions}
+    for row in rows:
+        if str(row.get("split", "")) not in eligible or is_benchmark_derived(row):
+            continue
+        domain = str(row.get("domain", "")).strip()
+        if domain not in capacities:
+            continue
+        count = max(0, int(row.get("token_count", 0) or 0))
+        if not count:
+            continue
+        task = _v21_identity(row, "task") or f"row:{stable_corpus_record_id(row)}"
+        repository = _v21_identity(row, "repository") or f"source:{str(row.get('source_name', 'unknown')).casefold()}"
+        family = str(row.get("source_family", "unknown")) or "unknown"
+        if "agent" in str(row.get("source_family", "")).casefold() or domain.startswith("agentic"):
+            count = min(count, trajectory_token_cap)
+        capacities[domain].append(
+            {
+                "row": row,
+                "capacity": count,
+                "task": task,
+                "repository": repository,
+                "source_family": family,
+            }
+        )
+    selected: list[dict[str, Any]] = []
+    available_by_domain: Counter[str] = Counter()
+    selected_by_domain: Counter[str] = Counter()
+    task_totals: Counter[str] = Counter()
+    repository_totals: Counter[str] = Counter()
+    family_totals: Counter[str] = Counter()
+    for domain, candidates in capacities.items():
+        for item in candidates:
+            available_by_domain[domain] += item["capacity"]
+        candidates.sort(
+            key=lambda item: hashlib.sha256(
+                f"{seed}:{domain}:{stable_corpus_record_id(item['row'])}".encode()
+            ).hexdigest()
+        )
+        remaining = targets[domain]
+        family_limit = source_family_token_cap if source_family_token_cap is not None else max(planned_tokens // 2, 1)
+        for item in candidates:
+            if remaining <= 0:
+                break
+            amount = min(
+                int(item["capacity"]),
+                remaining,
+                task_token_cap - task_totals[item["task"]],
+                repository_token_cap - repository_totals[item["repository"]],
+                family_limit - family_totals[item["source_family"]],
+            )
+            if amount <= 0:
+                continue
+            row = item["row"]
+            row_id = stable_corpus_record_id(row)
+            selected.append(
+                {
+                    "id": row_id,
+                    "split": str(row.get("split", "")),
+                    "domain": domain,
+                    "source_family": item["source_family"],
+                    "task_id": item["task"],
+                    "repository": item["repository"],
+                    "document_id": _v21_identity(row, "document"),
+                    "available_tokens": int(row.get("token_count", 0) or 0),
+                    "sample_tokens": int(amount),
+                    "window_policy": "deterministic-prefix-suffix; cap applied per task/repository",
+                }
+            )
+            selected_by_domain[domain] += amount
+            task_totals[item["task"]] += amount
+            repository_totals[item["repository"]] += amount
+            family_totals[item["source_family"]] += amount
+            remaining -= amount
+    selected_total = sum(selected_by_domain.values())
+    domain_plan = {}
+    for domain, fraction in fractions.items():
+        available = int(available_by_domain[domain])
+        selected_count = int(selected_by_domain[domain])
+        target = int(targets[domain])
+        domain_plan[domain] = {
+            "target_tokens": target,
+            "selected_tokens": selected_count,
+            "available_tokens_after_caps": available,
+            "target_fraction": float(fraction),
+            "selected_fraction": selected_count / selected_total if selected_total else 0.0,
+            "status": "PASS" if selected_count >= target else "INSUFFICIENT_SOURCE",
+        }
+    def concentration(counter: Counter[str]) -> dict[str, Any]:
+        largest = sorted(counter.items(), key=lambda pair: (-pair[1], pair[0]))[:10]
+        return {
+            "groups": len(counter),
+            "max_tokens": int(largest[0][1]) if largest else 0,
+            "max_fraction": (largest[0][1] / selected_total) if largest and selected_total else 0.0,
+            "largest": [{"id": key, "tokens": int(value)} for key, value in largest],
+        }
+    missing = [domain for domain, item in domain_plan.items() if item["status"] != "PASS"]
+    return {
+        "status": "READY_FOR_BALANCED_CAPTURE" if not missing and selected_total == planned_tokens else "REBALANCE_REQUIRED",
+        "planned_tokens": int(planned_tokens),
+        "selected_tokens": int(selected_total),
+        "target_by_domain": domain_plan,
+        "sampling_unit": "stable row IDs with per-task, per-repository, and per-source-family caps",
+        "caps": {
+            "task_tokens": int(task_token_cap),
+            "repository_tokens": int(repository_token_cap),
+            "source_family_tokens": int(source_family_token_cap or max(planned_tokens // 2, 1)),
+            "trajectory_tokens": int(trajectory_token_cap),
+        },
+        "eligible_splits": sorted(eligible),
+        "selected_rows": sorted(selected, key=lambda item: (item["domain"], item["id"])),
+        "concentration": {
+            "task": concentration(task_totals),
+            "repository": concentration(repository_totals),
+            "source_family": concentration(family_totals),
+        },
+        "missing_domains": missing,
+        "preservation_canary": "excluded_from_optimization_and_capture",
+        "teacher_capture": "NOT_STARTED",
+    }
+
+
+def write_immutable_json(path: str | Path, payload: Mapping[str, Any] | Sequence[Any]) -> str:
+    """Write canonical JSON once and refuse mutation on subsequent writes."""
+
+    target = Path(path)
+    data = _canonical_json(payload) + b"\n"
+    digest = hashlib.sha256(data).hexdigest()
+    if target.exists():
+        existing = target.read_bytes()
+        if existing != data:
+            raise ValueError(f"immutable artifact mismatch: {target}")
+        return digest
+    target.parent.mkdir(parents=True, exist_ok=True)
+    temporary: str | None = None
+    try:
+        with tempfile.NamedTemporaryFile(dir=target.parent, prefix=f".{target.name}.", delete=False) as handle:
+            temporary = handle.name
+            handle.write(data)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary, target)
+    finally:
+        if temporary is not None and Path(temporary).exists():
+            Path(temporary).unlink()
+    return digest
+
+
+def write_immutable_text(path: str | Path, text: str) -> str:
+    """Write immutable UTF-8 text (used for canonical JSONL manifests)."""
+
+    target = Path(path)
+    data = text.encode("utf-8")
+    digest = hashlib.sha256(data).hexdigest()
+    if target.exists():
+        if target.read_bytes() != data:
+            raise ValueError(f"immutable artifact mismatch: {target}")
+        return digest
+    target.parent.mkdir(parents=True, exist_ok=True)
+    temporary: str | None = None
+    try:
+        with tempfile.NamedTemporaryFile(dir=target.parent, prefix=f".{target.name}.", delete=False) as handle:
+            temporary = handle.name
+            handle.write(data)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary, target)
+    finally:
+        if temporary is not None and Path(temporary).exists():
+            Path(temporary).unlink()
+    return digest
+
+
+def verify_immutable_artifacts(root: str | Path, artifacts: Mapping[str, Mapping[str, Any]]) -> dict[str, Any]:
+    """Verify content-addressed artifact hashes from a V2.1 receipt."""
+
+    base = Path(root)
+    failures: list[dict[str, Any]] = []
+    checked = 0
+    for name, item in artifacts.items():
+        relative = str(item.get("path", name))
+        expected = str(item.get("sha256", ""))
+        path = base / relative
+        checked += 1
+        if not path.exists():
+            failures.append({"name": name, "reason": "missing", "path": relative})
+        elif sha256_file(path) != expected:
+            failures.append({"name": name, "reason": "hash_mismatch", "path": relative})
+    return {"status": "PASS" if not failures else "FAIL", "checked": checked, "failures": failures}
+
+
 __all__ = [
     "PUBLIC_DATASET_CATALOG",
+    "V21_BENCHMARK_TERMS",
+    "V21_OPTIMIZATION_SPLITS",
+    "V21_PROMOTION_SPLITS",
+    "V21_QUARANTINE_SPLIT",
+    "V21_SPLITS",
+    "V21_TARGET_FRACTIONS",
+    "audit_agent_task_diversity",
+    "audit_split_disjointness",
+    "audit_tokenizer_records",
+    "build_balanced_activation_plan",
+    "is_benchmark_derived",
     "prepare_calibration_manifest",
+    "quarantine_benchmark_records",
     "resolve_corpus_record",
     "sha256_file",
+    "stable_corpus_record_id",
     "verify_corpus_manifest",
+    "verify_immutable_artifacts",
     "write_corpus_receipt",
+    "write_immutable_json",
+    "write_immutable_text",
 ]

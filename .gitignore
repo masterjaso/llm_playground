@@ -31,3 +31,11 @@ runs/**/*.ckpt
 runs/**/*.onnx
 runs/**/*.npz
 *.publishing
+# Global-backed repos keep only the project beacon under .nsp/; runtime lives in NSP global homes.
+!.nsp/
+!.nsp/project.json
+!.nsp/artifacts/
+.nsp/artifacts/**
+!.nsp/artifacts/.gitkeep
+!.nsp/metrics.json
+!.nsp/capabilities.json

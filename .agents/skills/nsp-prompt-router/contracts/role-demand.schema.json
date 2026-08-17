@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://nehemiah-steward-protocol.local/contracts/role-demand.schema.json",
+  "title": "NSP Role Demand",
+  "description": "Portable execution responsibility and workflow policy. It must not assign a model, provider, harness, vendor, or executor.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["role", "mode", "binding", "writeAuthority", "onUnmet", "independentFrom"],
+  "properties": {
+    "role": {
+      "type": "string",
+      "enum": ["research-workhorse", "planner", "worker", "judgment", "verifier", "synthesizer", "triage"]
+    },
+    "mode": { "type": "string", "enum": ["none", "compact", "expanded"] },
+    "binding": { "type": "string", "enum": ["advisory", "preferred", "required"] },
+    "writeAuthority": { "type": "string", "enum": ["inherit", "artifact-only", "scoped-write"] },
+    "onUnmet": { "type": "string", "enum": ["continue", "continue-with-disclosure", "reduce-assurance", "block"] },
+    "independentFrom": {
+      "type": "array",
+      "maxItems": 8,
+      "uniqueItems": true,
+      "items": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$" }
+    },
+    "detailsRef": {
+      "type": "string",
+      "maxLength": 240,
+      "pattern": "^(?!/)(?!.*\\.\\.)(?!.*\\*)(?![A-Za-z]:)(?!.*://)[^\\r\\n\\u0000]{1,240}$"
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "mode": { "const": "expanded" } }, "required": ["mode"] },
+      "then": { "required": ["detailsRef"] },
+      "else": { "not": { "required": ["detailsRef"] } }
+    },
+    {
+      "if": { "properties": { "binding": { "const": "required" } }, "required": ["binding"] },
+      "then": { "properties": { "onUnmet": { "const": "block" } } }
+    },
+    {
+      "if": { "properties": { "binding": { "const": "preferred" } }, "required": ["binding"] },
+      "then": { "properties": { "onUnmet": { "enum": ["continue-with-disclosure", "reduce-assurance"] } } }
+    },
+    {
+      "if": { "properties": { "binding": { "const": "advisory" } }, "required": ["binding"] },
+      "then": { "properties": { "onUnmet": { "enum": ["continue", "continue-with-disclosure"] } } }
+    }
+  ]
+}

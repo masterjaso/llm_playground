@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-import json
 import hashlib
+import json
 from pathlib import Path
 
 import numpy as np
@@ -12,8 +12,10 @@ torch = pytest.importorskip("torch")
 from dense2moe.models.torch_moe import TorchQwen35SwiGLUMoE
 from dense2moe.partition import partition_indices
 from dense2moe.training.oracle_refinement import (
+    load_oracle_assignments,
     oracle_assignments,
     oracle_routed_forward,
+    save_oracle_assignments,
     train_oracle_routed_basis,
 )
 
@@ -69,6 +71,26 @@ def test_oracle_assignments_bypass_selector_and_fit_positive_coefficients() -> N
     assert assignment.coefficient_constraint == "nonnegative"
     assert float(torch.mean((prediction - target).square())) < 1e-8
     model.router = original_router
+
+
+def test_oracle_assignments_round_trip_and_ignore_selector_changes(tmp_path: Path) -> None:
+    model = _model()
+    inputs = torch.randn(3, 5)
+    with torch.no_grad():
+        target = model(inputs)
+    assignment = oracle_assignments(model, inputs, target, max_combinations=100)
+    path = tmp_path / "assignments.pt"
+    save_oracle_assignments(assignment, path)
+    restored = load_oracle_assignments(path)
+    assert torch.equal(restored.indices, assignment.indices)
+    assert torch.equal(restored.coefficients, assignment.coefficients)
+    assert torch.equal(restored.residual_mse, assignment.residual_mse)
+    before = oracle_routed_forward(model, inputs, restored)
+    with torch.no_grad():
+        for parameter in model.router.parameters():
+            parameter.add_(torch.randn_like(parameter))
+    after = oracle_routed_forward(model, inputs, restored)
+    assert torch.equal(before, after)
 
 
 def test_p32_style_assignment_is_explicitly_bounded() -> None:

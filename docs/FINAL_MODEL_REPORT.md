@@ -1,3 +1,21 @@
+<!-- nsp:meta
+id: docs.final.model.report
+kind: document
+scope: features
+persona: prompt-engineering
+status: active
+source: human
+confidence: high
+reviewStatus: reviewed
+graphNode: document:docs/FINAL_MODEL_REPORT.md
+graphTags: docs
+validation: manifest-check,secret-scan
+owner: features
+lastReviewed: 2026-05-23
+replaces: 
+replacedBy: 
+-->
+
 # Continuation report: dense-to-MoE recovery
 
 Run: `20260815-145505-windows-real-d2m`

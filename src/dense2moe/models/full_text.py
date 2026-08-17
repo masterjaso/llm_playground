@@ -24,6 +24,11 @@ except ImportError:  # pragma: no cover - optional dependency path.
     Tensor = Any  # type: ignore[misc,assignment]
     nn = None  # type: ignore[assignment]
 
+# Keep the package importable in the dependency-light control-plane
+# environment.  The concrete module operations still fail closed through
+# ``_require_torch`` when a caller tries to instantiate or run the spike.
+_ModuleBase = nn.Module if nn is not None else object
+
 from .torch_moe import TorchQwen35SwiGLUMoE
 
 
@@ -45,7 +50,7 @@ class TinyQwen35TextConfig:
     moe_layer: int = 0
 
 
-class _TinyDenseMLP(nn.Module):
+class _TinyDenseMLP(_ModuleBase):
     def __init__(self, hidden_size: int, intermediate_size: int) -> None:
         super().__init__()
         self.gate_proj = nn.Linear(hidden_size, intermediate_size, bias=False)
@@ -56,7 +61,7 @@ class _TinyDenseMLP(nn.Module):
         return self.down_proj(torch.nn.functional.silu(self.gate_proj(x)) * self.up_proj(x))
 
 
-class _TinyTextBlock(nn.Module):
+class _TinyTextBlock(_ModuleBase):
     def __init__(self, config: TinyQwen35TextConfig, *, is_moe: bool) -> None:
         super().__init__()
         self.input_layernorm = nn.LayerNorm(config.hidden_size)
@@ -82,7 +87,7 @@ class _TinyTextBlock(nn.Module):
         return x + self.mlp(self.post_attention_layernorm(x))
 
 
-class TinyQwen35TextMoE(nn.Module):
+class TinyQwen35TextMoE(_ModuleBase):
     """Minimal reloadable text model with one replaceable MLP."""
 
     architecture = "qwen3_5_text_tiny_moe_v1"

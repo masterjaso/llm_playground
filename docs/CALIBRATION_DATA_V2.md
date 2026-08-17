@@ -1,3 +1,21 @@
+<!-- nsp:meta
+id: docs.calibration.data.v2
+kind: document
+scope: features
+persona: prompt-engineering
+status: active
+source: human
+confidence: high
+reviewStatus: reviewed
+graphNode: document:docs/CALIBRATION_DATA_V2.md
+graphTags: docs
+validation: manifest-check,secret-scan
+owner: features
+lastReviewed: 2026-05-23
+replaces: 
+replacedBy: 
+-->
+
 # Calibration corpus v2
 
 Phase 2 calibration data is a reproducible, source-backed manifest.  The

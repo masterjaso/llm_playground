@@ -1,3 +1,21 @@
+<!-- nsp:meta
+id: docs.target.architecture
+kind: document
+scope: features
+persona: prompt-engineering
+status: active
+source: human
+confidence: high
+reviewStatus: reviewed
+graphNode: document:docs/TARGET_ARCHITECTURE.md
+graphTags: docs
+validation: manifest-check,secret-scan
+owner: features
+lastReviewed: 2026-05-23
+replaces: 
+replacedBy: 
+-->
+
 # Target architecture
 
 The target is text-only Qwen 3.5 with the source embedding, mixed

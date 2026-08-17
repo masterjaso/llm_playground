@@ -1,0 +1,121 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.nehemiah-steward-protocol.dev/planning-record.schema.json",
+  "title": "NSP Prompt Genesis Planning Record",
+  "description": "Agent-authored semantic planning input that deterministic tooling may validate and render without making planning judgments.",
+  "schemaVersion": 1,
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "readiness", "mode", "register"],
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "readiness": {
+      "enum": ["READY", "READY_WITH_ASSUMPTIONS", "CLARIFICATION_REQUIRED", "BLOCKING_INPUT_REQUIRED"]
+    },
+    "mode": {
+      "enum": ["interactive", "noninteractive"]
+    },
+    "clarificationBudget": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 3,
+      "default": 3
+    },
+    "summary": {
+      "type": "string"
+    },
+    "register": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/registerEntry"
+      }
+    },
+    "evidenceReferences": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "uniqueItems": true
+    }
+  },
+  "$defs": {
+    "registerEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "item",
+        "category",
+        "authority",
+        "resolution",
+        "source",
+        "confidence",
+        "reversibility",
+        "fallback",
+        "downstreamImpact",
+        "reviewTrigger",
+        "status"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9._-]{0,79}$"
+        },
+        "item": {
+          "type": "string",
+          "minLength": 1
+        },
+        "category": {
+          "enum": [
+            "discoverable_fact",
+            "repository_constraint",
+            "implementation_choice",
+            "user_decision",
+            "external_authority_decision"
+          ]
+        },
+        "authority": {
+          "enum": ["agent_selectable", "human_preferred", "human_required", "external_required"]
+        },
+        "resolution": {
+          "type": "string"
+        },
+        "source": {
+          "type": "string",
+          "minLength": 1
+        },
+        "confidence": {
+          "enum": ["low", "medium", "high"]
+        },
+        "reversibility": {
+          "enum": ["reversible", "costly_to_reverse", "irreversible", "unknown"]
+        },
+        "fallback": {
+          "type": "string"
+        },
+        "downstreamImpact": {
+          "type": "string",
+          "minLength": 1
+        },
+        "reviewTrigger": {
+          "type": "string",
+          "minLength": 1
+        },
+        "status": {
+          "enum": ["resolved", "assumed", "clarification_required", "blocking", "deferred"]
+        },
+        "recommendation": {
+          "type": "string",
+          "minLength": 1
+        },
+        "rationale": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}

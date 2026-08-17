@@ -1,3 +1,21 @@
+<!-- nsp:meta
+id: docs.quality.gates
+kind: document
+scope: features
+persona: prompt-engineering
+status: active
+source: human
+confidence: high
+reviewStatus: reviewed
+graphNode: document:docs/QUALITY_GATES.md
+graphTags: docs
+validation: manifest-check,secret-scan
+owner: features
+lastReviewed: 2026-05-23
+replaces: 
+replacedBy: 
+-->
+
 # Quality gates
 
 Thresholds are fixed for the initial p8/top-2 experiments and remain the

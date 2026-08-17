@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://nehemiah-steward-protocol.local/contracts/contradiction-ledger.schema.json",
+  "title": "NSP Contradiction Ledger",
+  "description": "Compact run-scoped ledger of decision-relevant failed assumptions.",
+  "type": "object",
+  "required": ["schemaVersion", "kind", "nspProvenance", "runId", "entries"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "kind": { "const": "contradiction-ledger" },
+    "nspProvenance": { "$ref": "#/$defs/provenance" },
+    "runId": { "$ref": "#/$defs/identifier" },
+    "entries": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "phaseOrPivId", "assumption", "observedDifference", "material", "status", "evidenceRefs"],
+        "properties": {
+          "id": { "$ref": "#/$defs/identifier" },
+          "phaseOrPivId": { "$ref": "#/$defs/identifier" },
+          "assumption": { "$ref": "#/$defs/string600" },
+          "observedDifference": { "$ref": "#/$defs/string600" },
+          "material": { "type": "boolean" },
+          "status": { "enum": ["unresolved", "resolved"] },
+          "evidenceRefs": { "$ref": "#/$defs/evidenceRefs" },
+          "resolution": { "$ref": "#/$defs/string600" }
+        },
+        "allOf": [
+          {
+            "if": { "properties": { "status": { "const": "resolved" } }, "required": ["status"] },
+            "then": { "required": ["resolution"] }
+          }
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "identifier": { "type": "string", "minLength": 1, "maxLength": 80, "pattern": "^(?!\\.{1,2}$)[a-z0-9][a-z0-9._-]*$" },
+    "string240": { "type": "string", "minLength": 1, "maxLength": 240 },
+    "string600": { "type": "string", "minLength": 1, "maxLength": 600 },
+    "evidenceRefs": { "type": "array", "minItems": 1, "maxItems": 5, "items": { "$ref": "#/$defs/string240" } },
+    "provenance": {
+      "type": "object",
+      "required": ["schemaVersion", "source", "semanticJudgmentByCli", "authority", "reviewStatus", "intendedSkillOwner", "modelProviderRequired"],
+      "properties": {
+        "schemaVersion": { "const": 1 }, "source": { "const": "deterministic-cli" },
+        "semanticJudgmentByCli": { "const": false },
+        "authority": { "enum": ["deterministic-validator", "deterministic-parser", "heuristic", "safe-repair-candidate"] },
+        "reviewStatus": { "enum": ["reviewed", "unreviewed"] },
+        "intendedSkillOwner": { "type": ["string", "null"] }, "modelProviderRequired": { "const": false }
+      },
+      "additionalProperties": false
+    }
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://nehemiah-steward-protocol.local/contracts/project-beacon.schema.json",
+  "title": "NSP Project Beacon",
+  "description": "Target-project beacon at .nsp/project.json.",
+  "type": "object",
+  "required": ["schemaVersion", "projectId", "nspEnabled", "installMode", "docsRoot", "governanceFile", "compatibility"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "projectId": { "type": "string" },
+    "nspEnabled": { "type": "boolean" },
+    "installMode": { "type": "string", "enum": ["global", "local-only"] },
+    "docsRoot": { "type": "string" },
+    "governanceFile": { "type": "string" },
+    "compatibility": {
+      "type": "object",
+      "required": ["nsp"],
+      "properties": {
+        "nsp": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "migration": {
+      "type": "object",
+      "properties": {
+        "lastMigrationId": { "type": "string" },
+        "previousMode": { "type": "string", "enum": ["global", "local-only"] }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

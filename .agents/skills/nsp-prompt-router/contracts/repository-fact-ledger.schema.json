@@ -1,0 +1,388 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.nehemiah-steward-protocol.dev/repository-fact-ledger.schema.json",
+  "title": "NSP Repository Fact Ledger",
+  "description": "Versioned, bounded repository evidence used by the Repository Discovery Gate. Facts do not replace architecture decisions or semantic planning judgment.",
+  "schemaVersion": 1,
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "kind",
+    "nspProvenance",
+    "target",
+    "requiredCoverage",
+    "discoveryResult",
+    "facts"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "kind": {
+      "const": "repository-fact-ledger"
+    },
+    "nspProvenance": {
+      "$ref": "#/$defs/nspProvenance"
+    },
+    "target": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 500
+    },
+    "runId": {
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9._-]{0,79}$"
+        }
+      ]
+    },
+    "baseRef": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200
+    },
+    "capturedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "repositoryState": {
+      "$ref": "#/$defs/repositoryState"
+    },
+    "contextReceiptRef": {
+      "$ref": "#/$defs/evidenceRef"
+    },
+    "routedContextRefs": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/evidenceRef"
+      },
+      "uniqueItems": true
+    },
+    "evidenceArtifacts": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/evidenceRef"
+      },
+      "uniqueItems": true
+    },
+    "requiredCoverage": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/factCategory"
+      }
+    },
+    "discoveryResult": {
+      "enum": ["DISCOVERY_READY", "DISCOVERY_BLOCKED"]
+    },
+    "facts": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/fact"
+      }
+    },
+    "blockers": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/blocker"
+      },
+      "uniqueItems": true
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "required": ["discoveryResult"],
+        "properties": {
+          "discoveryResult": {
+            "const": "DISCOVERY_READY"
+          }
+        }
+      },
+      "then": {
+        "required": ["capturedAt", "repositoryState"]
+      }
+    }
+  ],
+  "$defs": {
+    "nspProvenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "source",
+        "semanticJudgmentByCli",
+        "authority",
+        "reviewStatus",
+        "intendedSkillOwner",
+        "modelProviderRequired"
+      ],
+      "properties": {
+        "schemaVersion": {
+          "const": 1
+        },
+        "source": {
+          "const": "deterministic-cli"
+        },
+        "semanticJudgmentByCli": {
+          "const": false
+        },
+        "authority": {
+          "enum": ["deterministic-validator", "deterministic-parser", "heuristic", "safe-repair-candidate"]
+        },
+        "reviewStatus": {
+          "enum": ["reviewed", "unreviewed"]
+        },
+        "intendedSkillOwner": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "string"
+            }
+          ]
+        },
+        "modelProviderRequired": {
+          "const": false
+        }
+      }
+    },
+    "repositoryState": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["branch", "commit", "dirty"],
+      "properties": {
+        "branch": {
+          "type": "string",
+          "minLength": 1
+        },
+        "commit": {
+          "type": "string",
+          "minLength": 1
+        },
+        "dirty": {
+          "type": "boolean"
+        }
+      }
+    },
+    "factCategory": {
+      "enum": [
+        "file_path",
+        "file_responsibility",
+        "command",
+        "test_convention",
+        "schema",
+        "public_contract",
+        "producer",
+        "consumer",
+        "producer_consumer_surface",
+        "artifact_path",
+        "runtime_path",
+        "installation_mode",
+        "packaging",
+        "generated_source",
+        "compatibility_surface",
+        "other"
+      ]
+    },
+    "factStatus": {
+      "enum": ["verified", "rejected", "unknown", "conflicted"]
+    },
+    "factEvidenceKind": {
+      "enum": [
+        "path",
+        "repository-path",
+        "symbol",
+        "heading",
+        "line",
+        "command-source",
+        "command-output",
+        "artifact",
+        "test",
+        "commit",
+        "runtime",
+        "generated"
+      ]
+    },
+    "evidenceRef": {
+      "anyOf": [
+        {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind"],
+          "properties": {
+            "kind": {
+              "$ref": "#/$defs/factEvidenceKind"
+            },
+            "path": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 500,
+              "pattern": "^(?!/)(?!.*\\.\\.)(?!.*\\*).+$"
+            },
+            "anchor": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1000
+            },
+            "lineStart": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "lineEnd": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "command": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1000
+            },
+            "value": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1000
+            },
+            "source": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1000
+            }
+          }
+        }
+      ]
+    },
+    "fact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "claim",
+        "category",
+        "status",
+        "materiality",
+        "evidenceRefs",
+        "evidenceSummary",
+        "confidence",
+        "impactIfWrong",
+        "discoveryMethod",
+        "reviewTrigger"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$"
+        },
+        "claim": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4000
+        },
+        "category": {
+          "$ref": "#/$defs/factCategory"
+        },
+        "status": {
+          "$ref": "#/$defs/factStatus"
+        },
+        "materiality": {
+          "enum": ["material", "nonmaterial"]
+        },
+        "evidenceRefs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/evidenceRef"
+          },
+          "uniqueItems": true
+        },
+        "evidenceSummary": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4000
+        },
+        "confidence": {
+          "enum": ["low", "medium", "high"]
+        },
+        "impactIfWrong": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4000
+        },
+        "discoveryMethod": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1000
+        },
+        "reviewTrigger": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1000
+        }
+      }
+    },
+    "blocker": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "factId",
+        "unresolvedFact",
+        "whyUnresolved",
+        "neededEvidence",
+        "additionalDiscoveryPossible",
+        "impact"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$"
+        },
+        "factId": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$"
+            }
+          ]
+        },
+        "unresolvedFact": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4000
+        },
+        "whyUnresolved": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4000
+        },
+        "neededEvidence": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4000
+        },
+        "additionalDiscoveryPossible": {
+          "type": "boolean"
+        },
+        "impact": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4000
+        }
+      }
+    }
+  }
+}

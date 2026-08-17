@@ -1,3 +1,21 @@
+<!-- nsp:meta
+id: docs.real.d2m.plan
+kind: document
+scope: features
+persona: prompt-engineering
+status: active
+source: human
+confidence: high
+reviewStatus: reviewed
+graphNode: document:docs/REAL_D2M_PLAN.md
+graphTags: docs
+validation: manifest-check,secret-scan
+owner: features
+lastReviewed: 2026-05-23
+replaces: 
+replacedBy: 
+-->
+
 # Real dense-to-MoE continuation plan
 
 This plan records the continuation of `20260815-030931-windows` without

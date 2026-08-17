@@ -21,7 +21,27 @@ import sys
 import time
 from pathlib import Path
 
-import torch
+from dense2moe.hardware import collect_environment, run_environment_doctor
+
+environment = collect_environment()
+doctor = run_environment_doctor(environment=environment, repo_root=Path.cwd())
+if doctor["status"] != "GREEN":
+    blocked = {
+        "status": "WINDOWS_CUDA_BLOCKED",
+        "environment": environment,
+        "doctor": doctor,
+        "blockers": doctor.get("blockers", []),
+    }
+    target = Path(r'''__RECEIPT__''')
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(json.dumps(blocked, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    print(json.dumps(blocked, indent=2, sort_keys=True))
+    raise SystemExit("WINDOWS_CUDA_NOT_READY: environment doctor is blocked")
+
+try:
+    import torch
+except (ImportError, ModuleNotFoundError) as exc:
+    raise SystemExit(f"WINDOWS_CUDA_NOT_READY: torch import failed: {exc}")
 
 if not torch.cuda.is_available():
     raise SystemExit("WINDOWS_CUDA_NOT_READY: torch.cuda.is_available() is false")
@@ -61,6 +81,9 @@ payload = {
     "cuda_available": bool(torch.cuda.is_available()),
     "device_count": torch.cuda.device_count(),
     "devices": devices,
+    "environment": environment,
+    "doctor": doctor,
+    "recovery_pin": doctor.get("recovery_pin"),
 }
 target = Path(r'''__RECEIPT__''')
 target.parent.mkdir(parents=True, exist_ok=True)

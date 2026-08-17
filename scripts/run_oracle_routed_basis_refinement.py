@@ -100,14 +100,16 @@ def _verify_frozen_artifacts(receipt_path: Path, payload: dict[str, Any]) -> Non
                 if not isinstance(row, dict):
                     raise ValueError("corpus manifest rows must be objects")
                 manifest_rows.append(row)
-    expected_records = int(manifest.get("records", payload.get("records", 0)))
-    if len(manifest_rows) != expected_records:
-        raise ValueError(f"corpus manifest record count mismatch: expected {expected_records}, got {len(manifest_rows)}")
+    expected_records_value = manifest.get("records", payload.get("records"))
+    if expected_records_value is not None and len(manifest_rows) != int(expected_records_value):
+        raise ValueError(f"corpus manifest record count mismatch: expected {expected_records_value}, got {len(manifest_rows)}")
     manifest_ids = [str(row.get("id", "")) for row in manifest_rows]
     if not all(manifest_ids) or len(set(manifest_ids)) != len(manifest_ids):
         raise ValueError("corpus manifest IDs must be present and unique")
 
     split_identity = payload.get("split_identity")
+    if split_identity is None and isinstance(payload.get("artifacts"), dict):
+        split_identity = payload["artifacts"].get("corpus-v2.1-splits.json")
     if not isinstance(split_identity, dict) or not split_identity.get("path") or not split_identity.get("sha256"):
         raise ValueError("receipt must include a hashed frozen split manifest")
     split_path = _resolve_receipt_artifact(receipt_path, split_identity["path"])
@@ -120,12 +122,12 @@ def _verify_frozen_artifacts(receipt_path: Path, payload: dict[str, Any]) -> Non
         raise ValueError("frozen split manifest is not valid JSON") from exc
     split_records = split_payload.get("records") if isinstance(split_payload, dict) else None
     if not isinstance(split_records, dict):
-        raise ValueError("frozen split manifest must contain records by role")
+        raise ValueError("frozen split manifest must contain records by role")  # noqa: TRY004 - malformed receipt is a semantic validation error
     role_ids: list[str] = []
     seen: set[str] = set()
     for role, values in split_records.items():
         if not isinstance(values, list):
-            raise ValueError(f"split role {role!r} is not a list")
+            raise ValueError(f"split role {role!r} is not a list")  # noqa: TRY004 - malformed receipt is a semantic validation error
         for value in values:
             identifier = str(value)
             if identifier in seen:
@@ -162,53 +164,67 @@ def require_frozen_corpus_v2(receipt_path: str | Path) -> dict[str, Any]:
 
     version = _find_named_value(payload, {"corpus-version", "corpus-v2-version"})
     version_marker = _normalise_marker(version) if version is not None else ""
-    if version_marker not in {"v2", "2", "corpus-v2", "corpus-v2.0", "2.0"}:
-        raise ValueError("receipt must explicitly declare corpus_version=corpus-v2 (or v2)")
+    if version_marker not in {"v2", "2", "corpus-v2", "corpus-v2.0", "2.0", "v2.1", "corpus-v2.1", "2.1"}:
+        raise ValueError("receipt must explicitly declare corpus_version=corpus-v2 or corpus-v2.1")
 
     frozen = _find_named_value(payload, {"frozen", "corpus-frozen", "splits-frozen"})
     status = _find_named_value(payload, {"status", "corpus-status"})
     frozen_ok = _check_passed(frozen) or _normalise_marker(status) in {
         "corpus-v2-frozen",
+        "corpus-v21-frozen",
+        "corpus-v2.1-frozen",
         "corpus-frozen",
         "frozen",
         "corpus-verified-frozen",
     }
     if not frozen_ok:
-        raise ValueError("receipt must explicitly prove that corpus-v2 splits are frozen")
+        raise ValueError("receipt must explicitly prove that corpus-v2/v2.1 splits are frozen")
 
-    provenance = _find_named_value(
-        payload,
-        {
-            "provenance-check",
-            "provenance-checks",
-            "provenance-verified",
-            "source-provenance",
-            "provenance",
-        },
-    )
-    overlap = _find_named_value(
-        payload,
-        {
-            "overlap-check",
-            "overlap-checks",
-            "repo-document-overlap-check",
-            "repository-document-overlap",
-            "repo-document-overlap",
-            "repository-document-disjoint",
-            "overlap-verified",
-        },
-    )
-    denylist = _find_named_value(
-        payload,
-        {
-            "benchmark-denylist-check",
-            "benchmark-denylist-checks",
-            "benchmark-denylist-verified",
-            "denylist-check",
-            "denylist-checks",
-            "benchmark-denylist",
-        },
-    )
+    if version_marker in {"v2.1", "corpus-v2.1", "2.1"}:
+        phase_gate = payload.get("phase_gate")
+        if not isinstance(phase_gate, dict) or not _check_passed(phase_gate.get("status")):
+            raise ValueError("Corpus V2.1 phase gate is not green; acquire required tasks and capture capacity first")
+        parent = payload.get("parent_v2")
+        overlap_audit = payload.get("overlap_audit")
+        benchmark_audit = payload.get("benchmark_exclusion")
+        provenance = {"status": "pass" if isinstance(parent, dict) and parent.get("receipt_verified") else "blocked"}
+        overlap = overlap_audit.get("status") if isinstance(overlap_audit, dict) else None
+        denylist = benchmark_audit.get("status") if isinstance(benchmark_audit, dict) else None
+
+    if version_marker not in {"v2.1", "corpus-v2.1", "2.1"}:
+        provenance = _find_named_value(
+            payload,
+            {
+                "provenance-check",
+                "provenance-checks",
+                "provenance-verified",
+                "source-provenance",
+                "provenance",
+            },
+        )
+        overlap = _find_named_value(
+            payload,
+            {
+                "overlap-check",
+                "overlap-checks",
+                "repo-document-overlap-check",
+                "repository-document-overlap",
+                "repo-document-overlap",
+                "repository-document-disjoint",
+                "overlap-verified",
+            },
+        )
+        denylist = _find_named_value(
+            payload,
+            {
+                "benchmark-denylist-check",
+                "benchmark-denylist-checks",
+                "benchmark-denylist-verified",
+                "denylist-check",
+                "denylist-checks",
+                "benchmark-denylist",
+            },
+        )
     missing = [
         name
         for name, value in (

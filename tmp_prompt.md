@@ -1,13 +1,13 @@
-Yes. I’d make **corpus-v2 construction a hard Phase 0 and forbid any further meaningful basis refinement until it is frozen**.
+D2M / QWEN3.8 MOE — FEATURE-COMPLETION EPIC
+GENERALIZATION-FIRST DISTILLATION → ROBUST BF16 MOE → QUANTIZED MODEL
 
-Also, your inability to run the dense checkpoint autoregressively to create agent trajectories is **not a blocker**. We can obtain existing code/agent trajectories externally, then feed those fixed sequences through the dense Qwen checkpoint only for activation/teacher capture. The external trajectory supplies *where in token/context space we sample*; Qwen still supplies the actual FFN reconstruction target.
-
-There are good public sources for this. NVIDIA’s current Open-SWE-Traces contains large numbers of SWE-agent/OpenHands trajectories, including a Qwen3.5-generated non-thinking split, which is particularly attractive as an input-distribution source for us. ([Hugging Face][1]) CodeSearchNet gives repository-separated code/documentation data, and BigCode provides code plus issue/PR-oriented sources with provenance/licensing metadata, though The Stack requires careful compliance with its current access and source-license terms. ([GitHub][2])
-
-The branch is still at `b750733f3c2c337410f466c9bfc5c7db3042f941`, so this can supersede the previous takeover prompt cleanly.
-
-```text
-D2M TAKEOVER — CORPUS-V2 FIRST, THEN GENERALIZATION-FIRST BASIS REFINEMENT
+NSP execution:
+- Use /nsp-build-bezalel as the primary implementation/execution skill.
+- Use /nsp-plan-genesis only when material discovery invalidates this plan or requires the execution contract to be regenerated.
+- This is EPIC-scale work.
+- Use .agents/skills/nsp-epic-execution/SKILL.md for EPIC Ralph/PIV/ATDD execution.
+- Rehydrate from repository and Ralph artifacts, never from chat history or the Prompt Genesis conversation.
+- Do not begin implementation or edit source until Ralph state and explicit active-phase ATDD gates with exact validation commands exist.
 
 Repository:
     C:\workplace\llm_playground
@@ -15,723 +15,706 @@ Repository:
 Branch:
     agent/windows-dense2moe-real-pipeline
 
-Observed remote HEAD at prompt creation:
-    b750733f3c2c337410f466c9bfc5c7db3042f941
+Observed HEAD when this prompt was authored:
+    3d7dd69fcaf2f885169de35a20d05b2e43cc524e
 
-Execution:
-    Native Windows.
-
-Before doing anything:
-- pull/inspect actual HEAD
-- reconcile HANDOFF.md, state.json, decision-register.json, and latest takeover report
-- preserve all previous captures/checkpoints/reports
-- do not open official holdout
-- do not begin representative replay
-- do not begin full64 replay
+Do not assume that SHA is still current.
+Fetch/pull and record actual HEAD first.
 
 ======================================================================
-ACTIVE TARGETS
+0. PRIMARY OUTCOME
 ======================================================================
 
-Exactly two sparse targets remain active:
+Drive D2M from its current research state to a reproducible feature-complete
+pipeline capable of producing:
+
+    dense Qwen3.8 source
+        ->
+    sparse FFN-distilled MoE
+        ->
+    validated BF16 MoE checkpoint
+        ->
+    quantized MoE artifact
+        ->
+    measured production candidate
+
+while first proving that the distillation/training method learns a
+GENERALIZABLE sparse basis rather than overfitting another activation corpus.
+
+This epic must produce progress toward an actual trained model.
+
+Infrastructure work is allowed only when it removes a concrete blocker from:
+
+    corpus
+    teacher capture
+    distillation
+    training
+    assembly
+    evaluation
+    quantization
+
+Do not allow the project to return to open-ended diagnostic research.
+
+======================================================================
+1. PRODUCT TARGETS
+======================================================================
+
+Exactly TWO sparse topologies remain active.
 
 SAFE FALLBACK:
+
     p16/top4
-    16 experts x 1024
+    16 routed experts
+    routed width 1024
     shared width 1024
-    top4
-    70.59% FFN reduction
+    top_k = 4
+    active FFN width = 5120
+    ~70.59% FFN reduction
 
 PRIMARY PRODUCT TARGET:
+
     p32/top5
-    32 experts x 512
+    32 routed experts
+    routed width 512
     shared width 1024
-    top5
-    79.41% FFN reduction
+    top_k = 5
+    active FFN width = 3584
+    ~79.41% FFN reduction
 
-Do NOT work p32/top4.
+Do NOT resume research on p32/top4.
 
-Current working blocker for both:
-    BASIS_QUALITY
+p16/top4 is the minimum viable completion path.
 
-However, current ~0.922 oracle results were produced from tiny bounded
-continuations and must NOT be interpreted as topology capacity limits.
+p32/top5 is the preferred product target.
 
-======================================================================
-CRITICAL CHANGE: STOP REFINEMENT UNTIL CORPUS-V2 EXISTS
-======================================================================
+CRITICAL DELIVERY RULE:
 
-DO NOT launch another meaningful basis-refinement campaign on the existing
-WikiText/Gutenberg-heavy fresh corpus.
+    p32/top5 MUST NOT indefinitely block creation of a complete p16/top4
+    BF16 + quantized model.
 
-The previous project trajectory demonstrated that we can appear very close
-on one activation distribution while being far from robust on genuinely new
-data.
-
-We will not repeat that.
-
-Corpus-v2 must be created, audited, split, fingerprinted, and frozen BEFORE
-the next serious p16/p32 basis campaign.
-
-Small implementation smoke tests are allowed.
-
-No serious optimization is allowed before corpus-v2 is ready.
+Once p16/top4 is robustly viable, proceed toward full-model p16 conversion
+while p32/top5 research continues if needed.
 
 ======================================================================
-IMPORTANT CONSTRAINT: NO LOCAL DENSE-MODEL TRAJECTORY GENERATION
+2. PRESERVE QWEN BACKBONE
 ======================================================================
 
-The user CANNOT afford/run the dense source model to autoregressively generate
-a large coding/agent trajectory corpus.
+The project remains an FFN-only Dense-to-MoE conversion.
 
-Do NOT make source-model generation a prerequisite.
+Preserve:
 
-Instead:
+    attention
+    Gated DeltaNet / linear attention
+    full-attention blocks
+    RoPE
+    norms
+    residual topology
+    embeddings
+    LM head
+    tokenizer
+    special tokens
+    chat template
+    generation semantics
 
-1. Acquire static coding/agentic text and trajectories from external public
-   sources.
+Replace only dense SwiGLU FFNs.
 
-2. Normalize those trajectories into sequences compatible with the source
-   model chat/tool format where practical.
+Do not introduce reasoning-efficiency post-training.
 
-3. Feed those FIXED sequences through the existing dense Qwen teacher/capture
-   pipeline.
-
-4. Use the source checkpoint ONLY to obtain:
-       hidden states
-       dense FFN outputs
-       reconstruction targets
-
-The externally sourced model responses/tool traces are NOT teacher labels.
-
-The Qwen dense FFN output remains the teacher target.
-
-This distinction is fundamental:
-
-    external corpus = WHERE we sample the activation manifold
-    dense Qwen oracle = WHAT the sparse FFN must reproduce
-
-We do NOT need Qwen itself to author the corpus.
+Do not train a shorter-reasoning policy.
 
 ======================================================================
-WHY STATIC AGENT TRAJECTORIES ARE VALID
+3. PRODUCTION QUALITY GATES
 ======================================================================
 
-A coding-agent trajectory can already contain:
+Layer-level green remains:
 
-    user request
-    repository context
-    assistant action
-    shell command
-    shell output
-    file read
-    patch
-    test result
-    compiler error
-    retry
-    tool call
-    tool response
-    final answer
+    cosine >= 0.98
+    global NMSE <= 0.05
+    load CV <= 0.50
+    dead experts = 0
 
-Feed the complete causal sequence through the dense teacher.
+Do not weaken these because a new corpus is harder.
 
-This exposes the sparse-conversion training pipeline to the kinds of token
-contexts encountered during real agent execution without requiring the local
-dense model to generate those trajectories itself.
+Whole-model evaluation later must preserve the established project gates:
 
-Prefer trajectories structurally similar to the actual production workload.
+    perplexity increase:
+        green <= 5%
+        yellow <= 10%
 
-======================================================================
-CORPUS-V2 PRODUCTION OBJECTIVE
-======================================================================
+    token KL:
+        green <= 0.10
+        yellow <= 0.20
 
-This converted model will be used predominantly for:
+    top-1 agreement:
+        >= 85%
 
-    coding
-    software engineering
-    repository reasoning
-    tool calling
-    terminal interaction
-    agentic multi-step work
+Exact conversion / equivalence sanity where applicable:
 
-Therefore corpus-v2 should be PRODUCTION-WEIGHTED, while retaining enough
-general-domain material to prevent narrow specialization.
+    MSE <= 1e-8
 
-Initial target mixture by activation-token budget:
-
-    40-50% REAL SOURCE CODE / REPOSITORY CONTEXT
-
-        Python
-        TypeScript / JavaScript
-        C / C++
-        Rust
-        Go
-        Java / C#
-        GDScript
-        SQL
-        Bash
-        PowerShell
-        HTML/CSS/config formats
-
-        Include:
-            implementations
-            tests
-            configs
-            build files
-            CI
-            package manifests
-            schemas
-            migrations
-
-    25-30% AGENTIC SOFTWARE-ENGINEERING TRAJECTORIES
-
-        Include sequences containing:
-            issue/problem statement
-            repository exploration
-            grep/search
-            file reads
-            tool calls
-            shell commands
-            command output
-            stack traces
-            compiler errors
-            test failures
-            patches/diffs
-            retries
-            validation
-            final responses
-
-    10-15% SOFTWARE-ENGINEERING NATURAL LANGUAGE
-
-        READMEs
-        API documentation
-        architecture docs
-        issue descriptions
-        PR descriptions
-        code reviews
-        commit messages
-        specifications
-
-    5-10% STRUCTURED / TOOL MATERIAL
-
-        JSON
-        JSON Schema
-        XML
-        YAML
-        TOML
-        shell transcripts
-        function/tool calls
-        tool results
-        git output
-        compiler output
-        logs
-
-    10-15% GENERAL/STEM PRESERVATION
-
-        technical prose
-        normal natural language
-        factual text
-        math/scientific text
-        existing broad-text corpus
-
-Do not treat these percentages as immutable hyperparameters.
-
-They are an initial production-weighted mixture.
-
-No single repository, book, dataset, or source family may dominate.
+Quantization must be evaluated INCREMENTALLY against the validated BF16 MoE,
+in addition to evaluating final quality against the dense source model.
 
 ======================================================================
-EXTERNAL CORPUS SOURCES
+4. NSP REQUIRED START / DISCOVERY GATE
 ======================================================================
 
-Prioritize sources whose provenance/license/terms can be recorded clearly.
+Before broad repository loading or edits, run the NSP substrate.
 
-Strong initial candidates include:
+Required commands:
 
-A. OPEN-SWE-TRACES
+    _nsp status --target C:\workplace\llm_playground
 
-Use as a major source of agentic software-engineering trajectories.
+    _nsp context select \
+        --target C:\workplace\llm_playground \
+        --request "Drive D2M Qwen3.8 MoE from Corpus V2 through generalizable oracle-routed distillation, p16/p32 training, full-model assembly, validation, and quantization" \
+        --limit 8 \
+        --format json \
+        --receipt-v2
 
-Prefer, where practical:
+    _nsp run list --target C:\workplace\llm_playground
 
-    Qwen3.5 non-thinking trajectories
-    OpenHands trajectories
-    SWE-agent trajectories
+    _nsp plan-substrate \
+        --target C:\workplace\llm_playground \
+        --milestone "feature-complete robust Qwen3.8 Dense-to-MoE conversion and quantized candidate"
 
-The Qwen3.5 trajectory split is particularly interesting because its style is
-closer to the model family we are converting.
+For this EPIC, start or join an NSP run and record RUN_ID.
 
-IMPORTANT:
+Then:
 
-Do NOT treat another model's reasoning as our teacher.
+    _nsp plan-substrate discovery seed \
+        --target C:\workplace\llm_playground \
+        --run-id <RUN_ID>
 
-Use trajectory text/actions/observations only as activation contexts.
+Persist the canonical Repository Fact Ledger under:
 
-Prefer:
-    actions
-    observations
-    commands
-    code
-    diffs
-    tool interactions
-    assistant responses
+    .nsp/artifacts/runs/<RUN_ID>/planning/repository-fact-ledger.json
 
-Do not intentionally train reasoning-efficiency behavior.
+Then validate:
 
-Do not add a loss over external model answers.
+    _nsp plan-substrate discovery validate \
+        --target C:\workplace\llm_playground \
+        --path .nsp/artifacts/runs/<RUN_ID>/planning/repository-fact-ledger.json
 
-If a source contains explicit private/internal chain-of-thought-like fields,
-exclude those by default unless they are ordinary visible model output that
-would genuinely exist in our intended runtime format.
+Do not proceed into source edits until agent-owned semantic review concludes:
 
-B. PERMISSIVELY LICENSED REAL REPOSITORIES
+    DISCOVERY_READY
 
-Curate real repositories across our target language families.
+Required fact coverage includes at minimum:
 
-Prefer active, nontrivial projects containing:
-    tests
-    docs
-    issue-related changes
-    build tooling
-    CI
-    multiple interacting modules
+    actual branch HEAD
+    current run state
+    current corpus hashes
+    current split hashes
+    current teacher-capture implementation
+    current oracle-refinement implementation
+    current p16 checkpoint
+    current p32 checkpoint
+    current source checkpoint/revision
+    Python/Torch/CUDA environment used by prior successful Windows runs
+    model assembly path
+    model export/inference path
+    quantization-capable runtime/backend candidates
+    applicable tests
+    current holdout/replay closure
 
-Apply a license whitelist.
+Rejected or stale facts must not silently authorize execution.
 
-Record:
-    repo URL
-    commit SHA
-    license
-    language
-    file list/hash
-    split assignment
+If material facts are unknown/conflicted:
 
-C. CODESEARCHNET OR COMPARABLE CODE/DOC SOURCES
+    DISCOVERY_BLOCKED
 
-Useful for:
-    code
-    documentation
-    code-comment relationships
-
-Do not depend solely on it because agent behavior requires much more than
-function bodies.
-
-D. BIGCODE / THE STACK FAMILY
-
-May be used as a source of additional code/issues/PR-style material only if:
-
-    current access terms are satisfied
-    source licenses are acceptable
-    provenance is retained
-    removals/opt-out requirements are respected
-
-Do not blindly bulk-ingest it.
-
-E. REAL REPOSITORY HISTORY
-
-For selected permissive repositories, derive static examples from:
-
-    issues
-    commits
-    diffs
-    PR descriptions
-    test changes
-    bug fixes
-
-This is valuable because it provides real software-maintenance structure
-without requiring local LLM generation.
+and resolve them before continuing.
 
 ======================================================================
-BENCHMARK CONTAMINATION POLICY
+5. EPIC / RALPH OWNERSHIP
 ======================================================================
 
-Do NOT train on benchmark instances that we intend to use as final evaluation.
+Epic id:
 
-Maintain a denylist for intended downstream benchmarks.
+    epic-d2m-qwen38-moe
 
-At minimum, avoid training directly on held-out evaluation tasks from any
-benchmark we plan to report later.
+Ralph state:
 
-Repository-level overlap counts as contamination even if the exact issue is
-different when we are claiming repository-generalization evidence.
+    .nsp/artifacts/tmp/ralph/epic-d2m-qwen38-moe/
 
-Track:
-    repo
-    task
-    issue/PR identifier
-    commit
-    benchmark membership if known
+This Ralph state is the in-flight source of truth.
 
-======================================================================
-CORPUS QUALITY > RAW SIZE
-======================================================================
+Never use chat memory as execution state.
 
-Do not solve this by simply downloading millions of random code files.
+Never write in-flight epic state under .docs/roadmap/**.
 
-Favor:
+Every phase must contain:
 
-    real maintained projects
-    tests
-    buildable projects
-    realistic diffs
-    tool interactions
-    error/recovery sequences
-    cross-file context
-    useful documentation
+    objective
+    exact acceptance gates
+    exact validation commands
+    prediction depth
+    expected artifacts
+    actual observations
+    Prediction Result classifier
+    residual risks
+    next-phase eligibility
 
-Reject or heavily downweight:
+Use clean-context implementation and validation envelopes where supported.
 
-    generated boilerplate
-    vendored dependencies
-    minified code
-    lockfiles dominating the mix
-    enormous generated sources
-    duplicated forks
-    obvious spam
-    binary-derived text
-    repeated templates
-
-Near-deduplicate corpus-v2 before capture.
+Do not mark any phase complete without fresh evidence.
 
 ======================================================================
-REPOSITORY/DOCUMENT DISJOINTNESS IS MANDATORY
+6. KNOWN CURRENT STATE TO VERIFY
 ======================================================================
 
-Random token splits are NOT acceptable generalization evidence.
+Treat these as expected facts requiring repository verification:
 
-Build the split BEFORE activation capture where practical.
+- Corpus V2 exists and is frozen.
+- It currently contains 676 records.
+- A balanced activation plan targets ~750k tokens.
+- Planned capture mixture is approximately:
 
-No repository may span:
+      code                         44%
+      agentic SWE                 28%
+      SWE natural language        12%
+      structured/tool              6%
+      general                     10%
 
-    FIT
+- teacher capture for Corpus V2 has NOT started.
+- oracle-routed basis refinement has been implemented.
+- p16 can use exhaustive C(16,4)=1820 route search.
+- p32 uses a bounded candidate-pool oracle.
+- current ML execution is blocked because the environment used by the last
+  agent could not import usable PyTorch.
+- official holdout remains closed for the new run.
+- representative replay remains blocked.
+- full64 replay remains blocked.
+
+Also verify/fix known provenance drift:
+
+    child-run state/HANDOFF may record an older source commit than actual HEAD.
+
+No decisive experiment may start with stale provenance.
+
+======================================================================
+7. PHASE 0 — CORPUS V2.1 + ENVIRONMENT RECOVERY
+======================================================================
+
+Objective:
+
+    create a final production-oriented training/evaluation corpus and restore
+    a deterministic native-Windows ML environment.
+
+This is the final planned corpus revision before real distillation unless a
+later independent gate demonstrates a concrete coverage failure.
+
+--------------------------------------------------
+7A. CORPUS V2.1
+--------------------------------------------------
+
+Do NOT mutate frozen Corpus V2 in place.
+
+Derive:
+
+    Corpus V2.1
+
+Preserve V2 hashes and receipts.
+
+A. QUARANTINE BENCHMARK-DERIVED TASKS
+
+Current corpus evidence includes SWE-Bench-style / SWE-rebench-derived tasks.
+
+Move all benchmark-derived records outside:
+
+    FIT-TRAIN
+    FIT-DEV
     GATE-A
     SHADOW-B
     SHADOW-C
 
-For non-code sources:
+Use an explicit bucket such as:
 
-    no document may span those roles
+    BENCHMARK-CANARY-EXCLUDED
 
-For agent trajectories:
+They must never participate in:
 
-    avoid sharing the same underlying issue/PR/task across roles
+    gradients
+    checkpoint selection
+    shadow promotion
 
-Where possible, also keep related forks out of opposing splits.
+Keep provenance for diagnostic use only.
 
-======================================================================
-GENERALIZATION MATRIX
-======================================================================
+B. INCREASE INDEPENDENT AGENT TASK DIVERSITY
 
-Create and freeze:
+Current V2 contains too few complete agent trajectories for the importance
+assigned to that domain.
 
-1. FIT-TRAIN
+Target:
 
-Optimizer data.
+    >= 96 independent non-benchmark agent tasks
 
-Production-weighted coding/agentic mixture.
+Prefer:
 
-2. FIT-DEV
+    ~128-200 tasks
 
-From FIT source families but independent examples.
+if acquisition is straightforward.
 
-Can be evaluated frequently.
+Do not endlessly grow the corpus once diversity requirements are met.
 
-Used for:
-    implementation iteration
-    pilot checkpointing
-    LR/loss debugging
+Favor:
 
-NOT evidence of broad generalization.
+    more independent tasks
+    more repositories
+    more languages/frameworks
 
-3. GATE-A
+over:
 
-Repository/document-disjoint.
+    more tokens from the same task
 
-Used for real checkpoint selection.
+Suggested activation cap per agent task:
 
-Evaluate only at meaningful milestones.
+    approximately 2k-4k sampled tokens
 
-4. SHADOW-B
+unless evidence supports a different bounded cap.
 
-Different repositories and partially different task/language composition.
+Hard concentration checks:
 
-Confirmation only.
+    no single task dominates agentic activation sampling
+    no single repository dominates production sampling
+    no source family overwhelms the balanced sampler
 
-Do not use for hyperparameter tuning.
+Retain complete raw visible trajectories for provenance; sample bounded windows
+for activation capture.
 
-5. SHADOW-C
+C. REPOSITORY/TASK/DOCUMENT DISJOINTNESS
 
-A harder, independently sourced coding/agentic shadow.
+Maintain:
 
-Different repositories and preferably different trajectory source/framework.
-
-Do not open until a candidate has already survived A and B.
-
-6. GENERAL-PRESERVATION CANARY
-
-Use the existing WikiText/Gutenberg/general fresh data and selected historical
-data as regression canaries.
-
-These sets have already influenced project decisions and are NOT untouched
-generalization evidence.
-
-Their purpose is to detect catastrophic narrowing.
-
-7. OFFICIAL HISTORICAL HOLDOUT
-
-CLOSED.
-
-Do not open.
-
-======================================================================
-SOURCE-FAMILY DIVERSITY INSIDE EACH MAJOR SPLIT
-======================================================================
-
-Within FIT/A/B/C record metrics by:
-
-    language
-    repository
-    source family
-    task type
-    trajectory framework
-    code vs prose vs tool/log
-    sequence length bucket
-
-Important task families:
-
-    code generation
-    bug fixing
-    test repair
-    test creation
-    refactoring
-    repository navigation
-    code explanation
-    dependency problems
-    configuration problems
-    build failures
-    type errors
-    compiler errors
-    runtime exceptions
-    API usage
-    git operations
-    multi-file changes
-    long-context repository analysis
-    JSON/tool calling
-    shell interaction
-    iterative diagnose-edit-test loops
-
-Do not let "Python code completion" become a proxy for coding-agent coverage.
-
-======================================================================
-SAMPLING
-======================================================================
-
-Do not sample only proportional to corpus size.
-
-Use capped/balanced source-family sampling.
-
-Cap:
-    per repository
-    per source
-    per language where necessary
-
-so large repositories/datasets cannot dominate.
-
-Record the ACTUAL optimizer mixture in every run.
-
-======================================================================
-CORPUS-V2 SIZE
-======================================================================
-
-Do not immediately create a gigantic activation store.
-
-First produce a source corpus large enough to support staged captures.
-
-Suggested activation progression:
-
-    CORRECTNESS/SMOKE:
-        2k-4k states
-
-    PILOT:
-        ~32k states
-
-    SERIOUS:
-        ~128k states
-
-    BROAD FIT:
-        500k-1M+ states if trajectory continues improving
-
-The corpus source itself may be considerably larger.
-
-Activation capture can be progressively expanded without changing the frozen
-split identities.
-
-======================================================================
-CORPUS-V2 REQUIRED RECEIPT
-======================================================================
-
-Before basis refinement resumes, create a machine-readable corpus-v2 receipt.
-
-Record:
-
-    corpus version
-    creation code SHA
-    all source URLs/identifiers
-    source revisions
-    repository commit SHAs
-    licenses/terms metadata
-    source hashes
-    document hashes
-    language
-    source family
-    task family
-    trajectory framework/model if known
-    token counts
-    split assignments
-    dedup statistics
-    repo/document overlap checks
-    benchmark denylist checks
-
-Report final token/state budget per:
-
-    FIT
+    FIT-TRAIN
     FIT-DEV
-    A
-    B
-    C
-    preservation canary
+    GATE-A
+    SHADOW-B
+    SHADOW-C
+    PRESERVATION-CANARY
 
-Do not proceed if overlap/provenance checks fail.
+Require zero forbidden overlap at:
 
-======================================================================
-ONLY AFTER CORPUS-V2 IS FROZEN:
-ORACLE-ROUTED BASIS REFINEMENT
-======================================================================
+    repository
+    task/issue
+    document
 
-The current bounded basis trainer freezes the selector but still routes basis
-training through the selector's selected experts.
+level.
 
-Stop doing that for capacity learning.
+Do not use random token splitting as generalization evidence.
 
-The selector is already known to be weak.
+D. PRODUCTION COVERAGE
 
-Implement ORACLE-ROUTED / EM-LIKE basis refinement.
+Maintain production-weighted diversity:
 
-E STEP:
+    code
+    agentic coding
+    tool calls/results
+    shell
+    git
+    compiler/test output
+    structured formats
+    technical docs
+    broad/general preservation
 
-For current basis and each training state:
+Preserve the old Wiki/Gutenberg/general corpus only as an OOD/regression
+canary, not as primary optimization data.
 
-    obtain a strong sparse assignment
-    obtain positive route coefficients where applicable
+E. FREEZE
 
-For p16/top4:
-    exhaustive top4 assignment where practical
+Produce immutable:
 
-For p32/top5:
-    validated bounded strong candidate search
-    expand candidate pool when evidence suggests candidate limitation
+    corpus manifest
+    splits
+    source/provenance receipt
+    benchmark exclusion receipt
+    exact tokenizer audit
+    activation sampling plan
 
-M STEP:
+with hashes.
 
-Using frozen oracle assignments for a bounded interval, update only:
+--------------------------------------------------
+7B. WINDOWS ML ENVIRONMENT
+--------------------------------------------------
 
-    shared gate/up/down
-    expert gate/up/down
-    expert scales
+Do NOT blindly install whatever current torch package pip selects.
 
-against the dense source FFN target.
+First identify the exact native-Windows Python/Torch/CUDA environment or
+dependency combination that previously produced successful D2M GPU runs.
 
-Then recompute assignments.
+Recover/reuse it where possible.
 
-The learned selector does NOT control which experts receive basis gradients.
+Then pin enough information to reproduce it.
 
-======================================================================
-SHARED → RESIDUAL → JOINT REFINEMENT
-======================================================================
+Create or extend an environment doctor that proves:
 
-Stage 1:
-    shared-foundation refinement
+    Python executable/version
+    torch import
+    torch version
+    CUDA runtime
+    torch.cuda.is_available() == True
+    expected GPU visible
+    BF16 tensor operation
+    small CUDA GEMM
+    safetensors load
+    existing D2M checkpoint load
+    one p16 forward
+    one dense-teacher FFN forward
+    oracle module import
 
-Train the shared 1024 branch toward broadly useful dense FFN behavior.
+Run complete relevant ML tests after recovery.
 
-Stage 2:
-    routed residual specialization
+--------------------------------------------------
+PHASE 0 ATDD EXIT
+--------------------------------------------------
 
-Define:
+Required:
 
-    residual = dense_teacher - shared_output
+    Corpus V2.1 frozen
+    benchmark-derived tasks excluded from optimization/promotion
+    >=96 independent non-benchmark agent tasks unless a documented acquisition
+      blocker is accepted by the epic owner
+    overlap audits green
+    tokenizer audit green
+    balanced capture plan green
+    environment doctor green
+    complete ML test collection green
+    actual HEAD/provenance reconciled
 
-Train experts to reconstruct residual under oracle routing.
-
-Stage 3:
-    joint basis refinement
-
-Jointly refine:
-    shared
-    experts
-    scales
-
-under periodically refreshed oracle assignments.
-
-======================================================================
-DO NOT OVERFIT CORPUS-V2 EITHER
-======================================================================
-
-The existence of a better corpus does not remove overfitting risk.
-
-Use this experiment ladder:
-
-SMOKE:
-    FIT only
-
-PILOT:
-    FIT + FIT-DEV
-
-SERIOUS:
-    FIT + FIT-DEV
-    occasional A
-
-PROMOTION:
-    select using A
-
-CONFIRMATION:
-    B exactly once per selected finalist
-
-ROBUST CONFIRMATION:
-    C only after A+B success
-
-Do not look at B/C after every training run.
-
-If B or C fails:
-
-    record failure
-    return to FIT/design
-    formulate a hypothesis
-    train a NEW candidate
-
-Do not tune interactively while repeatedly observing shadow metrics.
+No teacher training campaign before this gate.
 
 ======================================================================
-PER-DOMAIN METRICS
+8. PHASE 1 — DISTILLATION METHOD PROOF
 ======================================================================
 
-For all meaningful evaluation cohorts report:
+Objective:
 
-    aggregate cosine
-    aggregate NMSE
-    hard-quartile cosine
+    prove oracle-routed basis training works scientifically before committing
+    large compute.
 
-plus per:
+Use p16/top4 as the method-proof topology because its top4 routing can be
+exhaustively evaluated over all 1,820 expert sets.
 
-    language
-    repository family
+--------------------------------------------------
+8A. TEACHER CAPTURE
+--------------------------------------------------
+
+Start small.
+
+Capture balanced V2.1 teacher activations at approximately:
+
+    2k-4k states
+
+Verify:
+
+    source revision
+    tokenizer
+    hidden geometry
+    dense FFN target
+    capture hashes
+    split identity
+
+Teacher output reconstruction/equivalence must satisfy existing strict
+numerical sanity requirements.
+
+Do not generate the source corpus autoregressively with the dense model.
+
+External fixed trajectories supply contexts.
+
+Dense Qwen supplies:
+
+    hidden states
+    dense FFN outputs
+    reconstruction target
+
+--------------------------------------------------
+8B. ORACLE METHOD VERIFICATION
+--------------------------------------------------
+
+Prove that:
+
+    learned selector is never consulted for E-step assignments
+    selector parameters receive no basis-training gradients
+    p16 E-step is exhaustive
+    route coefficients obey intended constraints
+    M-step uses frozen E-step assignments
+    assignments can refresh as basis changes
+    checkpoint save/reload preserves results
+
+Add change-sensitive tests if absent.
+
+--------------------------------------------------
+8C. SMALL REAL PILOT
+--------------------------------------------------
+
+Run:
+
+    ~2k-4k p16 oracle-routed smoke
+
+Then:
+
+    ~32k p16 production-balanced GPU pilot
+
+Use:
+
+    shared-foundation
+        ->
+    routed-residual
+        ->
+    joint refreshable basis refinement
+
+Primary measurement:
+
+    trained-basis UNCONSTRAINED oracle quality
+
+Selector is telemetry only.
+
+--------------------------------------------------
+METHOD-PROOF FALSIFIER
+--------------------------------------------------
+
+Do not accept another +0.0004-style result as evidence of success.
+
+Method proof is green if either:
+
+A. the initial V2.1 basis is already near capacity:
+       oracle cosine >= ~0.97
+       and NMSE trajectory is healthy
+
+OR
+
+B. the 32k pilot produces material improvement such as:
+       approximately +0.01 absolute oracle cosine
+       AND meaningful NMSE reduction
+
+with no material collapse on source-disjoint A sampling or preservation
+canaries.
+
+If neither occurs:
+
+    STOP SCALING.
+
+Diagnose:
+
+    shared branch
+    residual target
+    partition initialization
+    oracle assignment quality
+    route coefficient fitting
+    optimizer/LR
+    gradient normalization
+    expert specialization
+    candidate search
+
+One bounded hypothesis at a time.
+
+Do not spend 750k-state compute on an unproven method.
+
+======================================================================
+9. PHASE 2 — P16/TOP4 ROBUST TRAINING
+======================================================================
+
+Objective:
+
+    produce the safe-fallback layer-0 candidate and LOCK the training recipe.
+
+Progression:
+
+    32k pilot
+        ->
+    ~128k serious run
+        ->
+    larger balanced FIT / up to planned ~750k
+        only while trajectory remains useful
+
+Do not blindly consume the largest dataset.
+
+Use hard-token mining only from FIT.
+
+--------------------------------------------------
+9A. QUALITY FIRST
+--------------------------------------------------
+
+First solve unconstrained reconstruction.
+
+Target:
+
+    oracle cosine >= .98
+    oracle NMSE <= .05
+
+Do NOT heavily optimize load balance while oracle cosine remains far below
+~.97.
+
+--------------------------------------------------
+9B. JOINT QUALITY/LOAD
+--------------------------------------------------
+
+Once reconstruction is close:
+
+introduce load-friendly basis pressure / balanced oracle assignment.
+
+Require simultaneously:
+
+    cosine >= .98
+    NMSE <= .05
+    CV <= .50
+    dead experts = 0
+
+Load metrics must be measured on meaningful sample counts, not 16 tokens.
+
+--------------------------------------------------
+9C. SELECTOR
+--------------------------------------------------
+
+Only after oracle joint capacity is proven:
+
+    freeze basis
+
+Cache strong oracle labels on diverse FIT:
+
+    route IDs
+    coefficients
+    reconstruction regret
+    cosine regret
+
+Train selector against the FINAL basis.
+
+Weight routing mistakes by actual output damage.
+
+FIT-DEV:
+    frequent feedback allowed
+
+GATE-A:
+    milestone selection
+
+SHADOW-B:
+    confirmation only
+
+SHADOW-C:
+    final independent confirmation
+
+If B or C causes a method change:
+
+    that shadow is now diagnostic
+    it is no longer untouched evidence
+
+Use another still-untouched shadow for final promotion.
+
+--------------------------------------------------
+9D. GENERALIZATION
+--------------------------------------------------
+
+Report aggregate and per:
+
     source family
     task family
+    language
+    repository group
 
-Report:
+Track:
 
     worst-domain cosine
-    best-domain cosine
     domain spread
     FIT-DEV -> A gap
     A -> B gap
@@ -739,324 +722,611 @@ Report:
 
 Flag:
 
-    any material domain collapse
-    any independent-cohort cosine drop > ~0.01
-    any important production domain below ~0.975 when aggregate is near green
+    independent-cohort cosine drop > ~.01
+    important production domain < ~.975 when aggregate is near green
 
-These are investigation triggers.
+Do not call the model "close" because one familiar split is green.
 
-Do not lower the global production gate.
+--------------------------------------------------
+P16 ROBUST-GREEN
+--------------------------------------------------
 
-======================================================================
-P16/TOP4 FIRST
-======================================================================
+P16 is robust-green only when:
 
-p16/top4 remains the methodology proving ground and safe fallback.
+    oracle capacity green
+    load green
+    selector green
+    independent A/B/C evidence supports generalization
+    preservation canary shows no unexplained catastrophic collapse
 
-After corpus-v2 and oracle-routing are ready:
-
-1. 2k-4k smoke
-2. 16k-32k GPU pilot
-3. 64k-128k serious run if trajectory is strong
-4. scale toward broader FIT only after material improvement
-
-Primary basis criterion:
-
-    trained-basis unconstrained oracle
-
-Production reconstruction target:
-
-    cosine >= .98
-    NMSE <= .05
-
-Do not focus on selector quality until basis capacity is demonstrated.
-
-Do not focus aggressively on load CV while basis cosine remains ~.92.
+Only then may p16 advance toward representative-layer transfer.
 
 ======================================================================
-MATERIAL-IMPROVEMENT FALSIFIER
+10. PHASE 3 — P32/TOP5 PRIMARY PRODUCT
 ======================================================================
 
-The previous tiny continuations improved only ~0.0004 cosine.
+Do not make p32 rediscover the successful p16 recipe from scratch.
 
-A real 16k-32k oracle-routed diverse-data pilot should materially outperform
-that trajectory.
+After p16 methodology is proven:
 
-If the first serious pilot does NOT improve oracle cosine by approximately
-0.01 absolute or show a comparably convincing trajectory:
+transfer:
 
-DO NOT blindly scale to the full corpus.
-
-Investigate:
-
-    partition initialization
-    shared capacity
-    residual decomposition
-    assignment quality
-    coefficient fitting
-    optimization scale/LR
-    expert specialization
-    loss normalization
-
-before spending large compute.
-
-======================================================================
-QUALITY FIRST, LOAD SECOND
-======================================================================
-
-Current oracle reconstruction is too poor for load balancing to be the main
-optimization target.
-
-Phase order:
-
-1. reconstruction capacity
-2. robust cross-domain reconstruction
-3. quality/load joint geometry
-4. selector imitation/generalization
-
-Only when unconstrained basis oracle approaches >= .97 should load-aware
-basis pressure become a major objective.
-
-Final gate remains:
-
-    cosine >= .98
-    NMSE <= .05
-    load CV <= .50
-    dead experts = 0
-
-Evaluate load on hundreds/thousands of states, not tiny 16-token samples.
-
-======================================================================
-SELECTOR ONLY AFTER BASIS CAPACITY
-======================================================================
-
-Once a basis is robust across the required independent cohorts:
-
-    freeze basis
-
-Generate/cache oracle assignments over diverse FIT.
-
-Train selector against:
-
-    oracle route IDs
-    route coefficients
-    reconstruction regret
-    cosine regret
-
-Use actual reconstruction cost to weight mistakes.
-
-Selection:
-    FIT-DEV for frequent telemetry
-    A for finalist selection
-
-Confirmation:
-    B
-    then C
-
-Only after robust A/B/C evidence should an official holdout confirmation be
-considered.
-
-======================================================================
-P32/TOP5 AFTER P16 RECIPE IS WORKING
-======================================================================
-
-Do not make p32 independently rediscover the basis recipe.
-
-Once p16 refinement clearly works:
-
-Transfer:
-    p16 shared 1024 branch
+    shared 1024 branch
 
 Investigate structured initialization:
 
-    each p16 1024 expert
+    each p16 1024-wide routed expert
         ->
-    two p32 512 experts
+    two p32 512-wide experts
 
-Prefer contribution-aware/neuron-clustered split over arbitrary halves.
+Prefer contribution/neuron-aware splitting over arbitrary halves.
 
 Then run p32-specific:
 
-    top5 oracle routing
-    residual specialization
-    joint refinement
+    top5 oracle assignment
+    shared/residual/joint refinement
+    load geometry
+    selector refinement
 
-using corpus-v2.
+Because p32 uses bounded oracle search:
 
-p32/top5 remains the primary product objective.
+    audit candidate-pool adequacy on small samples
 
-Decision guidance:
+Periodically expand candidate pools where practical.
 
-    >= .98 / <= .05
-        proceed aggressively
+Do not interpret a bounded-search failure as architecture impossibility
+without a coverage check.
+
+--------------------------------------------------
+P32 DECISION
+--------------------------------------------------
+
+If:
+
+    oracle >= .98 / <= .05
+
+then proceed aggressively.
+
+If:
 
     .975-.98
-        continue refinement
 
-    still .92-.94 after strong p16-derived initialization +
-    meaningful diverse GPU training
-        investigate real topology capacity limitation
+continue bounded refinement.
 
-Do not reject p32 using current tiny-pilot evidence.
+If:
 
-======================================================================
-GENERALIZATION STATUS TERMINOLOGY
-======================================================================
+    remains ~.92-.94
 
-Use explicit labels:
+after:
 
-    FIT-GREEN
-    A-GREEN
-    B-GREEN
-    C-GREEN
-    ROBUST-GREEN
+    successful p16-derived initialization
+    meaningful production-balanced GPU training
+    candidate-pool adequacy checks
 
-Do not call a candidate "close" merely because FIT or A is green.
+then document credible topology-capacity concern.
 
-ROBUST-GREEN requires independent evidence.
+p32 research may continue, but p16 completion must proceed.
 
 ======================================================================
-REPLAY REMAINS CLOSED
+11. PHASE 4 — TRAINING METHOD LOCK
 ======================================================================
 
-Do not begin representative replay.
+When p16 is robust-green and p32 status is understood, freeze a reproducible
+training specification.
 
-Do not begin full64 conversion.
+Lock:
 
-Do not open official holdout.
+    corpus version
+    split hashes
+    activation sampler
+    per-domain caps
+    partition initialization
+    shared/residual/joint stage schedule
+    E-step refresh schedule
+    coefficient solver
+    optimizer
+    LR
+    losses
+    oracle configuration
+    load policy
+    selector architecture
+    selector loss
+    checkpoint-selection rule
+    validation cadence
+    quality gates
 
-Future representative set remains:
+Publish:
 
-    0 1 2 3
+    TRAINING_METHOD_LOCK
+
+After this point:
+
+    representative layers validate TRANSFERABILITY
+
+They are not a new architecture-search playground.
+
+No arbitrary layer-by-layer hyperparameter invention.
+
+======================================================================
+12. PHASE 5 — REPRESENTATIVE LAYER MATRIX
+======================================================================
+
+Once p16 training method is locked, test exactly:
+
+    0  1  2  3
     28 29 30 31
     60 61 62 63
 
-with:
+Record:
 
-    LINEAR_A
-    LINEAR_B
-    LINEAR_C
-    FULL_ATTENTION
+    attention_type
+    cycle_position = layer % 4
+    cycle_index = layer // 4
 
-Only SwiGLU FFNs may be replaced.
+Cycle mapping:
 
-======================================================================
-NO REASONING POST-TRAINING
-======================================================================
+    mod4 0 = LINEAR_A
+    mod4 1 = LINEAR_B
+    mod4 2 = LINEAR_C
+    mod4 3 = FULL_ATTENTION
 
-Do not optimize reasoning length.
+Require the locked method to work across:
 
-Do not perform reasoning-efficiency post-training.
+    early
+    middle
+    late
+    all attention-cycle classes
 
-External agent trajectories are being used for activation-distribution
-coverage, not to introduce a new reasoning objective.
+Prefer:
 
-Passive telemetry remains acceptable.
+    one uniform topology
 
-======================================================================
-IMMEDIATE EXECUTION ORDER
-======================================================================
+or at most:
 
-1. Reconcile HEAD/state/HANDOFF.
+    simple attention-cycle-class decisions justified by evidence
 
-2. Update stale project state:
-       targets = p16/top4 + p32/top5
-       blocker = BASIS_QUALITY
-       replay = blocked
+Avoid bespoke per-layer designs.
 
-3. STOP serious existing-corpus basis refinement.
+--------------------------------------------------
+REPRESENTATIVE EXIT
+--------------------------------------------------
 
-4. Design corpus-v2 manifest/schema and benchmark denylist.
+The p16 fallback advances if representative evidence demonstrates that the
+locked training method transfers adequately across the 12-layer matrix.
 
-5. Acquire a coding/agent-heavy external corpus.
-
-6. Prioritize:
-       externally sourced agent trajectories
-       permissively licensed real repositories
-       issues/PRs/diffs/tests/docs
-       structured tool/log material
-
-7. Preserve a smaller general/STEM corpus.
-
-8. Deduplicate and license/provenance audit.
-
-9. Freeze repo/document-disjoint:
-       FIT
-       FIT-DEV
-       A
-       B
-       C
-
-10. Publish corpus-v2 receipt.
-
-11. Capture a small dense-teacher activation smoke from corpus-v2.
-
-12. Implement/test oracle-routed basis training.
-
-13. Run p16 16k-32k GPU pilot.
-
-14. Evaluate FIT-DEV and meaningful A sample.
-
-15. Scale only if materially improving.
-
-16. Establish robust p16 basis methodology.
-
-17. Transfer methodology/initialization to p32/top5.
-
-18. Do not open B/C casually.
-
-19. Do not open official holdout.
-
-20. Do not start representative/full64 replay.
+Do not require p32 to block p16 full conversion.
 
 ======================================================================
-TAKEOVER SUCCESS CONDITION
+13. PHASE 6 — FULL 64-LAYER P16 CONVERSION
 ======================================================================
 
-The next handoff should NOT simply say:
+This is the minimum viable model-completion path.
 
-    "trained longer and gained +0.0004"
+Once representative p16 is green:
 
-It should answer:
+    START FULL64 P16.
 
-A. CORPUS
+Do not automatically train every layer on 750k states.
 
-    Is corpus-v2 coding/agent-heavy?
-    Are sources/repositories documented?
-    Are splits truly repo/document disjoint?
-    Is benchmark contamination controlled?
-    Is general-domain preservation retained?
+Use representative experiments to determine the SMALLEST sufficient
+production-balanced training budget.
 
-B. P16
+Suggested strategy:
 
-    Did oracle-routed diverse training materially improve the basis?
-    What is the cross-domain trajectory?
-    What is the A generalization gap?
+    normal layer budget ~64k-128k
+    hard/problem layers escalate selectively
+    hard-token continuation only where needed
 
-C. P32
+Avoid wasting full 750k-scale optimization on easy layers.
 
-    Has the p16 methodology been transferred?
-    Is p32 responding to the improved training method?
+Use the existing resumable layer-major teacher/capture architecture.
 
-D. SCIENTIFIC QUESTION
+Maintain:
 
-    Are we learning a basis that reconstructs the dense Qwen FFN across the
-    production coding/agent manifold,
+    clean commit
+        ->
+    guarded execution
+        ->
+    receipt
+        ->
+    checkpoint hash
+        ->
+    report commit
 
-    OR
+for decisive runs.
 
-    are we merely fitting another convenient corpus?
+No science solely in an uncommitted tree.
 
-Do not proceed to expensive later-stage conversion until the evidence supports
-the former.
+======================================================================
+14. PHASE 7 — BF16 MODEL ASSEMBLY
+======================================================================
 
-Proceed autonomously through the bounded gates above.
-```
+Assemble a complete unquantized sparse model first.
 
-One addition I feel strongly about: **prefer the Qwen3.5 non-thinking portion of Open-SWE-Traces over importing arbitrary visible “reasoning” from other models**. It gives us realistic software-agent conversations/tool interactions without making Minimax-style reasoning prose a dominant part of the activation distribution. Open-SWE-Traces explicitly separates those kinds of traces, which makes that feasible. ([Hugging Face][3])
+Preserve all non-FFN tensors exactly unless required format conversion is
+proven equivalent.
 
-And I would keep the old WikiText/Gutenberg capture rather than delete it—it has become a useful **regression/OOD canary**, just not the corpus we should optimize around anymore.
+Verify:
 
-[1]: https://huggingface.co/datasets/nvidia/Open-SWE-Traces?utm_source=chatgpt.com "nvidia/Open-SWE-Traces · Datasets at Hugging Face"
-[2]: https://github.com/github/CodeSearchNet?utm_source=chatgpt.com "GitHub - github/CodeSearchNet: Datasets, tools, and benchmarks for representation learning of code. · GitHub"
-[3]: https://huggingface.co/datasets/nvidia/Open-SWE-Traces/blob/81ad5141cac45fccfc5af0528fea819c6989fc05/README.md?utm_source=chatgpt.com "README.md · nvidia/Open-SWE-Traces at 81ad5141cac45fccfc5af0528fea819c6989fc05"
+    all 64 FFNs replaced as intended
+    topology inventory
+    tensor inventory
+    model config
+    tokenizer/chat template
+    generation config
+    checkpoint load
+    representative forward tests
+    exact preserved tensor hashes where practical
+
+Produce a canonical:
+
+    BF16_SPARSE_MASTER
+
+Do not quantize an unvalidated research checkpoint.
+
+======================================================================
+15. PHASE 8 — WHOLE-MODEL VALIDATION
+======================================================================
+
+Evaluate BF16_SPARSE_MASTER against dense source.
+
+Include:
+
+A. MODEL-DISTRIBUTION METRICS
+
+    perplexity delta
+    token KL
+    top1 agreement
+
+B. CODING / AGENTIC BEHAVIOR
+
+Use tasks/repositories that are absent from Corpus V2.1 optimization splits.
+
+Cover:
+
+    code generation
+    bug fixing
+    repository navigation
+    multi-file edit
+    tests
+    compiler/runtime failure
+    retry/recovery
+    terminal interaction
+    JSON/tool calls
+    long-context code
+    multi-turn agent sequences
+
+C. GENERAL PRESERVATION
+
+Use general/STEM/OOD canaries.
+
+Do not optimize against the official holdout.
+
+Official holdout becomes eligible only after robust pre-holdout evidence.
+
+Use it once for finalist confirmation under the established project policy.
+
+======================================================================
+16. PHASE 9 — QUANTIZATION READINESS IN PARALLEL
+======================================================================
+
+Do not wait until the final day to discover that the target runtime cannot
+represent the new MoE.
+
+Once PHASE 2 method proof is green, start a PARALLEL NON-BLOCKING engineering
+track for:
+
+    sparse model serialization
+    runtime support
+    quantization backend compatibility
+    expert tensor layout
+    router precision requirements
+    shared-expert precision requirements
+
+Do NOT spend large compute quantizing research candidates.
+
+This track should answer:
+
+    what inference runtime will load this sparse architecture?
+    what quantized formats can represent the topology?
+    what tensors must remain BF16/FP16?
+    what tooling changes are needed?
+
+Avoid binding the project to GGUF, GPTQ, AWQ, EXL2, or another format before
+repository/runtime discovery establishes compatibility.
+
+======================================================================
+17. PHASE 10 — QUANTIZATION
+======================================================================
+
+Once BF16_SPARSE_MASTER passes whole-model gates:
+
+freeze it.
+
+Quantize from that exact checkpoint.
+
+Start conservatively:
+
+    higher precision / Q8-like baseline if supported
+
+then test more aggressive expert-weight quantization.
+
+Prefer keeping numerically sensitive components higher precision initially:
+
+    router
+    routing coefficients/scales
+    norms
+    other tiny/high-sensitivity tensors
+
+Measure BOTH:
+
+    Dense -> BF16 MoE degradation
+
+and
+
+    BF16 MoE -> Quantized MoE incremental degradation
+
+Do not hide distillation loss inside quantization loss.
+
+Produce at least one practical quantized candidate that remains inside the
+accepted whole-model quality envelope.
+
+======================================================================
+18. FEATURE-COMPLETION DEFINITION
+======================================================================
+
+D2M is FEATURE-COMPLETE when a clean checkout can reproducibly execute the
+full path:
+
+    source model verification
+        ->
+    corpus verification
+        ->
+    balanced teacher capture
+        ->
+    oracle-routed basis refinement
+        ->
+    load refinement
+        ->
+    selector training
+        ->
+    representative validation
+        ->
+    full64 conversion
+        ->
+    sparse model assembly
+        ->
+    BF16 validation
+        ->
+    quantization
+        ->
+    quantized validation
+
+without inventing a new ad-hoc script for every layer/phase.
+
+Integrate with the project's existing control plane where appropriate rather
+than creating unnecessary parallel orchestration.
+
+All major stages must be:
+
+    resumable
+    receipt-bearing
+    hash/fingerprint aware
+    failure-safe
+    provenance aware
+
+======================================================================
+19. RESEARCH-BUDGET / DRIFT RULES
+======================================================================
+
+Every research run must do at least one:
+
+    materially improve a candidate
+    falsify a specific hypothesis
+    remove a blocker on the path to the finished model
+
+Do not perform repetitive no-op refinements.
+
+A failed experiment must record:
+
+    hypothesis
+    prediction
+    result
+    falsifier outcome
+    next decision
+
+Maximum two materially similar retries without a new hypothesis.
+
+Do not respond to a failed shadow by repeatedly tuning on that shadow.
+
+Do not let infrastructure polishing consume multiple passes once environment
+and corpus gates are green.
+
+EXPECTED PACING:
+
+Pass 1:
+    V2.1 + environment + tests + small capture/oracle smoke
+
+Pass 2:
+    real 32k p16 method-proof experiment
+
+Pass 3:
+    128k p16 if green trajectory
+
+Pass 4:
+    larger p16 run / joint-load work
+
+Then:
+    selector + robust promotion
+    p32 transfer
+    representative layers
+    full64
+
+If execution diverges materially from that pacing, document why.
+
+======================================================================
+20. PARALLELISM
+======================================================================
+
+Once a phase has stable contracts, use independent work packages where useful.
+
+Potential parallel tracks:
+
+A. DISTILLATION SCIENCE
+    p16 / p32 basis + selector
+
+B. PRODUCTIZATION
+    assembly / serialization / runtime compatibility
+
+C. EVALUATION
+    clean coding-agent and whole-model harness
+
+D. QUANTIZATION READINESS
+    format/runtime spike
+
+Do not let parallel productization mutate the scientific training contract.
+
+Use path claims/run isolation under NSP.
+
+======================================================================
+21. REQUIRED CLOSEOUT ARTIFACTS PER PHASE
+======================================================================
+
+Every phase closeout records:
+
+    actual code HEAD
+    clean/dirty status
+    commands
+    tests
+    data hashes
+    checkpoint hashes
+    metrics
+    prediction result
+    gate decision
+    shadow sets opened
+    holdout opened
+    replay started
+    residual risks
+    exact next phase
+
+Do not claim:
+
+    fixed
+    complete
+    green
+    ready
+
+without fresh evidence.
+
+======================================================================
+22. HOLDOUT / REPLAY RULES
+======================================================================
+
+Until explicitly promoted:
+
+    official holdout = CLOSED
+    historical opened holdout = IMMUTABLE / NO TUNING
+    representative replay = BLOCKED
+    full64 replay = BLOCKED
+
+Representative replay unblocks only after:
+
+    robust p16 method + training lock
+
+Full64 p16 unblocks only after:
+
+    representative layer gate
+
+Official holdout unblocks only for a selected whole-model finalist under the
+existing project policy.
+
+======================================================================
+23. PLANNING / PREDICTION DISCIPLINE
+======================================================================
+
+For each phase during Plan:
+
+choose prediction depth:
+
+    none
+    compact
+    expanded
+
+Use expanded prediction for:
+
+    new distillation method
+    corpus/split changes
+    representative transfer
+    full64 conversion
+    model assembly
+    quantization
+
+During Validate compare observations to the activated Prediction Contract and
+record exactly one semantic Prediction Result classifier.
+
+A:
+
+    scope-discovery
+    counterexample
+    invalid-validation
+
+result reopens/blocks Discovery and requires repair/replan.
+
+Do not advance while a material contradiction remains unresolved.
+
+======================================================================
+24. SUCCESS GOAL
+======================================================================
+
+Near-term success:
+
+    prove the V2.1 oracle-routed p16 training method with a real 32k GPU pilot.
+
+Medium-term success:
+
+    robust-green p16 layer-0
+    training-method lock
+    p32/top5 strong candidate
+    12 representative layers
+
+Product success:
+
+    complete 64-layer p16 fallback
+    validated BF16 sparse Qwen3.8 derivative
+    at least one validated quantized artifact
+
+Preferred product success:
+
+    p32/top5 also reaches robust-green and produces a validated higher-sparsity
+    BF16 + quantized model.
+
+The project must always retain a clear path to the p16 fallback.
+
+======================================================================
+25. FIRST EXECUTION PHASE
+======================================================================
+
+Begin with PHASE 0 only.
+
+Do not immediately start the 750k capture.
+
+PHASE 0 output must include:
+
+1. NSP discovery receipt / Repository Fact Ledger.
+2. Reconciled current state and HEAD.
+3. Corpus V2.1 freeze.
+4. Benchmark-derived task quarantine.
+5. Agent-task diversity expansion.
+6. Final split/overlap/tokenization receipts.
+7. Recovered and pinned native-Windows ML environment.
+8. Environment doctor output.
+9. Full relevant ML tests.
+10. Exact PHASE 1 commands for:
+       small balanced teacher capture
+       p16 oracle smoke
+       2k-4k method smoke
+       32k method-proof pilot
+
+Then return control/evidence to the EPIC owner.
+
+Do NOT skip directly into large training before PHASE 0 gates are green.

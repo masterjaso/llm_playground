@@ -1,3 +1,21 @@
+<!-- nsp:meta
+id: docs.teacher.capture
+kind: document
+scope: features
+persona: prompt-engineering
+status: active
+source: human
+confidence: high
+reviewStatus: reviewed
+graphNode: document:docs/TEACHER_CAPTURE.md
+graphTags: docs
+validation: manifest-check,secret-scan
+owner: features
+lastReviewed: 2026-05-23
+replaces: 
+replacedBy: 
+-->
+
 # Native teacher activation capture
 
 `d2m capture` can run a real text-to-teacher path when a pinned, local

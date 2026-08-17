@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://nehemiah-steward-protocol.local/contracts/work-package.schema.json",
+  "title": "NSP Work Package",
+  "description": "Workstream-level orchestration contract with no model assignment fields.",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "packageId",
+    "projectId",
+    "runId",
+    "installMode",
+    "executionClass",
+    "objective",
+    "acceptanceGates",
+    "sharedInvariants",
+    "children",
+    "integrationValidation",
+    "classificationRevision"
+  ],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "packageId": { "type": "string" },
+    "projectId": { "type": "string" },
+    "runId": { "type": "string" },
+    "installMode": { "type": "string", "enum": ["global", "local-only"] },
+    "executionClass": { "const": "WORKSTREAM" },
+    "objective": { "type": "string" },
+    "acceptanceGates": { "type": "array", "items": { "type": "string" } },
+    "sharedInvariants": { "type": "array", "items": { "type": "string" } },
+    "children": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "objective", "status", "dependsOn", "requiredCapabilities", "preferredCapabilities", "capsulePath", "resultPath"],
+        "properties": {
+          "id": { "type": "string" },
+          "objective": { "type": "string" },
+          "status": {
+            "type": "string",
+            "enum": ["not-ready", "ready", "running", "validating", "passed", "failed", "blocked"]
+          },
+          "dependsOn": { "type": "array", "items": { "type": "string" } },
+          "requiredCapabilities": { "type": "array", "items": { "type": "string" } },
+          "preferredCapabilities": { "type": "array", "items": { "type": "string" } },
+          "capsulePath": { "type": ["string", "null"] },
+          "resultPath": { "type": ["string", "null"] },
+          "roleDemand": { "$ref": "role-demand.schema.json" },
+          "assuranceRequirements": { "$ref": "assurance.schema.json#/$defs/requirements" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "integrationValidation": { "type": "array", "items": { "type": "string" } },
+    "classificationRevision": {
+      "type": ["object", "null"],
+      "required": ["previousClass", "newClass", "reason", "evidence", "reclassifiedAt", "stateImpact"],
+      "properties": {
+        "previousClass": { "type": "string", "enum": ["DIRECT", "BOUNDED", "WORKSTREAM", "EPIC"] },
+        "newClass": { "type": "string", "enum": ["DIRECT", "BOUNDED", "WORKSTREAM", "EPIC"] },
+        "reason": { "type": "string" },
+        "evidence": { "type": "array", "items": { "type": "string" } },
+        "reclassifiedAt": { "type": "string" },
+        "stateImpact": { "type": "string" }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://nehemiah-steward-protocol.local/contracts/genesis-sweep-summary.schema.json",
+  "title": "NSP Genesis Sweep Summary",
+  "description": "Closeout summary produced by nsp-genesis-sweep. All claims must cite repository evidence. validation results come from CLI output.",
+  "type": "object",
+  "required": ["schemaVersion", "target", "filesCreatedOrUpdated", "validation", "ccbReadiness", "remainingRisks"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "target": { "type": "string" },
+    "generatedAt": { "type": "string" },
+    "filesCreatedOrUpdated": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["path", "evidence"],
+        "properties": {
+          "path": { "type": "string" },
+          "action": { "enum": ["created", "updated", "preserved", "marked-stale"] },
+          "evidence": { "type": "array", "items": { "type": "string" }, "minItems": 1 }
+        }
+      }
+    },
+    "personasUpdated": { "type": "array", "items": { "type": "string" } },
+    "guidanceNormalized": { "type": "array", "items": { "type": "string" } },
+    "validation": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["command", "result"],
+        "properties": {
+          "command": { "type": "string" },
+          "result": { "enum": ["PASS", "FAIL", "BLOCKED"] },
+          "notes": { "type": "string" }
+        }
+      }
+    },
+    "ccbReadiness": {
+      "type": "object",
+      "properties": {
+        "highestSatisfiedTier": { "type": "string" },
+        "activeFeatures": { "type": "number" },
+        "linkedFeatures": { "type": "number" }
+      }
+    },
+    "hygieneIssues": {
+      "type": "object",
+      "properties": {
+        "completed": { "type": "array", "items": { "type": "string" } },
+        "deferred": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "remainingRisks": { "type": "array", "items": { "type": "string" } },
+    "ralphStatePath": { "type": "string" }
+  }
+}
