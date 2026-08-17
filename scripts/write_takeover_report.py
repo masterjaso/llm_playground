@@ -31,6 +31,30 @@ def _metrics(receipt: dict[str, Any], key: str) -> dict[str, Any]:
     }
 
 
+def _continuation_summary(receipt: dict[str, Any], path: Path) -> dict[str, Any]:
+    return {
+        "path": str(path),
+        "status": receipt["status"],
+        "output_checkpoint": receipt["output_checkpoint"],
+        "output_tensor_sha256": receipt["output_checkpoint_tensor_sha256"],
+        "selector_frozen": receipt["selector_frozen"],
+        "fit_rows_used": receipt["split"]["fit_rows_used"],
+        "updates": receipt["updates"],
+        "before_student": receipt["before_validation_a"],
+        "after_student": receipt["after_validation_a"],
+    }
+
+
+def _diagnosis_summary(receipt: dict[str, Any], path: Path) -> dict[str, Any]:
+    return {
+        "path": str(path),
+        "student": _metrics(receipt, "student"),
+        "unconstrained_trained_basis_oracle": _metrics(receipt, "unconstrained_trained_basis_oracle"),
+        "load_constrained_trained_basis_oracle": _metrics(receipt, "load_constrained_trained_basis_oracle"),
+        "blocker": receipt["identified_blocker"],
+    }
+
+
 def run(args: argparse.Namespace) -> dict[str, Any]:
     p16_before = _load(args.p16_before)
     p16_after = _load(args.p16_after)
@@ -38,13 +62,27 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
     p32_before = _load(args.p32_before)
     p32_after = _load(args.p32_after)
     p32_cont = _load(args.p32_continuation)
+    optional_paths = (
+        args.p16_continuation2,
+        args.p16_after2,
+        args.p32_continuation2,
+        args.p32_after2,
+    )
+    if any(path is not None for path in optional_paths) and not all(path is not None for path in optional_paths):
+        raise ValueError("continuation round 2 requires both continuation and diagnosis receipts for p16 and p32")
+    p16_cont2 = _load(args.p16_continuation2) if args.p16_continuation2 else None
+    p16_after2 = _load(args.p16_after2) if args.p16_after2 else None
+    p32_cont2 = _load(args.p32_continuation2) if args.p32_continuation2 else None
+    p32_after2 = _load(args.p32_after2) if args.p32_after2 else None
+    p16_latest = p16_after2 or p16_after
+    p32_latest = p32_after2 or p32_after
     p16_equiv = _load(args.p16_equivalence)
     p32_equiv = _load(args.p32_equivalence)
     p16_frontier = p16_before["load_constrained_trained_basis_oracle"]["pricing_frontier"]
     p32_frontier = p32_before["load_constrained_trained_basis_oracle"]["pricing_frontier"]
     split = p16_before["split"]
     report = {
-        "schema_version": 2,
+        "schema_version": 3,
         "status": "TAKEOVER_COMPLETE_BOUNDED_REFINEMENT_CONTINUING",
         "observed_base_head": args.observed_base_head,
         "code_commit": current_git_commit(),
@@ -146,24 +184,8 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
                 "topk_recall": p16_before["student_oracle_topk_recall"],
                 "blocker": p16_before["identified_blocker"],
             },
-            "continuation": {
-                "path": str(args.p16_continuation),
-                "status": p16_cont["status"],
-                "output_checkpoint": p16_cont["output_checkpoint"],
-                "output_tensor_sha256": p16_cont["output_checkpoint_tensor_sha256"],
-                "selector_frozen": p16_cont["selector_frozen"],
-                "fit_rows_used": p16_cont["split"]["fit_rows_used"],
-                "updates": p16_cont["updates"],
-                "before_student": p16_cont["before_validation_a"],
-                "after_student": p16_cont["after_validation_a"],
-            },
-            "diagnosis_after": {
-                "path": str(args.p16_after),
-                "student": _metrics(p16_after, "student"),
-                "unconstrained_trained_basis_oracle": _metrics(p16_after, "unconstrained_trained_basis_oracle"),
-                "load_constrained_trained_basis_oracle": _metrics(p16_after, "load_constrained_trained_basis_oracle"),
-                "blocker": p16_after["identified_blocker"],
-            },
+            "continuation": _continuation_summary(p16_cont, args.p16_continuation),
+            "diagnosis_after": _diagnosis_summary(p16_after, args.p16_after),
             "next_state": "BASIS_REFINING_BOUNDED_PILOT",
         },
         "p32_top5": {
@@ -180,24 +202,8 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
                 "topk_recall": p32_before["student_oracle_topk_recall"],
                 "blocker": p32_before["identified_blocker"],
             },
-            "continuation": {
-                "path": str(args.p32_continuation),
-                "status": p32_cont["status"],
-                "output_checkpoint": p32_cont["output_checkpoint"],
-                "output_tensor_sha256": p32_cont["output_checkpoint_tensor_sha256"],
-                "selector_frozen": p32_cont["selector_frozen"],
-                "fit_rows_used": p32_cont["split"]["fit_rows_used"],
-                "updates": p32_cont["updates"],
-                "before_student": p32_cont["before_validation_a"],
-                "after_student": p32_cont["after_validation_a"],
-            },
-            "diagnosis_after": {
-                "path": str(args.p32_after),
-                "student": _metrics(p32_after, "student"),
-                "unconstrained_trained_basis_oracle": _metrics(p32_after, "unconstrained_trained_basis_oracle"),
-                "load_constrained_trained_basis_oracle": _metrics(p32_after, "load_constrained_trained_basis_oracle"),
-                "blocker": p32_after["identified_blocker"],
-            },
+            "continuation": _continuation_summary(p32_cont, args.p32_continuation),
+            "diagnosis_after": _diagnosis_summary(p32_after, args.p32_after),
             "next_state": "BASIS_REFINING_BOUNDED_PILOT",
         },
         "decision_table": [
@@ -205,16 +211,22 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
                 "target": "p16/top4",
                 "basis_cosine_before": p16_before["unconstrained_trained_basis_oracle"]["cosine"],
                 "basis_cosine_after": p16_after["unconstrained_trained_basis_oracle"]["cosine"],
+                "basis_cosine_after_latest": p16_latest["unconstrained_trained_basis_oracle"]["cosine"],
+                "basis_nmse_after_latest": p16_latest["unconstrained_trained_basis_oracle"]["global_nmse"],
+                "basis_load_cv_after_latest": p16_latest["unconstrained_trained_basis_oracle"]["load_cv"],
                 "joint_gate_oracle": p16_before["joint_quality_load_green"],
-                "blocker": p16_after["identified_blocker"],
+                "blocker": p16_latest["identified_blocker"],
                 "next_state": "REFINING",
             },
             {
                 "target": "p32/top5",
                 "basis_cosine_before": p32_before["unconstrained_trained_basis_oracle"]["cosine"],
                 "basis_cosine_after": p32_after["unconstrained_trained_basis_oracle"]["cosine"],
+                "basis_cosine_after_latest": p32_latest["unconstrained_trained_basis_oracle"]["cosine"],
+                "basis_nmse_after_latest": p32_latest["unconstrained_trained_basis_oracle"]["global_nmse"],
+                "basis_load_cv_after_latest": p32_latest["unconstrained_trained_basis_oracle"]["load_cv"],
                 "joint_gate_oracle": p32_before["joint_quality_load_green"],
-                "blocker": p32_after["identified_blocker"],
+                "blocker": p32_latest["identified_blocker"],
                 "next_state": "REFINING",
             },
         ],
@@ -230,6 +242,14 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         "representative_replay_started": False,
         "full64_replay_started": False,
     }
+    if p16_cont2 is not None:
+        report["p16_top4"]["continuation_round_2"] = _continuation_summary(p16_cont2, args.p16_continuation2)
+        report["p16_top4"]["diagnosis_after_round_2"] = _diagnosis_summary(p16_after2, args.p16_after2)
+        report["p32_top5"]["continuation_round_2"] = _continuation_summary(p32_cont2, args.p32_continuation2)
+        report["p32_top5"]["diagnosis_after_round_2"] = _diagnosis_summary(p32_after2, args.p32_after2)
+        report["continuation_rounds"] = 2
+    else:
+        report["continuation_rounds"] = 1
     return report
 
 
@@ -239,10 +259,14 @@ def main() -> None:
     parser.add_argument("--p16-before", type=Path, required=True)
     parser.add_argument("--p16-after", type=Path, required=True)
     parser.add_argument("--p16-continuation", type=Path, required=True)
+    parser.add_argument("--p16-continuation2", type=Path, default=None)
+    parser.add_argument("--p16-after2", type=Path, default=None)
     parser.add_argument("--p16-equivalence", type=Path, required=True)
     parser.add_argument("--p32-before", type=Path, required=True)
     parser.add_argument("--p32-after", type=Path, required=True)
     parser.add_argument("--p32-continuation", type=Path, required=True)
+    parser.add_argument("--p32-continuation2", type=Path, default=None)
+    parser.add_argument("--p32-after2", type=Path, default=None)
     parser.add_argument("--p32-equivalence", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--markdown", type=Path, required=True)
@@ -262,7 +286,7 @@ def main() -> None:
     ]
     for row in report["decision_table"]:
         before = report["p16_top4" if row["target"] == "p16/top4" else "p32_top5"]["diagnosis_before"]["unconstrained_trained_basis_oracle"]
-        after = report["p16_top4" if row["target"] == "p16/top4" else "p32_top5"]["diagnosis_after"]["unconstrained_trained_basis_oracle"]
+        after = report["p16_top4" if row["target"] == "p16/top4" else "p32_top5"]["diagnosis_after_round_2" if report["continuation_rounds"] > 1 else "diagnosis_after"]["unconstrained_trained_basis_oracle"]
         lines.append(f"| {row['target']} | {before['cosine']:.6f} → {after['cosine']:.6f} | {before['global_nmse']:.6f} → {after['global_nmse']:.6f} | {before['load_cv']:.6f} → {after['load_cv']:.6f} | `{row['blocker']}` | `{row['next_state']}` |")
     lines.extend(
         [

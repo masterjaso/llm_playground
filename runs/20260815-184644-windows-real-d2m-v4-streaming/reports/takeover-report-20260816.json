@@ -1,9 +1,13 @@
 {
-  "code_commit": "c9cfae0162114d56fe8975902b9cc3de2748ffa5",
+  "code_commit": "30046c4b2f03a7c3e95a5fdc2d479af0c0596d85",
+  "continuation_rounds": 2,
   "decision_table": [
     {
       "basis_cosine_after": 0.9224135195649348,
+      "basis_cosine_after_latest": 0.9228267818989015,
       "basis_cosine_before": 0.9217689794358982,
+      "basis_load_cv_after_latest": 0.6959705453537527,
+      "basis_nmse_after_latest": 0.12988979290693664,
       "blocker": "BASIS_QUALITY",
       "joint_gate_oracle": false,
       "next_state": "REFINING",
@@ -11,7 +15,10 @@
     },
     {
       "basis_cosine_after": 0.9223205663920128,
+      "basis_cosine_after_latest": 0.9224950033050815,
       "basis_cosine_before": 0.9218109324002488,
+      "basis_load_cv_after_latest": 1.1916375287812984,
+      "basis_nmse_after_latest": 0.1322860532291006,
       "blocker": "BASIS_QUALITY",
       "joint_gate_oracle": false,
       "next_state": "REFINING",
@@ -176,6 +183,65 @@
       "status": "BOUNDED_BASIS_REFINEMENT_COMPLETE",
       "updates": 8
     },
+    "continuation_round_2": {
+      "after_student": {
+        "cosine": 0.8911916799843311,
+        "dead_experts": 0,
+        "expert_usage_counts": [
+          8,
+          4,
+          3,
+          4,
+          7,
+          5,
+          3,
+          5,
+          6,
+          3,
+          3,
+          1,
+          5,
+          3,
+          2,
+          2
+        ],
+        "global_nmse": 0.20120871508905977,
+        "load_cv": 0.4592793267718459,
+        "tokens": 16
+      },
+      "before_student": {
+        "cosine": 0.890377800911665,
+        "dead_experts": 0,
+        "expert_usage_counts": [
+          8,
+          4,
+          3,
+          4,
+          7,
+          5,
+          3,
+          5,
+          6,
+          3,
+          3,
+          1,
+          5,
+          3,
+          2,
+          2
+        ],
+        "global_nmse": 0.20347148935610596,
+        "load_cv": 0.4592793267718459,
+        "tokens": 16
+      },
+      "fit_rows_used": 32,
+      "output_checkpoint": "runs\\20260815-184644-windows-real-d2m-v4-streaming\\layer-checkpoints\\fresh-basis\\p16-top4-bounded-basis-pilot-native-continue2\\layer-0000.safetensors",
+      "output_tensor_sha256": "c1bbee7389792e338f8e2a398226f9ce9ffd82b2a84f8183de49487e1eee58c2",
+      "path": "runs\\20260815-184644-windows-real-d2m-v4-streaming\\reports\\takeover-p16-bounded-basis-refinement-native-continue2-20260816.json",
+      "selector_frozen": true,
+      "status": "BOUNDED_BASIS_REFINEMENT_COMPLETE",
+      "updates": 64
+    },
     "diagnosis_after": {
       "blocker": "BASIS_QUALITY",
       "load_constrained_trained_basis_oracle": {
@@ -199,6 +265,31 @@
         "global_nmse": 0.13077134565454934,
         "hard_quartile_cosine": 0.8784783024935643,
         "load_cv": 0.6614378277661477
+      }
+    },
+    "diagnosis_after_round_2": {
+      "blocker": "BASIS_QUALITY",
+      "load_constrained_trained_basis_oracle": {
+        "cosine": 0.9228267818989015,
+        "dead_experts": 0,
+        "global_nmse": 0.12988979290693664,
+        "hard_quartile_cosine": 0.8788937948543446,
+        "load_cv": 0.6959705453537527
+      },
+      "path": "runs\\20260815-184644-windows-real-d2m-v4-streaming\\reports\\takeover-p16-trained-basis-diagnosis-after-continue2-native-20260816.json",
+      "student": {
+        "cosine": 0.8911916891145205,
+        "dead_experts": 0,
+        "global_nmse": 0.2012087133659642,
+        "hard_quartile_cosine": 0.7994523679183103,
+        "load_cv": 0.4592793267718459
+      },
+      "unconstrained_trained_basis_oracle": {
+        "cosine": 0.9228267818989015,
+        "dead_experts": 0,
+        "global_nmse": 0.12988979290693664,
+        "hard_quartile_cosine": 0.8788937948543446,
+        "load_cv": 0.6959705453537527
       }
     },
     "diagnosis_before": {
@@ -326,6 +417,97 @@
       "status": "BOUNDED_BASIS_REFINEMENT_COMPLETE",
       "updates": 8
     },
+    "continuation_round_2": {
+      "after_student": {
+        "cosine": 0.8589484132826328,
+        "dead_experts": 5,
+        "expert_usage_counts": [
+          4,
+          4,
+          4,
+          6,
+          6,
+          1,
+          4,
+          3,
+          1,
+          4,
+          3,
+          5,
+          1,
+          4,
+          2,
+          2,
+          7,
+          2,
+          1,
+          1,
+          1,
+          5,
+          0,
+          0,
+          1,
+          3,
+          0,
+          2,
+          2,
+          0,
+          0,
+          1
+        ],
+        "global_nmse": 0.2656465661782058,
+        "load_cv": 0.7810249675906654,
+        "tokens": 16
+      },
+      "before_student": {
+        "cosine": 0.8584501631557941,
+        "dead_experts": 5,
+        "expert_usage_counts": [
+          4,
+          4,
+          4,
+          6,
+          6,
+          1,
+          4,
+          3,
+          1,
+          4,
+          3,
+          5,
+          1,
+          4,
+          2,
+          2,
+          7,
+          2,
+          1,
+          1,
+          1,
+          5,
+          0,
+          0,
+          1,
+          3,
+          0,
+          2,
+          2,
+          0,
+          0,
+          1
+        ],
+        "global_nmse": 0.2671001937042477,
+        "load_cv": 0.7810249675906654,
+        "tokens": 16
+      },
+      "fit_rows_used": 32,
+      "output_checkpoint": "runs\\20260815-184644-windows-real-d2m-v4-streaming\\layer-checkpoints\\fresh-basis\\p32-top5-bounded-basis-pilot-native-continue2\\layer-0000.safetensors",
+      "output_tensor_sha256": "ae08e6c403c7b59c0d9ce96b4bb77b7ecb246ec92667e1c5d9dc24d52de99b4a",
+      "path": "runs\\20260815-184644-windows-real-d2m-v4-streaming\\reports\\takeover-p32-bounded-basis-refinement-native-continue2-20260816.json",
+      "selector_frozen": true,
+      "status": "BOUNDED_BASIS_REFINEMENT_COMPLETE",
+      "updates": 64
+    },
     "diagnosis_after": {
       "blocker": "BASIS_QUALITY",
       "load_constrained_trained_basis_oracle": {
@@ -349,6 +531,31 @@
         "global_nmse": 0.13279092868607664,
         "hard_quartile_cosine": 0.9133271586687035,
         "load_cv": 1.1661903789690602
+      }
+    },
+    "diagnosis_after_round_2": {
+      "blocker": "BASIS_QUALITY",
+      "load_constrained_trained_basis_oracle": {
+        "cosine": 0.9032320809041581,
+        "dead_experts": 10,
+        "global_nmse": 0.1638033843678248,
+        "hard_quartile_cosine": 0.8896091282722209,
+        "load_cv": 1.0535653752852738
+      },
+      "path": "runs\\20260815-184644-windows-real-d2m-v4-streaming\\reports\\takeover-p32-trained-basis-diagnosis-after-continue2-native-20260816.json",
+      "student": {
+        "cosine": 0.8589484199860423,
+        "dead_experts": 5,
+        "global_nmse": 0.2656465578573959,
+        "hard_quartile_cosine": 0.815451536499962,
+        "load_cv": 0.7810249675906654
+      },
+      "unconstrained_trained_basis_oracle": {
+        "cosine": 0.9224950033050815,
+        "dead_experts": 7,
+        "global_nmse": 0.1322860532291006,
+        "hard_quartile_cosine": 0.9140139183160455,
+        "load_cv": 1.1916375287812984
       }
     },
     "diagnosis_before": {
@@ -380,7 +587,7 @@
     "next_state": "BASIS_REFINING_BOUNDED_PILOT"
   },
   "representative_replay_started": false,
-  "schema_version": 2,
+  "schema_version": 3,
   "split_contract": {
     "a_b_overlap": 0,
     "dataset_hash": "b9c35dacf0085c5d5a0aa0607713bfeadfd8192058d9b4a05414057e88c72823",
