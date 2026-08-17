@@ -30,6 +30,7 @@ from dense2moe.hardware import (
     run_environment_doctor,
     write_runtime_lock,
 )
+from dense2moe.provenance import current_git_commit
 
 receipt_path = Path(r'''__ENVIRONMENT_RECEIPT__''')
 runtime_lock_path = Path(r'''__RUNTIME_LOCK__''')
@@ -55,7 +56,8 @@ if not doctor["ok"]:
     raise SystemExit("WINDOWS_CUDA_NOT_READY: environment capability gate is blocked")
 
 lock = load_runtime_lock(runtime_lock_path)
-if lock.get("status") == "MISSING":
+locked_commit = str(lock.get("payload", {}).get("code_commit", "")) if isinstance(lock.get("payload"), dict) else ""
+if lock.get("status") == "MISSING" or locked_commit != current_git_commit():
     lock = write_runtime_lock(
         environment,
         doctor,
