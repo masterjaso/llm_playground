@@ -118,7 +118,18 @@ print(f"WINDOWS_ENVIRONMENT_RECEIPT_WRITTEN: {target}")
     $pinCode = $pinCode.Replace("__PYTHON_VERSION__", $PythonVersion.Replace("'", "''"))
     $pinCode = $pinCode.Replace("__TORCH_VERSION__", $TorchVersion.Replace("'", "''"))
     $pinCode = $pinCode.Replace("__CUDA_INDEX_URL__", $CudaIndexUrl.Replace("'", "''"))
-    Invoke-Python -Name "write-environment-pin" -Args @("-c", $pinCode, $EnvironmentReceipt)
+    # Passing a multiline ``-c`` payload through the guarded PowerShell
+    # argument boundary strips Python quoting on Windows.  Publish the pin
+    # script as a temporary file instead so the exact source reaches Python
+    # unchanged and the command remains guarded.
+    $temporaryPin = Join-Path $env:TEMP ("d2m-environment-pin-" + [guid]::NewGuid().ToString("N") + ".py")
+    Set-Content -LiteralPath $temporaryPin -Value $pinCode -Encoding UTF8
+    try {
+        Invoke-Python -Name "write-environment-pin" -Args @($temporaryPin, $EnvironmentReceipt)
+    }
+    finally {
+        Remove-Item -LiteralPath $temporaryPin -Force -ErrorAction SilentlyContinue
+    }
     Write-Host "WINDOWS_PYTHON_READY"
     Write-Host "Interpreter: $venvPython"
     Write-Host "Environment receipt: $EnvironmentReceipt"

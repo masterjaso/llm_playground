@@ -1,10 +1,10 @@
-"""Run a corpus-gated, bounded oracle-routed basis refinement pilot.
+"""Compatibility wrapper for the legacy synthetic oracle smoke.
 
-This driver is intentionally smoke-test friendly.  It creates a tiny local
-SwiGLU fixture and exercises the same E/M implementation used by a real basis
-pilot; no model download, activation capture, or GPU is required.  A real
-pilot must pass an explicit frozen corpus-v2 receipt with ``--corpus-receipt``
-before any optimizer step is allowed.
+The implementation in this file creates a tiny local SwiGLU fixture.  It is
+useful for unit/smoke testing only and is never scientific or production
+evidence.  Real Phase 01 work must use
+``scripts/run_real_oracle_routed_basis_refinement.py`` with both a validated
+METHOD_PROOF_ONLY receipt and a real Qwen layer-0 capture receipt.
 
 The gate is deliberately fail-closed: old corpus receipts that only describe
 tokenization are not accepted as a frozen corpus-v2 receipt.  A receipt must
@@ -349,8 +349,8 @@ def require_method_proof_receipt(receipt_path: str | Path) -> dict[str, Any]:
     return payload
 
 
-def run_smoke(
-    receipt_path: str | Path,
+def run_synthetic_smoke(
+    receipt_path: str | Path | None = None,
     *,
     topology: str = "p16/top4",
     seed: int = 20260816,
@@ -360,17 +360,25 @@ def run_smoke(
     m_step_repeats: int = 1,
     candidate_pool_size: int | None = None,
     max_combinations: int = 4096,
-    receipt_kind: str = "corpus",
+    receipt_kind: str | None = None,
     device: str = "cpu",
 ) -> dict[str, Any]:
-    """Run a bounded E/M smoke after a corpus or method-proof gate passes."""
+    """Run the tiny random SwiGLU smoke and label it as non-promotable.
 
-    if receipt_kind == "method-proof":
+    ``receipt_path`` remains an optional compatibility hook for older callers
+    that wanted to exercise the corpus/method-proof receipt validators.  The
+    receipt, when supplied, does not change the evidence class of this run.
+    """
+
+    if receipt_path is not None and receipt_kind == "method-proof":
         receipt = require_method_proof_receipt(receipt_path)
-    elif receipt_kind == "corpus":
+    elif receipt_path is not None and receipt_kind == "corpus":
         receipt = require_frozen_corpus_v2(receipt_path)
-    else:
+    elif receipt_path is not None:
         raise ValueError(f"unknown receipt kind: {receipt_kind}")
+    else:
+        receipt = {}
+        receipt_kind = None
     if topology not in {"p16/top4", "p32/top5"}:
         raise ValueError("topology must be p16/top4 or p32/top5")
     if rows <= 0 or epochs < 0:
@@ -437,7 +445,10 @@ def run_smoke(
     if not router_unchanged or not amplitude_unchanged:
         raise AssertionError("oracle-routed smoke changed selector parameters")
     return {
-        "status": "ORACLE_ROUTED_BASIS_SMOKE_GREEN",
+        "status": "ORACLE_ROUTED_BASIS_SYNTHETIC_SMOKE_GREEN",
+        "evidence_class": "synthetic-smoke",
+        "scientific_promotion_eligible": False,
+        "production_promotion_eligible": False,
         "topology": topology,
         "device": device,
         "receipt_kind": receipt_kind,
@@ -445,6 +456,10 @@ def run_smoke(
         "method_proof_receipt": str(receipt_path) if receipt_kind == "method-proof" else None,
         "corpus_version": _find_named_value(receipt, {"corpus-version", "corpus-v2-version"}) if receipt_kind == "corpus" else None,
         "method_proof_only": receipt_kind == "method-proof",
+        "sample_count": int(rows),
+        "row_count": int(rows),
+        "token_count": None,
+        "terminology": "rows/samples; no token claim",
         "selector_frozen": True,
         "router_unchanged": router_unchanged,
         "amplitude_router_unchanged": amplitude_unchanged,
@@ -452,9 +467,20 @@ def run_smoke(
     }
 
 
+# Keep the import-level API used by historical unit tests, but make the
+# semantic class impossible to mistake for a real method-proof result.
+run_smoke = run_synthetic_smoke
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    receipts = parser.add_mutually_exclusive_group(required=True)
+    parser.add_argument(
+        "--synthetic-smoke",
+        action="store_true",
+        required=True,
+        help="required compatibility flag; this command can never emit scientific evidence",
+    )
+    receipts = parser.add_mutually_exclusive_group(required=False)
     receipts.add_argument("--corpus-receipt", type=Path)
     receipts.add_argument("--method-proof-receipt", type=Path)
     parser.add_argument("--topology", choices=("p16/top4", "p32/top5"), default="p16/top4")
@@ -479,7 +505,7 @@ def main() -> int:
                 m_step_repeats=args.m_step_repeats,
                 candidate_pool_size=args.candidate_pool_size,
                 max_combinations=args.max_combinations,
-                receipt_kind="method-proof" if args.method_proof_receipt else "corpus",
+                receipt_kind="method-proof" if args.method_proof_receipt else "corpus" if args.corpus_receipt else None,
                 device=args.device,
             ),
             indent=2,

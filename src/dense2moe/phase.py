@@ -40,6 +40,22 @@ PHASE_IDS = (PHASE_00A_ID, PHASE_00B_ID, *tuple(f"phase-{index:02d}" for index i
 PHASE_STATUSES = frozenset({"pending", "running", "blocked", "complete"})
 GATE_STATUSES = frozenset({"pending", "running", "passed", "failed", "blocked", "skipped"})
 PREDICTION_DEPTHS = frozenset({"none", "compact", "expanded"})
+PHASE_01_BLOCKED_NO_REAL_CAPTURE = "PHASE_01_BLOCKED_NO_REAL_CAPTURE"
+PHASE_01_BLOCKED_INVALID_CAPTURE = "PHASE_01_BLOCKED_INVALID_CAPTURE"
+PHASE_01_REAL_METHOD_PROOF_RUNNING = "PHASE_01_REAL_METHOD_PROOF_RUNNING"
+PHASE_01_REAL_METHOD_PROOF_GREEN = "PHASE_01_REAL_METHOD_PROOF_GREEN"
+PHASE_01_REAL_METHOD_PROOF_FAILED = "PHASE_01_REAL_METHOD_PROOF_FAILED"
+PHASE_01_REQUIRED_EVIDENCE_CLASS = "real-qwen-layer-capture"
+PHASE_01_MIN_TOKENS = 32_768
+PHASE_01_SCIENTIFIC_STATES = frozenset(
+    {
+        PHASE_01_BLOCKED_NO_REAL_CAPTURE,
+        PHASE_01_BLOCKED_INVALID_CAPTURE,
+        PHASE_01_REAL_METHOD_PROOF_RUNNING,
+        PHASE_01_REAL_METHOD_PROOF_GREEN,
+        PHASE_01_REAL_METHOD_PROOF_FAILED,
+    }
+)
 
 # Every executable phase handoff is a native PowerShell command. Keeping the
 # prefixes centralized prevents a later blueprint from silently reintroducing
@@ -57,6 +73,129 @@ def _utc_now() -> str:
 def _canonical_digest(payload: Mapping[str, Any]) -> str:
     encoded = json.dumps(payload, sort_keys=True, separators=(",", ":"), default=str).encode("utf-8")
     return hashlib.sha256(encoded).hexdigest()
+
+
+class Phase01PromotionBlocked(ValueError):
+    """Raised when Phase 01 evidence is not a real capture-backed result."""
+
+
+def _load_phase_artifact(value: Mapping[str, Any] | str | os.PathLike[str], *, label: str) -> dict[str, Any]:
+    if isinstance(value, Mapping):
+        return dict(value)
+    path = Path(value)
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, TypeError, ValueError, json.JSONDecodeError) as exc:
+        raise Phase01PromotionBlocked(f"{label} receipt is unreadable: {path}") from exc
+    if not isinstance(payload, Mapping):
+        raise Phase01PromotionBlocked(f"{label} receipt must be a JSON object")
+    return dict(payload)
+
+
+def validate_phase_01_promotion(
+    result_receipt: Mapping[str, Any] | str | os.PathLike[str],
+    *,
+    capture_receipt: Mapping[str, Any] | str | os.PathLike[str] | None = None,
+) -> dict[str, Any]:
+    """Validate the evidence class and receipt linkage required for Phase 01.
+
+    A synthetic result, an old ``ORACLE_ROUTED_BASIS_SMOKE_GREEN`` status, or
+    a real-looking result without a validated capture receipt is rejected.
+    """
+
+    result_path = Path(result_receipt) if isinstance(result_receipt, (str, os.PathLike)) else None
+    result = _load_phase_artifact(result_receipt, label="Phase 01 result")
+    evidence_class = str(result.get("evidence_class", ""))
+    status = str(result.get("status", ""))
+    if evidence_class != PHASE_01_REQUIRED_EVIDENCE_CLASS:
+        raise Phase01PromotionBlocked(PHASE_01_BLOCKED_NO_REAL_CAPTURE)
+    if status in {"ORACLE_ROUTED_BASIS_SMOKE_GREEN", "ORACLE_ROUTED_BASIS_SYNTHETIC_SMOKE_GREEN"} or "synthetic" in status.casefold():
+        raise Phase01PromotionBlocked("SYNTHETIC_EVIDENCE_REJECTED")
+
+    capture_value = capture_receipt or result.get("capture_receipt") or result.get("capture_receipt_path")
+    method_value = result.get("method_proof_receipt") or result.get("method_proof_receipt_path")
+    if capture_value is None or method_value is None:
+        raise Phase01PromotionBlocked(PHASE_01_BLOCKED_NO_REAL_CAPTURE)
+    if not isinstance(capture_value, (str, os.PathLike)) or not isinstance(method_value, (str, os.PathLike)):
+        raise Phase01PromotionBlocked("PHASE_01_RECEIPT_PATHS_REQUIRED")
+
+    # A result receipt is the final training/checkpoint contract, not merely a
+    # JSON status string.  Its canonical hash, linked receipt hashes, and
+    # reloadable checkpoint are verified before any phase state can turn green.
+    if result_path is None:
+        raise Phase01PromotionBlocked("PHASE_01_RESULT_RECEIPT_PATH_REQUIRED")
+    try:
+        from .training.real_method_proof import validate_result_receipt
+
+        result = validate_result_receipt(
+            result_path,
+            capture_receipt=Path(capture_value),
+            method_proof_receipt=Path(method_value),
+        )
+    except (OSError, TypeError, ValueError, KeyError) as exc:
+        raise Phase01PromotionBlocked(str(exc)) from exc
+
+    if result.get("scientific_promotion_eligible") is not True or result.get("production_promotion_eligible") is True:
+        raise Phase01PromotionBlocked("PHASE_01_ELIGIBILITY_FLAGS_INVALID")
+    if result.get("topology") != "p16/top4" or int(result.get("layer", -1)) != 0:
+        raise Phase01PromotionBlocked("PHASE_01_GEOMETRY_OR_TOPOLOGY_INVALID")
+    expected_source = {
+        "source_model": "Qwen/Qwen3.8-27B",
+        "source_revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
+        "source_model_type": "qwen3_5_text",
+    }
+    for key, expected in expected_source.items():
+        if result.get(key) != expected:
+            raise Phase01PromotionBlocked("PHASE_01_SOURCE_IDENTITY_INVALID")
+    token_count = int(result.get("token_count", result.get("sample_count", 0)) or 0)
+    if token_count < PHASE_01_MIN_TOKENS:
+        raise Phase01PromotionBlocked("PHASE_01_TOKEN_COUNT_BELOW_MINIMUM")
+
+    capture = _load_phase_artifact(capture_value, label="capture")
+    if capture.get("evidence_class") != PHASE_01_REQUIRED_EVIDENCE_CLASS:
+        raise Phase01PromotionBlocked("SYNTHETIC_EVIDENCE_REJECTED")
+    if capture.get("receipt_type") != "dense2moe-real-qwen-layer-capture":
+        raise Phase01PromotionBlocked(PHASE_01_BLOCKED_INVALID_CAPTURE)
+    try:
+        from .capture.real_method_proof import validate_capture_receipt
+
+        capture = validate_capture_receipt(
+            Path(capture_value),
+            method_proof_receipt=Path(method_value),
+            require_native_windows=True,
+            enforce_runtime_drift=True,
+            max_tokens=token_count,
+        )
+    except (OSError, TypeError, ValueError, KeyError) as exc:
+        raise Phase01PromotionBlocked(str(exc)) from exc
+    if result.get("capture_receipt_sha256") != hashlib.sha256(Path(capture_value).read_bytes()).hexdigest():
+        raise Phase01PromotionBlocked("CAPTURE_RECEIPT_HASH_MISMATCH")
+    if result.get("method_proof_receipt_sha256") != hashlib.sha256(Path(method_value).read_bytes()).hexdigest():
+        raise Phase01PromotionBlocked("METHOD_PROOF_RECEIPT_HASH_MISMATCH")
+    return {
+        "status": PHASE_01_REAL_METHOD_PROOF_GREEN,
+        "evidence_class": PHASE_01_REQUIRED_EVIDENCE_CLASS,
+        "scientific_promotion_eligible": True,
+        "production_promotion_eligible": False,
+        "result": result,
+        "capture": capture,
+    }
+
+
+def phase_01_promotion_state(
+    result_receipt: Mapping[str, Any] | str | os.PathLike[str] | None,
+    *,
+    capture_receipt: Mapping[str, Any] | str | os.PathLike[str] | None = None,
+) -> str:
+    """Return an explicit fail-closed Phase 01 state for orchestration."""
+
+    if result_receipt is None or capture_receipt is None:
+        return PHASE_01_BLOCKED_NO_REAL_CAPTURE
+    try:
+        validate_phase_01_promotion(result_receipt, capture_receipt=capture_receipt)
+    except Phase01PromotionBlocked:
+        return PHASE_01_BLOCKED_INVALID_CAPTURE
+    return PHASE_01_REAL_METHOD_PROOF_GREEN
 
 
 @dataclass(frozen=True)
@@ -391,11 +530,10 @@ PHASE_00_VALIDATION_COMMANDS = (
 )
 
 PHASE_01_COMMANDS = (
-    WINDOWS_CLI + r" prepare-data --run-dir <phase-01-run-dir> --corpus-manifest data\public_v21\corpus-v2.1.jsonl --source-snapshot runs\20260815-030931-windows\source --tokenizer-revision 1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0 --train-tokens 4096 --holdout-tokens 1024 --receipt-output <phase-01-run-dir>\capture\data-plan-receipt.json",
-    WINDOWS_CLI + r" streaming-capture --run-dir <phase-01-run-dir> --split train --layers 0 --dataset-manifest <phase-01-run-dir>\capture\data-plan.json --shard-tokens 2048 --resume",
-    WINDOWS_PYTHON + r"scripts\run_oracle_routed_basis_refinement.py --corpus-receipt data\public_v21\corpus-v2.1-receipt.json --topology p16/top4 --rows 2048 --epochs 1 --device cuda:0",
-    WINDOWS_PYTHON + r"scripts\run_oracle_routed_basis_refinement.py --corpus-receipt data\public_v21\corpus-v2.1-receipt.json --topology p16/top4 --rows 4096 --epochs 1 --device cuda:0",
-    WINDOWS_PYTHON + r"scripts\run_oracle_routed_basis_refinement.py --corpus-receipt data\public_v21\corpus-v2.1-receipt.json --topology p16/top4 --rows 32768 --epochs 1 --device cuda:0",
+    WINDOWS_PYTHON + r"scripts\capture_real_qwen_layer0.py --method-proof-receipt <phase-00b-run-dir>\method-proof\receipt.json --source-snapshot <pinned-qwen-source> --run-dir <phase-01-run-dir> --runtime-lock runs\windows-runtime-lock.json --shard-tokens 2048 --resume --json",
+    WINDOWS_PYTHON + r"scripts\run_real_oracle_routed_basis_refinement.py --method-proof-receipt <phase-00b-run-dir>\method-proof\receipt.json --capture-receipt <phase-01-run-dir>\capture\real-qwen-layer0-receipt.json --runtime-lock runs\windows-runtime-lock.json --source-snapshot <pinned-qwen-source> --topology p16/top4 --max-tokens 2048 --batch-rows 256 --learning-rate 0.0001 --epochs 1 --device cuda:0 --result-receipt <phase-01-run-dir>\metrics\p16-2k.json --checkpoint-dir <phase-01-run-dir>\checkpoints\p16-2k --json",
+    WINDOWS_PYTHON + r"scripts\run_real_oracle_routed_basis_refinement.py --method-proof-receipt <phase-00b-run-dir>\method-proof\receipt.json --capture-receipt <phase-01-run-dir>\capture\real-qwen-layer0-receipt.json --runtime-lock runs\windows-runtime-lock.json --source-snapshot <pinned-qwen-source> --topology p16/top4 --max-tokens 4096 --batch-rows 512 --learning-rate 0.0001 --epochs 1 --device cuda:0 --result-receipt <phase-01-run-dir>\metrics\p16-4k.json --checkpoint-dir <phase-01-run-dir>\checkpoints\p16-4k --json",
+    WINDOWS_PYTHON + r"scripts\run_real_oracle_routed_basis_refinement.py --method-proof-receipt <phase-00b-run-dir>\method-proof\receipt.json --capture-receipt <phase-01-run-dir>\capture\real-qwen-layer0-receipt.json --runtime-lock runs\windows-runtime-lock.json --source-snapshot <pinned-qwen-source> --topology p16/top4 --max-tokens 32768 --batch-rows 2048 --learning-rate 0.0001 --epochs 1 --device cuda:0 --result-receipt <phase-01-run-dir>\metrics\p16-32k.json --checkpoint-dir <phase-01-run-dir>\checkpoints\p16-32k --json",
 )
 
 PHASE_00A_COMMANDS = (
@@ -412,9 +550,9 @@ PHASE_00B_COMMANDS = (
 )
 
 METHOD_PROOF_COMMANDS = (
-    WINDOWS_PYTHON + r"scripts\run_oracle_routed_basis_refinement.py --method-proof-receipt <phase-00b-run-dir>\method-proof\receipt.json --topology p16/top4 --rows 2048 --epochs 1 --device cuda:0",
-    WINDOWS_PYTHON + r"scripts\run_oracle_routed_basis_refinement.py --method-proof-receipt <phase-00b-run-dir>\method-proof\receipt.json --topology p16/top4 --rows 4096 --epochs 1 --device cuda:0",
-    WINDOWS_PYTHON + r"scripts\run_oracle_routed_basis_refinement.py --method-proof-receipt <phase-00b-run-dir>\method-proof\receipt.json --topology p16/top4 --rows 32768 --epochs 1 --device cuda:0",
+    PHASE_01_COMMANDS[1],
+    PHASE_01_COMMANDS[2],
+    PHASE_01_COMMANDS[3],
 )
 
 
@@ -466,9 +604,9 @@ _LATER_PHASE_BLUEPRINTS: dict[str, dict[str, Any]] = {
         "next_phase": PHASE_02_ID,
         "gates": (
             ("phase-00-green", "Phase 0 corpus, environment, and provenance gates are green.", (WINDOWS_CLI + " status --run-dir <phase-01-run-dir> --json",), ("phase-00-receipt.json",)),
-            ("balanced-teacher-capture", "Balanced V2.1 teacher capture is hash- and split-closed.", (PHASE_01_COMMANDS[0], PHASE_01_COMMANDS[1]), ("capture/data-plan-receipt.json",)),
-            ("oracle-independence", "E-step assignments are selector-independent and checkpoint-reloadable.", (WINDOWS_PYTHON + r"scripts\run_oracle_routed_basis_refinement.py --corpus-receipt data\public_v21\corpus-v2.1-receipt.json --topology p16/top4 --rows 2048 --epochs 1 --device cuda:0",), ("oracle/assignment-receipt.json",)),
-            ("method-falsifier", "The 2k–4k smoke and 32k pilot satisfy the method-proof falsifier without shadow collapse.", (PHASE_01_COMMANDS[2], PHASE_01_COMMANDS[3], PHASE_01_COMMANDS[4]), ("metrics/method-proof.json",)),
+            ("balanced-teacher-capture", "Real Qwen layer-0 X/Y capture is hash- and split-closed.", (PHASE_01_COMMANDS[0],), ("capture/real-qwen-layer0-receipt.json",)),
+            ("oracle-independence", "E-step assignments are selector-independent and checkpoint-reloadable on real captured Qwen data.", (PHASE_01_COMMANDS[1],), ("metrics/p16-2k.json",)),
+            ("method-falsifier", "The real 2k, 4k, and 32k stages satisfy the method-proof falsifier without synthetic evidence.", (PHASE_01_COMMANDS[1], PHASE_01_COMMANDS[2], PHASE_01_COMMANDS[3]), ("metrics/p16-32k.json",)),
             ("phase-01-handoff", "The selected p16 recipe and unresolved risks are immutable and resumable.", (), ("handoff.md",)),
         ),
         "expected_artifacts": ("capture/data-plan-receipt.json", "oracle/assignment-receipt.json", "metrics/method-proof.json", "handoff.md"),
@@ -479,7 +617,7 @@ _LATER_PHASE_BLUEPRINTS: dict[str, dict[str, Any]] = {
         "next_phase": PHASE_03_ID,
         "gates": (
             ("phase-01-green", "The p16 method-proof falsifier is green.", (WINDOWS_CLI + " status --run-dir <phase-02-run-dir> --json",), ("phase-01-receipt.json",)),
-            ("oracle-quality", "Oracle cosine is at least 0.98 and NMSE is at most 0.05 on the approved FIT/DEV evidence.", (WINDOWS_PYTHON + r"scripts\run_oracle_routed_basis_refinement.py --corpus-receipt data\public_v21\corpus-v2.1-receipt.json --topology p16/top4 --rows 32768 --epochs 1 --device cuda:0",), ("metrics/oracle-quality.json",)),
+            ("oracle-quality", "The real capture-backed p16 method-proof receipt reports the historical oracle quality gates before any production work.", (WINDOWS_PYTHON + r"scripts\run_real_oracle_routed_basis_refinement.py --method-proof-receipt <phase-01-run-dir>\method-proof\receipt.json --capture-receipt <phase-01-run-dir>\capture\real-qwen-layer0-receipt.json --runtime-lock runs\windows-runtime-lock.json --source-snapshot <pinned-qwen-source> --topology p16/top4 --max-tokens 32768 --result-receipt <phase-01-run-dir>\metrics\p16-32k.json --json",), ("metrics/oracle-quality.json",)),
             ("load-quality", "p16 load CV is at most 0.50 with zero dead experts on meaningful counts.", (WINDOWS_CLI + " validate-layer --run-dir <phase-02-run-dir> --layer 0 --profile qwen38_p16s1_top4 --json",), ("metrics/load-quality.json",)),
             ("selector-quality", "The selector is trained only after basis freeze and remains change-sensitive on held-out labels.", (WINDOWS_CLI + " evaluate --run-dir <phase-02-run-dir> --json",), ("metrics/selector-quality.json",)),
             ("p16-robust-green", "Independent A/B/C evidence and preservation canary support promotion.", (WINDOWS_CLI + " report --run-dir <phase-02-run-dir> --json",), ("metrics/robust-green.json",)),
@@ -698,12 +836,14 @@ def _canonical_phase_contracts() -> dict[str, PhaseContract]:
             GateContract("phase-00-green", "The runtime-lock and capability gates are green before method proof begins.", (PHASE_00A_COMMANDS[4],), ("runs/windows-runtime-lock.json",)),
             GateContract("runtime-lock-green", "The approved current Windows runtime lock is present.", (PHASE_00A_COMMANDS[4],), ("runs/windows-runtime-lock.json",)),
             GateContract("method-proof-data-green", "The clean METHOD_PROOF_ONLY receipt is green.", (PHASE_00B_COMMANDS[0],), ("method-proof/receipt.json",)),
-            GateContract("oracle-independence", "The exhaustive p16 E-step remains selector-independent and checkpoint-reloadable.", (METHOD_PROOF_COMMANDS[0],), ("oracle/assignment-receipt.json",)),
-            GateContract("method-falsifier", "The 2k, 4k, and 32k runs show a material reconstruction signal or classify DISTILLATION_METHOD_BLOCKED.", METHOD_PROOF_COMMANDS, ("metrics/method-proof.json",)),
-            GateContract("phase-01-handoff", "The method-proof verdict and next production command are immutable and resumable.", (), ("handoff.md",)),
+            GateContract("real-capture-receipt", "A validated real Qwen layer-0 X/Y capture receipt is present; synthetic smoke is informational only.", (PHASE_01_COMMANDS[0],), ("capture/real-qwen-layer0-receipt.json",)),
+            GateContract("oracle-independence", "The exhaustive p16 E-step remains selector-independent and checkpoint-reloadable on real Qwen captures.", (METHOD_PROOF_COMMANDS[0],), ("metrics/p16-2k.json",)),
+            GateContract("method-falsifier", "The real 2k, 4k, and 32k stages show a repeatable reconstruction signal or classify the real method proof as failed.", METHOD_PROOF_COMMANDS, ("metrics/p16-32k.json",)),
+            GateContract("synthetic-evidence-rejection", "Synthetic-smoke receipts and legacy synthetic status names cannot satisfy Phase 01.", (), ("metrics/synthetic-rejection.json",)),
+            GateContract("phase-01-handoff", "The real method-proof verdict and next production command are immutable and resumable.", (), ("handoff.md",)),
         ),
-        validation_commands=(*PHASE_00A_COMMANDS[4:5], *PHASE_00B_COMMANDS, *METHOD_PROOF_COMMANDS),
-        expected_artifacts=("method-proof/receipt.json", "oracle/assignment-receipt.json", "metrics/method-proof.json", "handoff.md"),
+        validation_commands=(*PHASE_00A_COMMANDS[4:5], *PHASE_00B_COMMANDS, *PHASE_01_COMMANDS),
+        expected_artifacts=("method-proof/receipt.json", "capture/real-qwen-layer0-receipt.json", "metrics/p16-2k.json", "metrics/p16-4k.json", "metrics/p16-32k.json", "handoff.md"),
         handoff_commands=(WINDOWS_CLI + " status --run-dir <phase-01-run-dir> --json",),
     )
     phase_02 = PhaseContract(
@@ -711,7 +851,7 @@ def _canonical_phase_contracts() -> dict[str, PhaseContract]:
         objective="Acquire/freeze production Corpus V2.2 independently and begin production-balanced p16 training.",
         gates=(
             GateContract("runtime-lock-green", "The current Windows runtime lock remains green.", (PHASE_00A_COMMANDS[4],), ("runs/windows-runtime-lock.json",)),
-            GateContract("method-proof-green", "Phase 01 reports METHOD_PROOF_GREEN.", (WINDOWS_CLI + " status --run-dir <phase-02-run-dir> --json",), ("phase-01-receipt.json",)),
+            GateContract("method-proof-green", "Phase 01 reports a real capture-backed METHOD_PROOF_GREEN result; synthetic smoke is never sufficient.", (WINDOWS_CLI + " status --run-dir <phase-02-run-dir> --json",), ("phase-01-real-method-proof-receipt.json",)),
             GateContract("production-corpus-green", "Corpus V2.2 contains the required independent non-benchmark agent-task distribution.", (WINDOWS_PYTHON + r"scripts\freeze_corpus_v21.py --help",), ("corpus-v2.2-receipt.json",)),
             GateContract("production-p16-training", "The bounded 128k production p16 continuation completes with receipt-backed metrics.", (WINDOWS_CLI + " train-layer --run-dir <phase-02-run-dir> --layer 0 --profile qwen38_p16s1_top4 --json",), ("metrics/p16-production.json",)),
         ),
@@ -803,8 +943,16 @@ __all__ = [
     "PHASE_00B_ID",
     "PHASE_00_ID",
     "PHASE_00_VALIDATION_COMMANDS",
+    "PHASE_01_BLOCKED_INVALID_CAPTURE",
+    "PHASE_01_BLOCKED_NO_REAL_CAPTURE",
     "PHASE_01_COMMANDS",
     "PHASE_01_ID",
+    "PHASE_01_MIN_TOKENS",
+    "PHASE_01_REAL_METHOD_PROOF_FAILED",
+    "PHASE_01_REAL_METHOD_PROOF_GREEN",
+    "PHASE_01_REAL_METHOD_PROOF_RUNNING",
+    "PHASE_01_REQUIRED_EVIDENCE_CLASS",
+    "PHASE_01_SCIENTIFIC_STATES",
     "PHASE_02_ID",
     "PHASE_03_ID",
     "PHASE_04_ID",
@@ -819,6 +967,7 @@ __all__ = [
     "PHASE_SCHEMA_VERSION",
     "GateContract",
     "GateReceipt",
+    "Phase01PromotionBlocked",
     "PhaseContract",
     "PhaseReceipt",
     "PhaseReceiptStore",
@@ -827,4 +976,6 @@ __all__ = [
     "phase_00_contract",
     "phase_00a_contract",
     "phase_00b_contract",
+    "phase_01_promotion_state",
+    "validate_phase_01_promotion",
 ]

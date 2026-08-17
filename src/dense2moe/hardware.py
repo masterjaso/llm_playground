@@ -504,14 +504,48 @@ def _probe_safetensors(path: Path | None) -> dict[str, Any]:
         return _probe_status(False, detail="checkpoint path does not exist", path=str(path))
     try:
         from safetensors import safe_open  # type: ignore
+    except (ImportError, ModuleNotFoundError) as exc:
+        return _probe_status(False, detail="safetensors checkpoint load failed", path=str(path), error=str(exc))
+
+    # The NumPy backend cannot represent BF16 on some supported Windows
+    # environments.  Probe metadata with NumPy first for the lightweight
+    # path, then fall back to the CPU PyTorch backend without moving any
+    # tensor to CUDA.  This keeps the doctor honest while allowing the real
+    # Qwen shards (which are BF16) to qualify as readable.
+    try:
         with safe_open(str(path), framework="np") as handle:
             keys = sorted(handle.keys())
             if not keys:
                 return _probe_status(False, detail="checkpoint contains no tensors", path=str(path))
             sample = handle.get_tensor(keys[0])
             shape = list(getattr(sample, "shape", ()))
-        return _probe_status(True, path=str(path), tensor_count=len(keys), sample_tensor=keys[0], sample_shape=shape)
-    except (ImportError, ModuleNotFoundError, OSError, RuntimeError, TypeError, ValueError, KeyError) as exc:
+        return _probe_status(True, path=str(path), tensor_count=len(keys), sample_tensor=keys[0], sample_shape=shape, backend="numpy")
+    except (RuntimeError, TypeError, ValueError) as numpy_exc:
+        try:
+            with safe_open(str(path), framework="pt", device="cpu") as handle:
+                keys = sorted(handle.keys())
+                if not keys:
+                    return _probe_status(False, detail="checkpoint contains no tensors", path=str(path))
+                sample = handle.get_slice(keys[0])
+                shape = list(sample.get_shape())
+            return _probe_status(
+                True,
+                path=str(path),
+                tensor_count=len(keys),
+                sample_tensor=keys[0],
+                sample_shape=shape,
+                backend="torch-cpu",
+                fallback_reason=str(numpy_exc),
+            )
+        except (OSError, RuntimeError, TypeError, ValueError, KeyError) as torch_exc:
+            return _probe_status(
+                False,
+                detail="safetensors checkpoint load failed",
+                path=str(path),
+                error=str(torch_exc),
+                numpy_error=str(numpy_exc),
+            )
+    except (OSError, KeyError) as exc:
         return _probe_status(False, detail="safetensors checkpoint load failed", path=str(path), error=str(exc))
 
 

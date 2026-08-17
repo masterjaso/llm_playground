@@ -37,10 +37,77 @@ The bounded method-proof data gate is independent of production Corpus V2.2:
   --output <phase-00b-run-dir>\method-proof `
   --min-tokens 32768 --json
 
-& .\.venv\Scripts\python.exe scripts\run_oracle_routed_basis_refinement.py `
+& .\.venv\Scripts\python.exe scripts\capture_real_qwen_layer0.py `
   --method-proof-receipt <phase-00b-run-dir>\method-proof\receipt.json `
-  --topology p16/top4 --rows 2048 --epochs 1 --device cuda:0
+  --source-snapshot <pinned-qwen-source> `
+  --run-dir <phase-01-run-dir> `
+  --runtime-lock runs\windows-runtime-lock.json `
+  --shard-tokens 2048 --resume --json
+
+& .\.venv\Scripts\python.exe scripts\run_real_oracle_routed_basis_refinement.py `
+  --method-proof-receipt <phase-00b-run-dir>\method-proof\receipt.json `
+  --capture-receipt <phase-01-run-dir>\capture\real-qwen-layer0-receipt.json `
+  --runtime-lock runs\windows-runtime-lock.json `
+  --source-snapshot <pinned-qwen-source> `
+  --topology p16/top4 --max-tokens 2048 --epochs 1 --device cuda:0 `
+  --batch-rows 256 --learning-rate 0.0001 `
+  --result-receipt <phase-01-run-dir>\metrics\p16-2k.json `
+  --checkpoint-dir <phase-01-run-dir>\checkpoints\p16-2k --json
+
+# Stage 2: repeat on 4k captured tokens (rows are bounded batch windows).
+& .\.venv\Scripts\python.exe scripts\run_real_oracle_routed_basis_refinement.py `
+  --method-proof-receipt <phase-00b-run-dir>\method-proof\receipt.json `
+  --capture-receipt <phase-01-run-dir>\capture\real-qwen-layer0-receipt.json `
+  --runtime-lock runs\windows-runtime-lock.json `
+  --source-snapshot <pinned-qwen-source> `
+  --topology p16/top4 --max-tokens 4096 --epochs 1 --device cuda:0 `
+  --batch-rows 512 --learning-rate 0.0001 `
+  --result-receipt <phase-01-run-dir>\metrics\p16-4k.json `
+  --checkpoint-dir <phase-01-run-dir>\checkpoints\p16-4k --json
+
+# Stage 3: bounded scientific method proof on at least 32k captured tokens.
+& .\.venv\Scripts\python.exe scripts\run_real_oracle_routed_basis_refinement.py `
+  --method-proof-receipt <phase-00b-run-dir>\method-proof\receipt.json `
+  --capture-receipt <phase-01-run-dir>\capture\real-qwen-layer0-receipt.json `
+  --runtime-lock runs\windows-runtime-lock.json `
+  --source-snapshot <pinned-qwen-source> `
+  --topology p16/top4 --max-tokens 32768 --epochs 1 --device cuda:0 `
+  --batch-rows 2048 --learning-rate 0.0001 `
+  --result-receipt <phase-01-run-dir>\metrics\p16-32k.json `
+  --checkpoint-dir <phase-01-run-dir>\checkpoints\p16-32k --json
+
+For long native-Windows jobs, wrap each runner command with
+`scripts\Invoke-GuardedCommand.ps1` and retain its heartbeat/termination
+receipt.  `--max-tokens` is a captured-token limit; `--batch-rows` is only the
+in-memory window size.  A result records a method-proof decision of
+`GREEN`, `YELLOW`, or `FAILED` against the historical product gates, while
+`production_promotion_eligible` remains false in all cases.
 ```
+
+## Synthetic smoke versus real method proof
+
+`scripts/run_oracle_routed_basis_smoke.py` is the only supported entrypoint
+for the tiny random SwiGLU fixture.  It reports
+`ORACLE_ROUTED_BASIS_SYNTHETIC_SMOKE_GREEN` with
+`evidence_class=synthetic-smoke`, and both scientific and production
+promotion flags are false.  `--samples 32768` still means random fixture
+rows; it never means captured tokens and cannot satisfy Phase 01.
+
+The real method proof is the explicit
+`run_real_oracle_routed_basis_refinement.py` path.  It requires a validated
+`dense2moe-method-proof-data` receipt, a
+`dense2moe-real-qwen-layer-capture` receipt, the exact p16/top4 topology, the
+approved current Windows runtime lock, and `--max-tokens`.  Its preflight
+checks the pinned Qwen source identity, layer-0 geometry, shard hashes,
+selected-record identity, benchmark/evaluation exclusion, and runtime before
+constructing an optimizer.  Any failed gate reports `BLOCKED` with zero
+optimizer steps.
+
+Phase 01 is a method proof only.  A 32k decision reports GREEN/YELLOW/FAILED
+against the historical NMSE/cosine/dead-expert/loadCV gates but does not open
+the official holdout or promote a production candidate.  Corpus V2.2,
+selector optimization, p32 transfer, representative layers, and full64
+conversion remain later, separately gated phases.
 
 ## Phases and falsifiable gates
 
@@ -51,17 +118,15 @@ The bounded method-proof data gate is independent of production Corpus V2.2:
    strictly save/reload and reconstruct a dense FFN when all experts are used.
    Falsifier: missing/unexpected keys, non-finite tensors, or reconstruction
    MSE above `1e-8` on the tiny integration fixture.
-3. **Calibration and capture** — hypothesis: fixed, non-overlapping local
-   token splits can be represented by hashed binary shards and resumed at
-   shard granularity.  Falsifier: hash/overlap mismatch or a resumed capture
-   rewriting a validated shard.
+3. **Calibration and capture** — hypothesis: frozen METHOD_PROOF_ONLY records
+   replay through the exact layer-major Qwen teacher into hashed layer-0 X/Y
+   shards.  Falsifier: any source, split, target-hook, or shard-hash mismatch.
 4. **Oracle ceiling** — hypothesis: exhaustive p16/top-4 oracle routing is
-   sufficiently expressive before router optimization.  Falsifier: oracle
-   normalized MSE is above `0.10` on representative real layer samples.
+   sufficiently expressive before router optimization on real Qwen samples.
+   Falsifier: no repeatable improvement or expert collapse at 2k, 4k, and 32k.
 5. **One-layer vertical slice** — hypothesis: selector-independent basis
-   refinement followed by router warm-up and bounded joint distillation
-   improves over the oracle baseline on a fixed holdout.
-   Falsifier: no finite improvement or dead/collapsed experts.
+   refinement is numerically stable on real captured data.  The selector stays
+   frozen in this phase; no holdout is opened and no production claim follows.
 6. **Assembly/evaluation** — hypothesis: validated layer safetensors can be
    assembled into a strict, reloadable target checkpoint.  Falsifier: any
    inventory, fingerprint, shape, or reload gate fails.

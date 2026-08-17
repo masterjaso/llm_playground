@@ -46,9 +46,21 @@ experimentally checked by comparing the teacher output with
 `down_proj(silu(gate_proj(x)) * up_proj(x))`; the default normalized-MSE gate
 is `1e-7`.
 
-Only the MLP input is written.  Train and holdout are separate manifests and
-safetensors shard sets (`layer-XXXX-train.json` and
-`layer-XXXX-holdout.json`).  Each shard records the split ID/content hashes,
-tokenizer file hashes, tokenizer revision, source revision, hook path, and
-code commit.  Resume validates shard hashes and split/dataset identity before
-reusing an existing manifest.
+The general capture command writes MLP inputs for diagnostic or downstream
+calibration work.  Phase 01 uses the separate
+`scripts/capture_real_qwen_layer0.py` command, which selects only the frozen
+`METHOD_PROOF_ONLY` FIT-TRAIN records and reuses the same layer-major loader.
+For layer 0 it writes paired safetensors tensors:
+
+* `ffn_input` — the real layer-0 dense SwiGLU input `X`, shape `[N, 5120]`;
+* `dense_ffn_target` — the real dense `gate_proj/up_proj/SiLU/down_proj`
+  output `Y`, shape `[N, 5120]`.
+
+The resulting `real-qwen-layer0-receipt.json` has evidence class
+`real-qwen-layer-capture`, source/config/tokenizer/runtime-lock hashes,
+selected record/token identities, exclusion proof, and every shard SHA-256.
+It is the only capture receipt accepted by the Phase 01 method-proof runner.
+Synthetic fixture smoke output and legacy `mlp_input`-only manifests are not
+scientific method-proof evidence.  Resume validates shard hashes and the
+fixed split identity before reusing an artifact; it never fabricates a target
+from an input-only shard.

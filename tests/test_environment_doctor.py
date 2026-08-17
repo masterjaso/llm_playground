@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 import types
 from pathlib import Path
+
+import pytest
 
 from dense2moe import hardware
 from dense2moe.hardware import (
@@ -15,6 +18,7 @@ from dense2moe.hardware import (
 )
 
 
+@pytest.mark.skipif(probe_torch().get("installed") is True, reason="requires an interpreter without torch")
 def test_torch_probe_is_structured_when_torch_is_unavailable() -> None:
     result = probe_torch()
 
@@ -59,6 +63,10 @@ def test_recovery_pin_reads_historical_receipt() -> None:
     assert pin["expected_gpu_count"] == 2
 
 
+@pytest.mark.skipif(
+    os.name == "nt" and bool(probe_torch().get("cuda_available")),
+    reason="native CUDA runtime is expected to pass discovery",
+)
 def test_cli_doctor_returns_blocked_json_without_cuda(tmp_path) -> None:
     run_dir = tmp_path / "doctor-run"
     completed = subprocess.run(

@@ -517,7 +517,16 @@ def _read_stage(root: Path, stage: int, *, torch: Any, device: Any) -> Iterator[
         yield item, tensors
 
 
-def _run_native_layer(executor: TargetedLayerLoader, layer_module: Any, hidden: Any, attention_mask: Any, position_ids: Any, *, capture_mlp_input: bool) -> tuple[Any, Any | None]:
+def _run_native_layer(
+    executor: TargetedLayerLoader,
+    layer_module: Any,
+    hidden: Any,
+    attention_mask: Any,
+    position_ids: Any,
+    *,
+    capture_mlp_input: bool,
+    capture_mlp_output: bool = False,
+) -> tuple[Any, Any | None, Any | None]:
     import torch  # type: ignore
     from transformers.models.qwen3_5.modeling_qwen3_5 import (  # type: ignore
         create_causal_mask,
@@ -536,14 +545,25 @@ def _run_native_layer(executor: TargetedLayerLoader, layer_module: Any, hidden: 
     else:
         mask = create_recurrent_attention_mask(executor.text_config, hidden, attention_mask)
     captured: list[Any] = []
-    hook = None
+    captured_outputs: list[Any] = []
+    input_hook = None
+    output_hook = None
     if capture_mlp_input:
         def _pre_hook(_module: Any, args: tuple[Any, ...]) -> None:
             if not args:
                 raise RuntimeError("native Qwen MLP hook received no input")
             captured.append(args[0].detach().clone())
 
-        hook = layer_module.mlp.register_forward_pre_hook(_pre_hook)
+        input_hook = layer_module.mlp.register_forward_pre_hook(_pre_hook)
+    if capture_mlp_output:
+        def _output_hook(_module: Any, _args: tuple[Any, ...], value: Any) -> None:
+            if isinstance(value, (tuple, list)):
+                if not value:
+                    raise RuntimeError("native Qwen MLP hook returned an empty output")
+                value = value[0]
+            captured_outputs.append(value.detach().clone())
+
+        output_hook = layer_module.mlp.register_forward_hook(_output_hook)
     try:
         with torch.inference_mode():
             output = layer_module(
@@ -555,12 +575,19 @@ def _run_native_layer(executor: TargetedLayerLoader, layer_module: Any, hidden: 
                 use_cache=False,
             )
     finally:
-        if hook is not None:
-            hook.remove()
+        if input_hook is not None:
+            input_hook.remove()
+        if output_hook is not None:
+            output_hook.remove()
     if not torch.isfinite(output).all():
         raise TeacherCaptureBlocked("STREAM_NONFINITE_OUTPUT", f"layer {getattr(layer_module, 'layer_idx', '?')} emitted NaN or Inf")
     value = captured[0] if captured else None
-    return output, value
+    target = captured_outputs[0] if captured_outputs else None
+    if capture_mlp_input and value is None:
+        raise TeacherCaptureBlocked("STREAM_MLP_INPUT_CAPTURE_MISSING", "native Qwen MLP input hook did not fire")
+    if capture_mlp_output and target is None:
+        raise TeacherCaptureBlocked("STREAM_MLP_OUTPUT_CAPTURE_MISSING", "native Qwen MLP output hook did not fire")
+    return output, value, target
 
 
 class StreamingTeacherExecutor(TargetedLayerLoader):
@@ -693,6 +720,7 @@ class StreamingTeacherExecutor(TargetedLayerLoader):
         load_seconds = time.perf_counter() - loaded_at
         output_shards: list[dict[str, Any]] = []
         capture_shards: list[dict[str, Any]] = []
+        capture_dense_target = bool(selected_layer and layer == 0)
         completed: set[int] = set()
         resume_ids = _load_progress(progress_path, layer=layer, split=split, dataset_hash=dataset_hash, source_revision=source_revision)
         output_dir = _stage_root(root, output_stage)
@@ -728,16 +756,23 @@ class StreamingTeacherExecutor(TargetedLayerLoader):
                 if selected_layer:
                     capture_path = capture_dir / f"shard-{shard_id:05d}.safetensors"
                     capture_tensors = _load_tensors(capture_path, device="cpu")
-                    if "mlp_input" not in capture_tensors or int(capture_tensors["mlp_input"].shape[0]) != int(shard_meta["count"]):
+                    required_capture_tensors = {"mlp_input", "dense_ffn_target"} if capture_dense_target else {"mlp_input"}
+                    input_key = "ffn_input" if "ffn_input" in capture_tensors else "mlp_input"
+                    required_capture_tensors = {input_key, "dense_ffn_target"} if capture_dense_target else {input_key}
+                    if not required_capture_tensors.issubset(capture_tensors) or int(capture_tensors[input_key].shape[0]) != int(shard_meta["count"]):
+                        continue
+                    if capture_dense_target and tuple(capture_tensors["dense_ffn_target"].shape) != tuple(capture_tensors[input_key].shape):
                         continue
                     capture_shards.append({
                         "shard_id": shard_id,
                         "path": os.path.relpath(capture_path, root.parent.parent).replace("\\", "/"),
                         "sha256": _sha256(capture_path),
-                        "count": int(capture_tensors["mlp_input"].shape[0]),
+                        "count": int(capture_tensors[input_key].shape[0]),
                         "bytes": capture_path.stat().st_size,
-                        "shape": list(capture_tensors["mlp_input"].shape),
-                        "dtype": _dtype_name(capture_tensors["mlp_input"].dtype),
+                        "shape": list(capture_tensors[input_key].shape),
+                        "dtype": _dtype_name(capture_tensors[input_key].dtype),
+                        "input_tensor": input_key,
+                        "target_tensor": "dense_ffn_target" if capture_dense_target else None,
                         "records": shard_meta.get("records", []),
                     })
                 output_shards.append(output_meta)
@@ -765,7 +800,15 @@ class StreamingTeacherExecutor(TargetedLayerLoader):
                 attention_mask = tensors["attention_mask"].to(device=self.device)
                 max_len = int(hidden.shape[1])
                 position_ids = torch.arange(max_len, dtype=torch.long, device=self.device).unsqueeze(0).expand(hidden.shape[0], -1)
-                output, mlp_input = _run_native_layer(self, layer_module, hidden, attention_mask, position_ids, capture_mlp_input=selected_layer)
+                output, mlp_input, mlp_output = _run_native_layer(
+                    self,
+                    layer_module,
+                    hidden,
+                    attention_mask,
+                    position_ids,
+                    capture_mlp_input=selected_layer,
+                    capture_mlp_output=capture_dense_target,
+                )
                 output_cpu = output.detach().to("cpu")
                 out_tensors = {
                     "hidden_states": output_cpu,
@@ -780,14 +823,22 @@ class StreamingTeacherExecutor(TargetedLayerLoader):
                 write_seconds += time.perf_counter() - write_started
                 hidden_bytes_written += int(output_meta.get("bytes", 0))
                 output_shards.append(output_meta)
-                if selected_layer and mlp_input is not None:
+                if selected_layer and mlp_input is not None and (not capture_dense_target or mlp_output is not None):
                     lengths = [int(value) for value in tensors["lengths"].reshape(-1).tolist()]
                     valid_rows = torch.cat([mlp_input[row, :length] for row, length in enumerate(lengths)], dim=0).to("cpu")
+                    valid_targets = (
+                        torch.cat([mlp_output[row, :length] for row, length in enumerate(lengths)], dim=0).to("cpu")
+                        if capture_dense_target and mlp_output is not None
+                        else None
+                    )
                     capture_dir.mkdir(parents=True, exist_ok=True)
                     capture_path = capture_dir / f"shard-{shard_id:05d}.safetensors"
                     capture_base = root.parent.parent
                     write_started = time.perf_counter()
-                    capture_digest = _atomic_save_tensors({"mlp_input": valid_rows}, capture_path)
+                    capture_tensors = {"ffn_input": valid_rows}
+                    if valid_targets is not None:
+                        capture_tensors["dense_ffn_target"] = valid_targets
+                    capture_digest = _atomic_save_tensors(capture_tensors, capture_path)
                     write_seconds += time.perf_counter() - write_started
                     activation_bytes_written += capture_path.stat().st_size
                     capture_shards.append({
@@ -798,9 +849,11 @@ class StreamingTeacherExecutor(TargetedLayerLoader):
                         "bytes": capture_path.stat().st_size,
                         "shape": list(valid_rows.shape),
                         "dtype": _dtype_name(valid_rows.dtype),
+                        "input_tensor": "ffn_input",
+                        "target_tensor": "dense_ffn_target" if valid_targets is not None else None,
                         "records": shard_meta.get("records", []),
                     })
-                    del valid_rows
+                    del valid_rows, valid_targets
                 completed.add(shard_id)
                 atomic_write_json(progress_path, {
                     "schema_version": STREAMING_SCHEMA_VERSION,
@@ -816,7 +869,7 @@ class StreamingTeacherExecutor(TargetedLayerLoader):
                     "source_revision": source_revision,
                     "code_commit": current_git_commit(),
                 })
-                del hidden, attention_mask, position_ids, output, output_cpu, out_tensors, tensors
+                del hidden, attention_mask, position_ids, output, output_cpu, out_tensors, tensors, mlp_output
         finally:
             del layer_module
             gc.collect()
@@ -828,7 +881,8 @@ class StreamingTeacherExecutor(TargetedLayerLoader):
             capture_manifest = {
                 "schema_version": 2,
                 "status": "CAPTURE_COMPLETE",
-                "capture_kind": "streaming_teacher_mlp_input",
+                "capture_kind": "real_qwen_layer0_ffn_input_target" if capture_dense_target else "streaming_teacher_mlp_input",
+                "evidence_class": "real-qwen-layer-capture" if capture_dense_target else "streaming-teacher-input",
                 "diagnostic_only": False,
                 "quality_gate_eligible": True,
                 "layer": layer,
@@ -844,6 +898,8 @@ class StreamingTeacherExecutor(TargetedLayerLoader):
                 "input_stage": input_stage,
                 "output_stage": output_stage,
                 "layer_receipt": layer_receipt,
+                "input_tensor": "ffn_input",
+                "target_tensor": "dense_ffn_target" if capture_dense_target else None,
                 "code_commit": current_git_commit(),
             }
             capture_base = root.parent.parent

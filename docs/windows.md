@@ -25,10 +25,17 @@ Linux NVIDIA driver.
 ```powershell
 Set-Location C:\workplace\llm_playground
 & powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\Setup-Windows.ps1
+& powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\Invoke-GuardedCommand-Smoke.ps1 -Output runs\windows-guarded-command-smoke-current.json -HeartbeatSeconds 60
 & powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\Test-Windows-Cuda.ps1
 & .\.venv\Scripts\python.exe -m dense2moe.cli doctor --run-dir runs\<run-id> --runtime-lock runs\windows-runtime-lock.json --json
 & .\.venv\Scripts\python.exe -m dense2moe.cli status --run-dir runs\<run-id> --json
 ```
+
+Only `C:\workplace\llm_playground\.venv\Scripts\python.exe` is
+authoritative for D2M receipts. The guarded smoke and CUDA doctor must pass
+before a new `runs\windows-runtime-lock.json` is used for method-proof
+capture. Runtime-lock drift is a hard stop (`WINDOWS_RUNTIME_DRIFT`), not a
+reason to fall back to WSL or the global Python installation.
 
 If the current lock is explicitly reviewed as stale, rerun setup with
 `-ForceRecovery`. The script preserves the old lock as a timestamped
