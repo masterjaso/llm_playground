@@ -2,8 +2,8 @@
   "environment_receipt_path": "C:\\workplace\\llm_playground\\runs\\windows-environment-receipt.json",
   "environment_variables": {},
   "memory": {
-    "available": 19978915840,
-    "free": 19978915840,
+    "available": 20054003712,
+    "free": 20054003712,
     "swap_free": 20384104448,
     "swap_total": 23419461632,
     "total": 67767750656
@@ -104,7 +104,7 @@
         "C:\\Program Files\\CMake\\bin\\cmake.EXE",
         "--version"
       ],
-      "elapsed_seconds": 0.12409289996139705,
+      "elapsed_seconds": 0.12358720001066104,
       "returncode": 0,
       "status": "DONE",
       "stderr": "",
@@ -116,7 +116,7 @@
         "C:\\Program Files\\Git\\cmd\\git.EXE",
         "--version"
       ],
-      "elapsed_seconds": 0.12267090001842007,
+      "elapsed_seconds": 0.12324029998853803,
       "returncode": 0,
       "status": "DONE",
       "stderr": "",
@@ -148,7 +148,7 @@
         "C:\\WINDOWS\\system32\\nvidia-smi.EXE",
         "-L"
       ],
-      "elapsed_seconds": 0.1699633999960497,
+      "elapsed_seconds": 0.16498420003335923,
       "returncode": 0,
       "status": "DONE",
       "stderr": "",
@@ -161,11 +161,11 @@
         "--query-gpu=index,name,memory.total,driver_version,pci.bus_id,temperature.gpu,power.limit",
         "--format=csv"
       ],
-      "elapsed_seconds": 0.16860119998455048,
+      "elapsed_seconds": 0.16897419997258112,
       "returncode": 0,
       "status": "DONE",
       "stderr": "",
-      "stdout": "index, name, memory.total [MiB], driver_version, pci.bus_id, temperature.gpu, power.limit [W]\n0, NVIDIA GeForce RTX 5060 Ti, 16311 MiB, 610.88, 00000000:01:00.0, 47, 180.00 W\n1, NVIDIA GeForce RTX 4060, 8188 MiB, 610.88, 00000000:06:00.0, 36, 115.00 W\n",
+      "stdout": "index, name, memory.total [MiB], driver_version, pci.bus_id, temperature.gpu, power.limit [W]\n0, NVIDIA GeForce RTX 5060 Ti, 16311 MiB, 610.88, 00000000:01:00.0, 46, 180.00 W\n1, NVIDIA GeForce RTX 4060, 8188 MiB, 610.88, 00000000:06:00.0, 36, 115.00 W\n",
       "unavailable": false
     },
     "python": {
@@ -173,7 +173,7 @@
         "C:\\workplace\\llm_playground\\.venv\\Scripts\\python.exe",
         "--version"
       ],
-      "elapsed_seconds": 0.12470630003372207,
+      "elapsed_seconds": 0.12097499996889383,
       "returncode": 0,
       "status": "DONE",
       "stderr": "",
