@@ -1,14 +1,14 @@
 {
-  "approved_at": "2026-08-17T18:55:56.972769Z",
+  "approved_at": "2026-08-17T18:58:33.877489Z",
   "bf16_capability": true,
-  "code_commit": "29ec8af2a6a5aaa6515dde873afd77df2736c310",
+  "code_commit": "580060ed41801d55e3f5c57f32974d1ae7af3c13",
   "compiled_cuda": "13.0",
   "doctor_schema_version": 2,
   "driver": [
     "610.88"
   ],
   "environment_receipt_hashes": {
-    "C:\\workplace\\llm_playground\\runs\\windows-environment-receipt.json": "44e059a74b918eebe200abe03dbb601e8dd0c750e5bbac7ce3a38b80118c80ea"
+    "C:\\workplace\\llm_playground\\runs\\windows-environment-receipt.json": "1bd1d762abdb9c9b000a979cfe578d61edb9bc34cb17c0a11ab0c3e0f953ff5d"
   },
   "gpu_inventory": [
     {
@@ -32,7 +32,7 @@
       "total_memory": 17102864384
     }
   ],
-  "lock_sha256": "1bf1ebe03dd5ce12265c9a40039d3423a4f2afb8616d223cfb07238075b1a109",
+  "lock_sha256": "d4e6bd3768418e33b73b639b5615f27128dc4f2987b45d80f4545404e05f12a8",
   "package_versions": {
     "accelerate": "1.14.0",
     "numpy": "2.5.2",
