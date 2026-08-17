@@ -12,7 +12,8 @@
       "falsifier": "A or B remains below the research gate, hard load CV remains above 0.50, or basis tensors change.",
       "budget": {"epochs": 1, "microbatch": 512, "learning_rate": 0.00001, "hard_load_weight": 0.1, "oracle_weight": 0.1, "oracle_amplitude_weight": 0.05, "oracle_regret_weight": 1.0},
       "decision": "research_candidate_only",
-      "report": "fresh-selector-layer0/reports/p16-top4-fresh-selector-hard-regret-bce.json"
+      "report": "fresh-selector-layer0/reports/p16-top4-fresh-selector-hard-regret-bce.json",
+      "experiment_code_commit": "ce59145c46d53be6b7add12b101be352a921095d"
     },
     {
       "name": "p16_load_constrained_oracle",
