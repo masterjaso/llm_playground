@@ -1,0 +1,104 @@
+{
+  "approved_at": "2026-08-17T14:00:37.589523Z",
+  "bf16_capability": true,
+  "code_commit": "b8524095fc4d078dbd0a6494a07dceae42422699",
+  "compiled_cuda": "13.0",
+  "doctor_schema_version": 2,
+  "driver": [
+    "610.88"
+  ],
+  "environment_receipt_hashes": {
+    "runs\\windows-environment-receipt.json": "5f090d0e87e939d545da166214fe1ca86c20348fd90bfe262c0c0d7704a6a69a"
+  },
+  "gpu_inventory": [
+    {
+      "bf16_supported": true,
+      "compute_capability": [
+        8,
+        9
+      ],
+      "index": 0,
+      "name": "NVIDIA GeForce RTX 4060",
+      "total_memory": 8585216000
+    },
+    {
+      "bf16_supported": true,
+      "compute_capability": [
+        12,
+        0
+      ],
+      "index": 1,
+      "name": "NVIDIA GeForce RTX 5060 Ti",
+      "total_memory": 17102864384
+    }
+  ],
+  "lock_sha256": "5f376d096b6e44074c1b98318cb552805d9647579ffbb15ef4978b598e06416b",
+  "package_versions": {
+    "accelerate": "1.14.0",
+    "numpy": "2.5.2",
+    "psutil": "7.2.2",
+    "safetensors": "0.8.0",
+    "torch": "2.13.0+cu130",
+    "torch_compiled_cuda": "13.0",
+    "transformers": "5.15.0"
+  },
+  "platform": "Windows",
+  "python_executable": "C:\\workplace\\llm_playground\\.venv\\Scripts\\python.exe",
+  "python_version": "3.12.6",
+  "runtime_fingerprint": {
+    "bf16_capability": true,
+    "compiled_cuda": "13.0",
+    "driver_versions": [
+      "610.88"
+    ],
+    "gpu_inventory": [
+      {
+        "bf16_supported": true,
+        "compute_capability": [
+          8,
+          9
+        ],
+        "index": 0,
+        "name": "NVIDIA GeForce RTX 4060",
+        "total_memory": 8585216000
+      },
+      {
+        "bf16_supported": true,
+        "compute_capability": [
+          12,
+          0
+        ],
+        "index": 1,
+        "name": "NVIDIA GeForce RTX 5060 Ti",
+        "total_memory": 17102864384
+      }
+    ],
+    "package_versions": {
+      "accelerate": "1.14.0",
+      "numpy": "2.5.2",
+      "psutil": "7.2.2",
+      "safetensors": "0.8.0",
+      "torch": "2.13.0+cu130",
+      "torch_compiled_cuda": "13.0",
+      "transformers": "5.15.0"
+    },
+    "platform": "Windows",
+    "python_executable": "c:\\workplace\\llm_playground\\.venv\\scripts\\python.exe",
+    "python_version": "3.12.6",
+    "selected_training_gpus": [
+      0,
+      1
+    ],
+    "torch_version": "2.13.0+cu130",
+    "windows_release": "11",
+    "windows_version": "10.0.26200"
+  },
+  "schema_version": 1,
+  "selected_training_gpus": [
+    0,
+    1
+  ],
+  "status": "APPROVED",
+  "torch_version": "2.13.0+cu130",
+  "windows_version": "10.0.26200"
+}

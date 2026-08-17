@@ -1,0 +1,247 @@
+{
+  "environment_receipt_path": "runs\\windows-environment-receipt.json",
+  "environment_variables": {},
+  "memory": {
+    "available": 19917869056,
+    "free": 19917869056,
+    "swap_free": 20387041281,
+    "swap_total": 23419461632,
+    "total": 67767750656
+  },
+  "packages": {
+    "accelerate": {
+      "installed": true,
+      "version": "1.14.0"
+    },
+    "numpy": {
+      "installed": true,
+      "version": "2.5.2"
+    },
+    "psutil": {
+      "installed": true,
+      "version": "7.2.2"
+    },
+    "safetensors": {
+      "installed": true,
+      "version": "0.8.0"
+    },
+    "transformers": {
+      "installed": true,
+      "version": "5.15.0"
+    }
+  },
+  "platform": {
+    "machine": "AMD64",
+    "python": "3.12.6 (tags/v3.12.6:a4a2d2b, Sep  6 2024, 20:11:23) [MSC v.1940 64 bit (AMD64)]",
+    "python_executable": "C:\\workplace\\llm_playground\\.venv\\Scripts\\python.exe",
+    "release": "11",
+    "system": "Windows",
+    "version": "10.0.26200"
+  },
+  "python_executable": "C:\\workplace\\llm_playground\\.venv\\Scripts\\python.exe",
+  "python_version": "3.12.6 (tags/v3.12.6:a4a2d2b, Sep  6 2024, 20:11:23) [MSC v.1940 64 bit (AMD64)]",
+  "recovery_pin": {
+    "cuda_index_url": "https://download.pytorch.org/whl/cu130",
+    "cuda_runtime": "13.0",
+    "expected_gpu_count": 2,
+    "expected_gpu_names": [
+      "NVIDIA GeForce RTX 4060",
+      "NVIDIA GeForce RTX 5060 Ti"
+    ],
+    "observed": {
+      "cuda_available": true,
+      "device_count": 2,
+      "devices": [
+        {
+          "bf16_matmul": {
+            "ok": true,
+            "seconds": 0.15210269996896386
+          },
+          "bf16_supported": true,
+          "compute_capability": [
+            8,
+            9
+          ],
+          "free_memory": 7354712064,
+          "index": 0,
+          "name": "NVIDIA GeForce RTX 4060",
+          "total_memory": 8585216000
+        },
+        {
+          "bf16_matmul": {
+            "ok": true,
+            "seconds": 0.059249999991152436
+          },
+          "bf16_supported": true,
+          "compute_capability": [
+            12,
+            0
+          ],
+          "free_memory": 15806234624,
+          "index": 1,
+          "name": "NVIDIA GeForce RTX 5060 Ti",
+          "total_memory": 17102864384
+        }
+      ],
+      "platform": "Windows-11-10.0.26200-SP0",
+      "python": "3.12.6 (tags/v3.12.6:a4a2d2b, Sep  6 2024, 20:11:23) [MSC v.1940 64 bit (AMD64)]",
+      "python_executable": "C:\\workplace\\llm_playground\\.venv\\Scripts\\python.exe",
+      "status": "WINDOWS_CUDA_READY",
+      "torch": "2.13.0+cu130",
+      "torch_cuda": "13.0"
+    },
+    "platform": "Windows-11-10.0.26200-SP0",
+    "python_version": "3.12.6",
+    "reference": "C:\\workplace\\llm_playground\\runs\\windows-cuda-v3.json",
+    "reference_exists": true,
+    "status": "available",
+    "torch_version": "2.13.0+cu130"
+  },
+  "runtime_lock_path": "C:\\workplace\\llm_playground\\runs\\windows-runtime-lock.json",
+  "tools": {
+    "cmake": {
+      "command": [
+        "C:\\Program Files\\CMake\\bin\\cmake.EXE",
+        "--version"
+      ],
+      "elapsed_seconds": 0.1319634999963455,
+      "returncode": 0,
+      "status": "DONE",
+      "stderr": "",
+      "stdout": "cmake version 3.30.3\n\nCMake suite maintained and supported by Kitware (kitware.com/cmake).\n",
+      "unavailable": false
+    },
+    "git": {
+      "command": [
+        "C:\\Program Files\\Git\\cmd\\git.EXE",
+        "--version"
+      ],
+      "elapsed_seconds": 0.12571509997360408,
+      "returncode": 0,
+      "status": "DONE",
+      "stderr": "",
+      "stdout": "git version 2.47.0.windows.2\n",
+      "unavailable": false
+    },
+    "ninja": {
+      "command": [
+        "ninja",
+        "--version"
+      ],
+      "returncode": null,
+      "stderr": "not found",
+      "stdout": "",
+      "unavailable": true
+    },
+    "nvcc": {
+      "command": [
+        "nvcc",
+        "--version"
+      ],
+      "returncode": null,
+      "stderr": "not found",
+      "stdout": "",
+      "unavailable": true
+    },
+    "nvidia_smi_list": {
+      "command": [
+        "C:\\WINDOWS\\system32\\nvidia-smi.EXE",
+        "-L"
+      ],
+      "elapsed_seconds": 0.1511853999691084,
+      "returncode": 0,
+      "status": "DONE",
+      "stderr": "",
+      "stdout": "GPU 0: NVIDIA GeForce RTX 5060 Ti (UUID: GPU-49db48ba-f49e-6bf4-1d37-0eef00b47376)\nGPU 1: NVIDIA GeForce RTX 4060 (UUID: GPU-750f2411-a4ee-0f5a-40d0-9bef4e9143dc)\n",
+      "unavailable": false
+    },
+    "nvidia_smi_query": {
+      "command": [
+        "C:\\WINDOWS\\system32\\nvidia-smi.EXE",
+        "--query-gpu=index,name,memory.total,driver_version,pci.bus_id,temperature.gpu,power.limit",
+        "--format=csv"
+      ],
+      "elapsed_seconds": 0.15682989999186248,
+      "returncode": 0,
+      "status": "DONE",
+      "stderr": "",
+      "stdout": "index, name, memory.total [MiB], driver_version, pci.bus_id, temperature.gpu, power.limit [W]\n0, NVIDIA GeForce RTX 5060 Ti, 16311 MiB, 610.88, 00000000:01:00.0, 49, 180.00 W\n1, NVIDIA GeForce RTX 4060, 8188 MiB, 610.88, 00000000:06:00.0, 39, 115.00 W\n",
+      "unavailable": false
+    },
+    "python": {
+      "command": [
+        "C:\\workplace\\llm_playground\\.venv\\Scripts\\python.exe",
+        "--version"
+      ],
+      "elapsed_seconds": 0.12105640000663698,
+      "returncode": 0,
+      "status": "DONE",
+      "stderr": "",
+      "stdout": "Python 3.12.6\n",
+      "unavailable": false
+    }
+  },
+  "torch": {
+    "bf16_tensor": true,
+    "compiled_cuda": "13.0",
+    "cuda_available": true,
+    "device_count": 2,
+    "devices": [
+      {
+        "allocated": 0,
+        "bf16_supported": true,
+        "bf16_tensor_operation": true,
+        "bfloat16_matmul": true,
+        "bfloat16_tensor": true,
+        "compute_capability": [
+          8,
+          9
+        ],
+        "float16_matmul": true,
+        "float16_tensor": true,
+        "index": 0,
+        "name": "NVIDIA GeForce RTX 4060",
+        "reserved": 0,
+        "small_cuda_gemm": true,
+        "total_memory": 8585216000
+      },
+      {
+        "allocated": 0,
+        "bf16_supported": true,
+        "bf16_tensor_operation": true,
+        "bfloat16_matmul": true,
+        "bfloat16_tensor": true,
+        "compute_capability": [
+          12,
+          0
+        ],
+        "float16_matmul": true,
+        "float16_tensor": true,
+        "index": 1,
+        "name": "NVIDIA GeForce RTX 5060 Ti",
+        "reserved": 0,
+        "small_cuda_gemm": true,
+        "total_memory": 17102864384
+      }
+    ],
+    "import_ok": true,
+    "installed": true,
+    "peer_access": [
+      [
+        false,
+        false
+      ],
+      [
+        false,
+        false
+      ]
+    ],
+    "python_executable": "C:\\workplace\\llm_playground\\.venv\\Scripts\\python.exe",
+    "python_version": "3.12.6 (tags/v3.12.6:a4a2d2b, Sep  6 2024, 20:11:23) [MSC v.1940 64 bit (AMD64)]",
+    "small_cuda_gemm": true,
+    "version": "2.13.0+cu130"
+  },
+  "windows": true,
+  "working_directory": "C:\\workplace\\llm_playground",
+  "wsl": false
+}
