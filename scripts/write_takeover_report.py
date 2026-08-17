@@ -51,7 +51,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         "execution": {
             "requested_mode": "native_windows_only",
             "native_windows_smoke": "PASS",
-            "scientific_runtime": "guarded CPU execution in the available checkout; no GPU/native-Windows training claim",
+            "scientific_runtime": "guarded native Windows CPU execution; no GPU training claim",
             "representative_replay_started": False,
             "full64_replay_started": False,
             "holdout_opened": False,
