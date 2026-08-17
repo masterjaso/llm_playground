@@ -18,19 +18,19 @@ replacedBy:
 
 # Native teacher activation capture
 
-`d2m capture` can run a real text-to-teacher path when a pinned, local
+`dense2moe.cli capture` can run a real text-to-teacher path when a pinned, local
 Transformers snapshot is available:
 
 ```text
-d2m capture \
-  --run-dir runs/<child-run> \
-  --dataset-manifest runs/<child-run>/capture/data-plan.json \
-  --source-dir /path/to/qwen-snapshot \
-  --source-revision 1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0 \
-  --layers 0,16,32,48,63 \
-  --split both \
-  --device-map auto \
-  --microbatch 1 \
+& .\.venv\Scripts\python.exe -m dense2moe.cli capture `
+  --run-dir runs\<child-run> `
+  --dataset-manifest runs\<child-run>\capture\data-plan.json `
+  --source-dir C:\path\to\qwen-snapshot `
+  --source-revision 1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0 `
+  --layers 0,16,32,48,63 `
+  --split both `
+  --device-map auto `
+  --microbatch 1 `
   --resume
 ```
 

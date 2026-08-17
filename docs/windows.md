@@ -24,10 +24,16 @@ Linux NVIDIA driver.
 
 ```powershell
 Set-Location C:\workplace\llm_playground
-python -m pip install -e ".[runtime,dev,ml]"
-python -m dense2moe.cli doctor --run-dir runs\<run-id> --json
-python -m dense2moe.cli status --run-dir runs\<run-id> --json
+& powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\Setup-Windows.ps1
+& powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\Test-Windows-Cuda.ps1
+& .\.venv\Scripts\python.exe -m dense2moe.cli doctor --run-dir runs\<run-id> --runtime-lock runs\windows-runtime-lock.json --json
+& .\.venv\Scripts\python.exe -m dense2moe.cli status --run-dir runs\<run-id> --json
 ```
+
+If the current lock is explicitly reviewed as stale, rerun setup with
+`-ForceRecovery`. The script preserves the old lock as a timestamped
+`.drift-*.json` backup, rebuilds the project environment, and asks the
+capability gate to issue a new lock; it never silently overwrites drift.
 
 For a durable long-running command, use `scripts\Invoke-GuardedCommand.ps1`
 with `-LongRunning` and a heartbeat receipt; the wrapper owns process-tree

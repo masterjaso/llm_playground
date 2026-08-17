@@ -99,18 +99,18 @@ evidence.
 Example:
 
 ```text
-d2m prepare-data \
-  --run-dir runs/<run> \
-  --corpus-manifest data/public-subset.jsonl \
-  --source-snapshot /snapshots/qwen-pinned \
-  --tokenizer-revision 1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0 \
-  --train-tokens 131072 \
-  --holdout-tokens 16384 \
-  --sequence-length 2048 \
-  --require-domain code \
-  --require-domain reasoning/math \
-  --require-domain instruction/dialogue \
-  --require-domain general \
+& .\.venv\Scripts\python.exe -m dense2moe.cli prepare-data `
+  --run-dir runs\<run> `
+  --corpus-manifest data\public-subset.jsonl `
+  --source-snapshot C:\snapshots\qwen-pinned `
+  --tokenizer-revision 1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0 `
+  --train-tokens 131072 `
+  --holdout-tokens 16384 `
+  --sequence-length 2048 `
+  --require-domain code `
+  --require-domain reasoning/math `
+  --require-domain instruction/dialogue `
+  --require-domain general `
   --require-domain long-context
 ```
 

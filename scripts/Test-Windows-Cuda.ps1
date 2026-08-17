@@ -1,5 +1,7 @@
 param(
-    [string]$Receipt = ""
+    [Alias("Receipt")][string]$EnvironmentReceipt = "",
+    [string]$RuntimeLock = "",
+    [switch]$Lightweight
 )
 
 $ErrorActionPreference = "Stop"
@@ -8,101 +10,87 @@ $venvPython = Join-Path $projectRoot ".venv\Scripts\python.exe"
 if (-not (Test-Path -LiteralPath $venvPython -PathType Leaf)) {
     throw "Missing .venv\Scripts\python.exe. Run scripts\Setup-Windows.ps1 first."
 }
-if (-not $Receipt) {
-    $Receipt = Join-Path $projectRoot "runs\windows-cuda-receipt.json"
+if (-not $EnvironmentReceipt) {
+    $EnvironmentReceipt = Join-Path $projectRoot "runs\windows-environment-receipt.json"
+}
+if (-not $RuntimeLock) {
+    $RuntimeLock = Join-Path $projectRoot "runs\windows-runtime-lock.json"
 }
 
 Push-Location $projectRoot
 try {
     $script = @'
 import json
-import platform
 import sys
-import time
 from pathlib import Path
 
-from dense2moe.hardware import collect_environment, run_environment_doctor
+from dense2moe.hardware import (
+    collect_environment,
+    load_runtime_lock,
+    run_environment_doctor,
+    write_runtime_lock,
+)
 
-environment = collect_environment()
-doctor = run_environment_doctor(environment=environment, repo_root=Path.cwd())
-if doctor["status"] != "GREEN":
+receipt_path = Path(r'''__ENVIRONMENT_RECEIPT__''')
+runtime_lock_path = Path(r'''__RUNTIME_LOCK__''')
+environment = collect_environment(repo_root=Path.cwd())
+environment["environment_receipt_path"] = str(receipt_path)
+receipt_path.parent.mkdir(parents=True, exist_ok=True)
+receipt_path.write_text(json.dumps(environment, indent=2, sort_keys=True, default=str) + "\n", encoding="utf-8")
+doctor = run_environment_doctor(
+    environment=environment,
+    repo_root=Path.cwd(),
+    runtime_lock_path=runtime_lock_path,
+)
+if not doctor["ok"]:
+    status = "WINDOWS_RUNTIME_DRIFT" if any("WINDOWS_RUNTIME_DRIFT" in item for item in doctor.get("blockers", [])) else "WINDOWS_RUNTIME_UNRESOLVED"
     blocked = {
-        "status": "WINDOWS_CUDA_BLOCKED",
+        "status": status,
         "environment": environment,
         "doctor": doctor,
         "blockers": doctor.get("blockers", []),
+        "runtime_lock": load_runtime_lock(runtime_lock_path),
     }
-    target = Path(r'''__RECEIPT__''')
-    target.parent.mkdir(parents=True, exist_ok=True)
-    target.write_text(json.dumps(blocked, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    print(json.dumps(blocked, indent=2, sort_keys=True))
-    raise SystemExit("WINDOWS_CUDA_NOT_READY: environment doctor is blocked")
+    print(json.dumps(blocked, indent=2, sort_keys=True, default=str))
+    raise SystemExit("WINDOWS_CUDA_NOT_READY: environment capability gate is blocked")
 
-try:
-    import torch
-except (ImportError, ModuleNotFoundError) as exc:
-    raise SystemExit(f"WINDOWS_CUDA_NOT_READY: torch import failed: {exc}")
-
-if not torch.cuda.is_available():
-    raise SystemExit("WINDOWS_CUDA_NOT_READY: torch.cuda.is_available() is false")
-if torch.cuda.device_count() < 2:
-    raise SystemExit(f"WINDOWS_CUDA_NOT_READY: expected >=2 GPUs, found {torch.cuda.device_count()}")
-
-devices = []
-for index in range(torch.cuda.device_count()):
-    with torch.cuda.device(index):
-        props = torch.cuda.get_device_properties(index)
-        bf16_supported = bool(torch.cuda.is_bf16_supported())
-        started = time.perf_counter()
-        left = torch.randn((2048, 2048), device=f"cuda:{index}", dtype=torch.bfloat16)
-        right = torch.randn((2048, 2048), device=f"cuda:{index}", dtype=torch.bfloat16)
-        result = left @ right
-        torch.cuda.synchronize(index)
-        elapsed = time.perf_counter() - started
-        devices.append({
-            "index": index,
-            "name": props.name,
-            "total_memory": int(props.total_memory),
-            "compute_capability": [int(props.major), int(props.minor)],
-            "bf16_supported": bf16_supported,
-            "bf16_matmul": {"ok": bool(torch.isfinite(result).all().item()), "seconds": elapsed},
-            "free_memory": int(torch.cuda.mem_get_info(index)[0]),
-        })
-        del left, right, result
-        torch.cuda.empty_cache()
-
+lock = load_runtime_lock(runtime_lock_path)
+if lock.get("status") == "MISSING":
+    lock = write_runtime_lock(
+        environment,
+        doctor,
+        repo_root=Path.cwd(),
+        path=runtime_lock_path,
+        environment_receipts=[receipt_path],
+    )
 payload = {
-    "status": "WINDOWS_CUDA_READY",
-    "platform": platform.platform(),
-    "python": sys.version,
-    "python_executable": sys.executable,
-    "torch": torch.__version__,
-    "torch_cuda": torch.version.cuda,
-    "cuda_available": bool(torch.cuda.is_available()),
-    "device_count": torch.cuda.device_count(),
-    "devices": devices,
+    "status": "WINDOWS_RUNTIME_LOCKED",
     "environment": environment,
     "doctor": doctor,
-    "recovery_pin": doctor.get("recovery_pin"),
+    "runtime_lock": lock,
+    "lightweight": bool(__LIGHTWEIGHT__),
 }
-target = Path(r'''__RECEIPT__''')
-target.parent.mkdir(parents=True, exist_ok=True)
-target.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-print(json.dumps(payload, indent=2, sort_keys=True))
+print(json.dumps(payload, indent=2, sort_keys=True, default=str))
 '@
-    $script = $script.Replace("__RECEIPT__", $Receipt.Replace("'", "''"))
+    $script = $script.Replace("__ENVIRONMENT_RECEIPT__", $EnvironmentReceipt.Replace("'", "''"))
+    $script = $script.Replace("__RUNTIME_LOCK__", $RuntimeLock.Replace("'", "''"))
+    $lightweightValue = if ($Lightweight) { "True" } else { "False" }
+    $script = $script.Replace("__LIGHTWEIGHT__", $lightweightValue)
     $temporaryScript = Join-Path $env:TEMP ("d2m-cuda-gate-" + [guid]::NewGuid().ToString("N") + ".py")
     Set-Content -LiteralPath $temporaryScript -Value $script -Encoding UTF8
     try {
         $wrapper = Join-Path $projectRoot "scripts\run_guarded_command.py"
-        $guarded = @($wrapper, "--name", "windows-cuda-gate", "--category", "MEDIUM", "--timeout", "300", "--", $venvPython, $temporaryScript)
+        $guarded = @($wrapper, "--name", "windows-runtime-lock", "--category", "MEDIUM", "--timeout", "300", "--", $venvPython, $temporaryScript)
         & $venvPython @guarded
-        if ($LASTEXITCODE -ne 0) { throw "CUDA gate failed" }
+        if ($LASTEXITCODE -ne 0) { throw "Windows runtime capability gate failed" }
     }
     finally {
         Remove-Item -LiteralPath $temporaryScript -Force -ErrorAction SilentlyContinue
     }
-    Write-Host "WINDOWS_CUDA_READY"
+    Write-Host "WINDOWS_RUNTIME_LOCKED"
+    Write-Host "Interpreter: $venvPython"
+    Write-Host "Environment receipt: $EnvironmentReceipt"
+    Write-Host "Runtime lock: $RuntimeLock"
 }
 finally {
     Pop-Location

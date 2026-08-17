@@ -210,3 +210,67 @@ def test_corpus_gate_requires_v2_frozen_success_checks(tmp_path: Path) -> None:
     )
     with pytest.raises(ValueError, match="hashed corpus manifest"):
         require_frozen_corpus_v2(forged)
+
+
+def test_method_proof_gate_accepts_only_clean_receipt_and_manifest(tmp_path: Path) -> None:
+    from scripts.run_oracle_routed_basis_refinement import require_method_proof_receipt
+
+    source = tmp_path / "source.jsonl"
+    source.write_text("source\n", encoding="utf-8")
+    manifest = tmp_path / "method-proof.jsonl"
+    manifest.write_text(
+        "".join(
+            json.dumps(
+                {
+                    "id": identifier,
+                    "split": "FIT-TRAIN",
+                    "token_count": tokens,
+                    "domain": "code" if identifier == "code" else "structured",
+                    "benchmark_membership": [],
+                    "benchmark_quarantine": False,
+                    "source_record_id": identifier,
+                    "source_family": "fixture",
+                    "source_name": "fixture",
+                    "source_revision": "a" * 40,
+                }
+            )
+            + "\n"
+            for identifier, tokens in (("code", 20_000), ("technical", 20_000))
+        ),
+        encoding="utf-8",
+    )
+    receipt = tmp_path / "receipt.json"
+    receipt.write_text(
+        json.dumps(
+            {
+                "receipt_type": "dense2moe-method-proof-data",
+                "status": "METHOD_PROOF_READY",
+                "method_proof_policy": {
+                    "eligible_split": "FIT-TRAIN",
+                    "minimum_tokens": 32_768,
+                    "diversity_buckets": ["code", "technical"],
+                    "source_manifest": str(source),
+                    "source_manifest_sha256": hashlib.sha256(source.read_bytes()).hexdigest(),
+                },
+                "manifest": {"path": str(manifest), "sha256": hashlib.sha256(manifest.read_bytes()).hexdigest()},
+                "selection": {"selected_tokens": 40_000, "selected_rows": 2},
+            }
+        ),
+        encoding="utf-8",
+    )
+    payload = json.loads(receipt.read_text(encoding="utf-8"))
+    payload["receipt_sha256"] = hashlib.sha256(
+        json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).hexdigest()
+    receipt.write_text(json.dumps(payload), encoding="utf-8")
+    assert require_method_proof_receipt(receipt)["status"] == "METHOD_PROOF_READY"
+
+    forged = json.loads(receipt.read_text(encoding="utf-8"))
+    forged["method_proof_policy"]["eligible_split"] = "FIT-DEV"
+    forged.pop("receipt_sha256", None)
+    forged["receipt_sha256"] = hashlib.sha256(
+        json.dumps(forged, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).hexdigest()
+    receipt.write_text(json.dumps(forged), encoding="utf-8")
+    with pytest.raises(ValueError, match="FIT-TRAIN"):
+        require_method_proof_receipt(receipt)

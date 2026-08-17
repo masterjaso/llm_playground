@@ -22,6 +22,8 @@ from typing import Any
 from .config import ACTIVE_TOPOLOGY_IDS, FORBIDDEN_TOPOLOGY_IDS
 
 PHASE_SCHEMA_VERSION = 1
+PHASE_00A_ID = "phase-00a"
+PHASE_00B_ID = "phase-00b"
 PHASE_00_ID = "phase-00"
 PHASE_01_ID = "phase-01"
 PHASE_02_ID = "phase-02"
@@ -33,10 +35,19 @@ PHASE_07_ID = "phase-07"
 PHASE_08_ID = "phase-08"
 PHASE_09_ID = "phase-09"
 PHASE_10_ID = "phase-10"
-PHASE_IDS = tuple(f"phase-{index:02d}" for index in range(11))
+LEGACY_PHASE_IDS = tuple(f"phase-{index:02d}" for index in range(11))
+PHASE_IDS = (PHASE_00A_ID, PHASE_00B_ID, *tuple(f"phase-{index:02d}" for index in range(1, 10)))
 PHASE_STATUSES = frozenset({"pending", "running", "blocked", "complete"})
 GATE_STATUSES = frozenset({"pending", "running", "passed", "failed", "blocked", "skipped"})
 PREDICTION_DEPTHS = frozenset({"none", "compact", "expanded"})
+
+# Every executable phase handoff is a native PowerShell command. Keeping the
+# prefixes centralized prevents a later blueprint from silently reintroducing
+# a bare interpreter, console alias, or POSIX environment assignment.
+WINDOWS_PYTHON = r"& .\.venv\Scripts\python.exe "
+WINDOWS_CLI = WINDOWS_PYTHON + "-m dense2moe.cli"
+WINDOWS_POWERSHELL_CUDA = r"& powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\Test-Windows-Cuda.ps1"
+WINDOWS_NSP = "& _nsp"
 
 
 def _utc_now() -> str:
@@ -370,21 +381,40 @@ class PhaseReceiptStore:
 
 
 PHASE_00_VALIDATION_COMMANDS = (
-    "PYTHONPATH=src pytest -q tests/test_data_v2.py tests/test_fetch_public_corpus_v2.py tests/test_real_pipeline.py",
-    "PYTHONPATH=src pytest -q",
-    "PYTHONPATH=src ruff check src tests scripts",
-    "python scripts/freeze_corpus_v21.py --source data/public_v2/corpus-v2-source.jsonl --v2-manifest data/public_v2/corpus.jsonl --v2-splits data/public_v2/corpus-v2-splits.json --output data/public_v21 --require-agent-tasks 96 --json",
-    "python -m dense2moe.cli doctor --run-dir <phase-00-run-dir> --json",
-    "powershell -ExecutionPolicy Bypass -File scripts\\Test-Windows-Cuda.ps1",
-    "_nsp plan-substrate discovery validate --target . --path .nsp/artifacts/runs/<run-id>/planning/repository-fact-ledger.json",
+    WINDOWS_PYTHON + "-m pytest -q tests/test_data_v2.py tests/test_fetch_public_corpus_v2.py tests/test_real_pipeline.py",
+    WINDOWS_PYTHON + "-m pytest -q",
+    WINDOWS_PYTHON + "-m ruff check src tests scripts",
+    WINDOWS_PYTHON + r"scripts\freeze_corpus_v21.py --source data\public_v2\corpus-v2-source.jsonl --v2-manifest data\public_v2\corpus.jsonl --v2-splits data\public_v2\corpus-v2-splits.json --output data\public_v21 --require-agent-tasks 96 --json",
+    WINDOWS_PYTHON + "-m dense2moe.cli doctor --run-dir <phase-00-run-dir> --json",
+    WINDOWS_POWERSHELL_CUDA,
+    WINDOWS_NSP + " plan-substrate discovery validate --target . --path .nsp/artifacts/runs/<run-id>/planning/repository-fact-ledger.json",
 )
 
 PHASE_01_COMMANDS = (
-    "d2m prepare-data --run-dir <phase-01-run-dir> --corpus-manifest data/public_v21/corpus-v2.1.jsonl --source-snapshot runs/20260815-030931-windows/source --tokenizer-revision 1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0 --train-tokens 4096 --holdout-tokens 1024 --receipt-output <phase-01-run-dir>/capture/data-plan-receipt.json",
-    "d2m streaming-capture --run-dir <phase-01-run-dir> --split train --layers 0 --dataset-manifest <phase-01-run-dir>/capture/data-plan.json --shard-tokens 2048 --resume",
-    "python scripts/run_oracle_routed_basis_refinement.py --corpus-receipt data/public_v21/corpus-v2.1-receipt.json --topology p16/top4 --rows 2048 --epochs 1",
-    "python scripts/run_oracle_routed_basis_refinement.py --corpus-receipt data/public_v21/corpus-v2.1-receipt.json --topology p16/top4 --rows 4096 --epochs 1",
-    "python scripts/run_oracle_routed_basis_refinement.py --corpus-receipt data/public_v21/corpus-v2.1-receipt.json --topology p16/top4 --rows 32768 --epochs 1",
+    WINDOWS_CLI + r" prepare-data --run-dir <phase-01-run-dir> --corpus-manifest data\public_v21\corpus-v2.1.jsonl --source-snapshot runs\20260815-030931-windows\source --tokenizer-revision 1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0 --train-tokens 4096 --holdout-tokens 1024 --receipt-output <phase-01-run-dir>\capture\data-plan-receipt.json",
+    WINDOWS_CLI + r" streaming-capture --run-dir <phase-01-run-dir> --split train --layers 0 --dataset-manifest <phase-01-run-dir>\capture\data-plan.json --shard-tokens 2048 --resume",
+    WINDOWS_PYTHON + r"scripts\run_oracle_routed_basis_refinement.py --corpus-receipt data\public_v21\corpus-v2.1-receipt.json --topology p16/top4 --rows 2048 --epochs 1 --device cuda:0",
+    WINDOWS_PYTHON + r"scripts\run_oracle_routed_basis_refinement.py --corpus-receipt data\public_v21\corpus-v2.1-receipt.json --topology p16/top4 --rows 4096 --epochs 1 --device cuda:0",
+    WINDOWS_PYTHON + r"scripts\run_oracle_routed_basis_refinement.py --corpus-receipt data\public_v21\corpus-v2.1-receipt.json --topology p16/top4 --rows 32768 --epochs 1 --device cuda:0",
+)
+
+PHASE_00A_COMMANDS = (
+    WINDOWS_PYTHON + "-m pytest -q tests/test_environment_doctor.py tests/test_phase_contract.py",
+    WINDOWS_PYTHON + "-m ruff check src tests scripts",
+    r"& powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\Setup-Windows.ps1",
+    r"& powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\Test-Windows-Cuda.ps1",
+    WINDOWS_PYTHON + "-m dense2moe.cli doctor --run-dir <phase-00a-run-dir> --runtime-lock runs\\windows-runtime-lock.json --json",
+)
+
+PHASE_00B_COMMANDS = (
+    WINDOWS_PYTHON + r"scripts\prepare_method_proof_data.py --corpus-manifest data\public_v21\corpus-v2.1.jsonl --output <phase-00b-run-dir>\method-proof --min-tokens 32768 --json",
+    WINDOWS_PYTHON + "-m pytest -q tests/test_method_proof_data.py",
+)
+
+METHOD_PROOF_COMMANDS = (
+    WINDOWS_PYTHON + r"scripts\run_oracle_routed_basis_refinement.py --method-proof-receipt <phase-00b-run-dir>\method-proof\receipt.json --topology p16/top4 --rows 2048 --epochs 1 --device cuda:0",
+    WINDOWS_PYTHON + r"scripts\run_oracle_routed_basis_refinement.py --method-proof-receipt <phase-00b-run-dir>\method-proof\receipt.json --topology p16/top4 --rows 4096 --epochs 1 --device cuda:0",
+    WINDOWS_PYTHON + r"scripts\run_oracle_routed_basis_refinement.py --method-proof-receipt <phase-00b-run-dir>\method-proof\receipt.json --topology p16/top4 --rows 32768 --epochs 1 --device cuda:0",
 )
 
 
@@ -435,9 +465,9 @@ _LATER_PHASE_BLUEPRINTS: dict[str, dict[str, Any]] = {
         "prediction_depth": "expanded",
         "next_phase": PHASE_02_ID,
         "gates": (
-            ("phase-00-green", "Phase 0 corpus, environment, and provenance gates are green.", ("d2m status --run-dir <phase-01-run-dir> --json",), ("phase-00-receipt.json",)),
+            ("phase-00-green", "Phase 0 corpus, environment, and provenance gates are green.", (WINDOWS_CLI + " status --run-dir <phase-01-run-dir> --json",), ("phase-00-receipt.json",)),
             ("balanced-teacher-capture", "Balanced V2.1 teacher capture is hash- and split-closed.", (PHASE_01_COMMANDS[0], PHASE_01_COMMANDS[1]), ("capture/data-plan-receipt.json",)),
-            ("oracle-independence", "E-step assignments are selector-independent and checkpoint-reloadable.", ("python scripts/run_oracle_routed_basis_refinement.py --corpus-receipt data/public_v21/corpus-v2.1-receipt.json --topology p16/top4 --rows 2048 --epochs 1",), ("oracle/assignment-receipt.json",)),
+            ("oracle-independence", "E-step assignments are selector-independent and checkpoint-reloadable.", (WINDOWS_PYTHON + r"scripts\run_oracle_routed_basis_refinement.py --corpus-receipt data\public_v21\corpus-v2.1-receipt.json --topology p16/top4 --rows 2048 --epochs 1 --device cuda:0",), ("oracle/assignment-receipt.json",)),
             ("method-falsifier", "The 2k–4k smoke and 32k pilot satisfy the method-proof falsifier without shadow collapse.", (PHASE_01_COMMANDS[2], PHASE_01_COMMANDS[3], PHASE_01_COMMANDS[4]), ("metrics/method-proof.json",)),
             ("phase-01-handoff", "The selected p16 recipe and unresolved risks are immutable and resumable.", (), ("handoff.md",)),
         ),
@@ -448,11 +478,11 @@ _LATER_PHASE_BLUEPRINTS: dict[str, dict[str, Any]] = {
         "prediction_depth": "compact",
         "next_phase": PHASE_03_ID,
         "gates": (
-            ("phase-01-green", "The p16 method-proof falsifier is green.", ("d2m status --run-dir <phase-02-run-dir> --json",), ("phase-01-receipt.json",)),
-            ("oracle-quality", "Oracle cosine is at least 0.98 and NMSE is at most 0.05 on the approved FIT/DEV evidence.", ("python scripts/run_oracle_routed_basis_refinement.py --corpus-receipt data/public_v21/corpus-v2.1-receipt.json --topology p16/top4 --rows 32768 --epochs 1",), ("metrics/oracle-quality.json",)),
-            ("load-quality", "p16 load CV is at most 0.50 with zero dead experts on meaningful counts.", ("d2m validate-layer --run-dir <phase-02-run-dir> --layer 0 --profile qwen38_p16s1_top4 --json",), ("metrics/load-quality.json",)),
-            ("selector-quality", "The selector is trained only after basis freeze and remains change-sensitive on held-out labels.", ("d2m evaluate --run-dir <phase-02-run-dir> --json",), ("metrics/selector-quality.json",)),
-            ("p16-robust-green", "Independent A/B/C evidence and preservation canary support promotion.", ("d2m report --run-dir <phase-02-run-dir> --json",), ("metrics/robust-green.json",)),
+            ("phase-01-green", "The p16 method-proof falsifier is green.", (WINDOWS_CLI + " status --run-dir <phase-02-run-dir> --json",), ("phase-01-receipt.json",)),
+            ("oracle-quality", "Oracle cosine is at least 0.98 and NMSE is at most 0.05 on the approved FIT/DEV evidence.", (WINDOWS_PYTHON + r"scripts\run_oracle_routed_basis_refinement.py --corpus-receipt data\public_v21\corpus-v2.1-receipt.json --topology p16/top4 --rows 32768 --epochs 1 --device cuda:0",), ("metrics/oracle-quality.json",)),
+            ("load-quality", "p16 load CV is at most 0.50 with zero dead experts on meaningful counts.", (WINDOWS_CLI + " validate-layer --run-dir <phase-02-run-dir> --layer 0 --profile qwen38_p16s1_top4 --json",), ("metrics/load-quality.json",)),
+            ("selector-quality", "The selector is trained only after basis freeze and remains change-sensitive on held-out labels.", (WINDOWS_CLI + " evaluate --run-dir <phase-02-run-dir> --json",), ("metrics/selector-quality.json",)),
+            ("p16-robust-green", "Independent A/B/C evidence and preservation canary support promotion.", (WINDOWS_CLI + " report --run-dir <phase-02-run-dir> --json",), ("metrics/robust-green.json",)),
         ),
         "expected_artifacts": ("metrics/oracle-quality.json", "metrics/load-quality.json", "metrics/selector-quality.json", "metrics/robust-green.json"),
     },
@@ -461,10 +491,10 @@ _LATER_PHASE_BLUEPRINTS: dict[str, dict[str, Any]] = {
         "prediction_depth": "compact",
         "next_phase": PHASE_04_ID,
         "gates": (
-            ("p16-lock-input", "A robust-green p16 recipe is frozen as the transfer input.", ("d2m status --run-dir <phase-03-run-dir> --json",), ("p16-method-lock.json",)),
-            ("structured-initialization", "p16 routed experts are split into p32 512-wide experts with contribution evidence.", ("python scripts/materialize_p32_product_targets.py --help",), ("p32/initialization-receipt.json",)),
-            ("candidate-pool-adequacy", "The bounded p32 oracle candidate pool is measured and expanded when coverage is insufficient.", ("python scripts/run_oracle_routed_basis_refinement.py --corpus-receipt data/public_v21/corpus-v2.1-receipt.json --topology p32/top5 --rows 2048 --epochs 1",), ("p32/candidate-pool-receipt.json",)),
-            ("p32-quality", "p32/top5 quality, load, and selector evidence are reported against the same gates.", ("d2m validate-layer --run-dir <phase-03-run-dir> --layer 0 --profile qwen38_p32s1_top5 --json",), ("metrics/p32-quality.json",)),
+            ("p16-lock-input", "A robust-green p16 recipe is frozen as the transfer input.", (WINDOWS_CLI + " status --run-dir <phase-03-run-dir> --json",), ("p16-method-lock.json",)),
+            ("structured-initialization", "p16 routed experts are split into p32 512-wide experts with contribution evidence.", (WINDOWS_PYTHON + r"scripts\materialize_p32_product_targets.py --help",), ("p32/initialization-receipt.json",)),
+            ("candidate-pool-adequacy", "The bounded p32 oracle candidate pool is measured and expanded when coverage is insufficient.", (WINDOWS_PYTHON + r"scripts\run_oracle_routed_basis_refinement.py --corpus-receipt data\public_v21\corpus-v2.1-receipt.json --topology p32/top5 --rows 2048 --epochs 1 --device cuda:0",), ("p32/candidate-pool-receipt.json",)),
+            ("p32-quality", "p32/top5 quality, load, and selector evidence are reported against the same gates.", (WINDOWS_CLI + " validate-layer --run-dir <phase-03-run-dir> --layer 0 --profile qwen38_p32s1_top5 --json",), ("metrics/p32-quality.json",)),
             ("p32-decision", "The p32 product decision is recorded without blocking the p16 completion path.", (), ("p32/decision.json",)),
         ),
         "expected_artifacts": ("p32/initialization-receipt.json", "p32/candidate-pool-receipt.json", "metrics/p32-quality.json", "p32/decision.json"),
@@ -474,9 +504,9 @@ _LATER_PHASE_BLUEPRINTS: dict[str, dict[str, Any]] = {
         "prediction_depth": "compact",
         "next_phase": PHASE_05_ID,
         "gates": (
-            ("promotion-inputs", "p16 robust-green and p32 decision receipts are present.", ("d2m status --run-dir <phase-04-run-dir> --json",), ("promotion-inputs.json",)),
+            ("promotion-inputs", "p16 robust-green and p32 decision receipts are present.", (WINDOWS_CLI + " status --run-dir <phase-04-run-dir> --json",), ("promotion-inputs.json",)),
             ("method-specification", "Corpus, split, sampler, partition, solver, optimizer, schedule, selector, and validation cadence are specified.", (), ("TRAINING_METHOD_LOCK.json",)),
-            ("method-hash", "The method lock is content-addressed and reloadable.", ("python -m json.tool <phase-04-run-dir>/TRAINING_METHOD_LOCK.json",), ("TRAINING_METHOD_LOCK.sha256",)),
+            ("method-hash", "The method lock is content-addressed and reloadable.", (WINDOWS_PYTHON + "-m json.tool <phase-04-run-dir>\\TRAINING_METHOD_LOCK.json",), ("TRAINING_METHOD_LOCK.sha256",)),
             ("transfer-boundary", "Representative phases consume the lock without arbitrary per-layer architecture search.", (), ("transfer-boundary.json",)),
         ),
         "expected_artifacts": ("TRAINING_METHOD_LOCK.json", "TRAINING_METHOD_LOCK.sha256", "transfer-boundary.json"),
@@ -486,10 +516,10 @@ _LATER_PHASE_BLUEPRINTS: dict[str, dict[str, Any]] = {
         "prediction_depth": "expanded",
         "next_phase": PHASE_06_ID,
         "gates": (
-            ("method-lock-input", "The immutable training method lock is green.", ("d2m status --run-dir <phase-05-run-dir> --json",), ("TRAINING_METHOD_LOCK.json",)),
+            ("method-lock-input", "The immutable training method lock is green.", (WINDOWS_CLI + " status --run-dir <phase-05-run-dir> --json",), ("TRAINING_METHOD_LOCK.json",)),
             ("representative-layer-set", "Exactly layers 0–3, 28–31, and 60–63 are captured and evaluated.", (), ("representative/layers.json",)),
             ("cycle-coverage", "LINEAR_A/B/C and FULL_ATTENTION cycle classes are represented.", (), ("representative/cycle-coverage.json",)),
-            ("transfer-quality", "The locked method meets layer quality/load gates across early, middle, and late layers.", ("d2m report --run-dir <phase-05-run-dir> --json",), ("representative/quality.json",)),
+            ("transfer-quality", "The locked method meets layer quality/load gates across early, middle, and late layers.", (WINDOWS_CLI + " report --run-dir <phase-05-run-dir> --json",), ("representative/quality.json",)),
             ("representative-decision", "The p16 method transfers or a bounded corrective PIV is recorded.", (), ("representative/decision.json",)),
         ),
         "expected_artifacts": ("representative/layers.json", "representative/cycle-coverage.json", "representative/quality.json", "representative/decision.json"),
@@ -499,9 +529,9 @@ _LATER_PHASE_BLUEPRINTS: dict[str, dict[str, Any]] = {
         "prediction_depth": "expanded",
         "next_phase": PHASE_07_ID,
         "gates": (
-            ("representative-green", "The representative matrix authorizes full64 p16 conversion.", ("d2m status --run-dir <phase-06-run-dir> --json",), ("representative/decision.json",)),
+            ("representative-green", "The representative matrix authorizes full64 p16 conversion.", (WINDOWS_CLI + " status --run-dir <phase-06-run-dir> --json",), ("representative/decision.json",)),
             ("layer-queue", "All 64 layers have deterministic queue receipts and bounded budgets.", (), ("full64/layer-queue.json",)),
-            ("layer-checkpoints", "Every layer has a validated checkpoint, hash, source pin, and dataset fingerprint.", ("d2m assemble --run-dir <phase-06-run-dir> --profile qwen38_p16s1_top4 --strict --json",), ("full64/checkpoints-manifest.json",)),
+            ("layer-checkpoints", "Every layer has a validated checkpoint, hash, source pin, and dataset fingerprint.", (WINDOWS_CLI + " assemble --run-dir <phase-06-run-dir> --profile qwen38_p16s1_top4 --strict --json",), ("full64/checkpoints-manifest.json",)),
             ("full64-quality", "All layer-level quality gates pass or have an explicit bounded blocker; no silent substitution occurs.", (), ("full64/quality-report.json",)),
         ),
         "expected_artifacts": ("full64/layer-queue.json", "full64/checkpoints-manifest.json", "full64/quality-report.json"),
@@ -511,8 +541,8 @@ _LATER_PHASE_BLUEPRINTS: dict[str, dict[str, Any]] = {
         "prediction_depth": "expanded",
         "next_phase": PHASE_08_ID,
         "gates": (
-            ("full64-input", "All 64 p16 layer checkpoints are complete and hash-consistent.", ("d2m status --run-dir <phase-07-run-dir> --json",), ("full64/checkpoints-manifest.json",)),
-            ("tensor-inventory", "All intended FFNs are replaced and non-FFN tensor inventory is preserved.", ("d2m assemble --run-dir <phase-07-run-dir> --profile qwen38_p16s1_top4 --strict --json",), ("BF16_SPARSE_MASTER/manifest.json",)),
+            ("full64-input", "All 64 p16 layer checkpoints are complete and hash-consistent.", (WINDOWS_CLI + " status --run-dir <phase-07-run-dir> --json",), ("full64/checkpoints-manifest.json",)),
+            ("tensor-inventory", "All intended FFNs are replaced and non-FFN tensor inventory is preserved.", (WINDOWS_CLI + " assemble --run-dir <phase-07-run-dir> --profile qwen38_p16s1_top4 --strict --json",), ("BF16_SPARSE_MASTER/manifest.json",)),
             ("backbone-preservation", "Attention, norms, residual, embeddings, LM head, tokenizer, chat template, and generation metadata are verified.", (), ("BF16_SPARSE_MASTER/preservation-receipt.json",)),
             ("bf16-reload", "The assembled BF16 master reloads and passes representative forward checks.", (), ("BF16_SPARSE_MASTER/reload-receipt.json",)),
         ),
@@ -523,8 +553,8 @@ _LATER_PHASE_BLUEPRINTS: dict[str, dict[str, Any]] = {
         "prediction_depth": "compact",
         "next_phase": PHASE_09_ID,
         "gates": (
-            ("bf16-master-input", "The canonical BF16 sparse master is frozen.", ("d2m status --run-dir <phase-08-run-dir> --json",), ("BF16_SPARSE_MASTER/manifest.json",)),
-            ("distribution-quality", "PPL delta, token KL, and top-1 agreement meet the accepted envelope.", ("d2m evaluate --run-dir <phase-08-run-dir> --json",), ("validation/distribution.json",)),
+            ("bf16-master-input", "The canonical BF16 sparse master is frozen.", (WINDOWS_CLI + " status --run-dir <phase-08-run-dir> --json",), ("BF16_SPARSE_MASTER/manifest.json",)),
+            ("distribution-quality", "PPL delta, token KL, and top-1 agreement meet the accepted envelope.", (WINDOWS_CLI + " evaluate --run-dir <phase-08-run-dir> --json",), ("validation/distribution.json",)),
             ("coding-agent-quality", "Unseen coding-agent tasks cover generation, debugging, navigation, tools, retries, and long context.", (), ("validation/coding-agent.json",)),
             ("preservation-quality", "General/STEM/OOD canaries show no unexplained catastrophic collapse.", (), ("validation/preservation.json",)),
             ("finalist-holdout-policy", "Official holdout remains closed unless this artifact is the selected finalist.", (), ("validation/holdout-policy.json",)),
@@ -536,10 +566,10 @@ _LATER_PHASE_BLUEPRINTS: dict[str, dict[str, Any]] = {
         "prediction_depth": "compact",
         "next_phase": PHASE_10_ID,
         "gates": (
-            ("bf16-validation-input", "BF16 whole-model validation is green before quantization work.", ("d2m status --run-dir <phase-09-run-dir> --json",), ("validation/distribution.json",)),
-            ("runtime-discovery", "A runtime/backend capable of the active sparse topology is identified and exercised structurally.", ("d2m export-gguf --run-dir <phase-09-run-dir> --json",), ("quant/runtime-discovery.json",)),
+            ("bf16-validation-input", "BF16 whole-model validation is green before quantization work.", (WINDOWS_CLI + " status --run-dir <phase-09-run-dir> --json",), ("validation/distribution.json",)),
+            ("runtime-discovery", "A runtime/backend capable of the active sparse topology is identified and exercised structurally.", (WINDOWS_CLI + " export-gguf --run-dir <phase-09-run-dir> --json",), ("quant/runtime-discovery.json",)),
             ("serialization-contract", "Expert layout, router precision, shared branch precision, and metadata survive round-trip.", (), ("quant/serialization-contract.json",)),
-            ("imatrix-contract", "Calibration/imatrix generation is receipt-bearing and source/BF16 fingerprints are closed.", ("d2m build-imatrix --run-dir <phase-09-run-dir> --json",), ("quant/imatrix-receipt.json",)),
+            ("imatrix-contract", "Calibration/imatrix generation is receipt-bearing and source/BF16 fingerprints are closed.", (WINDOWS_CLI + " build-imatrix --run-dir <phase-09-run-dir> --json",), ("quant/imatrix-receipt.json",)),
         ),
         "expected_artifacts": ("quant/runtime-discovery.json", "quant/serialization-contract.json", "quant/imatrix-receipt.json"),
     },
@@ -548,9 +578,9 @@ _LATER_PHASE_BLUEPRINTS: dict[str, dict[str, Any]] = {
         "prediction_depth": "expanded",
         "next_phase": "complete",
         "gates": (
-            ("bf16-freeze", "Quantization starts only from the exact validated BF16 sparse master.", ("d2m status --run-dir <phase-10-run-dir> --json",), ("BF16_SPARSE_MASTER/manifest.json",)),
-            ("conservative-quantization", "A conservative Q8-like or equivalent baseline reloads successfully.", ("d2m quantize --run-dir <phase-10-run-dir> --json",), ("quant/candidate-q8/receipt.json",)),
-            ("incremental-quality", "BF16-to-quantized degradation is measured separately from dense-to-BF16 degradation.", ("d2m evaluate --run-dir <phase-10-run-dir> --json",), ("quant/incremental-quality.json",)),
+            ("bf16-freeze", "Quantization starts only from the exact validated BF16 sparse master.", (WINDOWS_CLI + " status --run-dir <phase-10-run-dir> --json",), ("BF16_SPARSE_MASTER/manifest.json",)),
+            ("conservative-quantization", "A conservative Q8-like or equivalent baseline reloads successfully.", (WINDOWS_CLI + " quantize --run-dir <phase-10-run-dir> --json",), ("quant/candidate-q8/receipt.json",)),
+            ("incremental-quality", "BF16-to-quantized degradation is measured separately from dense-to-BF16 degradation.", (WINDOWS_CLI + " evaluate --run-dir <phase-10-run-dir> --json",), ("quant/incremental-quality.json",)),
             ("practical-candidate", "At least one quantized candidate remains within the accepted whole-model quality envelope.", (), ("quant/final-candidate.json",)),
             ("closeout", "The full source-to-quantized pipeline is reproducible from a clean checkout with hashes and receipts.", (), ("FINAL_CLOSEOUT.md",)),
         ),
@@ -577,26 +607,200 @@ def _later_phase_contract(phase_id: str, blueprint: Mapping[str, Any]) -> PhaseC
         prediction_depth=str(blueprint["prediction_depth"]),
         expected_artifacts=tuple(str(path) for path in blueprint["expected_artifacts"]),
         next_phase=str(blueprint["next_phase"]),
-        handoff_commands=(f"d2m status --run-dir <{phase_id}-run-dir> --json",),
+        handoff_commands=(f"{WINDOWS_CLI} status --run-dir <{phase_id}-run-dir> --json",),
         predecessor_phase=f"phase-{int(phase_id[-2:]) - 1:02d}",
     )
 
 
-PHASE_CONTRACTS: dict[str, PhaseContract] = {
+LEGACY_PHASE_CONTRACTS: dict[str, PhaseContract] = {
     PHASE_00_ID: phase_00_contract(),
     **{phase_id: _later_phase_contract(phase_id, blueprint) for phase_id, blueprint in _LATER_PHASE_BLUEPRINTS.items()},
 }
 
 
+def phase_00a_contract() -> PhaseContract:
+    return PhaseContract(
+        phase_id=PHASE_00A_ID,
+        objective="Establish and approve the reusable native-Windows runtime capability lock.",
+        gates=(
+            GateContract("platform-policy", "WSL/Linux is rejected and no fallback execution path is offered.", (PHASE_00A_COMMANDS[0],)),
+            GateContract("capability-gate", "The project Windows interpreter proves Torch, CUDA, BF16, GEMM, checkpoint, p16, teacher, oracle, and source probes.", (PHASE_00A_COMMANDS[4],)),
+            GateContract("runtime-lock", "A green capability result creates runs\\windows-runtime-lock.json with a content hash and receipt hashes.", (PHASE_00A_COMMANDS[3],), ("runs/windows-runtime-lock.json",)),
+            GateContract("runtime-drift", "Changes from the current lock classify as WINDOWS_RUNTIME_DRIFT.", (PHASE_00A_COMMANDS[4],)),
+            GateContract("handoff", "The next phase receives the lock path and exact native commands.", (), ("runs/windows-runtime-lock.json",)),
+        ),
+        validation_commands=PHASE_00A_COMMANDS,
+        prediction_depth="compact",
+        expected_artifacts=("runs/windows-environment-receipt.json", "runs/windows-runtime-lock.json"),
+        next_phase=PHASE_00B_ID,
+        handoff_commands=(PHASE_00B_COMMANDS[0],),
+        predecessor_phase=None,
+    )
+
+
+def phase_00b_contract() -> PhaseContract:
+    return PhaseContract(
+        phase_id=PHASE_00B_ID,
+        objective="Derive a clean non-benchmark METHOD_PROOF_ONLY dataset from immutable Corpus V2.1.",
+        gates=(
+            GateContract("runtime-lock-green", "The current Windows runtime lock is approved and reusable.", (PHASE_00A_COMMANDS[4],), ("runs/windows-runtime-lock.json",)),
+            GateContract("method-proof-data", "At least 32k usable states/tokens are selected with known provenance and no benchmark rows.", (PHASE_00B_COMMANDS[0],), ("method-proof/receipt.json",)),
+            GateContract("method-proof-diversity", "The subset includes code/technical diversity and remains disjoint from evaluation cohorts.", (PHASE_00B_COMMANDS[1],)),
+        ),
+        validation_commands=PHASE_00B_COMMANDS,
+        prediction_depth="compact",
+        expected_artifacts=("method-proof/manifest.jsonl", "method-proof/receipt.json"),
+        next_phase=PHASE_01_ID,
+        handoff_commands=METHOD_PROOF_COMMANDS,
+        predecessor_phase=PHASE_00A_ID,
+    )
+
+
+def _variant(
+    base: PhaseContract,
+    *,
+    phase_id: str,
+    predecessor_phase: str | None,
+    next_phase: str,
+    objective: str | None = None,
+    gates: tuple[GateContract, ...] | None = None,
+    validation_commands: tuple[str, ...] | None = None,
+    expected_artifacts: tuple[str, ...] | None = None,
+    prediction_depth: str | None = None,
+    handoff_commands: tuple[str, ...] | None = None,
+) -> PhaseContract:
+    selected_gates = gates if gates is not None else base.gates
+    selected_commands = validation_commands if validation_commands is not None else tuple(command for gate in selected_gates for command in gate.validation_commands)
+    return PhaseContract(
+        phase_id=phase_id,
+        objective=objective or base.objective,
+        gates=selected_gates,
+        validation_commands=selected_commands,
+        prediction_depth=prediction_depth or base.prediction_depth,
+        expected_artifacts=expected_artifacts or base.expected_artifacts,
+        next_phase=next_phase,
+        handoff_commands=handoff_commands or (WINDOWS_CLI + f" status --run-dir <{phase_id}-run-dir> --json",),
+        active_topologies=base.active_topologies,
+        forbidden_topologies=base.forbidden_topologies,
+        predecessor_phase=predecessor_phase,
+    )
+
+
+def _canonical_phase_contracts() -> dict[str, PhaseContract]:
+    legacy = LEGACY_PHASE_CONTRACTS
+    phase_01 = _variant(
+        legacy[PHASE_01_ID],
+        phase_id=PHASE_01_ID,
+        predecessor_phase=PHASE_00B_ID,
+        next_phase=PHASE_02_ID,
+        objective="Prove selector-independent oracle-routed p16/top4 basis refinement at 2k, 4k, and 32k.",
+        gates=(
+            GateContract("phase-00-green", "The runtime-lock and capability gates are green before method proof begins.", (PHASE_00A_COMMANDS[4],), ("runs/windows-runtime-lock.json",)),
+            GateContract("runtime-lock-green", "The approved current Windows runtime lock is present.", (PHASE_00A_COMMANDS[4],), ("runs/windows-runtime-lock.json",)),
+            GateContract("method-proof-data-green", "The clean METHOD_PROOF_ONLY receipt is green.", (PHASE_00B_COMMANDS[0],), ("method-proof/receipt.json",)),
+            GateContract("oracle-independence", "The exhaustive p16 E-step remains selector-independent and checkpoint-reloadable.", (METHOD_PROOF_COMMANDS[0],), ("oracle/assignment-receipt.json",)),
+            GateContract("method-falsifier", "The 2k, 4k, and 32k runs show a material reconstruction signal or classify DISTILLATION_METHOD_BLOCKED.", METHOD_PROOF_COMMANDS, ("metrics/method-proof.json",)),
+            GateContract("phase-01-handoff", "The method-proof verdict and next production command are immutable and resumable.", (), ("handoff.md",)),
+        ),
+        validation_commands=(*PHASE_00A_COMMANDS[4:5], *PHASE_00B_COMMANDS, *METHOD_PROOF_COMMANDS),
+        expected_artifacts=("method-proof/receipt.json", "oracle/assignment-receipt.json", "metrics/method-proof.json", "handoff.md"),
+        handoff_commands=(WINDOWS_CLI + " status --run-dir <phase-01-run-dir> --json",),
+    )
+    phase_02 = PhaseContract(
+        phase_id=PHASE_02_ID,
+        objective="Acquire/freeze production Corpus V2.2 independently and begin production-balanced p16 training.",
+        gates=(
+            GateContract("runtime-lock-green", "The current Windows runtime lock remains green.", (PHASE_00A_COMMANDS[4],), ("runs/windows-runtime-lock.json",)),
+            GateContract("method-proof-green", "Phase 01 reports METHOD_PROOF_GREEN.", (WINDOWS_CLI + " status --run-dir <phase-02-run-dir> --json",), ("phase-01-receipt.json",)),
+            GateContract("production-corpus-green", "Corpus V2.2 contains the required independent non-benchmark agent-task distribution.", (WINDOWS_PYTHON + r"scripts\freeze_corpus_v21.py --help",), ("corpus-v2.2-receipt.json",)),
+            GateContract("production-p16-training", "The bounded 128k production p16 continuation completes with receipt-backed metrics.", (WINDOWS_CLI + " train-layer --run-dir <phase-02-run-dir> --layer 0 --profile qwen38_p16s1_top4 --json",), ("metrics/p16-production.json",)),
+        ),
+        validation_commands=(PHASE_00A_COMMANDS[4], WINDOWS_CLI + " status --run-dir <phase-02-run-dir> --json", WINDOWS_PYTHON + r"scripts\freeze_corpus_v21.py --help", WINDOWS_CLI + " train-layer --run-dir <phase-02-run-dir> --layer 0 --profile qwen38_p16s1_top4 --json"),
+        prediction_depth="compact",
+        expected_artifacts=("corpus-v2.2-receipt.json", "metrics/p16-production.json"),
+        next_phase=PHASE_03_ID,
+        handoff_commands=(WINDOWS_CLI + " status --run-dir <phase-02-run-dir> --json",),
+        predecessor_phase=PHASE_01_ID,
+    )
+    phase_03 = _variant(legacy[PHASE_02_ID], phase_id=PHASE_03_ID, predecessor_phase=PHASE_02_ID, next_phase=PHASE_04_ID, objective="Train the p16 selector and validate joint load/generalization across FIT-DEV, GATE-A, SHADOW-B, and SHADOW-C.")
+    phase_04 = _variant(legacy[PHASE_03_ID], phase_id=PHASE_04_ID, predecessor_phase=PHASE_03_ID, next_phase=PHASE_05_ID, objective="Transfer the proven method to the primary p32/top5 product without blocking the p16 fallback.")
+    phase_05 = _variant(legacy[PHASE_04_ID], phase_id=PHASE_05_ID, predecessor_phase=PHASE_04_ID, next_phase=PHASE_06_ID)
+    phase_06 = _variant(legacy[PHASE_05_ID], phase_id=PHASE_06_ID, predecessor_phase=PHASE_05_ID, next_phase=PHASE_07_ID)
+    phase_07 = _variant(
+        legacy[PHASE_06_ID],
+        phase_id=PHASE_07_ID,
+        predecessor_phase=PHASE_06_ID,
+        next_phase=PHASE_08_ID,
+        gates=legacy[PHASE_06_ID].gates
+        + (
+            GateContract(
+                "full64-input",
+                "The guarded full64 p16 queue and layer checkpoints are the sole input to BF16 assembly.",
+                (WINDOWS_CLI + " status --run-dir <phase-07-run-dir> --json",),
+                ("full64/checkpoints-manifest.json",),
+            ),
+        ),
+    )
+    # The canonical graph collapses the historical assembly/validation pair
+    # into Phase 08 and the historical runtime/quantization pair into Phase
+    # 09.  Preserve every required gate when translating those legacy
+    # contracts; otherwise a canonical phase could report green while silently
+    # dropping whole-model, serialization, or imatrix evidence.
+    phase_08_assembly_validation_gates = legacy[PHASE_07_ID].gates + legacy[PHASE_08_ID].gates
+    phase_08 = _variant(
+        legacy[PHASE_07_ID],
+        phase_id=PHASE_08_ID,
+        predecessor_phase=PHASE_07_ID,
+        next_phase=PHASE_09_ID,
+        objective="Assemble the BF16 sparse model and validate whole-model preservation and quality.",
+        gates=phase_08_assembly_validation_gates,
+        validation_commands=tuple(command for gate in phase_08_assembly_validation_gates for command in gate.validation_commands),
+        expected_artifacts=legacy[PHASE_07_ID].expected_artifacts + legacy[PHASE_08_ID].expected_artifacts,
+    )
+    phase_09_runtime_quantization_gates = legacy[PHASE_09_ID].gates + legacy[PHASE_10_ID].gates
+    phase_09 = _variant(
+        legacy[PHASE_09_ID],
+        phase_id=PHASE_09_ID,
+        predecessor_phase=PHASE_08_ID,
+        next_phase="complete",
+        objective="Prove sparse runtime/serialization compatibility, then quantize the frozen BF16 sparse master and validate incremental degradation.",
+        gates=phase_09_runtime_quantization_gates,
+        validation_commands=tuple(command for gate in phase_09_runtime_quantization_gates for command in gate.validation_commands),
+        expected_artifacts=legacy[PHASE_09_ID].expected_artifacts + legacy[PHASE_10_ID].expected_artifacts,
+    )
+    return {PHASE_00A_ID: phase_00a_contract(), PHASE_00B_ID: phase_00b_contract(), PHASE_01_ID: phase_01, PHASE_02_ID: phase_02, PHASE_03_ID: phase_03, PHASE_04_ID: phase_04, PHASE_05_ID: phase_05, PHASE_06_ID: phase_06, PHASE_07_ID: phase_07, PHASE_08_ID: phase_08, PHASE_09_ID: phase_09}
+
+
+PHASE_CONTRACTS: dict[str, PhaseContract] = _canonical_phase_contracts()
+
+
 def get_phase_contract(phase_id: str) -> PhaseContract:
+    key = str(phase_id)
+    if key in PHASE_CONTRACTS:
+        return PHASE_CONTRACTS[key]
     try:
-        return PHASE_CONTRACTS[str(phase_id)]
+        return LEGACY_PHASE_CONTRACTS[key]
     except KeyError as exc:
         raise KeyError(f"unknown phase contract: {phase_id!r}") from exc
 
 
+def get_execution_phase_contract(phase_id: str) -> PhaseContract:
+    """Return only a canonical 00A/00B/01–09 contract."""
+
+    try:
+        return PHASE_CONTRACTS[str(phase_id)]
+    except KeyError as exc:
+        raise KeyError(f"unknown canonical execution phase: {phase_id!r}") from exc
+
+
 __all__ = [
     "GATE_STATUSES",
+    "LEGACY_PHASE_IDS",
+    "METHOD_PROOF_COMMANDS",
+    "PHASE_00A_COMMANDS",
+    "PHASE_00A_ID",
+    "PHASE_00B_COMMANDS",
+    "PHASE_00B_ID",
     "PHASE_00_ID",
     "PHASE_00_VALIDATION_COMMANDS",
     "PHASE_01_COMMANDS",
@@ -618,6 +822,9 @@ __all__ = [
     "PhaseContract",
     "PhaseReceipt",
     "PhaseReceiptStore",
+    "get_execution_phase_contract",
     "get_phase_contract",
     "phase_00_contract",
+    "phase_00a_contract",
+    "phase_00b_contract",
 ]

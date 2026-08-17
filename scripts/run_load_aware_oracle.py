@@ -12,7 +12,7 @@ Pareto report.
 
 Example::
 
-    python scripts/run_load_aware_oracle.py \
+    & .\\.venv\\Scripts\\python.exe scripts\\run_load_aware_oracle.py `
       --input validation/p16-top4-contributions --topology p16/top4 \
       --input validation/p32-top5-contributions --topology p32/top5 \
       --output reports/load-aware-oracle.json

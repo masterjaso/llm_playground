@@ -71,5 +71,5 @@ than contiguous grouping, but not sufficient for the fixed quality gate.
 ## Recommended next command
 
 ```text
-d2m prepare-data --run-dir runs/20260815-145505-windows-real-d2m --corpus-manifest <approved-jsonl>
+& .\.venv\Scripts\python.exe -m dense2moe.cli prepare-data --run-dir runs/20260815-145505-windows-real-d2m --corpus-manifest <approved-jsonl>
 ```

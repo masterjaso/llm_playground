@@ -3,14 +3,19 @@ param(
     [string]$TorchVersion = "2.13.0",
     [string]$PythonVersion = "3.12",
     [string]$EnvironmentReceipt = "",
-    [switch]$SkipTorchInstall
+    [string]$RuntimeLock = "",
+    [switch]$SkipTorchInstall,
+    [switch]$ForceRecovery
 )
 
 $ErrorActionPreference = "Stop"
 $projectRoot = Split-Path -Parent $PSScriptRoot
 $venvPython = Join-Path $projectRoot ".venv\Scripts\python.exe"
 if (-not $EnvironmentReceipt) {
-    $EnvironmentReceipt = Join-Path $projectRoot "runs\windows-environment-pin.json"
+    $EnvironmentReceipt = Join-Path $projectRoot "runs\windows-environment-receipt.json"
+}
+if (-not $RuntimeLock) {
+    $RuntimeLock = Join-Path $projectRoot "runs\windows-runtime-lock.json"
 }
 
 function Invoke-GuardedPython {
@@ -40,6 +45,24 @@ function Invoke-Python {
 
 Push-Location $projectRoot
 try {
+    if ($ForceRecovery -and (Test-Path -LiteralPath $RuntimeLock -PathType Leaf)) {
+        # Preserve the stale lock for audit/recovery, then let the capability
+        # gate create a fresh lock only after the rebuilt environment is green.
+        $recoveryStamp = Get-Date -Format "yyyyMMdd-HHmmss"
+        $recoveryBackup = "$RuntimeLock.drift-$recoveryStamp.json"
+        Move-Item -LiteralPath $RuntimeLock -Destination $recoveryBackup
+        Write-Host "WINDOWS_RUNTIME_LOCK_BACKED_UP: $recoveryBackup"
+    }
+    if ((Test-Path -LiteralPath $RuntimeLock -PathType Leaf) -and (-not $ForceRecovery)) {
+        Write-Host "WINDOWS_RUNTIME_LOCK_PRESENT: running lightweight capability verification"
+        $testScript = Join-Path $projectRoot "scripts\Test-Windows-Cuda.ps1"
+        & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $testScript -EnvironmentReceipt $EnvironmentReceipt -RuntimeLock $RuntimeLock -Lightweight
+        if ($LASTEXITCODE -ne 0) {
+            throw "Current Windows runtime lock verification failed. Use -ForceRecovery only after reviewing WINDOWS_RUNTIME_DRIFT."
+        }
+        Write-Host "WINDOWS_RUNTIME_LOCK_REUSED"
+        return
+    }
     if (-not (Test-Path -LiteralPath $venvPython -PathType Leaf)) {
         $knownPython = Join-Path $env:LOCALAPPDATA "Programs\Python\Python312\python.exe"
         if (Test-Path -LiteralPath $knownPython -PathType Leaf) {
@@ -87,9 +110,10 @@ payload["setup_request"] = {
     "cuda_index_url": "__CUDA_INDEX_URL__",
     "torch_requirement": "torch==__TORCH_VERSION__",
 }
+payload["environment_receipt_path"] = str(target)
 target.parent.mkdir(parents=True, exist_ok=True)
 target.write_text(json.dumps(payload, indent=2, sort_keys=True, default=str) + "\n", encoding="utf-8")
-print(f"WINDOWS_ENVIRONMENT_PIN_WRITTEN: {target}")
+print(f"WINDOWS_ENVIRONMENT_RECEIPT_WRITTEN: {target}")
 '@
     $pinCode = $pinCode.Replace("__PYTHON_VERSION__", $PythonVersion.Replace("'", "''"))
     $pinCode = $pinCode.Replace("__TORCH_VERSION__", $TorchVersion.Replace("'", "''"))
@@ -98,6 +122,14 @@ print(f"WINDOWS_ENVIRONMENT_PIN_WRITTEN: {target}")
     Write-Host "WINDOWS_PYTHON_READY"
     Write-Host "Interpreter: $venvPython"
     Write-Host "Environment receipt: $EnvironmentReceipt"
+    if ($ForceRecovery) {
+        $testScript = Join-Path $projectRoot "scripts\Test-Windows-Cuda.ps1"
+        & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $testScript -EnvironmentReceipt $EnvironmentReceipt -RuntimeLock $RuntimeLock
+        if ($LASTEXITCODE -ne 0) {
+            throw "Rebuilt Windows runtime did not pass the capability gate; the prior lock remains in the drift backup."
+        }
+        Write-Host "WINDOWS_RUNTIME_LOCK_REAPPROVED"
+    }
 }
 finally {
     Pop-Location

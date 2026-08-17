@@ -66,9 +66,11 @@ def _parser() -> argparse.ArgumentParser:
 
     doctor = sub.choices["doctor"]
     doctor.add_argument("--checkpoint", help="existing D2M safetensors or layer metadata path to load")
-    doctor.add_argument("--expected-gpu", action="append", dest="expected_gpus", help="expected GPU name (repeatable; defaults to the pinned recovery receipt)")
-    doctor.add_argument("--expected-gpu-count", type=int, help="expected visible GPU count (defaults to the pinned recovery receipt)")
+    doctor.add_argument("--expected-gpu", action="append", dest="expected_gpus", help="expected selected GPU name (repeatable; defaults to the current visible set)")
+    doctor.add_argument("--expected-gpu-count", type=int, help="expected selected GPU count (defaults to the current visible set)")
     doctor.add_argument("--recovery-pin", help="override the historical native-Windows environment receipt")
+    doctor.add_argument("--runtime-lock", help="current approved runtime lock (defaults to runs/windows-runtime-lock.json)")
+    doctor.add_argument("--source-checkpoint", help="source safetensors shard or checkpoint used by the capability gate")
 
     spike = base("full-model-spike")
     spike.add_argument("--seed", type=int, default=17)
@@ -221,9 +223,11 @@ def _doctor(args: argparse.Namespace, store: StateStore) -> dict[str, Any]:
         environment=environment,
         repo_root=Path.cwd(),
         checkpoint_path=getattr(args, "checkpoint", None),
+        source_checkpoint_path=getattr(args, "source_checkpoint", None),
         expected_gpu_names=getattr(args, "expected_gpus", None),
         expected_gpu_count=getattr(args, "expected_gpu_count", None),
         recovery_pin_path=getattr(args, "recovery_pin", None),
+        runtime_lock_path=getattr(args, "runtime_lock", None),
     )
     environment["doctor"] = doctor
     environment["disk"] = {str(Path.cwd().anchor or Path.cwd()): {"total": shutil.disk_usage(Path.cwd()).total, "free": shutil.disk_usage(Path.cwd()).free, "used": shutil.disk_usage(Path.cwd()).used}}
@@ -264,7 +268,11 @@ def _doctor(args: argparse.Namespace, store: StateStore) -> dict[str, Any]:
     decision_path = store.run_dir / "decision-register.json"
     atomic_write_json(decision_path, decision)
     ready = bool(doctor.get("ok"))
-    next_command = f"d2m inspect-source --run-dir {args.run_dir} --model {args.model}" if ready else "powershell -ExecutionPolicy Bypass -File scripts\\Setup-Windows.ps1"
+    next_command = (
+        f"& .\\.venv\\Scripts\\python.exe -m dense2moe.cli inspect-source --run-dir {args.run_dir} --model {args.model}"
+        if ready
+        else "& powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\\scripts\\Setup-Windows.ps1"
+    )
     result = {
         "status": "DISCOVERY_READY" if ready else "BLOCKED",
         "message": "environment doctor passed" if ready else "environment doctor failed closed; native ML recovery is required",
@@ -275,6 +283,7 @@ def _doctor(args: argparse.Namespace, store: StateStore) -> dict[str, Any]:
         "windows_native": system == "Windows",
         "wsl": bool(environment.get("wsl", False)),
         "torch_cuda": bool(torch_info.get("cuda_available")),
+        "runtime_lock": doctor.get("runtime_lock"),
         "next_exact_command": next_command,
     }
     current = store.load()
@@ -321,7 +330,7 @@ def _inspect_source(args: argparse.Namespace, store: StateStore) -> dict[str, An
     decisions.update({"source_revision": manifest.revision, "source_text_model_class": geometry.get("model_type"), "source_geometry": geometry, "text_tensor_count": len(manifest.text_tensor_names), "target_moe_class": decisions.get("target_moe_class", "unknown")})
     atomic_write_json(decision_path, decisions)
     status = "SOURCE_READY" if manifest.revision_pinned and manifest.config and "error" not in manifest.config else "SOURCE_DISCOVERY_INCOMPLETE"
-    next_command = f"d2m estimate --run-dir {args.run_dir} --config {args.config or DEFAULT_ACTIVE_CONFIG}"
+    next_command = f"& .\\.venv\\Scripts\\python.exe -m dense2moe.cli estimate --run-dir {args.run_dir} --config {args.config or DEFAULT_ACTIVE_CONFIG}"
     result = {"status": status, "source_manifest": str(path), "revision": manifest.revision, "revision_pinned": manifest.revision_pinned, "config_keys": sorted(manifest.config), "tensor_count": len(manifest.tensor_names), "text_tensor_count": len(manifest.text_tensor_names), "next_exact_command": next_command}
     config_hash = None
     index_hash = None
@@ -356,7 +365,7 @@ def _estimate(args: argparse.Namespace, store: StateStore) -> dict[str, Any]:
     atomic_write_json(path, {"profile": profile.as_dict(), "estimate": estimate.as_dict()})
     free = shutil.disk_usage(store.run_dir).free
     enough = free >= estimate.total_bytes
-    next_command = f"d2m test --run-dir {args.run_dir}"
+    next_command = f"& .\\.venv\\Scripts\\python.exe -m dense2moe.cli test --run-dir {args.run_dir}"
     result = {"status": "ESTIMATE_READY" if enough else "BLOCKED", "estimate": str(path), "free_bytes": free, "source_bytes": source_bytes, "required_bytes": estimate.total_bytes, "sufficient": enough, "profile": profile.name, "next_exact_command": next_command}
     store.transition(selected_profile=profile.name, phase_status="complete" if enough else "blocked", current_phase="bootstrap", next_exact_command=next_command, validation_results={"estimate": result})
     if not enough:
@@ -434,7 +443,7 @@ def _download(args: argparse.Namespace, store: StateStore) -> dict[str, Any]:
         except (OSError, RuntimeError, ValueError, TypeError) as exc:
             result = {"status": "BLOCKED", "destination": str(target), "model": args.model, "revision": args.revision, "trust_remote_code": False, "error": str(exc), "message": "Pinned source download failed; preserve the diagnostic log and retry without changing the revision."}
     atomic_write_json(store.run_dir / "download.json", result)
-    next_command = f"d2m inspect-source --run-dir {args.run_dir} --source-dir {target} --revision <40-hex-commit>"
+    next_command = f"& .\\.venv\\Scripts\\python.exe -m dense2moe.cli inspect-source --run-dir {args.run_dir} --source-dir {target} --revision <40-hex-commit>"
     store.transition(next_exact_command=next_command, validation_results={"download": result})
     store.write_handoff(next_command=next_command, expected_output="source-manifest.json")
     return result
@@ -451,7 +460,7 @@ def _extract(args: argparse.Namespace, store: StateStore) -> dict[str, Any]:
         manifest = extract_text_checkpoint(args.source_dir, destination)
         result = {"status": "TEXT_CHECKPOINT_READY" if manifest.get("materialized") else "BLOCKED", "manifest": str(destination / "text-filter-manifest.json"), "tensor_count": len(manifest.get("text_tensor_names", [])), "materialized": bool(manifest.get("materialized", False))}
     atomic_write_json(store.run_dir / "extraction.json", result)
-    next_command = f"d2m test --run-dir {args.run_dir}"
+    next_command = f"& .\\.venv\\Scripts\\python.exe -m dense2moe.cli test --run-dir {args.run_dir}"
     store.transition(current_phase="extraction", phase_status="complete" if result["status"] != "BLOCKED" else "blocked", next_exact_command=next_command, validation_results={"extraction": result})
     store.write_prediction("extraction", {"expected_artifacts": ["text-checkpoint/model.safetensors.index.json", "text-filter-manifest.json"], "expected_validation_results": ["TEXT_CHECKPOINT_READY"]}, "confirmed" if result["status"] != "BLOCKED" else "counterexample")
     if result["status"] == "BLOCKED":
@@ -472,7 +481,7 @@ def _structural_smoke(args: argparse.Namespace, store: StateStore) -> dict[str, 
         weight_sums = np.sum(normalize_topk_weights(weights), axis=-1).tolist()
     except ImportError:
         weight_sums = []
-    next_command = f"d2m pilot --run-dir {args.run_dir} --config {args.config or DEFAULT_ACTIVE_CONFIG}"
+    next_command = f"& .\\.venv\\Scripts\\python.exe -m dense2moe.cli pilot --run-dir {args.run_dir} --config {args.config or DEFAULT_ACTIVE_CONFIG}"
     result = {"status": "TESTS_GREEN", "profile": profile.name, "partition_exhaustive": len(plan.all_indices) == profile.dense_intermediate_size, "partition_disjoint": len(set(plan.all_indices)) == profile.dense_intermediate_size, "capacity": plan.total_capacity, "router_topk": profile.top_k, "router_weight_sums": weight_sums, "checks": ["config_profile_arithmetic", "partition_roundtrip_contract", "router_topk_count", "router_weights_normalized", "atomic_state_contract", "job_queue_contract"], "next_exact_command": next_command}
     atomic_write_json(store.run_dir / "evidence" / "phase-00" / "structural-smoke.json", result)
     store.transition(current_phase="partition", phase_status="complete", last_successful_command="test", next_exact_command=next_command, validation_results={"tests": result})
@@ -483,7 +492,7 @@ def _structural_smoke(args: argparse.Namespace, store: StateStore) -> dict[str, 
 def _pilot(args: argparse.Namespace, store: StateStore) -> dict[str, Any]:
     source = store.run_dir / "source-manifest.json"
     real = source.exists() and bool(json.loads(source.read_text(encoding="utf-8")).get("text_tensor_names"))
-    next_command = f"d2m prepare-data --run-dir {args.run_dir}"
+    next_command = f"& .\\.venv\\Scripts\\python.exe -m dense2moe.cli prepare-data --run-dir {args.run_dir}"
     profile_paths = [
         Path(__file__).resolve().parents[2] / "configs" / "qwen38_p16s1_top4.yaml",
         Path(__file__).resolve().parents[2] / "configs" / "qwen38_p32s1_top5.yaml",
@@ -533,15 +542,15 @@ def _oracle_study(args: argparse.Namespace, store: StateStore) -> dict[str, Any]
         best = result.get("best_variant")
         blocker = None if result.get("gate", {}).get("green") else "p16/top4 oracle gate is red; bounded fallback or capacity change is required before router training"
         if blocker is None and result.get("quality_gate_eligible"):
-            next_command = f"d2m streaming-capture --run-dir {args.run_dir} --split train --layers 0 --dataset-manifest {store.run_dir / 'capture' / 'data-plan.json'} --resume"
+            next_command = f"& .\\.venv\\Scripts\\python.exe -m dense2moe.cli streaming-capture --run-dir {args.run_dir} --split train --layers 0 --dataset-manifest {store.run_dir / 'capture' / 'data-plan.json'} --resume"
         else:
-            next_command = f"d2m prepare-data --run-dir {args.run_dir} --corpus-manifest <approved-jsonl>"
+            next_command = f"& .\\.venv\\Scripts\\python.exe -m dense2moe.cli prepare-data --run-dir {args.run_dir} --corpus-manifest <approved-jsonl>"
         result.update({"best_variant": best, "next_exact_command": next_command})
         atomic_write_json(store.run_dir / "metrics" / "oracle-ablation.json", result)
         store.transition(current_phase="oracle", phase_status="pending" if blocker else "complete", active_blocker=blocker, next_exact_command=next_command, validation_results={"oracle": result})
         store.write_handoff(next_command=next_command, expected_output="fixed calibration manifest before router training", blocker=blocker)
     except (OSError, ValueError, TypeError, RuntimeError, KeyError) as exc:
-        result = {"status": "BLOCKED", "message": str(exc), "next_exact_command": f"d2m oracle-study --run-dir {args.run_dir} --layer {args.layer or 0}", "code_commit": current_git_commit()}
+        result = {"status": "BLOCKED", "message": str(exc), "next_exact_command": f"& .\\.venv\\Scripts\\python.exe -m dense2moe.cli oracle-study --run-dir {args.run_dir} --layer {args.layer or 0}", "code_commit": current_git_commit()}
         store.transition(current_phase="oracle", phase_status="blocked", active_blocker=str(exc), next_exact_command=result["next_exact_command"], validation_results={"oracle": result})
         store.write_handoff(next_command=result["next_exact_command"], expected_output="oracle ablation metrics", blocker=str(exc))
     return result
@@ -618,12 +627,12 @@ def _prepare_data(args: argparse.Namespace, store: StateStore) -> dict[str, Any]
         atomic_write_json(output, manifest)
         receipt = write_corpus_receipt(manifest, output, output=manifest.get("receipt_path"))
         result: dict[str, Any] = {"status": "DATA_READY", "artifact": str(output), "receipt": str(manifest.get("receipt_path", output.with_name("corpus-receipt.json"))), "dataset_hash": manifest["dataset_hash"], "train_tokens": manifest["train_tokens"], "holdout_tokens": manifest["holdout_tokens"], "seed": args.seed, "holdout_seed": args.holdout_seed, "tokenizer_revision": manifest.get("tokenizer_revision"), "tokenizer_files_sha256": manifest.get("tokenizer", {}).get("files_sha256"), "verified_sources": len(manifest.get("sources", [])), "receipt_dataset_sha256": receipt.get("manifest", {}).get("dataset_hash")}
-        next_command = f"d2m capture --run-dir {args.run_dir} --layers 0 --dataset-manifest {output} --resume"
+        next_command = f"& .\\.venv\\Scripts\\python.exe -m dense2moe.cli capture --run-dir {args.run_dir} --layers 0 --dataset-manifest {output} --resume"
         store.transition(current_phase="capture", phase_status="pending", next_exact_command=next_command, active_blocker=None, validation_results={"prepare_data": result})
         store.write_handoff(next_command=next_command, expected_output="binary activation manifests from the fixed calibration corpus")
     except (OSError, ValueError, TypeError, json.JSONDecodeError) as exc:
         result = {"status": "BLOCKED", "artifact": str(output), "error": str(exc), "message": "A non-empty, disjoint calibration corpus manifest is required; no empty plan is accepted."}
-        next_command = f"d2m prepare-data --run-dir {args.run_dir} --corpus-manifest <approved-jsonl>"
+        next_command = f"& .\\.venv\\Scripts\\python.exe -m dense2moe.cli prepare-data --run-dir {args.run_dir} --corpus-manifest <approved-jsonl>"
         store.transition(current_phase="capture", phase_status="blocked", next_exact_command=next_command, active_blocker=str(result["message"]), validation_results={"prepare_data": result})
         store.write_handoff(next_command=next_command, expected_output="calibration manifest", blocker=str(result["message"]))
     return result
@@ -653,14 +662,14 @@ def _capture(args: argparse.Namespace, store: StateStore) -> dict[str, Any]:
     manifest_path = Path(args.dataset_manifest)
     if not manifest_path.exists():
         result: dict[str, Any] = {"status": "BLOCKED", "message": f"dataset manifest does not exist: {manifest_path}"}
-        store.transition(current_phase="capture", phase_status="blocked", active_blocker=result["message"], next_exact_command=f"d2m capture --run-dir {args.run_dir} --layers {args.layers} --dataset-manifest <manifest>", validation_results={"capture": result})
+        store.transition(current_phase="capture", phase_status="blocked", active_blocker=result["message"], next_exact_command=f"& .\\.venv\\Scripts\\python.exe -m dense2moe.cli capture --run-dir {args.run_dir} --layers {args.layers} --dataset-manifest <manifest>", validation_results={"capture": result})
         store.write_handoff(next_command=store.load().next_exact_command, expected_output="binary activation shards", blocker=result["message"])
         return result
     payload = json.loads(manifest_path.read_text(encoding="utf-8"))
     if not isinstance(payload, dict) or payload.get("status") != "CALIBRATION_READY":
         result = {"status": "BLOCKED", "message": "capture requires a CALIBRATION_READY manifest from prepare-data"}
         store.transition(current_phase="capture", phase_status="blocked", active_blocker=result["message"], validation_results={"capture": result})
-        store.write_handoff(next_command=f"d2m prepare-data --run-dir {args.run_dir} --corpus-manifest <approved-jsonl>", expected_output="CALIBRATION_READY", blocker=result["message"])
+        store.write_handoff(next_command=f"& .\\.venv\\Scripts\\python.exe -m dense2moe.cli prepare-data --run-dir {args.run_dir} --corpus-manifest <approved-jsonl>", expected_output="CALIBRATION_READY", blocker=result["message"])
         return result
     layers: list[int] = []
     for part in str(args.layers).split(","):
@@ -820,11 +829,11 @@ def _capture(args: argparse.Namespace, store: StateStore) -> dict[str, Any]:
     }
     atomic_write_json(store.run_dir / "metrics" / "capture.json", result)
     if full_capture:
-        next_command = f"d2m partition-layer --run-dir {args.run_dir} --layer {layers[0] if layers else 0}"
+        next_command = f"& .\\.venv\\Scripts\\python.exe -m dense2moe.cli partition-layer --run-dir {args.run_dir} --layer {layers[0] if layers else 0}"
     elif status == "CAPTURE_HOLDOUT_COMPLETE":
-        next_command = f"d2m capture --run-dir {args.run_dir} --layers {args.layers} --dataset-manifest {args.dataset_manifest} --split train --resume"
+        next_command = f"& .\\.venv\\Scripts\\python.exe -m dense2moe.cli capture --run-dir {args.run_dir} --layers {args.layers} --dataset-manifest {args.dataset_manifest} --split train --resume"
     else:
-        next_command = f"d2m capture --run-dir {args.run_dir} --layers {args.layers} --dataset-manifest {args.dataset_manifest} --resume"
+        next_command = f"& .\\.venv\\Scripts\\python.exe -m dense2moe.cli capture --run-dir {args.run_dir} --layers {args.layers} --dataset-manifest {args.dataset_manifest} --resume"
     phase_pending = status in {"CAPTURE_COMPLETE", "CAPTURE_HOLDOUT_COMPLETE", "CAPTURE_SPLIT_COMPLETE"}
     store.transition(
         current_phase="capture",
@@ -851,7 +860,7 @@ def _streaming_capture(args: argparse.Namespace, store: StateStore) -> dict[str,
     manifest_path = Path(args.dataset_manifest)
     if not manifest_path.is_file():
         result = {"status": "BLOCKED", "blocker_code": "STREAM_DATASET_MANIFEST_MISSING", "message": f"dataset manifest does not exist: {manifest_path}"}
-        store.transition(current_phase="streaming", phase_status="blocked", active_blocker=result["message"], next_exact_command=f"d2m streaming-capture --run-dir {args.run_dir} --split {args.split} --layers {args.layers} --dataset-manifest <manifest>", validation_results={"streaming_capture": result})
+        store.transition(current_phase="streaming", phase_status="blocked", active_blocker=result["message"], next_exact_command=f"& .\\.venv\\Scripts\\python.exe -m dense2moe.cli streaming-capture --run-dir {args.run_dir} --split {args.split} --layers {args.layers} --dataset-manifest <manifest>", validation_results={"streaming_capture": result})
         store.write_handoff(next_command=store.load().next_exact_command, expected_output="complete layer-major streaming corpus", blocker=result["message"])
         return result
     try:
@@ -905,22 +914,22 @@ def _streaming_capture(args: argparse.Namespace, store: StateStore) -> dict[str,
             "quality_gate_eligible": quality_eligible,
             "gate": "FULL_REAL_HOLDOUT_CAPTURE_GREEN" if quality_eligible else "STREAMING_SPLIT_COMPLETE",
             "legacy_whole_model_capture_invoked": False,
-            "command": "d2m streaming-capture",
+            "command": "& .\\.venv\\Scripts\\python.exe -m dense2moe.cli streaming-capture",
             "hypothesis": "layer-major native replay removes whole-model residency pressure without changing teacher MLP inputs",
             "falsifier": "selected-layer replay fails the validated 1176-token native/text-only equivalence",
             "code_commit": current_git_commit(),
         })
         next_command = (
-            f"d2m oracle-study --run-dir {args.run_dir} --layer 0 --activation-manifest {store.run_dir / 'capture' / 'layer-0000-holdout.json'}"
+            f"& .\\.venv\\Scripts\\python.exe -m dense2moe.cli oracle-study --run-dir {args.run_dir} --layer 0 --activation-manifest {store.run_dir / 'capture' / 'layer-0000-holdout.json'}"
             if quality_eligible
-            else f"d2m streaming-capture --run-dir {args.run_dir} --split {args.split} --layers {args.layers} --dataset-manifest {args.dataset_manifest} --resume"
+            else f"& .\\.venv\\Scripts\\python.exe -m dense2moe.cli streaming-capture --run-dir {args.run_dir} --split {args.split} --layers {args.layers} --dataset-manifest {args.dataset_manifest} --resume"
         )
         result["next_exact_command"] = next_command
         atomic_write_json(store.run_dir / "metrics" / "streaming-capture.json", result)
         store.transition(current_phase="streaming", phase_status="complete" if quality_eligible else "pending", selected_profile=profile.name, active_blocker=None, last_successful_command="streaming-capture", next_exact_command=next_command, validation_results={"streaming_capture": result})
         store.write_handoff(next_command=next_command, expected_output="real holdout oracle metrics" if quality_eligible else "validated rolling hidden-state stage", blocker=None)
     except (OSError, ValueError, TypeError, RuntimeError, KeyError, TeacherCaptureBlocked) as exc:
-        result = {"status": "BLOCKED", "blocker_code": getattr(exc, "code", "STREAMING_CAPTURE_FAILED"), "message": str(exc), "profile": DEFAULT_ACTIVE_PROFILE, "legacy_whole_model_capture_invoked": False, "next_exact_command": f"d2m streaming-capture --run-dir {args.run_dir} --split {args.split} --layers {args.layers} --dataset-manifest {args.dataset_manifest} --resume", "code_commit": current_git_commit()}
+        result = {"status": "BLOCKED", "blocker_code": getattr(exc, "code", "STREAMING_CAPTURE_FAILED"), "message": str(exc), "profile": DEFAULT_ACTIVE_PROFILE, "legacy_whole_model_capture_invoked": False, "next_exact_command": f"& .\\.venv\\Scripts\\python.exe -m dense2moe.cli streaming-capture --run-dir {args.run_dir} --split {args.split} --layers {args.layers} --dataset-manifest {args.dataset_manifest} --resume", "code_commit": current_git_commit()}
         atomic_write_json(store.run_dir / "metrics" / "streaming-capture.json", result)
         store.transition(current_phase="streaming", phase_status="blocked", active_blocker=result["message"], next_exact_command=result["next_exact_command"], validation_results={"streaming_capture": result})
         store.write_handoff(next_command=result["next_exact_command"], expected_output="resumable layer-major streaming corpus", blocker=result["message"])
@@ -933,7 +942,7 @@ def _partition_layer(args: argparse.Namespace, store: StateStore) -> dict[str, A
     plan = partition_indices(profile.dense_intermediate_size, profile.routed_experts, profile.expert_intermediate_size, profile.shared_intermediate_size)
     path = store.run_dir / "partitions" / f"layer-{layer:04d}.json"
     atomic_write_json(path, plan.as_dict())
-    next_command = f"d2m train-layer --run-dir {args.run_dir} --layer {layer}"
+    next_command = f"& .\\.venv\\Scripts\\python.exe -m dense2moe.cli train-layer --run-dir {args.run_dir} --layer {layer}"
     result = {"status": "PARTITION_READY", "layer": layer, "path": str(path), "capacity": plan.total_capacity, "next_exact_command": next_command}
     store.transition(current_phase="training", phase_status="pending", next_exact_command=next_command, validation_results={"partition": result})
     store.write_handoff(next_command=next_command, expected_output="trained layer checkpoint")
@@ -955,7 +964,7 @@ def _train_layer(args: argparse.Namespace, store: StateStore) -> dict[str, Any]:
         # only way to replace it and no placeholder is written.
         if not args.resume:
             result = {"status": "BLOCKED", "layer": layer, "path": str(path), "message": "existing layer metadata is invalid; use --force to rerun", "errors": errors}
-            store.transition(current_phase="training", phase_status="blocked", active_blocker=result["message"], next_exact_command=f"d2m train-layer --run-dir {args.run_dir} --layer {layer} --profile {args.profile} --force", validation_results={"train_layer": result})
+            store.transition(current_phase="training", phase_status="blocked", active_blocker=result["message"], next_exact_command=f"& .\\.venv\\Scripts\\python.exe -m dense2moe.cli train-layer --run-dir {args.run_dir} --layer {layer} --profile {args.profile} --force", validation_results={"train_layer": result})
             store.write_handoff(next_command=store.load().next_exact_command, expected_output="validated safetensors layer checkpoint", blocker=result["message"])
             return result
     activation_manifest = store.run_dir / "capture" / f"layer-{layer:04d}.json"
@@ -975,11 +984,11 @@ def _train_layer(args: argparse.Namespace, store: StateStore) -> dict[str, Any]:
             learning_rate=args.learning_rate,
             device=args.device,
         )
-        result["next_exact_command"] = f"d2m validate-layer --run-dir {args.run_dir} --layer {layer} --profile {args.profile}"
+        result["next_exact_command"] = f"& .\\.venv\\Scripts\\python.exe -m dense2moe.cli validate-layer --run-dir {args.run_dir} --layer {layer} --profile {args.profile}"
         store.transition(current_phase="training", phase_status="pending" if result["status"] != "TRAINED_VALIDATED" else "complete", active_blocker=None if result["status"] == "TRAINED_VALIDATED" else "layer quality gate did not pass", next_exact_command=result["next_exact_command"], validation_results={"train_layer": result})
         store.write_handoff(next_command=result["next_exact_command"], expected_output="validated layer metrics", blocker=None if result["status"] == "TRAINED_VALIDATED" else "layer quality gate did not pass")
     except (OSError, ValueError, TypeError, RuntimeError, KeyError) as exc:
-        result = {"status": "BLOCKED", "layer": layer, "message": str(exc), "next_exact_command": f"d2m capture --run-dir {args.run_dir} --layers {layer} --dataset-manifest <manifest> --resume"}
+        result = {"status": "BLOCKED", "layer": layer, "message": str(exc), "next_exact_command": f"& .\\.venv\\Scripts\\python.exe -m dense2moe.cli capture --run-dir {args.run_dir} --layers {layer} --dataset-manifest <manifest> --resume"}
         store.transition(current_phase="training", phase_status="blocked", active_blocker=result["message"], next_exact_command=result["next_exact_command"], validation_results={"train_layer": result})
         store.write_handoff(next_command=result["next_exact_command"], expected_output="validated binary activation capture", blocker=result["message"])
     return result
@@ -993,7 +1002,7 @@ def _validate_layer(args: argparse.Namespace, store: StateStore) -> dict[str, An
     valid, errors, checkpoint = validate_layer_checkpoint(path, expected_profile=profile.name, expected_layer=args.layer, expected_source_revision=store.load().source_revision, require_quality=True)
     result = {"status": "LAYER_VALIDATED" if valid else "BLOCKED", "layer": args.layer, "path": str(path), "errors": errors, "metrics": checkpoint.holdout_metrics if checkpoint else {}}
     store.transition(current_phase="training", phase_status="pending" if not valid else "complete", active_blocker=None if valid else "; ".join(errors), validation_results={"validate_layer": result})
-    store.write_handoff(next_command=f"d2m train-layers --run-dir {args.run_dir} --profile {args.profile} --resume" if valid else f"d2m train-layer --run-dir {args.run_dir} --layer {args.layer} --profile {args.profile} --force", expected_output="next validated layer" if valid else "repaired layer checkpoint", blocker=None if valid else "; ".join(errors))
+    store.write_handoff(next_command=f"& .\\.venv\\Scripts\\python.exe -m dense2moe.cli train-layers --run-dir {args.run_dir} --profile {args.profile} --resume" if valid else f"& .\\.venv\\Scripts\\python.exe -m dense2moe.cli train-layer --run-dir {args.run_dir} --layer {args.layer} --profile {args.profile} --force", expected_output="next validated layer" if valid else "repaired layer checkpoint", blocker=None if valid else "; ".join(errors))
     return result
 
 
@@ -1004,7 +1013,7 @@ def _train_layers(args: argparse.Namespace, store: StateStore) -> dict[str, Any]
     result = {"status": "QUEUE_READY", "profile": profile.name, "queue": queue.summary(), "message": "Layer workers require captured activations and a verified source checkpoint."}
     atomic_write_json(store.run_dir / "metrics" / "training-queue.json", result)
     queue.close()
-    next_command = f"d2m assemble --run-dir {args.run_dir} --profile {args.profile} --strict"
+    next_command = f"& .\\.venv\\Scripts\\python.exe -m dense2moe.cli assemble --run-dir {args.run_dir} --profile {args.profile} --strict"
     store.transition(current_phase="training", phase_status="pending", next_exact_command=next_command, validation_results={"train_layers": result})
     store.write_handoff(next_command=next_command, expected_output="complete trained layer checkpoints", blocker="Layer workers require captured activations and a verified source checkpoint")
     return result
@@ -1028,7 +1037,7 @@ def _assemble(args: argparse.Namespace, store: StateStore) -> dict[str, Any]:
         },
     )
     result = {"status": "ASSEMBLY_READY" if manifest["complete"] else "BLOCKED", "manifest": str(store.run_dir / "artifacts" / "hf-moe" / "manifest.json"), "layers": len(paths), "errors": manifest.get("errors", [])}
-    next_command = f"d2m evaluate --run-dir {args.run_dir}" if manifest["complete"] else f"d2m train-layers --run-dir {args.run_dir} --profile {args.profile} --resume"
+    next_command = f"& .\\.venv\\Scripts\\python.exe -m dense2moe.cli evaluate --run-dir {args.run_dir}" if manifest["complete"] else f"& .\\.venv\\Scripts\\python.exe -m dense2moe.cli train-layers --run-dir {args.run_dir} --profile {args.profile} --resume"
     store.transition(current_phase="evaluation", phase_status="pending" if manifest["complete"] else "blocked", active_blocker=None if manifest["complete"] else "strict assembly rejected incomplete or invalid layer checkpoints", next_exact_command=next_command, validation_results={"assembly": result})
     store.write_handoff(next_command=next_command, expected_output="real-model evaluation metrics" if manifest["complete"] else "validated safetensors checkpoints for every layer", blocker=None if manifest["complete"] else "strict assembly rejected incomplete or invalid layer checkpoints")
     return result
@@ -1045,7 +1054,7 @@ def _evaluate(args: argparse.Namespace, store: StateStore) -> dict[str, Any]:
     gate = quality_gate(metrics, {"layer_loss": {"green": 0.01, "yellow": 0.1, "lower_is_better": True}, "router_collapse": {"green": 0.9, "yellow": 0.5, "lower_is_better": False}})
     result = {"status": "EVALUATION_PENDING", "gate": gate, "message": "Synthetic metrics are not substituted for a real-model quality result."}
     atomic_write_json(store.run_dir / "metrics" / "evaluation.json", result)
-    next_command = f"d2m export-gguf --run-dir {args.run_dir}"
+    next_command = f"& .\\.venv\\Scripts\\python.exe -m dense2moe.cli export-gguf --run-dir {args.run_dir}"
     store.transition(current_phase="export", phase_status="pending", next_exact_command=next_command, validation_results={"evaluation": result})
     store.write_handoff(next_command=next_command, expected_output="validated high-precision GGUF", blocker=str(result["message"]))
     return result
@@ -1057,14 +1066,14 @@ def _export(args: argparse.Namespace, store: StateStore) -> dict[str, Any]:
     if not manifest_path.exists():
         result = {"status": "BLOCKED", "path": str(path), "message": "GGUF export is gated on a validated real Hugging Face assembly; no structural smoke file is emitted."}
         atomic_write_json(store.run_dir / "metrics" / "gguf.json", result)
-        store.transition(current_phase="export", phase_status="blocked", active_blocker=result["message"], next_exact_command=f"d2m assemble --run-dir {args.run_dir} --profile {DEFAULT_ACTIVE_PROFILE} --strict", validation_results={"gguf": result})
+        store.transition(current_phase="export", phase_status="blocked", active_blocker=result["message"], next_exact_command=f"& .\\.venv\\Scripts\\python.exe -m dense2moe.cli assemble --run-dir {args.run_dir} --profile {DEFAULT_ACTIVE_PROFILE} --strict", validation_results={"gguf": result})
         store.write_handoff(next_command=store.load().next_exact_command, expected_output="validated HF assembly before GGUF", blocker=result["message"])
         return result
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     if not manifest.get("complete"):
         result = {"status": "BLOCKED", "path": str(path), "message": "GGUF export is gated on a complete, reloaded real Hugging Face assembly; structural smoke output is not evidence."}
         atomic_write_json(store.run_dir / "metrics" / "gguf.json", result)
-        store.transition(current_phase="export", phase_status="blocked", active_blocker=result["message"], next_exact_command=f"d2m assemble --run-dir {args.run_dir} --profile {DEFAULT_ACTIVE_PROFILE} --strict", validation_results={"gguf": result})
+        store.transition(current_phase="export", phase_status="blocked", active_blocker=result["message"], next_exact_command=f"& .\\.venv\\Scripts\\python.exe -m dense2moe.cli assemble --run-dir {args.run_dir} --profile {DEFAULT_ACTIVE_PROFILE} --strict", validation_results={"gguf": result})
         store.write_handoff(next_command=store.load().next_exact_command, expected_output="complete HF assembly before GGUF", blocker=result["message"])
         return result
     try:
@@ -1081,12 +1090,12 @@ def _export(args: argparse.Namespace, store: StateStore) -> dict[str, Any]:
     except (OSError, RuntimeError, TypeError, ValueError) as exc:
         result = {"status": "BLOCKED", "path": str(path), "message": f"Strict GGUF export could not publish a validated tensor-bearing artifact: {exc}"}
         atomic_write_json(store.run_dir / "metrics" / "gguf.json", result)
-        store.transition(current_phase="export", phase_status="blocked", active_blocker=result["message"], next_exact_command=f"d2m export-gguf --run-dir {args.run_dir}", validation_results={"gguf": result})
-        store.write_handoff(next_command=f"d2m export-gguf --run-dir {args.run_dir}", expected_output="validated tensor-bearing GGUF", blocker=result["message"])
+        store.transition(current_phase="export", phase_status="blocked", active_blocker=result["message"], next_exact_command=f"& .\\.venv\\Scripts\\python.exe -m dense2moe.cli export-gguf --run-dir {args.run_dir}", validation_results={"gguf": result})
+        store.write_handoff(next_command=f"& .\\.venv\\Scripts\\python.exe -m dense2moe.cli export-gguf --run-dir {args.run_dir}", expected_output="validated tensor-bearing GGUF", blocker=result["message"])
         return result
     result = {"status": "GGUF_READY", "path": str(path), "receipt": exported.get("receipt"), "validation": validation}
     atomic_write_json(store.run_dir / "metrics" / "gguf.json", result)
-    next_command = f"d2m build-imatrix --run-dir {args.run_dir}"
+    next_command = f"& .\\.venv\\Scripts\\python.exe -m dense2moe.cli build-imatrix --run-dir {args.run_dir}"
     store.transition(current_phase="quantization", phase_status="pending", next_exact_command=next_command, validation_results={"gguf": result})
     store.write_handoff(next_command=next_command, expected_output="expert-covering importance matrix", blocker=None)
     return result
@@ -1096,7 +1105,7 @@ def _imatrix(args: argparse.Namespace, store: StateStore) -> dict[str, Any]:
     path = store.run_dir / "artifacts" / "imatrix.json"
     result = {"status": "IMATRIX_PENDING", "path": str(path), "expert_coverage": {}, "message": "Calibration corpus is required to build an expert-covering imatrix."}
     atomic_write_json(path, result)
-    next_command = f"d2m quantize --run-dir {args.run_dir} --type {args.type}"
+    next_command = f"& .\\.venv\\Scripts\\python.exe -m dense2moe.cli quantize --run-dir {args.run_dir} --type {args.type}"
     store.transition(next_exact_command=next_command, validation_results={"imatrix": result})
     store.write_handoff(next_command=next_command, expected_output="validated Q4_K_M artifact", blocker=str(result["message"]))
     return result
@@ -1106,14 +1115,14 @@ def _quantize(args: argparse.Namespace, store: StateStore) -> dict[str, Any]:
     path = store.run_dir / "artifacts" / f"moe-{args.type.lower()}.gguf"
     result = {"status": "QUANTIZATION_PENDING", "path": str(path), "type": args.type, "message": "Quantization is gated on a validated high-precision GGUF and imatrix."}
     atomic_write_json(store.run_dir / "metrics" / "quantization.json", result)
-    store.write_handoff(next_command=f"d2m benchmark --run-dir {args.run_dir}", expected_output="dense-vs-MoE benchmark", blocker=result["message"])
+    store.write_handoff(next_command=f"& .\\.venv\\Scripts\\python.exe -m dense2moe.cli benchmark --run-dir {args.run_dir}", expected_output="dense-vs-MoE benchmark", blocker=result["message"])
     return result
 
 
 def _benchmark(args: argparse.Namespace, store: StateStore) -> dict[str, Any]:
     result = {"status": "BENCHMARK_PENDING", "message": "Requires dense and MoE GGUF artifacts on the same Windows runtime."}
     atomic_write_json(store.run_dir / "metrics" / "benchmark.json", result)
-    store.write_handoff(next_command=f"d2m report --run-dir {args.run_dir} --json", expected_output="final report", blocker=result["message"])
+    store.write_handoff(next_command=f"& .\\.venv\\Scripts\\python.exe -m dense2moe.cli report --run-dir {args.run_dir} --json", expected_output="final report", blocker=result["message"])
     return result
 
 
@@ -1147,13 +1156,13 @@ def _full_model_spike(args: argparse.Namespace, store: StateStore) -> dict[str, 
     result = run_full_model_spike(destination, seed=args.seed)
     result.update({"code_commit": current_git_commit(), "run_id": store.run_id, "parent_run_id": store.load().parent_run_id})
     atomic_write_json(store.run_dir / "reports" / "full-model-spike.json", result)
-    next_command = f"d2m report --run-dir {args.run_dir} --json"
+    next_command = f"& .\\.venv\\Scripts\\python.exe -m dense2moe.cli report --run-dir {args.run_dir} --json"
     if result.get("status") == "FULL_MODEL_RELOAD_GREEN":
         store.transition(current_phase="runtime", phase_status="complete", last_successful_command="full-model-spike", active_blocker=None, next_exact_command=next_command, validation_results={"full_model_spike": result})
         store.write_handoff(next_command=next_command, expected_output="full-model-spike.json and final report")
     else:
         message = "full-model save/reload spike failed strict logits or generation comparison"
-        store.transition(current_phase="runtime", phase_status="blocked", active_blocker=message, next_exact_command=f"d2m full-model-spike --run-dir {args.run_dir} --seed {args.seed}", validation_results={"full_model_spike": result})
+        store.transition(current_phase="runtime", phase_status="blocked", active_blocker=message, next_exact_command=f"& .\\.venv\\Scripts\\python.exe -m dense2moe.cli full-model-spike --run-dir {args.run_dir} --seed {args.seed}", validation_results={"full_model_spike": result})
         store.write_handoff(next_command=store.load().next_exact_command, expected_output="strict reloadable tiny text target", blocker=message)
     return result
 
@@ -1169,6 +1178,34 @@ def _status(args: argparse.Namespace, store: StateStore) -> dict[str, Any]:
     return {"run_id": state.run_id, "state": state.as_dict(), "command_count": len(read_jsonl(store.commands_path)), "queue": queue_summary, "handoff": str(store.run_dir / "HANDOFF.md")}
 
 
+def _resume_cli_tokens(command_text: str) -> list[str] | None:
+    """Parse only an explicit project-interpreter CLI handoff.
+
+    PowerShell's call operator is accepted, but bare ``python``/``d2m`` and
+    arbitrary script commands are deliberately not resumed by the Python
+    control plane. Those commands must be launched from native PowerShell with
+    the exact interpreter shown in the handoff.
+    """
+
+    tokens = shlex.split(command_text, posix=False)
+    if tokens and tokens[0] == "&":
+        tokens = tokens[1:]
+    if not tokens:
+        return None
+    executable = tokens[0].replace("/", "\\").lower()
+    if not executable.endswith(r".venv\scripts\python.exe"):
+        # Retain compatibility for old in-process receipts, but never create
+        # new handoffs in these forms.
+        if executable == "d2m":
+            return tokens[1:]
+        if executable in {"python", "python3"} and len(tokens) >= 3 and tokens[1:3] == ["-m", "dense2moe.cli"]:
+            return tokens[3:]
+        return None
+    if len(tokens) < 3 or tokens[1:3] != ["-m", "dense2moe.cli"]:
+        return None
+    return tokens[3:]
+
+
 def _run(args: argparse.Namespace, store: StateStore) -> dict[str, Any]:
     state = store.load()
     if state.terminal_state in TERMINAL_STATES and args.resume:
@@ -1178,13 +1215,15 @@ def _run(args: argparse.Namespace, store: StateStore) -> dict[str, Any]:
         # concrete; placeholder commands remain a truthful blocker.
         command_text = state.next_exact_command.strip()
         if "<" not in command_text and ">" not in command_text:
+            if command_text.lower().lstrip().startswith(("& powershell.exe", "powershell.exe")):
+                return {
+                    "status": "NATIVE_WINDOWS_HANDOFF_REQUIRED",
+                    "next_command": command_text,
+                    "message": "The durable handoff is a native PowerShell command; execute it from the approved Windows shell.",
+                }
             try:
-                tokens = shlex.split(command_text, posix=True)
-                if tokens and tokens[0] in {"d2m", "python", "python3"}:
-                    if tokens[0] == "d2m":
-                        tokens = tokens[1:]
-                    elif len(tokens) >= 3 and tokens[1] == "-m" and tokens[2] == "dense2moe.cli":
-                        tokens = tokens[3:]
+                tokens = _resume_cli_tokens(command_text)
+                if tokens:
                     resumed_args = _parser().parse_args(tokens)
                     if resumed_args.command != "run":
                         resumed_store = _store(resumed_args)
@@ -1199,22 +1238,22 @@ def _run(args: argparse.Namespace, store: StateStore) -> dict[str, Any]:
         _doctor(doctor_args, store)
     manifest_path = store.run_dir / "source-manifest.json"
     if not manifest_path.exists():
-        result = {"status": "BLOCKED", "terminal_state": "BLOCKED", "message": "source discovery has not completed; run inspect-source with an immutable local snapshot and pinned revision", "next_command": f"d2m inspect-source --run-dir {args.run_dir} --source-dir <snapshot> --revision <40-hex-commit>"}
+        result = {"status": "BLOCKED", "terminal_state": "BLOCKED", "message": "source discovery has not completed; run inspect-source with an immutable local snapshot and pinned revision", "next_command": f"& .\\.venv\\Scripts\\python.exe -m dense2moe.cli inspect-source --run-dir {args.run_dir} --source-dir <snapshot> --revision <40-hex-commit>"}
         store.transition(phase_status="blocked", terminal_state="BLOCKED", active_blocker="Verified source snapshot and immutable commit revision are required before model implementation", next_exact_command=result["next_command"])
         store.write_handoff(next_command=result["next_command"], expected_output="source-manifest.json", blocker=store.load().active_blocker)
         return result
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     if not manifest.get("revision_pinned") or not manifest.get("config"):
-        result = {"status": "BLOCKED", "terminal_state": "BLOCKED", "message": "source gate is red", "next_command": f"d2m inspect-source --run-dir {args.run_dir} --source-dir <snapshot> --revision <40-hex-commit>"}
+        result = {"status": "BLOCKED", "terminal_state": "BLOCKED", "message": "source gate is red", "next_command": f"& .\\.venv\\Scripts\\python.exe -m dense2moe.cli inspect-source --run-dir {args.run_dir} --source-dir <snapshot> --revision <40-hex-commit>"}
         store.transition(phase_status="blocked", terminal_state="BLOCKED", active_blocker="Source revision/config could not be verified", next_exact_command=result["next_command"])
         store.write_handoff(next_command=result["next_command"], expected_output="pinned source manifest", blocker=store.load().active_blocker)
         return result
     if not manifest.get("text_tensor_names"):
-        result = {"status": "BLOCKED", "terminal_state": "BLOCKED", "message": "source config is known but no local text checkpoint tensor inventory exists; download and inspect the pinned snapshot before continuing", "next_command": f"d2m download --run-dir {args.run_dir} --model {args.model} --revision {manifest.get('revision')} --source-dir {args.run_dir}\\source --execute"}
+        result = {"status": "BLOCKED", "terminal_state": "BLOCKED", "message": "source config is known but no local text checkpoint tensor inventory exists; download and inspect the pinned snapshot before continuing", "next_command": f"& .\\.venv\\Scripts\\python.exe -m dense2moe.cli download --run-dir {args.run_dir} --model {args.model} --revision {manifest.get('revision')} --source-dir {args.run_dir}\\source --execute"}
         store.transition(phase_status="blocked", terminal_state="BLOCKED", active_blocker="No local safetensors tensor inventory is available for a real-layer pilot", next_exact_command=result["next_command"])
         store.write_handoff(next_command=result["next_command"], expected_output="a local immutable source snapshot", blocker=store.load().active_blocker)
         return result
-    return {"status": "READY_TO_CONTINUE", "message": "discovery and source gates are green; resume the next phase command", "next_command": f"d2m estimate --run-dir {args.run_dir} --config {args.config or DEFAULT_ACTIVE_CONFIG}"}
+    return {"status": "READY_TO_CONTINUE", "message": "discovery and source gates are green; resume the next phase command", "next_command": f"& .\\.venv\\Scripts\\python.exe -m dense2moe.cli estimate --run-dir {args.run_dir} --config {args.config or DEFAULT_ACTIVE_CONFIG}"}
 
 
 HANDLERS: dict[str, Callable[[argparse.Namespace, StateStore], dict[str, Any]]] = {

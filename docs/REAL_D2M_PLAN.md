@@ -22,7 +22,25 @@ This plan records the continuation of `20260815-030931-windows` without
 mutating that historical run.  The source is `Qwen/Qwen3.8-27B` at revision
 `1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0`; its text backbone is Qwen 3.5
 (`qwen3_5_text`, 64 layers, hidden size 5120, dense intermediate size 17408).
-The first production profile is `qwen38_p8s1_top2`.
+The current product profiles are `qwen38_p16s1_top4` (safe fallback) and
+`qwen38_p32s1_top5` (preferred product). `p32/top4` is inactive. The
+canonical execution graph is phase 00A runtime lock, 00B method-proof data,
+01 p16 method proof, 02 production Corpus V2.2/p16, 03 selector/generalization,
+04 p32 transfer, 05 method lock, 06 representative layers, 07 full64 p16,
+08 BF16/whole-model validation, and 09 quantization.
+
+The bounded method-proof data gate is independent of production Corpus V2.2:
+
+```powershell
+& .\.venv\Scripts\python.exe scripts\prepare_method_proof_data.py `
+  --corpus-manifest data\public_v21\corpus-v2.1.jsonl `
+  --output <phase-00b-run-dir>\method-proof `
+  --min-tokens 32768 --json
+
+& .\.venv\Scripts\python.exe scripts\run_oracle_routed_basis_refinement.py `
+  --method-proof-receipt <phase-00b-run-dir>\method-proof\receipt.json `
+  --topology p16/top4 --rows 2048 --epochs 1 --device cuda:0
+```
 
 ## Phases and falsifiable gates
 
@@ -37,11 +55,12 @@ The first production profile is `qwen38_p8s1_top2`.
    token splits can be represented by hashed binary shards and resumed at
    shard granularity.  Falsifier: hash/overlap mismatch or a resumed capture
    rewriting a validated shard.
-4. **Oracle ceiling** — hypothesis: contribution-aware p8/top-2 routing is
+4. **Oracle ceiling** — hypothesis: exhaustive p16/top-4 oracle routing is
    sufficiently expressive before router optimization.  Falsifier: oracle
    normalized MSE is above `0.10` on representative real layer samples.
-5. **One-layer vertical slice** — hypothesis: router warm-up plus bounded
-   joint distillation improves over the oracle baseline on a fixed holdout.
+5. **One-layer vertical slice** — hypothesis: selector-independent basis
+   refinement followed by router warm-up and bounded joint distillation
+   improves over the oracle baseline on a fixed holdout.
    Falsifier: no finite improvement or dead/collapsed experts.
 6. **Assembly/evaluation** — hypothesis: validated layer safetensors can be
    assembled into a strict, reloadable target checkpoint.  Falsifier: any
@@ -55,14 +74,14 @@ quality evidence above.  GGUF is a separate, downstream track and cannot
 
 The canonical source snapshot is used read-only.  Derived artifacts are
 streamed, sharded, and hashed; source weights and activation corpora are never
-committed.  CPU execution is the portable fallback.  If PyTorch/Transformers
-support for the exact Qwen 3.5 hybrid block is unavailable, the target spike
-remains a self-contained text FFN/MoE contract and the HF milestone is marked
-research-candidate rather than pretending multimodal support.
+committed. The scientific pipeline is native-Windows only: WSL/Linux is a
+policy violation and cannot be used as a CPU fallback for D2M claims. If the
+approved Windows runtime is unavailable, the phase remains blocked and the
+historical environment receipt is advisory only.
 
 ## Corpus strategy
 
-`prepare-data` requires a manifest (local JSONL/JSON/TSV or a declared public
+`dense2moe.cli prepare-data` requires a manifest (local JSONL/JSON/TSV or a declared public
 dataset) and writes deterministic train/holdout IDs, tokenizer identity,
 sequence length, token counts, and SHA-256 hashes.  The default pilot uses at
 least 131,072 train tokens and 16,384 holdout tokens when the supplied corpus

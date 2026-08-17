@@ -4,6 +4,7 @@ import json
 
 import pytest
 
+from dense2moe.cli import _resume_cli_tokens
 from dense2moe.config import (
     ACTIVE_TOPOLOGY_IDS,
     FORBIDDEN_TOPOLOGY_IDS,
@@ -13,12 +14,31 @@ from dense2moe.config import (
     validate_active_profile,
 )
 from dense2moe.phase import (
+    LEGACY_PHASE_CONTRACTS,
     PHASE_CONTRACTS,
     PHASE_IDS,
     PhaseReceiptStore,
     get_phase_contract,
     phase_00_contract,
 )
+
+
+def test_executable_phase_contracts_are_explicit_native_windows_commands() -> None:
+    contracts = [*PHASE_CONTRACTS.values(), *LEGACY_PHASE_CONTRACTS.values()]
+    commands = [command for contract in contracts for command in (*contract.validation_commands, *contract.handoff_commands) if command.strip()]
+    assert commands
+    for command in commands:
+        assert "PYTHONPATH=" not in command
+        assert not command.lstrip().startswith(("python ", "python3 ", "pytest ", "d2m "))
+        if "_nsp" not in command and "powershell.exe" not in command:
+            assert ".venv\\Scripts\\python.exe" in command
+
+
+def test_cli_resume_accepts_only_explicit_windows_project_interpreter() -> None:
+    command = r"& .\.venv\Scripts\python.exe -m dense2moe.cli status --run-dir C:\workplace\run --json"
+    assert _resume_cli_tokens(command) == ["status", "--run-dir", r"C:\workplace\run", "--json"]
+    assert _resume_cli_tokens("d2m status --run-dir run") == ["status", "--run-dir", "run"]
+    assert _resume_cli_tokens(r"& powershell.exe -File .\scripts\Setup-Windows.ps1") is None
 
 
 def test_only_product_topologies_are_active() -> None:
@@ -78,9 +98,13 @@ def test_all_later_phases_have_coarse_receipt_bearing_contracts() -> None:
 def test_later_phase_contracts_keep_scientific_predecessor_gates() -> None:
     phase1 = get_phase_contract("phase-01")
     phase7 = get_phase_contract("phase-07")
+    phase8 = get_phase_contract("phase-08")
+    phase9 = get_phase_contract("phase-09")
     phase10 = get_phase_contract("phase-10")
     assert "phase-00-green" in phase1.gate_ids
     assert "full64-input" in phase7.gate_ids
+    assert {"bf16-reload", "distribution-quality", "preservation-quality"} <= set(phase8.gate_ids)
+    assert {"runtime-discovery", "serialization-contract", "imatrix-contract", "conservative-quantization"} <= set(phase9.gate_ids)
     assert "bf16-freeze" in phase10.gate_ids
     assert phase10.next_phase == "complete"
 

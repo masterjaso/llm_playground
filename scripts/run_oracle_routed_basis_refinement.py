@@ -10,6 +10,10 @@ The gate is deliberately fail-closed: old corpus receipts that only describe
 tokenization are not accepted as a frozen corpus-v2 receipt.  A receipt must
 declare a v2 marker, a frozen marker, successful provenance/overlap and
 benchmark-denylist checks, and byte-verified manifest/split artifacts.
+For the bounded Phase 01 method proof, ``--method-proof-receipt`` accepts the
+separate receipt emitted by ``prepare_method_proof_data.py``.  It verifies the
+clean FIT-TRAIN manifest and its token/diversity policy without treating that
+subset as production-corpus evidence.
 """
 
 from __future__ import annotations
@@ -251,6 +255,100 @@ def require_frozen_corpus_v2(receipt_path: str | Path) -> dict[str, Any]:
     return payload
 
 
+def _has_method_provenance(row: dict[str, Any]) -> bool:
+    return all(
+        str(row.get(key, "")).strip().casefold() not in {"", "unknown", "none", "null"}
+        for key in ("source_record_id", "source_family", "source_name", "source_revision")
+    )
+
+
+def require_method_proof_receipt(receipt_path: str | Path) -> dict[str, Any]:
+    """Load and verify the clean, non-production method-proof receipt."""
+
+    path = Path(receipt_path)
+    if not path.is_file():
+        raise FileNotFoundError(f"method-proof receipt is required: {path}")
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"method-proof receipt is not valid JSON: {path}") from exc
+    if not isinstance(payload, dict) or payload.get("receipt_type") != "dense2moe-method-proof-data":
+        raise ValueError("receipt_type must be dense2moe-method-proof-data")
+    recorded_receipt_hash = str(payload.get("receipt_sha256", ""))
+    unsigned_receipt = dict(payload)
+    unsigned_receipt.pop("receipt_sha256", None)
+    if not recorded_receipt_hash or recorded_receipt_hash != hashlib.sha256(
+        json.dumps(unsigned_receipt, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).hexdigest():
+        raise ValueError("method-proof receipt hash mismatch")
+    if payload.get("status") != "METHOD_PROOF_READY":
+        raise ValueError("method-proof data receipt is not ready")
+    policy = payload.get("method_proof_policy")
+    if not isinstance(policy, dict) or policy.get("eligible_split") != "FIT-TRAIN":
+        raise ValueError("method-proof receipt must be restricted to FIT-TRAIN")
+    source_manifest_value = policy.get("source_manifest")
+    source_manifest_hash = str(policy.get("source_manifest_sha256", ""))
+    if not source_manifest_value or not source_manifest_hash:
+        raise ValueError("method-proof receipt must include a hashed source manifest")
+    source_manifest_path = _resolve_receipt_artifact(path, source_manifest_value)
+    if hashlib.sha256(source_manifest_path.read_bytes()).hexdigest() != source_manifest_hash:
+        raise ValueError("method-proof source manifest hash mismatch")
+    diversity_buckets = policy.get("diversity_buckets")
+    if not isinstance(diversity_buckets, list) or not {str(value) for value in diversity_buckets} >= {"code", "technical"}:
+        raise ValueError("method-proof receipt must require code/technical diversity")
+    manifest = payload.get("manifest")
+    if not isinstance(manifest, dict) or not manifest.get("path") or not manifest.get("sha256"):
+        raise ValueError("method-proof receipt must include a hashed manifest")
+    manifest_path = _resolve_receipt_artifact(path, manifest["path"])
+    manifest_hash = hashlib.sha256(manifest_path.read_bytes()).hexdigest()
+    if manifest_hash != str(manifest["sha256"]):
+        raise ValueError("method-proof manifest hash mismatch")
+    rows: list[dict[str, Any]] = []
+    with manifest_path.open(encoding="utf-8") as handle:
+        for line in handle:
+            if line.strip():
+                row = json.loads(line)
+                if not isinstance(row, dict):
+                    raise ValueError("method-proof manifest rows must be objects")
+                rows.append(row)
+    if not rows:
+        raise ValueError("method-proof manifest is empty")
+    if any(str(row.get("split", "")) != "FIT-TRAIN" for row in rows):
+        raise ValueError("method-proof manifest contains a non-FIT-TRAIN row")
+    if any(
+        bool(row.get("benchmark_quarantine"))
+        or row.get("benchmark_quarantine_reason")
+        or row.get("benchmark_membership")
+        or row.get("benchmark_denylist")
+        or row.get("benchmark_context")
+        or row.get("benchmark_original_split")
+        for row in rows
+    ):
+        raise ValueError("method-proof manifest contains benchmark-derived material")
+    if any(not _has_method_provenance(row) for row in rows):
+        raise ValueError("method-proof manifest contains a row without retained provenance")
+    ids = [str(row.get("id", "")) for row in rows]
+    if not all(ids) or len(set(ids)) != len(ids):
+        raise ValueError("method-proof manifest IDs must be present and unique")
+    selected_tokens = sum(int(row.get("token_count", 0) or 0) for row in rows)
+    minimum_tokens = int(policy.get("minimum_tokens", 0) or 0)
+    if selected_tokens < minimum_tokens or minimum_tokens < 32_768:
+        raise ValueError("method-proof token threshold is below the required 32768-token gate")
+    selection = payload.get("selection")
+    if not isinstance(selection, dict) or int(selection.get("selected_tokens", -1)) != selected_tokens or int(selection.get("selected_rows", -1)) != len(rows):
+        raise ValueError("method-proof receipt token count does not match its manifest")
+    bucket_tokens = {"code": 0, "technical": 0}
+    for row in rows:
+        domain = str(row.get("domain", "")).casefold().replace("_", "-")
+        bucket = "code" if domain == "code" or domain.startswith("code/") or domain.endswith("/code") else "technical" if "agentic" in domain or "software-engineering" in domain or domain == "structured" else "other"
+        if bucket in bucket_tokens:
+            bucket_tokens[bucket] += int(row.get("token_count", 0) or 0)
+    bucket_target = max(1, int(minimum_tokens * 0.25))
+    if any(bucket_tokens[bucket] < bucket_target for bucket in ("code", "technical")):
+        raise ValueError("method-proof manifest does not satisfy code/technical diversity")
+    return payload
+
+
 def run_smoke(
     receipt_path: str | Path,
     *,
@@ -262,10 +360,17 @@ def run_smoke(
     m_step_repeats: int = 1,
     candidate_pool_size: int | None = None,
     max_combinations: int = 4096,
+    receipt_kind: str = "corpus",
+    device: str = "cpu",
 ) -> dict[str, Any]:
-    """Run a tiny CPU-only E/M smoke after the corpus gate passes."""
+    """Run a bounded E/M smoke after a corpus or method-proof gate passes."""
 
-    receipt = require_frozen_corpus_v2(receipt_path)
+    if receipt_kind == "method-proof":
+        receipt = require_method_proof_receipt(receipt_path)
+    elif receipt_kind == "corpus":
+        receipt = require_frozen_corpus_v2(receipt_path)
+    else:
+        raise ValueError(f"unknown receipt kind: {receipt_kind}")
     if topology not in {"p16/top4", "p32/top5"}:
         raise ValueError("topology must be p16/top4 or p32/top5")
     if rows <= 0 or epochs < 0:
@@ -288,6 +393,9 @@ def run_smoke(
     gate = rng.normal(size=(intermediate, hidden)).astype("float32")
     up = rng.normal(size=(intermediate, hidden)).astype("float32")
     down = rng.normal(size=(hidden, intermediate)).astype("float32")
+    gate_tensor = torch.as_tensor(gate, device=device)
+    up_tensor = torch.as_tensor(up, device=device)
+    down_tensor = torch.as_tensor(down, device=device)
     model = TorchQwen35SwiGLUMoE.from_dense(
         gate,
         up,
@@ -298,10 +406,10 @@ def run_smoke(
         routing_mode="independent_positive",
         partition=partition_indices(intermediate, experts, expert_width, shared_width),
         learnable_scales=True,
-    ).to("cpu")
-    inputs = torch.as_tensor(rng.normal(size=(rows, hidden)).astype("float32"))
-    dense_target = torch.nn.functional.silu(inputs @ torch.as_tensor(gate).T)
-    dense_target = (dense_target * (inputs @ torch.as_tensor(up).T)) @ torch.as_tensor(down).T
+    ).to(device)
+    inputs = torch.as_tensor(rng.normal(size=(rows, hidden)).astype("float32"), device=device)
+    dense_target = torch.nn.functional.silu(inputs @ gate_tensor.T)
+    dense_target = (dense_target * (inputs @ up_tensor.T)) @ down_tensor.T
     router_before = {
         name: value.detach().clone() for name, value in model.router.state_dict().items()
     }
@@ -313,7 +421,7 @@ def run_smoke(
         [(inputs, dense_target)],
         epochs=epochs,
         learning_rate=1e-3,
-        device="cpu",
+        device=device,
         assignment_refresh_steps=assignment_refresh_steps,
         m_step_repeats=m_step_repeats,
         candidate_pool_size=candidate_pool_size,
@@ -331,9 +439,12 @@ def run_smoke(
     return {
         "status": "ORACLE_ROUTED_BASIS_SMOKE_GREEN",
         "topology": topology,
-        "device": "cpu",
-        "corpus_receipt": str(receipt_path),
-        "corpus_version": _find_named_value(receipt, {"corpus-version", "corpus-v2-version"}),
+        "device": device,
+        "receipt_kind": receipt_kind,
+        "corpus_receipt": str(receipt_path) if receipt_kind == "corpus" else None,
+        "method_proof_receipt": str(receipt_path) if receipt_kind == "method-proof" else None,
+        "corpus_version": _find_named_value(receipt, {"corpus-version", "corpus-v2-version"}) if receipt_kind == "corpus" else None,
+        "method_proof_only": receipt_kind == "method-proof",
         "selector_frozen": True,
         "router_unchanged": router_unchanged,
         "amplitude_router_unchanged": amplitude_unchanged,
@@ -343,7 +454,9 @@ def run_smoke(
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--corpus-receipt", type=Path, required=True)
+    receipts = parser.add_mutually_exclusive_group(required=True)
+    receipts.add_argument("--corpus-receipt", type=Path)
+    receipts.add_argument("--method-proof-receipt", type=Path)
     parser.add_argument("--topology", choices=("p16/top4", "p32/top5"), default="p16/top4")
     parser.add_argument("--rows", type=int, default=2)
     parser.add_argument("--epochs", type=int, default=1)
@@ -352,11 +465,12 @@ def main() -> int:
     parser.add_argument("--candidate-pool-size", type=int, default=None)
     parser.add_argument("--max-combinations", type=int, default=4096)
     parser.add_argument("--seed", type=int, default=20260816)
+    parser.add_argument("--device", default="cpu")
     args = parser.parse_args()
     print(
         json.dumps(
             run_smoke(
-                args.corpus_receipt,
+                args.method_proof_receipt or args.corpus_receipt,
                 topology=args.topology,
                 seed=args.seed,
                 rows=args.rows,
@@ -365,6 +479,8 @@ def main() -> int:
                 m_step_repeats=args.m_step_repeats,
                 candidate_pool_size=args.candidate_pool_size,
                 max_combinations=args.max_combinations,
+                receipt_kind="method-proof" if args.method_proof_receipt else "corpus",
+                device=args.device,
             ),
             indent=2,
             sort_keys=True,

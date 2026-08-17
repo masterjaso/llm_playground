@@ -2,9 +2,9 @@
 
 Examples::
 
-    python scripts/run_guarded_command.py --name git-log --category FAST -- git log -1
-    python scripts/run_guarded_command.py --name capture --long-running \
-        --heartbeat-path runs/example/capture-progress.json -- python train.py
+    & .\\.venv\\Scripts\\python.exe scripts\\run_guarded_command.py --name git-log --category FAST -- git log -1
+    & .\\.venv\\Scripts\\python.exe scripts\\run_guarded_command.py --name capture --long-running `
+        --heartbeat-path runs\\example\\capture-progress.json -- .\\.venv\\Scripts\\python.exe scripts\\train.py
 
 The child receives no stdin and Git/GitHub pagers/prompts are disabled by the
 shared :mod:`dense2moe.command` implementation.
