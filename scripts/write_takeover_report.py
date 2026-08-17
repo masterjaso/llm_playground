@@ -121,7 +121,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
             },
         },
         "split_contract": {
-            "dataset_hash": p16_before.get("dataset_hash"),
+            "dataset_hash": p16_cont.get("dataset_hash") or p32_cont.get("dataset_hash"),
             "fit_rows": split["fit_rows"],
             "validation_a_rows": split["validation_a_rows"],
             "validation_a_indices_sha256": split["validation_a_indices_sha256"],
