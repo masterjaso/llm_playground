@@ -16,6 +16,12 @@ PROMOTION_THRESHOLDS: dict[str, dict[str, Any]] = {
     "p95_relative_norm_error": {"green": 0.15, "yellow": 0.20, "lower_is_better": True},
 }
 
+WHOLE_MODEL_THRESHOLDS: dict[str, dict[str, Any]] = {
+    "perplexity_increase": {"green": 0.05, "yellow": 0.10, "lower_is_better": True},
+    "mean_token_kl": {"green": 0.10, "yellow": 0.20, "lower_is_better": True},
+    "teacher_top1_agreement": {"green": 0.85, "yellow": 0.75, "lower_is_better": False},
+}
+
 
 def classify_metric(value: float, *, green: float, yellow: float, lower_is_better: bool = True) -> str:
     if lower_is_better:
@@ -128,7 +134,19 @@ def amplitude_metrics(
 
 
 def _canonical_metric_name(name: str) -> str:
-    return str(name).casefold().replace(" ", "_").replace("-", "_")
+    normalized = str(name).casefold().replace(" ", "_").replace("-", "_")
+    aliases = {
+        "normalized_mse": "nmse",
+        "global_nmse": "nmse",
+        "mean_nmse": "nmse",
+        "load_cv": "loadcv",
+        "dead_expert_count": "dead_experts",
+        "oracle_regret_nmse": "oracle_regret",
+        "repeat_variation_pct": "repeat_variation",
+        "median_norm_ratio_delta": "median_norm_ratio_error",
+        "p95_abs_relative_norm_error": "p95_relative_norm_error",
+    }
+    return aliases.get(normalized, normalized)
 
 
 def evaluate_promotion_metrics(
@@ -178,4 +196,61 @@ def evaluate_promotion_metrics(
         "overall": overall,
         "promotion_decision": "PROMOTE" if overall == "green" else "REJECT",
         "external_data_untouched": True,
+    }
+
+
+def evaluate_whole_model_metrics(
+    metrics: Mapping[str, Any],
+    *,
+    domain_slices: Mapping[str, Mapping[str, Any]] | None = None,
+    thresholds: Mapping[str, Mapping[str, Any]] | None = None,
+) -> dict[str, Any]:
+    """Apply the fixed whole-model distribution and preservation envelope."""
+
+    rules = {key: dict(value) for key, value in (thresholds or WHOLE_MODEL_THRESHOLDS).items()}
+    aliases = {
+        "ppl_delta": "perplexity_increase",
+        "perplexity_delta": "perplexity_increase",
+        "mean_kl": "mean_token_kl",
+        "token_kl": "mean_token_kl",
+        "top1_agreement": "teacher_top1_agreement",
+        "teacher_top_1_agreement": "teacher_top1_agreement",
+    }
+
+    def canonical(value: Mapping[str, Any]) -> dict[str, float]:
+        result: dict[str, float] = {}
+        for name, item in value.items():
+            normalized = _canonical_metric_name(name)
+            normalized = aliases.get(normalized, normalized)
+            result[normalized] = _as_float(item)
+        if "teacher_top1_agreement" in result and result["teacher_top1_agreement"] > 1.0:
+            result["teacher_top1_agreement"] /= 100.0
+        return result
+
+    observed = canonical(metrics)
+    missing = [name for name in rules if name not in observed]
+    gate = quality_gate({name: observed[name] for name in rules if name in observed}, rules)
+    slices: dict[str, Any] = {}
+    failed_critical: list[str] = []
+    for name, values in (domain_slices or {}).items():
+        slice_metrics = canonical(values)
+        slice_missing = [key for key in rules if key not in slice_metrics]
+        slice_gate = quality_gate({key: slice_metrics[key] for key in rules if key in slice_metrics}, rules)
+        critical = bool(values.get("critical", values.get("critical_domain", False)))
+        failed = bool(slice_missing or slice_gate["overall"] == "red" or values.get("failed") is True)
+        slices[str(name)] = {"metrics": dict(values), "gate": slice_gate, "missing_metrics": slice_missing, "critical": critical, "failed": failed}
+        if critical and failed:
+            failed_critical.append(str(name))
+    explicit_failure = bool(metrics.get("critical_domain_slice_failed", False))
+    overall = "green" if not missing and gate["overall"] == "green" and not failed_critical and not explicit_failure else "red"
+    return {
+        "metrics": dict(metrics),
+        "thresholds": rules,
+        "gate": gate,
+        "missing_metrics": missing,
+        "domain_slices": slices,
+        "failed_critical_slices": failed_critical,
+        "critical_domain_slice_failed": explicit_failure,
+        "overall": overall,
+        "promotion_decision": "PROMOTE" if overall == "green" else "REJECT",
     }

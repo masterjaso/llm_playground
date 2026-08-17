@@ -22,6 +22,7 @@ except ImportError:  # pragma: no cover
     Tensor = Any  # type: ignore[misc,assignment]
     nn = None  # type: ignore[assignment]
 
+from ..checkpoint.layer import validate_layer_checkpoint
 from ..config import TopologyContract, active_topology_contract
 from .torch_moe import TorchQwen35SwiGLUMoE
 
@@ -143,6 +144,115 @@ def replace_qwen35_ffns(
     }
 
 
+def _resolve_manifest_path(manifest_path: Path, value: str | Path) -> Path:
+    candidate = Path(value)
+    if candidate.is_absolute() or candidate.exists():
+        return candidate
+    return manifest_path.parent / candidate
+
+
+def apply_layer_checkpoints(
+    wrapper: Qwen35DenseToMoE,
+    manifest_path: str | Path,
+    *,
+    expected_profile: str,
+    strict_layer_count: int = 64,
+) -> dict[str, Any]:
+    """Apply validated trained layer tensors to a converted full model.
+
+    A queue or metadata-only manifest is not sufficient.  Every layer must be
+    ``TRAINED_VALIDATED`` with a real, hashed safetensors artifact and a green
+    quality gate before its tensors are loaded into the corresponding Qwen
+    decoder MLP.  The source model remains the owner of all non-FFN tensors.
+    """
+
+    runtime = _require_torch()
+    manifest = Path(manifest_path)
+    payload = json.loads(manifest.read_text(encoding="utf-8"))
+    if not isinstance(payload, Mapping) or payload.get("complete") is not True:
+        raise ValueError("full64 checkpoint manifest must be complete before assembly")
+    entries = payload.get("layers")
+    if not isinstance(entries, list) or len(entries) != strict_layer_count:
+        raise ValueError(f"full64 checkpoint manifest must contain exactly {strict_layer_count} layers")
+    text_model = _text_backbone(wrapper.model)
+    if len(text_model.layers) != strict_layer_count:
+        raise ValueError("converted Qwen model layer count does not match the full64 manifest")
+
+    try:
+        from safetensors.torch import load_file  # type: ignore
+    except ImportError as exc:  # pragma: no cover
+        raise RuntimeError("safetensors is required for full-model checkpoint assembly") from exc
+
+    applied: list[dict[str, Any]] = []
+    seen_layers: set[int] = set()
+    for item in sorted(entries, key=lambda value: int(value.get("layer", -1)) if isinstance(value, Mapping) else -1):
+        if not isinstance(item, Mapping):
+            raise TypeError("full64 layer manifest entries must be objects")
+        layer = int(item.get("layer", -1))
+        if layer in seen_layers or layer < 0 or layer >= strict_layer_count:
+            raise ValueError(f"invalid or duplicate full64 layer {layer}")
+        seen_layers.add(layer)
+        if str(item.get("profile", expected_profile)) != expected_profile:
+            raise ValueError(f"layer {layer} profile does not match {expected_profile}")
+        metadata_value = item.get("metadata")
+        if not metadata_value:
+            raise ValueError(f"layer {layer} metadata path is required")
+        metadata_path = _resolve_manifest_path(manifest, str(metadata_value))
+        valid, errors, checkpoint = validate_layer_checkpoint(
+            metadata_path,
+            expected_profile=expected_profile,
+            expected_layer=layer,
+            require_quality=True,
+        )
+        if not valid or checkpoint is None:
+            raise ValueError(f"layer {layer} checkpoint validation failed: {errors[:8]}")
+        if checkpoint.quality_gate.get("overall") != "green":
+            raise ValueError(f"layer {layer} is not product-green: {checkpoint.quality_gate.get('overall')!r}")
+        tensor_path = _resolve_manifest_path(metadata_path, str(checkpoint.tensor_file or ""))
+        raw_state = load_file(str(tensor_path), device="cpu")
+        prefix = f"model.layers.{layer}."
+        block_state: dict[str, Any] = {}
+        for name, value in raw_state.items():
+            key = str(name)
+            key = key.removeprefix(prefix).removeprefix("mlp.")
+            block_state[key] = value
+        expected_keys = set(text_model.layers[layer].mlp.state_dict())
+        if set(block_state) != expected_keys:
+            raise ValueError(
+                f"layer {layer} tensor namespace mismatch: "
+                f"missing={sorted(expected_keys - set(block_state))[:8]}, "
+                f"unexpected={sorted(set(block_state) - expected_keys)[:8]}"
+            )
+        text_model.layers[layer].mlp.load_state_dict(block_state, strict=True)
+        applied.append(
+            {
+                "layer": layer,
+                "metadata": str(metadata_path),
+                "tensor_file": str(tensor_path),
+                "tensor_sha256": checkpoint.tensor_sha256,
+                "quality_gate": checkpoint.quality_gate,
+                "code_commit": checkpoint.code_commit,
+            }
+        )
+    if seen_layers != set(range(strict_layer_count)):
+        raise ValueError("full64 manifest does not cover every decoder layer")
+    receipt = {
+        "schema_version": 1,
+        "receipt_type": "dense2moe-qwen35-layer-checkpoint-application",
+        "status": "FULL64_LAYER_CHECKPOINTS_APPLIED",
+        "profile": expected_profile,
+        "manifest": str(manifest),
+        "manifest_sha256": hashlib.sha256(manifest.read_bytes()).hexdigest(),
+        "applied_layer_count": len(applied),
+        "layers": applied,
+        "dense_fallback_used": False,
+        "source_backbone_preserved": True,
+        "torch_version": runtime.__version__,
+    }
+    wrapper.receipt["layer_checkpoint_application"] = receipt
+    return receipt
+
+
 class Qwen35DenseToMoE(nn.Module if nn is not None else object):
     """Reloadable wrapper around a converted Hugging Face Qwen3.5 model."""
 
@@ -225,4 +335,4 @@ class Qwen35DenseToMoE(nn.Module if nn is not None else object):
         return destination
 
 
-__all__ = ["Qwen35DenseToMoE", "replace_qwen35_ffns"]
+__all__ = ["Qwen35DenseToMoE", "apply_layer_checkpoints", "replace_qwen35_ffns"]

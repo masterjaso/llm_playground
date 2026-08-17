@@ -1073,35 +1073,54 @@ def _evaluate(args: argparse.Namespace, store: StateStore) -> dict[str, Any]:
             "message": "evaluation requires a complete HF sparse assembly; no synthetic metrics are emitted",
             "blocker_code": "ASSEMBLY_REQUIRED",
         }
-    elif receipt_path is None:
-        result = {
-            "status": "BLOCKED",
-            "profile": profile.name,
-            "topology": profile.topology_id,
-            "message": "evaluation requires a receipt-bearing real-model metric artifact",
-            "blocker_code": "REAL_METRICS_REQUIRED",
-        }
     else:
         try:
-            payload = json.loads(receipt_path.read_text(encoding="utf-8"))
-            metrics = payload.get("metrics")
-            if not isinstance(metrics, dict):
-                raise TypeError("metric receipt has no metrics object")
-            gate = evaluate_promotion_metrics(
-                metrics,
-                domain_slices=payload.get("domain_slices") if isinstance(payload.get("domain_slices"), dict) else None,
-                development_metrics=payload.get("development_metrics") if isinstance(payload.get("development_metrics"), dict) else None,
-            )
+            assembly_payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+        except (OSError, ValueError, TypeError, json.JSONDecodeError) as exc:
+            assembly_payload = None
+            assembly_error = str(exc)
+        if not isinstance(assembly_payload, dict) or assembly_payload.get("complete") is not True:
             result = {
-                "status": "EVALUATION_GREEN" if gate["overall"] == "green" else "EVALUATION_REJECTED",
+                "status": "BLOCKED",
                 "profile": profile.name,
                 "topology": profile.topology_id,
-                "receipt": str(receipt_path),
-                "gate": gate,
-                "message": "real receipt-backed promotion metrics evaluated; no threshold relaxation applied",
+                "message": "evaluation requires a complete strict HF sparse assembly; incomplete manifests cannot be paired with metrics",
+                "blocker_code": "ASSEMBLY_INCOMPLETE",
+                "assembly_error": assembly_error if assembly_payload is None else None,
             }
-        except (OSError, TypeError, ValueError, json.JSONDecodeError) as exc:
-            result = {"status": "BLOCKED", "profile": profile.name, "topology": profile.topology_id, "message": str(exc), "blocker_code": "INVALID_METRIC_RECEIPT"}
+        elif receipt_path is None:
+            result = {
+                "status": "BLOCKED",
+                "profile": profile.name,
+                "topology": profile.topology_id,
+                "message": "evaluation requires a receipt-bearing real-model metric artifact",
+                "blocker_code": "REAL_METRICS_REQUIRED",
+            }
+        else:
+            try:
+                payload = json.loads(receipt_path.read_text(encoding="utf-8"))
+                metrics = payload.get("metrics")
+                if not isinstance(metrics, dict):
+                    raise TypeError("metric receipt has no metrics object")
+                if not str(payload.get("dataset_hash", "")):
+                    raise ValueError("metric receipt must bind an immutable dataset_hash")
+                if payload.get("external_data_untouched") is not True:
+                    raise ValueError("metric receipt must explicitly prove external data was untouched")
+                gate = evaluate_promotion_metrics(
+                    metrics,
+                    domain_slices=payload.get("domain_slices") if isinstance(payload.get("domain_slices"), dict) else None,
+                    development_metrics=payload.get("development_metrics") if isinstance(payload.get("development_metrics"), dict) else None,
+                )
+                result = {
+                    "status": "EVALUATION_GREEN" if gate["overall"] == "green" else "EVALUATION_REJECTED",
+                    "profile": profile.name,
+                    "topology": profile.topology_id,
+                    "receipt": str(receipt_path),
+                    "gate": gate,
+                    "message": "real receipt-backed promotion metrics evaluated; no threshold relaxation applied",
+                }
+            except (OSError, TypeError, ValueError, json.JSONDecodeError) as exc:
+                result = {"status": "BLOCKED", "profile": profile.name, "topology": profile.topology_id, "message": str(exc), "blocker_code": "INVALID_METRIC_RECEIPT"}
     atomic_write_json(store.run_dir / "metrics" / "evaluation.json", result)
     next_command = f"& .\\.venv\\Scripts\\python.exe -m dense2moe.cli export-gguf --run-dir {args.run_dir} --config {profile.name}"
     green = result.get("status") == "EVALUATION_GREEN"

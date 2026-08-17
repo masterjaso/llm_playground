@@ -18,7 +18,11 @@ from dense2moe.data import write_immutable_json
 
 def build(*, run_dir: Path, profile: str) -> dict[str, Any]:
     gguf = run_dir / "artifacts" / f"{profile}-f16.gguf"
-    corpus = run_dir / "corpus-v2.2-receipt.json"
+    corpus_candidates = [
+        run_dir / "corpus-v2.2-receipt.json",
+        run_dir / "corpus-v2.2" / "corpus-v2.2-receipt.json",
+    ]
+    corpus = next((candidate for candidate in corpus_candidates if candidate.exists()), corpus_candidates[0])
     llama = shutil.which("llama-imatrix") or shutil.which("llama-imatrix.exe")
     if not gguf.exists() or not corpus.exists():
         result = {"status": "BLOCKED", "blocker_code": "IMATRIX_INPUTS_REQUIRED", "profile": profile, "message": "validated winner GGUF and sealed Corpus V2.2 receipt are required"}
@@ -43,4 +47,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

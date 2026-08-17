@@ -13,13 +13,21 @@ if __package__ in {None, ""}:
     sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from dense2moe.data import write_immutable_json
-from dense2moe.evaluation import evaluate_promotion_metrics
+from dense2moe.evaluation import evaluate_whole_model_metrics
 
 
 def evaluate(*, run_dir: Path, profile: str, tiers: list[str]) -> dict[str, Any]:
     assembly = run_dir / "BF16_SPARSE_MASTER" / profile / "assembly-receipt.json"
     if not assembly.exists():
         return {"status": "BLOCKED", "blocker_code": "BF16_ASSEMBLY_REQUIRED", "profile": profile, "message": "whole-model evaluation requires a strict BF16 assembly"}
+    try:
+        assembly_payload = json.loads(assembly.read_text(encoding="utf-8"))
+    except (OSError, ValueError, TypeError, json.JSONDecodeError) as exc:
+        return {"status": "BLOCKED", "blocker_code": "BF16_ASSEMBLY_INVALID", "profile": profile, "message": str(exc)}
+    if assembly_payload.get("status") != "BF16_SPARSE_MASTER_ASSEMBLED" or assembly_payload.get("layer_checkpoint_application", {}).get("status") != "FULL64_LAYER_CHECKPOINTS_APPLIED":
+        return {"status": "BLOCKED", "blocker_code": "BF16_FULL64_APPLICATION_REQUIRED", "profile": profile, "message": "whole-model evaluation requires a full64 checkpoint-applied BF16 assembly"}
+    if "POST-ASSEMBLY-FRESH" not in tiers:
+        return {"status": "BLOCKED", "blocker_code": "POST_ASSEMBLY_FRESH_TIER_REQUIRED", "profile": profile, "message": "whole-model green requires a fresh post-assembly corpus"}
     metric_paths = {tier: run_dir / "validation" / f"{profile}-{tier}.json" for tier in tiers}
     missing = [tier for tier, path in metric_paths.items() if not path.exists()]
     if missing:
@@ -30,7 +38,9 @@ def evaluate(*, run_dir: Path, profile: str, tiers: list[str]) -> dict[str, Any]
         metrics = payload.get("metrics")
         if not isinstance(metrics, dict):
             return {"status": "BLOCKED", "blocker_code": "INVALID_WHOLE_MODEL_METRICS", "profile": profile, "tier": tier}
-        results[tier] = evaluate_promotion_metrics(metrics, domain_slices=payload.get("domain_slices"), development_metrics=payload.get("development_metrics"))
+        if not str(payload.get("dataset_hash", "")) or payload.get("external_data_untouched") is not True:
+            return {"status": "BLOCKED", "blocker_code": "WHOLE_MODEL_PROVENANCE_REQUIRED", "profile": profile, "tier": tier, "message": "whole-model metrics must bind a dataset hash and prove untouched evaluation data"}
+        results[tier] = evaluate_whole_model_metrics(metrics, domain_slices=payload.get("domain_slices"))
     status = "WHOLE_MODEL_GREEN" if all(item["overall"] == "green" for item in results.values()) else "WHOLE_MODEL_REJECTED"
     result = {"status": status, "profile": profile, "tiers": results, "fresh_post_assembly_required": "POST-ASSEMBLY-FRESH" in tiers, "assembly_receipt": str(assembly)}
     path = run_dir / "validation" / f"{profile}-whole-model.json"
@@ -52,4 +62,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

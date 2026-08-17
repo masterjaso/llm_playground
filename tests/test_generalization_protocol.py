@@ -102,4 +102,16 @@ def test_amplitude_and_external_gate_require_all_metrics_and_domains() -> None:
     result = evaluate_promotion_metrics(values, domain_slices={"code": values, "agentic": {**values, "cosine": 0.90}})
     assert result["overall"] == "red"
     assert "agentic" in result["failed_domains"]
-
+    alias_result = evaluate_promotion_metrics(
+        {
+            "normalized_mse": 0.04,
+            "cosine": 0.985,
+            "load_cv": 0.4,
+            "dead_expert_count": 0,
+            "oracle_regret_nmse": 0.05,
+            "repeat_variation": 0.02,
+            "median_norm_ratio_delta": 0.02,
+            "p95_abs_relative_norm_error": 0.1,
+        }
+    )
+    assert alias_result["overall"] == "green"
