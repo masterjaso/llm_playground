@@ -860,7 +860,14 @@ def _score_candidate_batches(
                 hidden,
                 simplex=simplex,
             )
-            errors[start:stop, candidate_start:candidate_stop] = np.asarray(block_errors, dtype=np.float32)
+            # Candidate residuals are MSEs (typically 1e-6--1e-4 for the
+            # learned basis), whereas a load price is dimensionless.  Price
+            # the *relative* candidate error so the Lagrangian has a stable
+            # scale across tokens and hidden widths.  Final metrics are still
+            # recomputed from the selected routes and remain unnormalised.
+            residual_scale = np.maximum(residual_norm / max(hidden, 1), 1e-12)
+            normalized_errors = np.asarray(block_errors, dtype=np.float32) / residual_scale[:, None]
+            errors[start:stop, candidate_start:candidate_stop] = normalized_errors
     if isinstance(errors, np.memmap):
         errors.flush()
     if isinstance(ids_store, np.memmap):
@@ -876,6 +883,7 @@ def _score_candidate_batches(
         "input_bytes_per_token": int(input_bytes_per_token),
         "input_batch_bytes": input_batch_bytes,
         "candidate_chunk_size": candidate_chunk,
+        "candidate_error_scale": "per_token_residual_mse_relative_to_hidden_mean",
     }
     return errors, ids_store, metadata
 
@@ -1153,6 +1161,9 @@ def frozen_slice_load_aware_oracle(
             best_assignment: Any | None = None
             best_metric: dict[str, Any] | None = None
             best_key: tuple[float, ...] | None = None
+            previous_ids: Any | None = None
+            pricing_trace: list[dict[str, Any]] = []
+            convergence_reason = "max_iterations"
             for iteration in range(int(iterations)):
                 choice, usage = _select_stream_assignment(
                     errors,
@@ -1189,17 +1200,79 @@ def frozen_slice_load_aware_oracle(
                     and int(metric["dead_experts"]) == 0
                     and float(metric["load_cv"]) <= float(target_load_cv)
                 )
-                if hard_feasible:
+                gate_feasible = bool(
+                    hard_feasible and float(metric["cosine"]) >= 0.98
+                )
+                if gate_feasible:
                     key = (0.0, -float(metric["cosine"]), float(metric["global_nmse"]), float(metric["load_cv"]))
+                elif hard_feasible:
+                    # Once the quality/load constraints are met, cosine is
+                    # always the primary objective, even if it is below the
+                    # final cosine gate.
+                    key = (1.0, -float(metric["cosine"]), float(metric["global_nmse"]), float(metric["load_cv"]))
                 else:
-                    key = (1.0, float(metric["load_cv"]), -float(metric["cosine"]), float(metric["global_nmse"]))
+                    cv_violation = max(float(metric["load_cv"]) - float(target_load_cv), 0.0)
+                    nmse_violation = max(float(metric["global_nmse"]) - 0.05, 0.0)
+                    key = (2.0, cv_violation + nmse_violation, -float(metric["cosine"]), float(metric["global_nmse"]), float(metric["load_cv"]))
                 if best_key is None or key < best_key:
                     best_key = key
                     best_assignment = (ids.copy(), weights.copy())
                     best_metric = metric
+                assignment_change_zero = float(
+                    np.mean(
+                        np.any(
+                            np.sort(np.asarray(ids, dtype=np.int64), axis=1)
+                            != np.sort(np.asarray(unconstrained_ids, dtype=np.int64), axis=1),
+                            axis=1,
+                        )
+                    )
+                )
+                assignment_change_previous = (
+                    0.0
+                    if previous_ids is None
+                    else float(
+                        np.mean(
+                            np.any(
+                                np.sort(np.asarray(ids, dtype=np.int64), axis=1)
+                                != np.sort(np.asarray(previous_ids, dtype=np.int64), axis=1),
+                                axis=1,
+                            )
+                        )
+                    )
+                )
+                selected_cost = float(np.mean(errors[np.arange(tokens), choice]))
+                price_cost = float(np.mean(np.sum(prices[np.asarray(ids, dtype=np.int64)], axis=1)))
+                pricing_trace.append(
+                    {
+                        "iteration": int(iteration),
+                        "reconstruction_objective": selected_cost,
+                        "priced_objective": selected_cost + float(penalty) * price_cost,
+                        "cosine": float(metric["cosine"]),
+                        "nmse": float(metric["global_nmse"]),
+                        "global_nmse": float(metric["global_nmse"]),
+                        "load_cv": float(metric["load_cv"]),
+                        "dead_experts": int(metric["dead_experts"]),
+                        "expert_loads": list(metric["expert_usage_counts"]),
+                        "assignment_change_fraction_from_zero": assignment_change_zero,
+                        "assignment_change_fraction_from_previous": assignment_change_previous,
+                        "assignment_change_fraction_from_zero_price": assignment_change_zero,
+                        "assignment_change_fraction_from_previous_iteration": assignment_change_previous,
+                        "price_min": float(np.min(prices)),
+                        "price_mean": float(np.mean(prices)),
+                        "price_max": float(np.max(prices)),
+                        "price_scale": "relative_candidate_error_per_token",
+                    }
+                )
                 imbalance = usage.astype(np.float64) / max(target_usage, 1e-12) - 1.0
-                prices += float(price_step) * (float(price_decay) ** iteration) * imbalance
+                update = float(price_step) * (float(price_decay) ** iteration) * imbalance
+                prices += update
                 prices -= prices.mean()
+                previous_ids = ids.copy()
+                if assignment_change_previous == 0.0 and float(np.max(np.abs(update))) <= 1e-6:
+                    convergence_reason = "assignment_stable_and_price_update_small"
+                    break
+                if gate_feasible and float(metric["load_cv"]) <= float(target_load_cv):
+                    convergence_reason = "gate_feasible"
             if best_assignment is None or best_metric is None:  # pragma: no cover
                 raise RuntimeError("load-aware assignment produced no route")
             ids, weights = best_assignment
@@ -1218,6 +1291,12 @@ def frozen_slice_load_aware_oracle(
                     and int(best_metric["dead_experts"]) == 0
                     and float(best_metric["load_cv"]) <= float(target_load_cv)
                 ),
+                "gate_feasible": bool(
+                    float(best_metric["global_nmse"]) <= 0.05
+                    and float(best_metric["cosine"]) >= 0.98
+                    and float(best_metric["load_cv"]) <= float(target_load_cv)
+                    and int(best_metric["dead_experts"]) == 0
+                ),
                 "green_gate": bool(
                     float(best_metric["global_nmse"]) <= 0.05
                     and float(best_metric["cosine"]) >= 0.98
@@ -1225,13 +1304,22 @@ def frozen_slice_load_aware_oracle(
                     and int(best_metric["dead_experts"]) == 0
                 ),
                 "iterations": int(iterations),
+                "iterations_executed": len(pricing_trace),
+                "convergence_reason": convergence_reason,
+                "pricing_trace": pricing_trace,
             }
             points.append(point)
             selected_by_point.append((ids, weights))
 
+        gate_feasible_points = [index for index, point in enumerate(points) if point["gate_feasible"]]
         hard_feasible_points = [index for index, point in enumerate(points) if point["hard_feasible"]]
         load_feasible_points = [index for index, point in enumerate(points) if point["feasible_load_target"]]
-        if hard_feasible_points:
+        if gate_feasible_points:
+            selected_index = min(
+                gate_feasible_points,
+                key=lambda index: (-float(points[index]["cosine"]), float(points[index]["global_nmse"]), float(points[index]["load_cv"])),
+            )
+        elif hard_feasible_points:
             selected_index = min(
                 hard_feasible_points,
                 key=lambda index: (-float(points[index]["cosine"]), float(points[index]["global_nmse"]), float(points[index]["load_cv"])),
@@ -1244,7 +1332,13 @@ def frozen_slice_load_aware_oracle(
         else:
             selected_index = min(
                 range(len(points)),
-                key=lambda index: (float(points[index]["load_cv"]), -float(points[index]["cosine"]), float(points[index]["global_nmse"])),
+                key=lambda index: (
+                    max(float(points[index]["load_cv"]) - float(target_load_cv), 0.0)
+                    + max(float(points[index]["global_nmse"]) - 0.05, 0.0),
+                    -float(points[index]["cosine"]),
+                    float(points[index]["global_nmse"]),
+                    float(points[index]["load_cv"]),
+                ),
             )
         ids, weights = selected_by_point[selected_index]
         metric = _stream_metrics(
@@ -1273,6 +1367,12 @@ def frozen_slice_load_aware_oracle(
                 float(metric["global_nmse"]) <= 0.05
                 and int(metric["dead_experts"]) == 0
                 and float(metric["load_cv"]) <= float(target_load_cv)
+            ),
+            "gate_feasible": bool(
+                float(metric["global_nmse"]) <= 0.05
+                and float(metric["cosine"]) >= 0.98
+                and float(metric["load_cv"]) <= float(target_load_cv)
+                and int(metric["dead_experts"]) == 0
             ),
             "green_gate": bool(
                 float(metric["global_nmse"]) <= 0.05

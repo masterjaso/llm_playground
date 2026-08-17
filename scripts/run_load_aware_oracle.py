@@ -35,7 +35,6 @@ if __package__ in {None, ""}:
 from dense2moe.partition import frozen_slice_load_aware_oracle
 from dense2moe.provenance import current_git_commit
 
-
 _ARRAY_NAMES = ("shared", "routed", "target")
 
 
@@ -48,13 +47,36 @@ def _sha256(path: Path) -> str:
 
 
 def _validate_store_manifest(path: Path, manifest: dict[str, Any]) -> dict[str, Any]:
+    basis_source = manifest.get("basis_source")
+    # Keep the low-level loader backward compatible for old test fixtures and
+    # historical artifacts, but label them as unusable rather than guessing a
+    # basis.  ``run`` below refuses this label for an oracle report.
+    if basis_source is None:
+        basis_source = "legacy_unlabelled"
+        manifest["basis_source"] = basis_source
+    if basis_source not in {"raw_dense_partition", "trained_checkpoint", "legacy_unlabelled"}:
+        raise ValueError(f"{path / 'manifest.json'} has an unsupported basis_source: {basis_source!r}")
+    if basis_source == "trained_checkpoint" and (
+        not manifest.get("checkpoint_path") or not manifest.get("checkpoint_tensor_sha256")
+    ):
+        raise ValueError(
+            f"{path / 'manifest.json'} trained_checkpoint stores require checkpoint_path and checkpoint_tensor_sha256"
+        )
+    topology = manifest.get("topology_manifest", manifest.get("topology"))
+    if topology is None and basis_source == "legacy_unlabelled":
+        topology = {}
+    if not isinstance(topology, dict):
+        raise TypeError(f"{path / 'manifest.json'} must record topology_manifest")
+    for field in ("expert_count", "expert_width", "shared_width", "top_k"):
+        if field not in topology and basis_source != "legacy_unlabelled":
+            raise ValueError(f"{path / 'manifest.json'} topology is missing {field}")
     arrays = manifest.get("arrays")
     if not isinstance(arrays, dict):
-        raise ValueError(f"{path / 'manifest.json'} must contain an 'arrays' mapping")
+        raise TypeError(f"{path / 'manifest.json'} must contain an 'arrays' mapping")
     for name in _ARRAY_NAMES:
         entry = arrays.get(name)
         if not isinstance(entry, dict):
-            raise ValueError(f"{path / 'manifest.json'} is missing arrays.{name}")
+            raise TypeError(f"{path / 'manifest.json'} is missing arrays.{name}")
         relative = Path(str(entry.get("path", f"{name}.npy")))
         candidate = (path / relative).resolve()
         if candidate.parent != path.resolve():
@@ -83,7 +105,7 @@ def _load_arrays(path: Path, *, allow_eager_npz: bool = False) -> tuple[tuple[An
         )
         for name, values in zip(_ARRAY_NAMES, arrays):
             if not isinstance(values, np.memmap):
-                raise ValueError(f"{path / name}.npy did not open as a read-only memmap")
+                raise TypeError(f"{path / name}.npy did not open as a read-only memmap")
             entry = manifest["arrays"][name]
             expected_shape = entry.get("shape")
             if expected_shape is not None and list(values.shape) != list(expected_shape):
@@ -96,6 +118,17 @@ def _load_arrays(path: Path, *, allow_eager_npz: bool = False) -> tuple[tuple[An
             "manifest": str(manifest_path),
             "manifest_sha256": _sha256(manifest_path),
             "array_paths": {name: str(path / str(manifest["arrays"][name]["path"])) for name in _ARRAY_NAMES},
+            "basis_source": manifest["basis_source"],
+            "checkpoint_path": manifest.get("checkpoint_path"),
+            "checkpoint_tensor_sha256": manifest.get("checkpoint_tensor_sha256"),
+            "partition_path": manifest.get("partition_path"),
+            "partition_sha256": manifest.get("partition_sha256"),
+            "source_revision": manifest.get("source_revision"),
+            "code_commit": manifest.get("code_commit"),
+            "dataset_hash": manifest.get("dataset_hash"),
+            "split": manifest.get("split"),
+            "row_count": manifest.get("row_count"),
+            "topology_manifest": manifest.get("topology_manifest", manifest.get("topology")),
         }
     if path.suffix.lower() != ".npz":
         raise ValueError(f"input must be a contribution-store directory or .npz fixture: {path}")
@@ -110,7 +143,23 @@ def _load_arrays(path: Path, *, allow_eager_npz: bool = False) -> tuple[tuple[An
         if missing:
             raise ValueError(f"{path} is missing contribution arrays: {missing}")
         arrays = tuple(np.asarray(values[name]) for name in _ARRAY_NAMES)
-    return arrays, {"format": "eager_npz", "manifest": None, "manifest_sha256": None, "array_paths": {}}
+    return arrays, {
+        "format": "eager_npz",
+        "manifest": None,
+        "manifest_sha256": None,
+        "array_paths": {},
+        "basis_source": "fixture_unlabelled",
+        "checkpoint_path": None,
+        "checkpoint_tensor_sha256": None,
+        "partition_path": None,
+        "partition_sha256": None,
+        "source_revision": None,
+        "code_commit": None,
+        "dataset_hash": None,
+        "split": None,
+        "row_count": None,
+        "topology_manifest": None,
+    }
 
 
 def run(
@@ -135,6 +184,11 @@ def run(
         profile, raw_top_k = topology.split("/", 1)
         top_k = int(raw_top_k.removeprefix("top"))
         (shared, routed, target), input_metadata = _load_arrays(path, allow_eager_npz=allow_eager_npz)
+        if input_metadata["basis_source"] not in {"raw_dense_partition", "trained_checkpoint"}:
+            raise ValueError(
+                f"refusing oracle input without explicit basis_source: {path}; "
+                "rematerialize it as raw_dense_partition or trained_checkpoint"
+            )
         expected_experts = {"p16": 16, "p32": 32}.get(profile)
         if expected_experts is None:
             raise ValueError(f"unsupported topology profile: {profile!r}")
@@ -147,13 +201,18 @@ def run(
             if storage_dir is not None
             else None
         )
+        effective_candidate_pool = candidate_pool_size
+        if effective_candidate_pool is None and profile == "p32" and top_k == 5:
+            # C(15,5)=3003 is the default strong practical p32/top5 pool;
+            # callers may still request a smaller bounded screen explicitly.
+            effective_candidate_pool = 15
         result = frozen_slice_load_aware_oracle(
             shared,
             routed,
             target,
             top_k=top_k,
             target_load_cv=target_load_cv,
-            candidate_pool_size=candidate_pool_size,
+            candidate_pool_size=effective_candidate_pool,
             max_combinations=max_combinations,
             iterations=iterations,
             batch_size=batch_size,
@@ -173,6 +232,17 @@ def run(
                 "input_manifest": input_metadata["manifest"],
                 "input_manifest_sha256": input_metadata["manifest_sha256"],
                 "input_array_paths": input_metadata["array_paths"],
+                "basis_source": input_metadata["basis_source"],
+                "checkpoint_path": input_metadata["checkpoint_path"],
+                "checkpoint_tensor_sha256": input_metadata["checkpoint_tensor_sha256"],
+                "partition_path": input_metadata["partition_path"],
+                "partition_sha256": input_metadata["partition_sha256"],
+                "source_revision": input_metadata["source_revision"],
+                "input_code_commit": input_metadata["code_commit"],
+                "dataset_hash": input_metadata["dataset_hash"],
+                "split": input_metadata["split"],
+                "row_count": input_metadata["row_count"],
+                "topology_manifest": input_metadata["topology_manifest"],
                 "tokens": int(result["indices"].shape[0]),
                 "exact_or_bounded": result["assurance"],
                 "candidate_pool_size": result["candidate_pool_size"],

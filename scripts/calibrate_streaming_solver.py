@@ -13,10 +13,14 @@ import argparse
 import hashlib
 import json
 import os
-import resource
 import time
 from pathlib import Path
 from typing import Any
+
+try:  # ``resource`` is POSIX-only; keep the guarded entry point Windows-safe.
+    import resource
+except ImportError:  # pragma: no cover - exercised by native Windows smoke
+    resource = None  # type: ignore[assignment]
 
 import numpy as np
 
@@ -39,8 +43,7 @@ except ModuleNotFoundError:  # direct ``python scripts/<file>.py`` execution
         _load_dense_mlp,
     )
 
-from dense2moe.partition.oracle import frozen_slice_load_aware_oracle, _stream_selected_weights
-
+from dense2moe.partition.oracle import _stream_selected_weights, frozen_slice_load_aware_oracle
 
 DEFAULT_RUN = Path("runs/20260815-184644-windows-real-d2m-v4-streaming")
 DEFAULT_SOURCE = Path("runs/20260815-030931-windows/source")
@@ -183,6 +186,16 @@ def _write_contribution_store(
     dataset_hash: str,
     partition_hash: str,
     indices_hash: str,
+    basis_source: str = "raw_dense_partition",
+    checkpoint_path: str | None = None,
+    checkpoint_tensor_sha256: str | None = None,
+    partition_path: str | None = None,
+    topology: dict[str, Any] | None = None,
+    source_revision: str | None = None,
+    capture_identity: dict[str, Any] | None = None,
+    split: str = "train",
+    row_count: int | None = None,
+    dtype: str = "float32",
 ) -> dict[str, Any]:
     """Persist a read-only mmap contribution store consumed by the CLI."""
 
@@ -207,7 +220,18 @@ def _write_contribution_store(
         "dataset_hash": dataset_hash,
         "partition_hash": partition_hash,
         "indices_sha256": indices_hash,
-        "split": "train",
+        "basis_source": basis_source,
+        "checkpoint_path": checkpoint_path,
+        "checkpoint_tensor_sha256": checkpoint_tensor_sha256,
+        "partition_path": partition_path,
+        "partition_sha256": partition_hash,
+        "topology_manifest": topology or {},
+        "source_revision": source_revision,
+        "capture_identity": capture_identity or {},
+        "split": split,
+        "row_count": int(row_count if row_count is not None else len(target)),
+        "dtype": dtype,
+        "code_commit": current_git_commit(),
         "classification": "FIT_ONLY_SOLVER_CALIBRATION_NO_HOLDOUT",
         "holdout_opened": False,
     }
@@ -234,7 +258,7 @@ def _metric(shared: np.ndarray, routed: np.ndarray, target: np.ndarray, ids: np.
     usage = np.bincount(ids.reshape(-1), minlength=routed.shape[1])
     hard = np.argsort(-np.linalg.norm(target - shared, axis=1), kind="stable")[: max(1, len(target) // 4)]
     return {
-        "tokens": int(len(target)),
+        "tokens": len(target),
         "global_nmse": float(error.sum() / max(target_norm.sum(), 1e-12)),
         "mean_cosine": float(cosine.mean()),
         "hard_quartile_cosine": float(cosine[hard].mean()),
@@ -333,6 +357,18 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
             dataset_hash=dataset.dataset_hash,
             partition_hash=partition_hash,
             indices_hash=_hash_indices(indices),
+            basis_source="raw_dense_partition",
+            partition_path=str(plan_path),
+            topology={
+                "expert_count": int(plan.routed_experts),
+                "expert_width": int(plan.expert_intermediate_size),
+                "shared_width": int(plan.shared_intermediate_size),
+                "top_k": 4,
+            },
+            capture_identity={"manifest": str(run_dir / "capture/layer-0000-train.json")},
+            split="train",
+            row_count=len(indices),
+            dtype="float32",
         )
         if args.store_dir
         else None
@@ -395,7 +431,10 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
     )
     exact_set_match = float(np.mean(overlap == 1.0))
     hard = np.argsort(-hardness, kind="stable")[: max(1, len(target) // 4)]
-    rss = int(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss * (1024 if os.name == "posix" else 1))
+    if resource is None:
+        rss = 0
+    else:
+        rss = int(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss * (1024 if os.name == "posix" else 1))
     cuda_peak = int(torch.cuda.max_memory_allocated(device) if torch.cuda.is_available() and device.startswith("cuda") else 0)
     payload = {
         "schema_version": 1,
@@ -409,11 +448,11 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         "partition": str(plan_path),
         "partition_hash": partition_hash,
         "sample": {
-            "stratify_pool": int(len(prefix_inputs)),
-            "count": int(len(indices)),
+            "stratify_pool": len(prefix_inputs),
+            "count": len(indices),
             "indices_sha256": _hash_indices(indices),
             "strata": {"easy": int(len(indices) // 4), "medium": int(len(indices) - 2 * (len(indices) // 4)), "hard": int(len(indices) // 4)},
-            "hard_quartile_count": int(len(hard)),
+            "hard_quartile_count": len(hard),
         },
         "exact_solver": {
             "method": "all_1820_candidate_sets_nonnegative_active_face_refit",

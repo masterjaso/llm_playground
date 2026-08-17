@@ -12,7 +12,11 @@ from dense2moe.partition import (
     sparse_baseline,
     trainable_student_proxy,
 )
-from dense2moe.partition.oracle import _batched_candidate_vectors, _batched_exact_positive_fit, _pareto_points
+from dense2moe.partition.oracle import (
+    _batched_candidate_vectors,
+    _batched_exact_positive_fit,
+    _pareto_points,
+)
 
 
 def test_selected_route_vector_shape_and_exact_refit_match_scalar_nnls() -> None:
@@ -46,6 +50,38 @@ def test_load_aware_oracle_reports_balanced_pareto_assignment() -> None:
     assert result["dead_experts"] == 0
     assert result["feasible_load_target"] is True
     assert result["pareto"]
+
+
+def test_load_prices_change_a_concentrated_assignment() -> None:
+    # Expert zero is the only exact direction.  The other experts are
+    # deliberately worse, but a sufficiently large normalized load price must
+    # trade reconstruction error for balance rather than returning the same
+    # route at every penalty point.
+    shared = np.zeros((12, 2), dtype=np.float32)
+    routed = np.zeros((12, 4, 2), dtype=np.float32)
+    routed[:, 0] = np.asarray([1.0, 0.0], dtype=np.float32)
+    routed[:, 1] = np.asarray([0.0, 1.0], dtype=np.float32)
+    routed[:, 2] = np.asarray([0.0, -1.0], dtype=np.float32)
+    routed[:, 3] = np.asarray([-1.0, 0.0], dtype=np.float32)
+    target = np.tile(np.asarray([[1.0, 0.0]], dtype=np.float32), (12, 1))
+
+    result = frozen_slice_load_aware_oracle(
+        shared,
+        routed,
+        target,
+        top_k=1,
+        iterations=6,
+        price_step=1.0,
+        penalty_grid=(0.0, 2.0),
+        batch_size=4,
+        max_in_memory_bytes=1 << 20,
+    )
+
+    priced_trace = result["pareto_all_points"][1]["pricing_trace"]
+    assert max(row["assignment_change_fraction_from_zero"] for row in priced_trace) > 0.0
+    assert any(row["price_max"] > row["price_min"] for row in priced_trace)
+    assert all("global_nmse" in row for row in priced_trace)
+    assert all("assignment_change_fraction_from_previous_iteration" in row for row in priced_trace)
 
 
 def test_load_aware_oracle_uses_bounded_float32_blocks_for_float64_inputs(tmp_path) -> None:

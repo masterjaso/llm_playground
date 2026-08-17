@@ -22,6 +22,18 @@ from .oracle import (
     swiglu_contributions,
     trainable_student_proxy,
 )
+from .contributions import (
+    basis_outputs_from_state,
+    canonical_partition_sha256,
+    contribution_manifest,
+    load_partition_plan,
+    load_trained_basis_state,
+    raw_dense_partition_contributions,
+    reconstruct_selected,
+    resolve_checkpoint_tensor,
+    sha256_file,
+    trained_checkpoint_contributions,
+)
 
 __all__ = [
     "ActivationPartitioner",
@@ -42,4 +54,14 @@ __all__ = [
     "swiglu_contributions",
     "trainable_student_proxy",
     "unpack_experts",
+    "basis_outputs_from_state",
+    "canonical_partition_sha256",
+    "contribution_manifest",
+    "load_partition_plan",
+    "load_trained_basis_state",
+    "raw_dense_partition_contributions",
+    "reconstruct_selected",
+    "resolve_checkpoint_tensor",
+    "sha256_file",
+    "trained_checkpoint_contributions",
 ]
