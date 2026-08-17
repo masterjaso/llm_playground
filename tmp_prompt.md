@@ -1,1332 +1,976 @@
-D2M / QWEN3.8 MOE — FEATURE-COMPLETION EPIC
-GENERALIZATION-FIRST DISTILLATION → ROBUST BF16 MOE → QUANTIZED MODEL
-
-NSP execution:
-- Use /nsp-build-bezalel as the primary implementation/execution skill.
-- Use /nsp-plan-genesis only when material discovery invalidates this plan or requires the execution contract to be regenerated.
-- This is EPIC-scale work.
-- Use .agents/skills/nsp-epic-execution/SKILL.md for EPIC Ralph/PIV/ATDD execution.
-- Rehydrate from repository and Ralph artifacts, never from chat history or the Prompt Genesis conversation.
-- Do not begin implementation or edit source until Ralph state and explicit active-phase ATDD gates with exact validation commands exist.
+You are Bezalel, the build/execution agent for the Dense-to-MoE (D2M) project in:
 
 Repository:
-    C:\workplace\llm_playground
+  masterjaso/llm_playground
 
 Branch:
-    agent/windows-dense2moe-real-pipeline
+  agent/windows-dense2moe-real-pipeline
 
-Observed HEAD when this prompt was authored:
-    3d7dd69fcaf2f885169de35a20d05b2e43cc524e
+Expected starting HEAD:
+  8062dcccf6d2b94acd40fa03dc862ec462af58e3
 
-Do not assume that SHA is still current.
-Fetch/pull and record actual HEAD first.
+Workspace on the authoritative machine:
+  C:\workplace\llm_playground
 
-======================================================================
-0. PRIMARY OUTCOME
-======================================================================
+MISSION
+=======
 
-Drive D2M from its current research state to a reproducible feature-complete
-pipeline capable of producing:
+Correct the current Phase 01 methodology so that a "p16/top4 method proof" can only become green from REAL Qwen layer-0 activation captures, never from the existing tiny synthetic SwiGLU fixture.
 
-    dense Qwen3.8 source
-        ->
-    sparse FFN-distilled MoE
-        ->
-    validated BF16 MoE checkpoint
-        ->
-    quantized MoE artifact
-        ->
-    measured production candidate
+Then establish the exact fail-closed execution path:
 
-while first proving that the distillation/training method learns a
-GENERALIZABLE sparse basis rather than overfitting another activation corpus.
+  Phase 00A
+    native Windows runtime qualification + runtime lock
 
-This epic must produce progress toward an actual trained model.
+  Phase 00B
+    frozen METHOD_PROOF_ONLY data receipt
 
-Infrastructure work is allowed only when it removes a concrete blocker from:
+  Phase 01
+    REAL Qwen layer-0 capture-backed p16/top4 basis/oracle method proof
+    run progressively at:
+      2k tokens/rows
+      4k tokens/rows
+      32k+ tokens
 
-    corpus
-    teacher capture
-    distillation
-    training
-    assembly
-    evaluation
-    quantization
+The existing synthetic implementation remains useful only as a unit/smoke test and MUST NOT be accepted as scientific or promotion evidence.
 
-Do not allow the project to return to open-ended diagnostic research.
+Do not advance into production Corpus V2.2, selector optimization, p32 transfer, representative layers, or full64 conversion as part of this task.
 
 ======================================================================
-1. PRODUCT TARGETS
+NON-NEGOTIABLE SCIENTIFIC CONTRACT
 ======================================================================
 
-Exactly TWO sparse topologies remain active.
+Source checkpoint:
+  Qwen/Qwen3.8-27B
 
-SAFE FALLBACK:
+Pinned source revision:
+  1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0
 
-    p16/top4
-    16 routed experts
-    routed width 1024
-    shared width 1024
-    top_k = 4
-    active FFN width = 5120
-    ~70.59% FFN reduction
+Source model family:
+  qwen3_5_text
 
-PRIMARY PRODUCT TARGET:
+Geometry:
+  num_hidden_layers = 64
+  hidden_size = 5120
+  dense_intermediate_size = 17408
 
-    p32/top5
-    32 routed experts
-    routed width 512
-    shared width 1024
-    top_k = 5
-    active FFN width = 3584
-    ~79.41% FFN reduction
+Conversion scope:
+  Replace only dense SwiGLU FFNs.
+  Preserve the Qwen backbone and all attention / Gated DeltaNet structure.
 
-Do NOT resume research on p32/top4.
+Product candidates:
+  p16/top4 = safe production fallback
+  p32/top5 = preferred aggressive product
+  p32/top4 = inactive for now
 
-p16/top4 is the minimum viable completion path.
+Phase 01 target:
+  p16/top4 only
 
-p32/top5 is the preferred product target.
+p16/top4 geometry:
+  routed experts = 16
+  expert intermediate width = 1024
+  shared intermediate width = 1024
+  top_k = 4
+  active intermediate width = 5120
+  FFN active reduction = 70.5882%
 
-CRITICAL DELIVERY RULE:
+Historical layer-quality gates remain:
+  global NMSE <= 0.05
+  cosine >= 0.98
+  dead experts = 0
+  loadCV <= 0.50
 
-    p32/top5 MUST NOT indefinitely block creation of a complete p16/top4
-    BF16 + quantized model.
+However:
+  Phase 01 is a METHOD PROOF, not permission to reopen historical holdout,
+  and not by itself a product-green declaration.
 
-Once p16/top4 is robustly viable, proceed toward full-model p16 conversion
-while p32/top5 research continues if needed.
+Official historical holdout MUST REMAIN CLOSED.
 
-======================================================================
-2. PRESERVE QWEN BACKBONE
-======================================================================
-
-The project remains an FFN-only Dense-to-MoE conversion.
-
-Preserve:
-
-    attention
-    Gated DeltaNet / linear attention
-    full-attention blocks
-    RoPE
-    norms
-    residual topology
-    embeddings
-    LM head
-    tokenizer
-    special tokens
-    chat template
-    generation semantics
-
-Replace only dense SwiGLU FFNs.
-
-Do not introduce reasoning-efficiency post-training.
-
-Do not train a shorter-reasoning policy.
+No holdout tuning.
+No holdout checkpoint selection.
+No historical replay continuation.
+No layer30+ replay.
+No representative-layer run.
+No full64 run.
 
 ======================================================================
-3. PRODUCTION QUALITY GATES
+CRITICAL BUG / FALSE-GREEN RISK TO FIX
 ======================================================================
 
-Layer-level green remains:
+The current:
 
-    cosine >= 0.98
-    global NMSE <= 0.05
-    load CV <= 0.50
-    dead experts = 0
+  scripts/run_oracle_routed_basis_refinement.py
 
-Do not weaken these because a new corpus is harder.
+contains a synthetic smoke path which constructs approximately:
 
-Whole-model evaluation later must preserve the established project gates:
+  hidden = 8
+  shared_width = 2
+  expert_width = 2
 
-    perplexity increase:
-        green <= 5%
-        yellow <= 10%
+with random gate/up/down matrices and random inputs.
 
-    token KL:
-        green <= 0.10
-        yellow <= 0.20
+That implementation is valid as a smoke/unit test.
 
-    top-1 agreement:
-        >= 85%
+It is NOT a real D2M method proof.
 
-Exact conversion / equivalence sanity where applicable:
+Yet the current phase/documentation path can treat:
 
-    MSE <= 1e-8
+  --rows 2048
+  --rows 4096
+  --rows 32768
 
-Quantization must be evaluated INCREMENTALLY against the validated BF16 MoE,
-in addition to evaluating final quality against the dense source model.
+through that synthetic fixture as though they were real Qwen method-proof stages.
 
-======================================================================
-4. NSP REQUIRED START / DISCOVERY GATE
-======================================================================
+That is not scientifically valid.
 
-Before broad repository loading or edits, run the NSP substrate.
-
-Required commands:
-
-    _nsp status --target C:\workplace\llm_playground
-
-    _nsp context select \
-        --target C:\workplace\llm_playground \
-        --request "Drive D2M Qwen3.8 MoE from Corpus V2 through generalizable oracle-routed distillation, p16/p32 training, full-model assembly, validation, and quantization" \
-        --limit 8 \
-        --format json \
-        --receipt-v2
-
-    _nsp run list --target C:\workplace\llm_playground
-
-    _nsp plan-substrate \
-        --target C:\workplace\llm_playground \
-        --milestone "feature-complete robust Qwen3.8 Dense-to-MoE conversion and quantized candidate"
-
-For this EPIC, start or join an NSP run and record RUN_ID.
-
-Then:
-
-    _nsp plan-substrate discovery seed \
-        --target C:\workplace\llm_playground \
-        --run-id <RUN_ID>
-
-Persist the canonical Repository Fact Ledger under:
-
-    .nsp/artifacts/runs/<RUN_ID>/planning/repository-fact-ledger.json
-
-Then validate:
-
-    _nsp plan-substrate discovery validate \
-        --target C:\workplace\llm_playground \
-        --path .nsp/artifacts/runs/<RUN_ID>/planning/repository-fact-ledger.json
-
-Do not proceed into source edits until agent-owned semantic review concludes:
-
-    DISCOVERY_READY
-
-Required fact coverage includes at minimum:
-
-    actual branch HEAD
-    current run state
-    current corpus hashes
-    current split hashes
-    current teacher-capture implementation
-    current oracle-refinement implementation
-    current p16 checkpoint
-    current p32 checkpoint
-    current source checkpoint/revision
-    Python/Torch/CUDA environment used by prior successful Windows runs
-    model assembly path
-    model export/inference path
-    quantization-capable runtime/backend candidates
-    applicable tests
-    current holdout/replay closure
-
-Rejected or stale facts must not silently authorize execution.
-
-If material facts are unknown/conflicted:
-
-    DISCOVERY_BLOCKED
-
-and resolve them before continuing.
+Your primary job is to eliminate this ambiguity and make false-green promotion structurally impossible.
 
 ======================================================================
-5. EPIC / RALPH OWNERSHIP
+WORKING RULES
 ======================================================================
 
-Epic id:
+1. First inspect current HEAD and current implementation.
+   Do not blindly apply this prompt if the repository has moved.
 
-    epic-d2m-qwen38-moe
+2. Run:
+     git status --short
+     git rev-parse HEAD
+     git log -5 --oneline
 
-Ralph state:
+3. If HEAD differs from the expected SHA:
+   inspect the delta first and adapt carefully.
+   Do not revert newer legitimate work.
 
-    .nsp/artifacts/tmp/ralph/epic-d2m-qwen38-moe/
+4. Never overwrite or delete:
+   - historical captures
+   - historical checkpoints
+   - historical reports
+   - partitions
+   - holdout data
+   - replay state
 
-This Ralph state is the in-flight source of truth.
+5. Large activation tensors / model tensors remain uncommitted.
 
-Never use chat memory as execution state.
+6. Derived receipts, manifests, reports, tests, code, and documentation should
+   be committed when appropriate.
 
-Never write in-flight epic state under .docs/roadmap/**.
+7. Use exact clean-commit provenance for any decisive experiment:
+     implement
+     test
+     commit code
+     run from that exact clean commit
+     record exact SHA
+     persist hashes/config/results
+     commit reports separately
 
-Every phase must contain:
+8. Native Windows is the ONLY valid scientific D2M execution environment.
+   WSL/Linux must never produce an authoritative D2M scientific receipt.
 
-    objective
-    exact acceptance gates
-    exact validation commands
-    prediction depth
-    expected artifacts
-    actual observations
-    Prediction Result classifier
-    residual risks
-    next-phase eligibility
+9. If you are not running on native Windows:
+   you may implement and run portable unit tests,
+   but DO NOT fabricate Windows runtime qualification,
+   CUDA receipts,
+   real model capture receipts,
+   or Phase 01 scientific evidence.
 
-Use clean-context implementation and validation envelopes where supported.
-
-Do not mark any phase complete without fresh evidence.
-
-======================================================================
-6. KNOWN CURRENT STATE TO VERIFY
-======================================================================
-
-Treat these as expected facts requiring repository verification:
-
-- Corpus V2 exists and is frozen.
-- It currently contains 676 records.
-- A balanced activation plan targets ~750k tokens.
-- Planned capture mixture is approximately:
-
-      code                         44%
-      agentic SWE                 28%
-      SWE natural language        12%
-      structured/tool              6%
-      general                     10%
-
-- teacher capture for Corpus V2 has NOT started.
-- oracle-routed basis refinement has been implemented.
-- p16 can use exhaustive C(16,4)=1820 route search.
-- p32 uses a bounded candidate-pool oracle.
-- current ML execution is blocked because the environment used by the last
-  agent could not import usable PyTorch.
-- official holdout remains closed for the new run.
-- representative replay remains blocked.
-- full64 replay remains blocked.
-
-Also verify/fix known provenance drift:
-
-    child-run state/HANDOFF may record an older source commit than actual HEAD.
-
-No decisive experiment may start with stale provenance.
+10. Fail closed instead of silently falling back.
 
 ======================================================================
-7. PHASE 0 — CORPUS V2.1 + ENVIRONMENT RECOVERY
+DELIVERABLE A — SPLIT SYNTHETIC SMOKE FROM REAL METHOD PROOF
 ======================================================================
 
-Objective:
+Refactor the current synthetic runner so its semantics are unmistakable.
 
-    create a final production-oriented training/evaluation corpus and restore
-    a deterministic native-Windows ML environment.
+Preferred approach:
 
-This is the final planned corpus revision before real distillation unless a
-later independent gate demonstrates a concrete coverage failure.
+  scripts/run_oracle_routed_basis_smoke.py
 
---------------------------------------------------
-7A. CORPUS V2.1
---------------------------------------------------
+for the existing tiny random SwiGLU fixture.
 
-Do NOT mutate frozen Corpus V2 in place.
+Alternatively retain the old filename only if the CLI requires an explicit:
 
-Derive:
+  --synthetic-smoke
 
-    Corpus V2.1
+mode and no default path can accidentally enter it.
 
-Preserve V2 hashes and receipts.
+Strong preference:
+  create a clearly named dedicated synthetic smoke runner.
 
-A. QUARANTINE BENCHMARK-DERIVED TASKS
+Synthetic output status should be explicit, for example:
 
-Current corpus evidence includes SWE-Bench-style / SWE-rebench-derived tasks.
+  ORACLE_ROUTED_BASIS_SYNTHETIC_SMOKE_GREEN
 
-Move all benchmark-derived records outside:
+and include:
 
-    FIT-TRAIN
-    FIT-DEV
-    GATE-A
-    SHADOW-B
-    SHADOW-C
+  evidence_class = "synthetic-smoke"
+  scientific_promotion_eligible = false
+  production_promotion_eligible = false
 
-Use an explicit bucket such as:
+The synthetic runner MUST NOT emit a status indistinguishable from a
+real method-proof result.
 
-    BENCHMARK-CANARY-EXCLUDED
+Add tests proving:
+  - synthetic smoke remains functional
+  - router remains frozen when expected
+  - amplitude router remains frozen when expected
+  - synthetic smoke receipt is rejected by Phase 01 promotion logic
+  - changing row count to 32768 does NOT make it scientific evidence
 
-They must never participate in:
+======================================================================
+DELIVERABLE B — DEFINE A REAL QWEN LAYER-0 CAPTURE CONTRACT
+======================================================================
 
-    gradients
-    checkpoint selection
-    shadow promotion
+Create or extend a structured receipt/schema for real Phase 01 captures.
 
-Keep provenance for diagnostic use only.
+Do NOT invent an unrelated teacher implementation.
 
-B. INCREASE INDEPENDENT AGENT TASK DIVERSITY
+Search the repository for the existing exact layer-streaming/native Qwen
+teacher infrastructure and reuse it.
 
-Current V2 contains too few complete agent trajectories for the importance
-assigned to that domain.
+Existing project history already has a proven exact layer-major streaming
+teacher path. Integrate with that path rather than duplicating model loading.
 
-Target:
+The real method-proof capture must be derived from the frozen
+METHOD_PROOF_ONLY selected records from Phase 00B.
 
-    >= 96 independent non-benchmark agent tasks
+A valid capture receipt must record and verify at minimum:
+
+  receipt_type
+  schema_version
+  evidence_class = "real-qwen-layer-capture"
+
+  source_model = "Qwen/Qwen3.8-27B"
+  source_revision =
+    "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0"
+
+  source_model_type = "qwen3_5_text"
+
+  layer = 0
+  hidden_size = 5120
+  dense_intermediate_size = 17408
+
+  source checkpoint identity/hash information already supported by repo
+
+  tokenizer identity/hash
+  tokenizer revision
+
+  method-proof receipt path/hash
+
+  exact selected record IDs or content-addressed identity thereof
+  selected record ID hash
+  selected token count
+
+  excluded evaluation identities / split identity proof
+
+  capture dtype
+  capture shard format
+  capture shard paths
+  capture shard SHA256 values
+  row/token counts
+  tensor shapes
+
+  dense FFN target definition
+  input activation definition
+
+  code_commit
+  creation timestamp
+  native_windows = true
+
+  runtime-lock identity/hash
+
+The receipt must prove that the optimizer inputs are genuine outputs from the
+pinned real Qwen source and not a synthetic fixture.
+
+The real capture should contain the tensors actually needed to train the
+selector-independent p16 basis, at minimum:
+
+  FFN input hidden state X:
+    shape [N, 5120]
+
+  dense FFN target Y:
+    shape [N, 5120]
+
+and whatever routed/shared contribution data is required by the established
+oracle/basis refinement method.
+
+Do not store unnecessary whole-model hidden histories.
 
 Prefer:
+  sharded .npy or similarly mmap-friendly arrays + manifest
 
-    ~128-200 tasks
+Avoid:
+  giant compressed .npz that must fully materialize in RAM
 
-if acquisition is straightforward.
-
-Do not endlessly grow the corpus once diversity requirements are met.
-
-Favor:
-
-    more independent tasks
-    more repositories
-    more languages/frameworks
-
-over:
-
-    more tokens from the same task
-
-Suggested activation cap per agent task:
-
-    approximately 2k-4k sampled tokens
-
-unless evidence supports a different bounded cap.
-
-Hard concentration checks:
-
-    no single task dominates agentic activation sampling
-    no single repository dominates production sampling
-    no source family overwhelms the balanced sampler
-
-Retain complete raw visible trajectories for provenance; sample bounded windows
-for activation capture.
-
-C. REPOSITORY/TASK/DOCUMENT DISJOINTNESS
-
-Maintain:
-
-    FIT-TRAIN
-    FIT-DEV
-    GATE-A
-    SHADOW-B
-    SHADOW-C
-    PRESERVATION-CANARY
-
-Require zero forbidden overlap at:
-
-    repository
-    task/issue
-    document
-
-level.
-
-Do not use random token splitting as generalization evidence.
-
-D. PRODUCTION COVERAGE
-
-Maintain production-weighted diversity:
-
-    code
-    agentic coding
-    tool calls/results
-    shell
-    git
-    compiler/test output
-    structured formats
-    technical docs
-    broad/general preservation
-
-Preserve the old Wiki/Gutenberg/general corpus only as an OOD/regression
-canary, not as primary optimization data.
-
-E. FREEZE
-
-Produce immutable:
-
-    corpus manifest
-    splits
-    source/provenance receipt
-    benchmark exclusion receipt
-    exact tokenizer audit
-    activation sampling plan
-
-with hashes.
-
---------------------------------------------------
-7B. WINDOWS ML ENVIRONMENT
---------------------------------------------------
-
-Do NOT blindly install whatever current torch package pip selects.
-
-First identify the exact native-Windows Python/Torch/CUDA environment or
-dependency combination that previously produced successful D2M GPU runs.
-
-Recover/reuse it where possible.
-
-Then pin enough information to reproduce it.
-
-Create or extend an environment doctor that proves:
-
-    Python executable/version
-    torch import
-    torch version
-    CUDA runtime
-    torch.cuda.is_available() == True
-    expected GPU visible
-    BF16 tensor operation
-    small CUDA GEMM
-    safetensors load
-    existing D2M checkpoint load
-    one p16 forward
-    one dense-teacher FFN forward
-    oracle module import
-
-Run complete relevant ML tests after recovery.
-
---------------------------------------------------
-PHASE 0 ATDD EXIT
---------------------------------------------------
-
-Required:
-
-    Corpus V2.1 frozen
-    benchmark-derived tasks excluded from optimization/promotion
-    >=96 independent non-benchmark agent tasks unless a documented acquisition
-      blocker is accepted by the epic owner
-    overlap audits green
-    tokenizer audit green
-    balanced capture plan green
-    environment doctor green
-    complete ML test collection green
-    actual HEAD/provenance reconciled
-
-No teacher training campaign before this gate.
+All large data paths should be resumable and content-addressed.
 
 ======================================================================
-8. PHASE 1 — DISTILLATION METHOD PROOF
+DELIVERABLE C — REAL CAPTURE-BACKED P16 METHOD-PROOF RUNNER
 ======================================================================
 
-Objective:
+Implement a new explicit runner for the actual scientific test, for example:
 
-    prove oracle-routed basis training works scientifically before committing
-    large compute.
+  scripts/run_real_oracle_routed_basis_refinement.py
 
-Use p16/top4 as the method-proof topology because its top4 routing can be
-exhaustively evaluated over all 1,820 expert sets.
+or an equivalent subcommand with equally strong semantics.
 
---------------------------------------------------
-8A. TEACHER CAPTURE
---------------------------------------------------
+It MUST require:
 
-Start small.
+  --method-proof-receipt
+  --capture-receipt
+  --topology p16/top4
 
-Capture balanced V2.1 teacher activations at approximately:
+and should support bounded token/sample limits such as:
 
-    2k-4k states
+  --max-tokens 2048
+  --max-tokens 4096
+  --max-tokens 32768
 
-Verify:
+Use token/sample terminology accurately.
 
-    source revision
-    tokenizer
-    hidden geometry
-    dense FFN target
-    capture hashes
-    split identity
+Do not call 32768 random tensor rows "32768 tokens".
 
-Teacher output reconstruction/equivalence must satisfy existing strict
-numerical sanity requirements.
+The runner must validate BEFORE any optimizer step:
 
-Do not generate the source corpus autoregressively with the dense model.
+  1. method-proof receipt hash
+  2. capture receipt hash
+  3. source model identity
+  4. source revision
+  5. model type
+  6. layer == 0
+  7. hidden_size == 5120
+  8. dense intermediate == 17408
+  9. native Windows proof
+  10. approved runtime-lock identity
+  11. capture shard hashes
+  12. selected record/token identities
+  13. no benchmark-derived material
+  14. no validation/holdout contamination
+  15. no synthetic evidence class
+  16. topology exactly p16/top4
+  17. sufficient requested token/sample count exists
 
-External fixed trajectories supply contexts.
+Any mismatch:
+  return BLOCKED
+  perform zero optimizer steps
 
-Dense Qwen supplies:
+======================================================================
+DELIVERABLE D — PHASE ORCHESTRATION MUST FAIL CLOSED
+======================================================================
 
-    hidden states
-    dense FFN outputs
-    reconstruction target
+Inspect:
 
---------------------------------------------------
-8B. ORACLE METHOD VERIFICATION
---------------------------------------------------
+  src/dense2moe/phase.py
 
-Prove that:
+and all relevant phase-state / receipt / promotion code.
 
-    learned selector is never consulted for E-step assignments
-    selector parameters receive no basis-training gradients
-    p16 E-step is exhaustive
-    route coefficients obey intended constraints
-    M-step uses frozen E-step assignments
-    assignments can refresh as basis changes
-    checkpoint save/reload preserves results
+Change Phase 01 so that it cannot become method-proof green from:
 
-Add change-sensitive tests if absent.
+  evidence_class = synthetic-smoke
 
---------------------------------------------------
-8C. SMALL REAL PILOT
---------------------------------------------------
+or old synthetic status names.
 
-Run:
+Phase 01 scientific acceptance must require a validated:
 
-    ~2k-4k p16 oracle-routed smoke
+  evidence_class = real-qwen-layer-capture
 
-Then:
+plus the real method-proof training/result receipt.
 
-    ~32k p16 production-balanced GPU pilot
+Add explicit states such as:
+
+  PHASE_01_BLOCKED_NO_REAL_CAPTURE
+  PHASE_01_BLOCKED_INVALID_CAPTURE
+  PHASE_01_REAL_METHOD_PROOF_RUNNING
+  PHASE_01_REAL_METHOD_PROOF_GREEN
+  PHASE_01_REAL_METHOD_PROOF_FAILED
+
+Exact naming may follow repo conventions, but semantics must be obvious.
+
+A synthetic smoke result should be informational only.
+
+Do not allow:
+  synthetic rows >= threshold
+to satisfy:
+  real sample/token threshold
+
+Add regression tests that specifically attempt to pass synthetic smoke receipts
+into Phase 01 and assert fail-closed behavior.
+
+======================================================================
+DELIVERABLE E — PHASE 00A WINDOWS QUALIFICATION
+======================================================================
+
+Preserve and use the new runtime-lock system.
+
+Inspect:
+  src/dense2moe/hardware.py
+  scripts/Invoke-GuardedCommand-Smoke.ps1
+  environment doctor / runtime lock commands
+
+On native Windows, before real scientific capture:
+
+1. Verify clean git state.
+
+2. Run the guarded-command smoke suite.
+
+Require the expected cases to be green:
+  success
+  nonzero failure
+  timeout + descendant kill
+  heartbeat/progress
+  git-log command
+
+3. Run the environment doctor.
+
+Required capability probes must include the established set such as:
+  native_windows
+  python
+  torch_import
+  torch_version
+  cuda_runtime
+  cuda_available
+  expected_gpu
+  bf16_tensor
+  small_cuda_gemm
+  safetensors_load
+  d2m_checkpoint_load
+  p16_forward
+  dense_teacher_ffn_forward
+  oracle_module_import
+  source_checkpoint_readable
+
+4. Use ONLY:
+     C:\workplace\llm_playground\.venv\Scripts\python.exe
+
+for authoritative D2M execution.
+
+5. Create the approved runtime lock only when the doctor is green.
+
+6. Persist:
+  runtime fingerprint
+  Python version
+  Torch version
+  compiled CUDA
+  driver
+  GPU inventory
+  selected training GPUs
+  BF16 capability
+  package versions
+  receipt hashes
+  exact code commit
+
+7. Do not use the historical recovery pin as current proof.
+   It is recovery guidance only.
+
+If the runtime differs after lock creation:
+  stop with WINDOWS_RUNTIME_DRIFT
+
+======================================================================
+DELIVERABLE F — PHASE 00B METHOD_PROOF_ONLY DATA
+======================================================================
+
+Preserve the existing strict METHOD_PROOF_ONLY policy.
 
 Use:
 
-    shared-foundation
-        ->
-    routed-residual
-        ->
-    joint refreshable basis refinement
+  scripts/prepare_method_proof_data.py
 
-Primary measurement:
+and existing:
+  src/dense2moe/method_proof.py
 
-    trained-basis UNCONSTRAINED oracle quality
+The method-proof subset must remain:
 
-Selector is telemetry only.
+  FIT-TRAIN only
+  benchmark-free
+  provenance retained
+  evaluation identities excluded
+  overlap checked
+  byte/hash verified
 
---------------------------------------------------
-METHOD-PROOF FALSIFIER
---------------------------------------------------
+Minimum:
+  32768 tokens
 
-Do not accept another +0.0004-style result as evidence of success.
+Require meaningful code + technical diversity under the current policy.
 
-Method proof is green if either:
+Do NOT falsely promote this subset to production Corpus V2.2.
 
-A. the initial V2.1 basis is already near capacity:
-       oracle cosine >= ~0.97
-       and NMSE trajectory is healthy
+It is only:
+  METHOD_PROOF_ONLY
 
-OR
-
-B. the 32k pilot produces material improvement such as:
-       approximately +0.01 absolute oracle cosine
-       AND meaningful NMSE reduction
-
-with no material collapse on source-disjoint A sampling or preservation
-canaries.
-
-If neither occurs:
-
-    STOP SCALING.
-
-Diagnose:
-
-    shared branch
-    residual target
-    partition initialization
-    oracle assignment quality
-    route coefficient fitting
-    optimizer/LR
-    gradient normalization
-    expert specialization
-    candidate search
-
-One bounded hypothesis at a time.
-
-Do not spend 750k-state compute on an unproven method.
+Persist:
+  manifest
+  selected IDs
+  selected rows
+  selected tokens
+  domain/diversity summary
+  source manifest hash
+  receipt SHA
+  exclusion hashes
 
 ======================================================================
-9. PHASE 2 — P16/TOP4 ROBUST TRAINING
+DELIVERABLE G — REAL LAYER-0 CAPTURE
 ======================================================================
 
-Objective:
+After Phase 00A and 00B are green on native Windows:
 
-    produce the safe-fallback layer-0 candidate and LOCK the training recipe.
+Capture ONLY what is required for layer 0.
 
-Progression:
+Do not run uncontrolled 64-layer replay.
 
-    32k pilot
-        ->
-    ~128k serious run
-        ->
-    larger balanced FIT / up to planned ~750k
-        only while trajectory remains useful
+Use the established exact Qwen layer-streaming teacher path.
 
-Do not blindly consume the largest dataset.
+Capture from the exact frozen METHOD_PROOF_ONLY records.
 
-Use hard-token mining only from FIT.
+The source layer-0 dense FFN must be the real Qwen FFN:
 
---------------------------------------------------
-9A. QUALITY FIRST
---------------------------------------------------
+  gate_proj
+  up_proj
+  SiLU/SwiGLU
+  down_proj
 
-First solve unconstrained reconstruction.
+Generate real:
+  X = layer-0 FFN inputs
+  Y = dense layer-0 FFN outputs
 
-Target:
+and any contribution tensors required by the p16 basis method.
 
-    oracle cosine >= .98
-    oracle NMSE <= .05
+Validate the dense teacher FFN computation against the already established
+native/reference path before optimizing.
 
-Do NOT heavily optimize load balance while oracle cosine remains far below
-~.97.
-
---------------------------------------------------
-9B. JOINT QUALITY/LOAD
---------------------------------------------------
-
-Once reconstruction is close:
-
-introduce load-friendly basis pressure / balanced oracle assignment.
-
-Require simultaneously:
-
-    cosine >= .98
-    NMSE <= .05
-    CV <= .50
-    dead experts = 0
-
-Load metrics must be measured on meaningful sample counts, not 16 tokens.
-
---------------------------------------------------
-9C. SELECTOR
---------------------------------------------------
-
-Only after oracle joint capacity is proven:
-
-    freeze basis
-
-Cache strong oracle labels on diverse FIT:
-
-    route IDs
-    coefficients
-    reconstruction regret
-    cosine regret
-
-Train selector against the FINAL basis.
-
-Weight routing mistakes by actual output damage.
-
-FIT-DEV:
-    frequent feedback allowed
-
-GATE-A:
-    milestone selection
-
-SHADOW-B:
-    confirmation only
-
-SHADOW-C:
-    final independent confirmation
-
-If B or C causes a method change:
-
-    that shadow is now diagnostic
-    it is no longer untouched evidence
-
-Use another still-untouched shadow for final promotion.
-
---------------------------------------------------
-9D. GENERALIZATION
---------------------------------------------------
-
-Report aggregate and per:
-
-    source family
-    task family
-    language
-    repository group
-
-Track:
-
-    worst-domain cosine
-    domain spread
-    FIT-DEV -> A gap
-    A -> B gap
-    B -> C gap
-
-Flag:
-
-    independent-cohort cosine drop > ~.01
-    important production domain < ~.975 when aggregate is near green
-
-Do not call the model "close" because one familiar split is green.
-
---------------------------------------------------
-P16 ROBUST-GREEN
---------------------------------------------------
-
-P16 is robust-green only when:
-
-    oracle capacity green
-    load green
-    selector green
-    independent A/B/C evidence supports generalization
-    preservation canary shows no unexplained catastrophic collapse
-
-Only then may p16 advance toward representative-layer transfer.
+Persist all hashes and shape metadata.
 
 ======================================================================
-10. PHASE 3 — P32/TOP5 PRIMARY PRODUCT
+DELIVERABLE H — 2K -> 4K -> 32K REAL P16 METHOD PROOF
 ======================================================================
 
-Do not make p32 rediscover the successful p16 recipe from scratch.
+Only after the real capture receipt is validated:
 
-After p16 methodology is proven:
+Run three bounded stages.
 
-transfer:
+Stage 1:
+  approximately 2048 real captured tokens/samples
 
-    shared 1024 branch
+Purpose:
+  implementation/numerical sanity only
 
-Investigate structured initialization:
+Require:
+  finite loss/metrics
+  no NaN/Inf
+  selector remains frozen
+  router parameters remain unchanged where oracle-routed basis refinement
+  requires that
+  basis parameters actually change
+  receipt hashes verify
+  output checkpoint reloads
+  deterministic/equivalent rerun where appropriate
 
-    each p16 1024-wide routed expert
-        ->
-    two p32 512-wide experts
+Stage 2:
+  approximately 4096 real captured tokens/samples
 
-Prefer contribution/neuron-aware splitting over arbitrary halves.
+Purpose:
+  verify improvement direction repeats
 
-Then run p32-specific:
+Compare:
+  initial reconstruction
+  post-refinement reconstruction
+  oracle quality
+  load statistics
 
-    top5 oracle assignment
-    shared/residual/joint refinement
-    load geometry
-    selector refinement
+Stage 3:
+  >= 32768 real method-proof tokens/samples
 
-Because p32 uses bounded oracle search:
+Purpose:
+  bounded scientific method proof
 
-    audit candidate-pool adequacy on small samples
+For every stage record at minimum:
 
-Periodically expand candidate pools where practical.
+  token/sample count
+  source record identity hash
+  topology
+  layer
+  source revision
+  checkpoint hash
+  partition hash
+  code commit
 
-Do not interpret a bounded-search failure as architecture impossibility
-without a coverage check.
+  initial:
+    global NMSE
+    cosine
+    mean-token-relative-MSE
+    dead experts
+    loadCV
 
---------------------------------------------------
-P32 DECISION
---------------------------------------------------
+  final:
+    global NMSE
+    cosine
+    mean-token-relative-MSE
+    dead experts
+    loadCV
 
-If:
+  oracle:
+    assurance level
+    candidate-set strategy
+    candidate count
+    global NMSE
+    cosine
+    loadCV
+    whether coefficient fitting is exact or projected/approximate
 
-    oracle >= .98 / <= .05
+  optimization:
+    epochs
+    steps
+    learning rate
+    assignment refresh
+    candidate pool settings
+    wall time
+    peak RAM if measurable
+    peak VRAM if measurable
 
-then proceed aggressively.
+  telemetry:
+    expert utilization
+    routing entropy/margin if applicable
+    shared output norm
+    routed output norm
+    shared:routed ratio
+    reconstruction norm
+    target norm
 
-If:
+Do not label projected-positive coefficient fitting as "exact".
 
-    .975-.98
-
-continue bounded refinement.
-
-If:
-
-    remains ~.92-.94
-
-after:
-
-    successful p16-derived initialization
-    meaningful production-balanced GPU training
-    candidate-pool adequacy checks
-
-then document credible topology-capacity concern.
-
-p32 research may continue, but p16 completion must proceed.
-
-======================================================================
-11. PHASE 4 — TRAINING METHOD LOCK
-======================================================================
-
-When p16 is robust-green and p32 status is understood, freeze a reproducible
-training specification.
-
-Lock:
-
-    corpus version
-    split hashes
-    activation sampler
-    per-domain caps
-    partition initialization
-    shared/residual/joint stage schedule
-    E-step refresh schedule
-    coefficient solver
-    optimizer
-    LR
-    losses
-    oracle configuration
-    load policy
-    selector architecture
-    selector loss
-    checkpoint-selection rule
-    validation cadence
-    quality gates
-
-Publish:
-
-    TRAINING_METHOD_LOCK
-
-After this point:
-
-    representative layers validate TRANSFERABILITY
-
-They are not a new architecture-search playground.
-
-No arbitrary layer-by-layer hyperparameter invention.
+Use honest names:
+  exhaustive-set projected-positive oracle
+  bounded screening oracle
+  unconstrained oracle
+as applicable.
 
 ======================================================================
-12. PHASE 5 — REPRESENTATIVE LAYER MATRIX
+SCIENTIFIC DECISION FOR PHASE 01
 ======================================================================
 
-Once p16 training method is locked, test exactly:
+The central question is:
 
-    0  1  2  3
-    28 29 30 31
-    60 61 62 63
+  Does selector-independent p16/top4 basis refinement on REAL Qwen layer-0
+  activations produce a credible and repeatable reconstruction improvement,
+  and is the resulting basis/oracle ceiling plausibly compatible with the
+  eventual product gates?
 
-Record:
+Do not require the final learned selector to be solved in Phase 01.
 
-    attention_type
-    cycle_position = layer % 4
-    cycle_index = layer // 4
+Do require:
+  real-data evidence
+  repeated direction of improvement
+  no numerical instability
+  no expert collapse
+  clear oracle/basis headroom measurements
+  provenance-safe results
 
-Cycle mapping:
+At 32k, report both:
 
-    mod4 0 = LINEAR_A
-    mod4 1 = LINEAR_B
-    mod4 2 = LINEAR_C
-    mod4 3 = FULL_ATTENTION
+A. Method-proof decision:
+  GREEN / YELLOW / FAILED
 
-Require the locked method to work across:
+B. Product-gate comparison:
+  NMSE vs 0.05
+  cosine vs 0.98
+  dead experts vs 0
+  loadCV vs 0.50
 
-    early
-    middle
-    late
-    all attention-cycle classes
-
-Prefer:
-
-    one uniform topology
-
-or at most:
-
-    simple attention-cycle-class decisions justified by evidence
-
-Avoid bespoke per-layer designs.
-
---------------------------------------------------
-REPRESENTATIVE EXIT
---------------------------------------------------
-
-The p16 fallback advances if representative evidence demonstrates that the
-locked training method transfers adequately across the 12-layer matrix.
-
-Do not require p32 to block p16 full conversion.
+Do not call the overall D2M product green based on Phase 01.
 
 ======================================================================
-13. PHASE 6 — FULL 64-LAYER P16 CONVERSION
+PRODUCTION CORPUS REMAINS BLOCKED
 ======================================================================
 
-This is the minimum viable model-completion path.
+Do NOT weaken Corpus V2.1/V2.2 requirements to make Phase 02 pass.
 
-Once representative p16 is green:
+Current known V2.1 deficiencies include:
+  insufficient independent non-benchmark agent tasks
+  acquisition/rebalancing requirements
 
-    START FULL64 P16.
+The method-proof path exists specifically so algorithm work can continue while
+production-corpus acquisition remains blocked.
 
-Do not automatically train every layer on 750k states.
-
-Use representative experiments to determine the SMALLEST sufficient
-production-balanced training budget.
-
-Suggested strategy:
-
-    normal layer budget ~64k-128k
-    hard/problem layers escalate selectively
-    hard-token continuation only where needed
-
-Avoid wasting full 750k-scale optimization on easy layers.
-
-Use the existing resumable layer-major teacher/capture architecture.
-
-Maintain:
-
-    clean commit
-        ->
-    guarded execution
-        ->
-    receipt
-        ->
-    checkpoint hash
-        ->
-    report commit
-
-for decisive runs.
-
-No science solely in an uncommitted tree.
+Phase 01 success must not erase Phase 02 corpus requirements.
 
 ======================================================================
-14. PHASE 7 — BF16 MODEL ASSEMBLY
+DO NOT DO THESE THINGS
 ======================================================================
 
-Assemble a complete unquantized sparse model first.
-
-Preserve all non-FFN tensors exactly unless required format conversion is
-proven equivalent.
-
-Verify:
-
-    all 64 FFNs replaced as intended
-    topology inventory
-    tensor inventory
-    model config
-    tokenizer/chat template
-    generation config
-    checkpoint load
-    representative forward tests
-    exact preserved tensor hashes where practical
-
-Produce a canonical:
-
-    BF16_SPARSE_MASTER
-
-Do not quantize an unvalidated research checkpoint.
+Do NOT:
+  - tune on historical holdout
+  - open historical holdout
+  - use validation B/C as optimizer data
+  - resume rolling replay
+  - touch layer30+ replay
+  - run representative 12 layers
+  - run full64 conversion
+  - train p32/top5
+  - reactivate p32/top4
+  - change source checkpoint/revision
+  - alter attention
+  - optimize reasoning length
+  - modify generation policy
+  - claim synthetic evidence is scientific evidence
+  - fabricate Windows/CUDA receipts
+  - silently use Linux/WSL as authoritative fallback
 
 ======================================================================
-15. PHASE 8 — WHOLE-MODEL VALIDATION
+TEST REQUIREMENTS
 ======================================================================
 
-Evaluate BF16_SPARSE_MASTER against dense source.
+Add focused unit/integration tests covering at least:
 
-Include:
+1. synthetic smoke runs
+2. synthetic smoke is marked non-promotable
+3. Phase 01 rejects synthetic receipt
+4. Phase 01 rejects wrong model
+5. Phase 01 rejects wrong revision
+6. Phase 01 rejects wrong model type
+7. Phase 01 rejects layer != 0
+8. Phase 01 rejects hidden != 5120
+9. Phase 01 rejects intermediate != 17408
+10. Phase 01 rejects invalid shard hash
+11. Phase 01 rejects missing runtime lock
+12. Phase 01 rejects Windows runtime drift
+13. Phase 01 rejects evaluation/benchmark contamination
+14. real capture receipt accepts a deterministic small fixture
+15. mmap/sharded input loading does not eagerly materialize entire dataset
+16. optimizer does zero steps on any failed preflight gate
+17. real runner distinguishes tokens/samples from raw rows
+18. checkpoint/result receipt reload and hash verification
+19. method-proof receipt remains FIT-TRAIN-only
+20. phase state machine cannot skip required prerequisites
 
-A. MODEL-DISTRIBUTION METRICS
+Keep tests lightweight by using explicit fixture receipts and tiny tensor
+fixtures where real Qwen execution is unnecessary.
 
-    perplexity delta
-    token KL
-    top1 agreement
-
-B. CODING / AGENTIC BEHAVIOR
-
-Use tasks/repositories that are absent from Corpus V2.1 optimization splits.
-
-Cover:
-
-    code generation
-    bug fixing
-    repository navigation
-    multi-file edit
-    tests
-    compiler/runtime failure
-    retry/recovery
-    terminal interaction
-    JSON/tool calls
-    long-context code
-    multi-turn agent sequences
-
-C. GENERAL PRESERVATION
-
-Use general/STEM/OOD canaries.
-
-Do not optimize against the official holdout.
-
-Official holdout becomes eligible only after robust pre-holdout evidence.
-
-Use it once for finalist confirmation under the established project policy.
+Real Qwen/CUDA tests should be separately marked/invoked.
 
 ======================================================================
-16. PHASE 9 — QUANTIZATION READINESS IN PARALLEL
+DOCUMENTATION UPDATES
 ======================================================================
 
-Do not wait until the final day to discover that the target runtime cannot
-represent the new MoE.
+Update:
+  docs/REAL_D2M_PLAN.md
 
-Once PHASE 2 method proof is green, start a PARALLEL NON-BLOCKING engineering
-track for:
+and any other affected docs.
 
-    sparse model serialization
-    runtime support
-    quantization backend compatibility
-    expert tensor layout
-    router precision requirements
-    shared-expert precision requirements
+Clearly distinguish:
 
-Do NOT spend large compute quantizing research candidates.
+  SYNTHETIC SMOKE
+    implementation-only
+    not scientific evidence
 
-This track should answer:
+from:
 
-    what inference runtime will load this sparse architecture?
-    what quantized formats can represent the topology?
-    what tensors must remain BF16/FP16?
-    what tooling changes are needed?
+  REAL METHOD PROOF
+    actual Qwen layer-0 capture-backed evidence
 
-Avoid binding the project to GGUF, GPTQ, AWQ, EXL2, or another format before
-repository/runtime discovery establishes compatibility.
+Document canonical Windows commands for:
 
-======================================================================
-17. PHASE 10 — QUANTIZATION
-======================================================================
+  Phase 00A runtime qualification
+  Phase 00B method-proof data preparation
+  real layer-0 capture
+  p16 2k
+  p16 4k
+  p16 32k
 
-Once BF16_SPARSE_MASTER passes whole-model gates:
+Remove or correct any example implying that:
 
-freeze it.
+  run_oracle_routed_basis_refinement.py --rows 32768
 
-Quantize from that exact checkpoint.
-
-Start conservatively:
-
-    higher precision / Q8-like baseline if supported
-
-then test more aggressive expert-weight quantization.
-
-Prefer keeping numerically sensitive components higher precision initially:
-
-    router
-    routing coefficients/scales
-    norms
-    other tiny/high-sensitivity tensors
-
-Measure BOTH:
-
-    Dense -> BF16 MoE degradation
-
-and
-
-    BF16 MoE -> Quantized MoE incremental degradation
-
-Do not hide distillation loss inside quantization loss.
-
-Produce at least one practical quantized candidate that remains inside the
-accepted whole-model quality envelope.
+on the tiny fixture is a real p16 method proof.
 
 ======================================================================
-18. FEATURE-COMPLETION DEFINITION
+IMPLEMENTATION QUALITY
 ======================================================================
 
-D2M is FEATURE-COMPLETE when a clean checkout can reproducibly execute the
-full path:
+Prefer reuse over parallel infrastructure.
 
-    source model verification
-        ->
-    corpus verification
-        ->
-    balanced teacher capture
-        ->
-    oracle-routed basis refinement
-        ->
-    load refinement
-        ->
-    selector training
-        ->
-    representative validation
-        ->
-    full64 conversion
-        ->
-    sparse model assembly
-        ->
-    BF16 validation
-        ->
-    quantization
-        ->
-    quantized validation
+Before adding new code, inspect:
+  scripts/
+  src/dense2moe/
+  src/dense2moe/training/
+  existing streaming_teacher / teacher capture implementation
+  existing capture manifests
+  existing provenance utilities
+  existing hash/receipt utilities
+  existing partition loaders
+  existing mmap contribution-store code
 
-without inventing a new ad-hoc script for every layer/phase.
+Avoid duplicate:
+  hashing
+  receipt validation
+  runtime checking
+  model geometry constants
+  teacher FFN math
 
-Integrate with the project's existing control plane where appropriate rather
-than creating unnecessary parallel orchestration.
+Centralize contracts when reasonable.
 
-All major stages must be:
+Use atomic receipt writes where existing utilities support them.
 
-    resumable
-    receipt-bearing
-    hash/fingerprint aware
-    failure-safe
-    provenance aware
+Use mmap/streaming for large arrays.
+
+Do not introduce a "quick workaround" that creates another ambiguous path.
 
 ======================================================================
-19. RESEARCH-BUDGET / DRIFT RULES
+COMMIT PLAN
 ======================================================================
 
-Every research run must do at least one:
+Keep the work reviewable.
 
-    materially improve a candidate
-    falsify a specific hypothesis
-    remove a blocker on the path to the finished model
+Suggested commits:
 
-Do not perform repetitive no-op refinements.
+Commit 1:
+  "Separate synthetic oracle smoke from method proof"
 
-A failed experiment must record:
+Contents:
+  runner rename/refactor
+  synthetic evidence class
+  phase rejection
+  tests
 
-    hypothesis
-    prediction
-    result
-    falsifier outcome
-    next decision
+Commit 2:
+  "Add real Qwen layer0 method-proof capture contract"
 
-Maximum two materially similar retries without a new hypothesis.
+Contents:
+  capture receipt schema
+  validation
+  streaming/mmap integration
+  tests
 
-Do not respond to a failed shadow by repeatedly tuning on that shadow.
+Commit 3:
+  "Add capture-backed p16 method-proof runner"
 
-Do not let infrastructure polishing consume multiple passes once environment
-and corpus gates are green.
+Contents:
+  real runner
+  preflight gate
+  metrics/receipts
+  tests
 
-EXPECTED PACING:
+Commit 4:
+  "Wire real method proof into phase orchestration"
 
-Pass 1:
-    V2.1 + environment + tests + small capture/oracle smoke
+Contents:
+  phase states
+  prerequisite validation
+  docs
+  tests
 
-Pass 2:
-    real 32k p16 method-proof experiment
+Do not squash these unless there is a strong reason.
 
-Pass 3:
-    128k p16 if green trajectory
+After each commit:
+  git status --short
+  run focused tests
 
-Pass 4:
-    larger p16 run / joint-load work
-
-Then:
-    selector + robust promotion
-    p32 transfer
-    representative layers
-    full64
-
-If execution diverges materially from that pacing, document why.
-
-======================================================================
-20. PARALLELISM
-======================================================================
-
-Once a phase has stable contracts, use independent work packages where useful.
-
-Potential parallel tracks:
-
-A. DISTILLATION SCIENCE
-    p16 / p32 basis + selector
-
-B. PRODUCTIZATION
-    assembly / serialization / runtime compatibility
-
-C. EVALUATION
-    clean coding-agent and whole-model harness
-
-D. QUANTIZATION READINESS
-    format/runtime spike
-
-Do not let parallel productization mutate the scientific training contract.
-
-Use path claims/run isolation under NSP.
+Before scientific execution:
+  full relevant test suite
+  clean tree
+  record git SHA
 
 ======================================================================
-21. REQUIRED CLOSEOUT ARTIFACTS PER PHASE
+NATIVE WINDOWS EXECUTION SEQUENCE
 ======================================================================
 
-Every phase closeout records:
+Once implementation is committed and tests are green, and ONLY if actually
+running on native Windows with the source checkpoint/captures available:
 
-    actual code HEAD
-    clean/dirty status
-    commands
-    tests
-    data hashes
-    checkpoint hashes
-    metrics
-    prediction result
-    gate decision
-    shadow sets opened
-    holdout opened
-    replay started
-    residual risks
-    exact next phase
+1. Confirm clean state:
+     git status --short
+     git rev-parse HEAD
 
-Do not claim:
+2. Run guarded-command Windows smoke.
 
-    fixed
-    complete
-    green
-    ready
+3. Run environment doctor.
 
-without fresh evidence.
+4. Create/verify approved runtime lock.
 
-======================================================================
-22. HOLDOUT / REPLAY RULES
-======================================================================
+5. Prepare METHOD_PROOF_ONLY data:
+     & .\.venv\Scripts\python.exe scripts\prepare_method_proof_data.py `
+       --corpus-manifest data\public_v21\corpus-v2.1.jsonl `
+       --output <NEW_PHASE_00B_RUN>\method-proof `
+       --min-tokens 32768 `
+       --json
 
-Until explicitly promoted:
+6. Verify receipt hashes.
 
-    official holdout = CLOSED
-    historical opened holdout = IMMUTABLE / NO TUNING
-    representative replay = BLOCKED
-    full64 replay = BLOCKED
+7. Capture REAL Qwen layer-0 activations from those exact records using the
+   new/reused capture path.
 
-Representative replay unblocks only after:
+8. Verify capture receipt/shards.
 
-    robust p16 method + training lock
+9. Run real p16/top4 2k method proof.
 
-Full64 p16 unblocks only after:
+10. Review metrics.
+    If numerically broken or directionally bad:
+      STOP and diagnose.
 
-    representative layer gate
+11. Run real p16/top4 4k method proof.
 
-Official holdout unblocks only for a selected whole-model finalist under the
-existing project policy.
+12. Review 2k vs 4k.
+    If improvement fails to repeat:
+      STOP and diagnose.
+
+13. Run real p16/top4 >=32k method proof.
+
+14. Produce a final Phase 01 method-proof synthesis report.
+
+15. DO NOT continue to Phase 02 automatically.
 
 ======================================================================
-23. PLANNING / PREDICTION DISCIPLINE
+FINAL REPORT REQUIRED
 ======================================================================
 
-For each phase during Plan:
+When finished, provide a concise but complete handoff containing:
 
-choose prediction depth:
-
-    none
-    compact
-    expanded
-
-Use expanded prediction for:
-
-    new distillation method
-    corpus/split changes
-    representative transfer
-    full64 conversion
-    model assembly
-    quantization
-
-During Validate compare observations to the activated Prediction Contract and
-record exactly one semantic Prediction Result classifier.
-
-A:
-
-    scope-discovery
-    counterexample
-    invalid-validation
-
-result reopens/blocks Discovery and requires repair/replan.
-
-Do not advance while a material contradiction remains unresolved.
-
-======================================================================
-24. SUCCESS GOAL
-======================================================================
-
-Near-term success:
-
-    prove the V2.1 oracle-routed p16 training method with a real 32k GPU pilot.
-
-Medium-term success:
-
-    robust-green p16 layer-0
-    training-method lock
-    p32/top5 strong candidate
-    12 representative layers
-
-Product success:
-
-    complete 64-layer p16 fallback
-    validated BF16 sparse Qwen3.8 derivative
-    at least one validated quantized artifact
-
-Preferred product success:
-
-    p32/top5 also reaches robust-green and produces a validated higher-sparsity
-    BF16 + quantized model.
-
-The project must always retain a clear path to the p16 fallback.
+1. Final git SHA
+2. Commit list created
+3. Files changed
+4. Tests run and results
+5. Whether execution environment was native Windows
+6. Runtime lock status/hash
+7. Method-proof data receipt/hash
+8. Real layer-0 capture receipt/hash
+9. Capture tensor shapes/counts
+10. 2k metrics
+11. 4k metrics
+12. 32k metrics
+13. Before/after reconstruction comparison
+14. Oracle ceiling comparison
+15. Expert load/dead-expert summary
+16. Any resource/runtime observations
+17. Phase 01 decision:
+      GREEN
+      YELLOW
+      FAILED
+      or BLOCKED
+18. Exact blocker if not green
+19. Explicit confirmation:
+      historical holdout was NOT opened
+      historical replay was NOT resumed
+      p32 was NOT run
+      representative layers were NOT run
+      full64 was NOT run
 
 ======================================================================
-25. FIRST EXECUTION PHASE
+AUTONOMY
 ======================================================================
 
-Begin with PHASE 0 only.
+Proceed autonomously through bounded implementation and tests.
 
-Do not immediately start the 750k capture.
+Do not ask for permission between normal coding/test steps.
 
-PHASE 0 output must include:
+Pause only for:
+  - destructive action
+  - source/provenance ambiguity
+  - unexpected historical artifact mutation
+  - inability to identify the existing exact teacher path
+  - native Windows/runtime-lock failure
+  - missing pinned source checkpoint
+  - major GPU/resource blocker
+  - scientific result that invalidates the planned next stage
 
-1. NSP discovery receipt / Repository Fact Ledger.
-2. Reconciled current state and HEAD.
-3. Corpus V2.1 freeze.
-4. Benchmark-derived task quarantine.
-5. Agent-task diversity expansion.
-6. Final split/overlap/tokenization receipts.
-7. Recovered and pinned native-Windows ML environment.
-8. Environment doctor output.
-9. Full relevant ML tests.
-10. Exact PHASE 1 commands for:
-       small balanced teacher capture
-       p16 oracle smoke
-       2k-4k method smoke
-       32k method-proof pilot
+The priority is not to make the pipeline appear green.
 
-Then return control/evidence to the EPIC owner.
-
-Do NOT skip directly into large training before PHASE 0 gates are green.
+The priority is to make it impossible for synthetic evidence to masquerade as
+real Qwen evidence, then obtain the first provenance-safe, capture-backed,
+real layer-0 p16/top4 method proof.

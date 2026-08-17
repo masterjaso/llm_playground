@@ -1,0 +1,25 @@
+{
+  "argv": [
+    "C:\\workplace\\llm_playground\\.venv\\Scripts\\python.exe",
+    "-c",
+    "import time; print('child-progress-start', flush=True); time.sleep(60); print('child-progress-done', flush=True)"
+  ],
+  "child_output_stale": false,
+  "completed": 0,
+  "elapsed_seconds": 60.13261319999583,
+  "last_child_output_age_seconds": 0.10654750000685453,
+  "last_child_output_at": "2026-08-17T15:32:24.841924+00:00",
+  "last_heartbeat": "2026-08-17T15:32:24.948268+00:00",
+  "output_lines_dropped": 0,
+  "pid": 33836,
+  "returncode": 0,
+  "started": "2026-08-17T15:31:24.815789+00:00",
+  "status": "SUCCESS",
+  "stderr_bytes": 0,
+  "stderr_log_path": "C:\\workplace\\llm_playground\\runs\\guarded-command-smoke\\heartbeat.stderr.log",
+  "stdout_bytes": 41,
+  "stdout_log_path": "C:\\workplace\\llm_playground\\runs\\guarded-command-smoke\\heartbeat.stdout.log",
+  "task": "windows-smoke-heartbeat",
+  "terminal_status": "DONE",
+  "total": null
+}

@@ -1,0 +1,1522 @@
+{
+  "code_commit": "b8524095fc4d078dbd0a6494a07dceae42422699",
+  "method_proof_receipt": "runs\\20260817-windows-real-method-proof-00b\\method-proof\\receipt.json",
+  "receipt": "runs\\20260817-windows-real-method-proof-01\\capture\\real-qwen-layer0-receipt.json",
+  "receipt_sha256": "c88f08eda79a2d01fe46b3e20c861e1759d67088d7790d802a242b0f6160afa1",
+  "status": "REAL_QWEN_LAYER_CAPTURE_READY",
+  "stream": {
+    "attention_implementation": "sdpa",
+    "code_commit": "8062dcccf6d2b94acd40fa03dc862ec462af58e3",
+    "compute_dtype": "bfloat16",
+    "dataset_hash": "da81b975d3eca1183db97ea6aa3fed9ffba15b997ad9f97cf60efd801b22ae7f",
+    "device": "cuda:1",
+    "examples": 20,
+    "final_stage": {
+      "capture_manifest": "runs\\20260817-windows-real-method-proof-01\\capture\\layer-0000-FIT-TRAIN.json",
+      "code_commit": "8062dcccf6d2b94acd40fa03dc862ec462af58e3",
+      "count": 36939,
+      "dataset_hash": "da81b975d3eca1183db97ea6aa3fed9ffba15b997ad9f97cf60efd801b22ae7f",
+      "metadata": {
+        "activation_bytes_written": 756514384,
+        "compute_seconds": 9.825561300036497,
+        "hidden_bytes_read": 378854536,
+        "hidden_bytes_written": 378854536,
+        "kind": "native_qwen3_5_decoder_layer",
+        "layer": 0,
+        "layer_receipt": {
+          "attention_implementation": "sdpa",
+          "compute_dtype": "bfloat16",
+          "layer": 0,
+          "source_bytes": 766546368,
+          "source_index_hash": "77042094076611b69791a610065f28b7013b8c621795fa86ddccc8bac7d1b9df",
+          "source_tensor_count": 14,
+          "source_tensor_hashes": [
+            {
+              "dtype": "bfloat16",
+              "sha256": "91767f47282a7a9d90fbe77c8fdc5b98aab09b9cd6c1021522d7514ba43ac71f",
+              "shape": [
+                5120
+              ],
+              "source_name": "model.language_model.layers.0.input_layernorm.weight",
+              "source_shard": "model-00001-of-00018.safetensors"
+            },
+            {
+              "dtype": "bfloat16",
+              "sha256": "53d79a7c7ab8260a4455b7c52b662fe81cd00109ff4c8c642730b4228dd06a8b",
+              "shape": [
+                48
+              ],
+              "source_name": "model.language_model.layers.0.linear_attn.A_log",
+              "source_shard": "model-00001-of-00018.safetensors"
+            },
+            {
+              "dtype": "bfloat16",
+              "sha256": "32af1caf05b7d1a6f501ef8c6057394068c7089ee051d9bb7ea6881e627e09c3",
+              "shape": [
+                10240,
+                1,
+                4
+              ],
+              "source_name": "model.language_model.layers.0.linear_attn.conv1d.weight",
+              "source_shard": "model-00001-of-00018.safetensors"
+            },
+            {
+              "dtype": "bfloat16",
+              "sha256": "176bb9f23604787c76d2de2b4a67100e4852f80de42c066f74858a4c1ee7ff0e",
+              "shape": [
+                48
+              ],
+              "source_name": "model.language_model.layers.0.linear_attn.dt_bias",
+              "source_shard": "model-00001-of-00018.safetensors"
+            },
+            {
+              "dtype": "bfloat16",
+              "sha256": "28aefac533cea08864390a8708abae15476b06004c60515b07900acad00b0070",
+              "shape": [
+                48,
+                5120
+              ],
+              "source_name": "model.language_model.layers.0.linear_attn.in_proj_a.weight",
+              "source_shard": "model-00001-of-00018.safetensors"
+            },
+            {
+              "dtype": "bfloat16",
+              "sha256": "a1c2bd2ae0195457c93ec97df7e6c6505db7221bc04a3ccfb995ed925f4af208",
+              "shape": [
+                48,
+                5120
+              ],
+              "source_name": "model.language_model.layers.0.linear_attn.in_proj_b.weight",
+              "source_shard": "model-00001-of-00018.safetensors"
+            },
+            {
+              "dtype": "bfloat16",
+              "sha256": "1d70fcfa37dbc8d0abf4b624b88e1bd065985e0cfb19a46778ca068327004e12",
+              "shape": [
+                10240,
+                5120
+              ],
+              "source_name": "model.language_model.layers.0.linear_attn.in_proj_qkv.weight",
+              "source_shard": "model-00001-of-00018.safetensors"
+            },
+            {
+              "dtype": "bfloat16",
+              "sha256": "fb06226fec5702f1ea1099398e4e37b28993df210e0546e33573c55271dc4b05",
+              "shape": [
+                6144,
+                5120
+              ],
+              "source_name": "model.language_model.layers.0.linear_attn.in_proj_z.weight",
+              "source_shard": "model-00001-of-00018.safetensors"
+            },
+            {
+              "dtype": "bfloat16",
+              "sha256": "c3ae00ea947b686f6e7fc7c3075f7316a0ae286b12b839bda0f988453c761aec",
+              "shape": [
+                128
+              ],
+              "source_name": "model.language_model.layers.0.linear_attn.norm.weight",
+              "source_shard": "model-00001-of-00018.safetensors"
+            },
+            {
+              "dtype": "bfloat16",
+              "sha256": "486a9d9193114e10fe15b80410b8ebd9ed564e53ccdb23c82910d91b90589cef",
+              "shape": [
+                5120,
+                6144
+              ],
+              "source_name": "model.language_model.layers.0.linear_attn.out_proj.weight",
+              "source_shard": "model-00001-of-00018.safetensors"
+            },
+            {
+              "dtype": "bfloat16",
+              "sha256": "d3a021babe82ddcd9552530a7461379e84862bf85d7fbfe7954d6c4543795993",
+              "shape": [
+                5120,
+                17408
+              ],
+              "source_name": "model.language_model.layers.0.mlp.down_proj.weight",
+              "source_shard": "model-00001-of-00018.safetensors"
+            },
+            {
+              "dtype": "bfloat16",
+              "sha256": "3d79a5cf4201aed36362e0db31831b11ea8e9fec255197480e059c40a4318926",
+              "shape": [
+                17408,
+                5120
+              ],
+              "source_name": "model.language_model.layers.0.mlp.gate_proj.weight",
+              "source_shard": "model-00001-of-00018.safetensors"
+            },
+            {
+              "dtype": "bfloat16",
+              "sha256": "56cd20cdf49cb0e64af2069d19137f279d73bbe48f36c16212e029acd4d18ac5",
+              "shape": [
+                17408,
+                5120
+              ],
+              "source_name": "model.language_model.layers.0.mlp.up_proj.weight",
+              "source_shard": "model-00001-of-00018.safetensors"
+            },
+            {
+              "dtype": "bfloat16",
+              "sha256": "f608aafd0e8670aa3db3306d7e912e4f775db866927ea023ec944f5dde1a3c11",
+              "shape": [
+                5120
+              ],
+              "source_name": "model.language_model.layers.0.post_attention_layernorm.weight",
+              "source_shard": "model-00001-of-00018.safetensors"
+            }
+          ]
+        },
+        "load_seconds": 3.2091127999592572,
+        "peak_vram_bytes": 1469683200,
+        "read_seconds": 0.009550400078296661,
+        "source_weight_bytes": 766546368,
+        "tokens_per_second": 3759.367161079963,
+        "write_seconds": 4.652826799836475
+      },
+      "schema_version": 1,
+      "shards": [
+        {
+          "bytes": 21004696,
+          "count": 2048,
+          "dataset_hash": "da81b975d3eca1183db97ea6aa3fed9ffba15b997ad9f97cf60efd801b22ae7f",
+          "dtype": "bfloat16",
+          "example_count": 1,
+          "path": "shard-00000.safetensors",
+          "records": [
+            {
+              "chunk_index": 0,
+              "content_sha256": "bf72cfb44f5983e663ace06438579c79c0ad1b846dba1f484a7a0fe3ae1e9169",
+              "example_id": "0367aa876b6f6025b6a7642349d3b541",
+              "length": 2048,
+              "offset": 0,
+              "source_record_index": 135,
+              "split": "FIT-TRAIN"
+            }
+          ],
+          "sha256": "927d32677c37339acf120d6f56db45f953b0de15a59c9b1d6269528bccc0d635",
+          "shape": [
+            1,
+            2048,
+            5120
+          ],
+          "shard_id": 0,
+          "source_revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
+          "stage": 1
+        },
+        {
+          "bytes": 21004696,
+          "count": 2048,
+          "dataset_hash": "da81b975d3eca1183db97ea6aa3fed9ffba15b997ad9f97cf60efd801b22ae7f",
+          "dtype": "bfloat16",
+          "example_count": 1,
+          "path": "shard-00001.safetensors",
+          "records": [
+            {
+              "chunk_index": 1,
+              "content_sha256": "bf72cfb44f5983e663ace06438579c79c0ad1b846dba1f484a7a0fe3ae1e9169",
+              "example_id": "0367aa876b6f6025b6a7642349d3b541",
+              "length": 2048,
+              "offset": 0,
+              "source_record_index": 135,
+              "split": "FIT-TRAIN"
+            }
+          ],
+          "sha256": "7050cb6ba1141429a8ace4bed1956a1899af64867538b52c9f555a056796f7c0",
+          "shape": [
+            1,
+            2048,
+            5120
+          ],
+          "shard_id": 1,
+          "source_revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
+          "stage": 1
+        },
+        {
+          "bytes": 21004696,
+          "count": 2048,
+          "dataset_hash": "da81b975d3eca1183db97ea6aa3fed9ffba15b997ad9f97cf60efd801b22ae7f",
+          "dtype": "bfloat16",
+          "example_count": 1,
+          "path": "shard-00002.safetensors",
+          "records": [
+            {
+              "chunk_index": 2,
+              "content_sha256": "bf72cfb44f5983e663ace06438579c79c0ad1b846dba1f484a7a0fe3ae1e9169",
+              "example_id": "0367aa876b6f6025b6a7642349d3b541",
+              "length": 2048,
+              "offset": 0,
+              "source_record_index": 135,
+              "split": "FIT-TRAIN"
+            }
+          ],
+          "sha256": "26edabf4a35e042eae177639abd8938ef1c996d26bc881516b997189663e4693",
+          "shape": [
+            1,
+            2048,
+            5120
+          ],
+          "shard_id": 2,
+          "source_revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
+          "stage": 1
+        },
+        {
+          "bytes": 21004696,
+          "count": 2048,
+          "dataset_hash": "da81b975d3eca1183db97ea6aa3fed9ffba15b997ad9f97cf60efd801b22ae7f",
+          "dtype": "bfloat16",
+          "example_count": 1,
+          "path": "shard-00003.safetensors",
+          "records": [
+            {
+              "chunk_index": 3,
+              "content_sha256": "bf72cfb44f5983e663ace06438579c79c0ad1b846dba1f484a7a0fe3ae1e9169",
+              "example_id": "0367aa876b6f6025b6a7642349d3b541",
+              "length": 2048,
+              "offset": 0,
+              "source_record_index": 135,
+              "split": "FIT-TRAIN"
+            }
+          ],
+          "sha256": "6abda1b5739363856847ae50f88383e2e3f8b9772caa21948c0283fb6fc712b0",
+          "shape": [
+            1,
+            2048,
+            5120
+          ],
+          "shard_id": 3,
+          "source_revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
+          "stage": 1
+        },
+        {
+          "bytes": 21004696,
+          "count": 2048,
+          "dataset_hash": "da81b975d3eca1183db97ea6aa3fed9ffba15b997ad9f97cf60efd801b22ae7f",
+          "dtype": "bfloat16",
+          "example_count": 1,
+          "path": "shard-00004.safetensors",
+          "records": [
+            {
+              "chunk_index": 4,
+              "content_sha256": "bf72cfb44f5983e663ace06438579c79c0ad1b846dba1f484a7a0fe3ae1e9169",
+              "example_id": "0367aa876b6f6025b6a7642349d3b541",
+              "length": 2048,
+              "offset": 0,
+              "source_record_index": 135,
+              "split": "FIT-TRAIN"
+            }
+          ],
+          "sha256": "c134881d57b3cb306f12a8a17b3a7169c887e22d79d9af591f7f4c5b80258d64",
+          "shape": [
+            1,
+            2048,
+            5120
+          ],
+          "shard_id": 4,
+          "source_revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
+          "stage": 1
+        },
+        {
+          "bytes": 2718240,
+          "count": 265,
+          "dataset_hash": "da81b975d3eca1183db97ea6aa3fed9ffba15b997ad9f97cf60efd801b22ae7f",
+          "dtype": "bfloat16",
+          "example_count": 1,
+          "path": "shard-00005.safetensors",
+          "records": [
+            {
+              "chunk_index": 5,
+              "content_sha256": "bf72cfb44f5983e663ace06438579c79c0ad1b846dba1f484a7a0fe3ae1e9169",
+              "example_id": "0367aa876b6f6025b6a7642349d3b541",
+              "length": 265,
+              "offset": 0,
+              "source_record_index": 135,
+              "split": "FIT-TRAIN"
+            }
+          ],
+          "sha256": "6293b0cda5abcb38e55d5351c1bf2230750cd6b20df73a0f721c88c52c1edd8b",
+          "shape": [
+            1,
+            265,
+            5120
+          ],
+          "shard_id": 5,
+          "source_revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
+          "stage": 1
+        },
+        {
+          "bytes": 21004696,
+          "count": 2048,
+          "dataset_hash": "da81b975d3eca1183db97ea6aa3fed9ffba15b997ad9f97cf60efd801b22ae7f",
+          "dtype": "bfloat16",
+          "example_count": 1,
+          "path": "shard-00006.safetensors",
+          "records": [
+            {
+              "chunk_index": 0,
+              "content_sha256": "09b43dec680e9c5afc3ce2854e40eb3c5b5b4894832652919254031a63df641b",
+              "example_id": "0d9883535b67f5f5c6ec0ab3fae7a500",
+              "length": 2048,
+              "offset": 0,
+              "source_record_index": 155,
+              "split": "FIT-TRAIN"
+            }
+          ],
+          "sha256": "bf8479ca346ff7bf693931ee9636fbeec053b147042681d332a08559a212f62f",
+          "shape": [
+            1,
+            2048,
+            5120
+          ],
+          "shard_id": 6,
+          "source_revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
+          "stage": 1
+        },
+        {
+          "bytes": 6461688,
+          "count": 630,
+          "dataset_hash": "da81b975d3eca1183db97ea6aa3fed9ffba15b997ad9f97cf60efd801b22ae7f",
+          "dtype": "bfloat16",
+          "example_count": 1,
+          "path": "shard-00007.safetensors",
+          "records": [
+            {
+              "chunk_index": 1,
+              "content_sha256": "09b43dec680e9c5afc3ce2854e40eb3c5b5b4894832652919254031a63df641b",
+              "example_id": "0d9883535b67f5f5c6ec0ab3fae7a500",
+              "length": 630,
+              "offset": 0,
+              "source_record_index": 155,
+              "split": "FIT-TRAIN"
+            }
+          ],
+          "sha256": "94d9d9f1978a97ce12849ddcbe7640760be016df3911e126a20ed4cd023d8a7f",
+          "shape": [
+            1,
+            630,
+            5120
+          ],
+          "shard_id": 7,
+          "source_revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
+          "stage": 1
+        },
+        {
+          "bytes": 21004696,
+          "count": 2048,
+          "dataset_hash": "da81b975d3eca1183db97ea6aa3fed9ffba15b997ad9f97cf60efd801b22ae7f",
+          "dtype": "bfloat16",
+          "example_count": 1,
+          "path": "shard-00008.safetensors",
+          "records": [
+            {
+              "chunk_index": 0,
+              "content_sha256": "536039291ff42e4d8e031af00ced031e577c032709bef56455c2e9351db4c60f",
+              "example_id": "0efe14e5610b717a145c57420fc5e21b",
+              "length": 2048,
+              "offset": 0,
+              "source_record_index": 157,
+              "split": "FIT-TRAIN"
+            }
+          ],
+          "sha256": "495bacf38058c04bb78aad71e501b831ef7a31a74423135369a123ed29ffc52c",
+          "shape": [
+            1,
+            2048,
+            5120
+          ],
+          "shard_id": 8,
+          "source_revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
+          "stage": 1
+        },
+        {
+          "bytes": 21004696,
+          "count": 2048,
+          "dataset_hash": "da81b975d3eca1183db97ea6aa3fed9ffba15b997ad9f97cf60efd801b22ae7f",
+          "dtype": "bfloat16",
+          "example_count": 1,
+          "path": "shard-00009.safetensors",
+          "records": [
+            {
+              "chunk_index": 1,
+              "content_sha256": "536039291ff42e4d8e031af00ced031e577c032709bef56455c2e9351db4c60f",
+              "example_id": "0efe14e5610b717a145c57420fc5e21b",
+              "length": 2048,
+              "offset": 0,
+              "source_record_index": 157,
+              "split": "FIT-TRAIN"
+            }
+          ],
+          "sha256": "53b1e861dee4cd067aeffdb94b32372ed7599b08f5a772926b3cd2661b0f4b5d",
+          "shape": [
+            1,
+            2048,
+            5120
+          ],
+          "shard_id": 9,
+          "source_revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
+          "stage": 1
+        },
+        {
+          "bytes": 21004696,
+          "count": 2048,
+          "dataset_hash": "da81b975d3eca1183db97ea6aa3fed9ffba15b997ad9f97cf60efd801b22ae7f",
+          "dtype": "bfloat16",
+          "example_count": 1,
+          "path": "shard-00010.safetensors",
+          "records": [
+            {
+              "chunk_index": 2,
+              "content_sha256": "536039291ff42e4d8e031af00ced031e577c032709bef56455c2e9351db4c60f",
+              "example_id": "0efe14e5610b717a145c57420fc5e21b",
+              "length": 2048,
+              "offset": 0,
+              "source_record_index": 157,
+              "split": "FIT-TRAIN"
+            }
+          ],
+          "sha256": "b52afe1930beef4ed1d11302def3c9329c5284ce1273104100026095453c8425",
+          "shape": [
+            1,
+            2048,
+            5120
+          ],
+          "shard_id": 10,
+          "source_revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
+          "stage": 1
+        },
+        {
+          "bytes": 21004696,
+          "count": 2048,
+          "dataset_hash": "da81b975d3eca1183db97ea6aa3fed9ffba15b997ad9f97cf60efd801b22ae7f",
+          "dtype": "bfloat16",
+          "example_count": 1,
+          "path": "shard-00011.safetensors",
+          "records": [
+            {
+              "chunk_index": 3,
+              "content_sha256": "536039291ff42e4d8e031af00ced031e577c032709bef56455c2e9351db4c60f",
+              "example_id": "0efe14e5610b717a145c57420fc5e21b",
+              "length": 2048,
+              "offset": 0,
+              "source_record_index": 157,
+              "split": "FIT-TRAIN"
+            }
+          ],
+          "sha256": "ae7d088c93b284d9e3d8dc4c772174367d624e78ab3866fc6c89302aaa088b39",
+          "shape": [
+            1,
+            2048,
+            5120
+          ],
+          "shard_id": 11,
+          "source_revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
+          "stage": 1
+        },
+        {
+          "bytes": 21004696,
+          "count": 2048,
+          "dataset_hash": "da81b975d3eca1183db97ea6aa3fed9ffba15b997ad9f97cf60efd801b22ae7f",
+          "dtype": "bfloat16",
+          "example_count": 1,
+          "path": "shard-00012.safetensors",
+          "records": [
+            {
+              "chunk_index": 4,
+              "content_sha256": "536039291ff42e4d8e031af00ced031e577c032709bef56455c2e9351db4c60f",
+              "example_id": "0efe14e5610b717a145c57420fc5e21b",
+              "length": 2048,
+              "offset": 0,
+              "source_record_index": 157,
+              "split": "FIT-TRAIN"
+            }
+          ],
+          "sha256": "85d80878bd762c1e7a92112cdb778d57efd8a19ab4e25ffc00b1148c1e316efd",
+          "shape": [
+            1,
+            2048,
+            5120
+          ],
+          "shard_id": 12,
+          "source_revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
+          "stage": 1
+        },
+        {
+          "bytes": 21004696,
+          "count": 2048,
+          "dataset_hash": "da81b975d3eca1183db97ea6aa3fed9ffba15b997ad9f97cf60efd801b22ae7f",
+          "dtype": "bfloat16",
+          "example_count": 1,
+          "path": "shard-00013.safetensors",
+          "records": [
+            {
+              "chunk_index": 5,
+              "content_sha256": "536039291ff42e4d8e031af00ced031e577c032709bef56455c2e9351db4c60f",
+              "example_id": "0efe14e5610b717a145c57420fc5e21b",
+              "length": 2048,
+              "offset": 0,
+              "source_record_index": 157,
+              "split": "FIT-TRAIN"
+            }
+          ],
+          "sha256": "c8b94cd5a8ea4332f3e03934b05115953c36c14ea084916536558a4235609c39",
+          "shape": [
+            1,
+            2048,
+            5120
+          ],
+          "shard_id": 13,
+          "source_revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
+          "stage": 1
+        },
+        {
+          "bytes": 21004696,
+          "count": 2048,
+          "dataset_hash": "da81b975d3eca1183db97ea6aa3fed9ffba15b997ad9f97cf60efd801b22ae7f",
+          "dtype": "bfloat16",
+          "example_count": 1,
+          "path": "shard-00014.safetensors",
+          "records": [
+            {
+              "chunk_index": 6,
+              "content_sha256": "536039291ff42e4d8e031af00ced031e577c032709bef56455c2e9351db4c60f",
+              "example_id": "0efe14e5610b717a145c57420fc5e21b",
+              "length": 2048,
+              "offset": 0,
+              "source_record_index": 157,
+              "split": "FIT-TRAIN"
+            }
+          ],
+          "sha256": "7e73c44f726688439074c1ac95532c4bb5410dd568d6044c3843de8918a0e9af",
+          "shape": [
+            1,
+            2048,
+            5120
+          ],
+          "shard_id": 14,
+          "source_revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
+          "stage": 1
+        },
+        {
+          "bytes": 21004696,
+          "count": 2048,
+          "dataset_hash": "da81b975d3eca1183db97ea6aa3fed9ffba15b997ad9f97cf60efd801b22ae7f",
+          "dtype": "bfloat16",
+          "example_count": 1,
+          "path": "shard-00015.safetensors",
+          "records": [
+            {
+              "chunk_index": 7,
+              "content_sha256": "536039291ff42e4d8e031af00ced031e577c032709bef56455c2e9351db4c60f",
+              "example_id": "0efe14e5610b717a145c57420fc5e21b",
+              "length": 2048,
+              "offset": 0,
+              "source_record_index": 157,
+              "split": "FIT-TRAIN"
+            }
+          ],
+          "sha256": "63ee0e3aa10ac1808cc017ba2c1a9954903b90b07614d617122c18a4c7b06529",
+          "shape": [
+            1,
+            2048,
+            5120
+          ],
+          "shard_id": 15,
+          "source_revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
+          "stage": 1
+        },
+        {
+          "bytes": 21004696,
+          "count": 2048,
+          "dataset_hash": "da81b975d3eca1183db97ea6aa3fed9ffba15b997ad9f97cf60efd801b22ae7f",
+          "dtype": "bfloat16",
+          "example_count": 1,
+          "path": "shard-00016.safetensors",
+          "records": [
+            {
+              "chunk_index": 8,
+              "content_sha256": "536039291ff42e4d8e031af00ced031e577c032709bef56455c2e9351db4c60f",
+              "example_id": "0efe14e5610b717a145c57420fc5e21b",
+              "length": 2048,
+              "offset": 0,
+              "source_record_index": 157,
+              "split": "FIT-TRAIN"
+            }
+          ],
+          "sha256": "2bff90f47770d119e6bf79df76b96c5ea851dc1cab9d3ac9f82de14cca7ed855",
+          "shape": [
+            1,
+            2048,
+            5120
+          ],
+          "shard_id": 16,
+          "source_revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
+          "stage": 1
+        },
+        {
+          "bytes": 21004696,
+          "count": 2048,
+          "dataset_hash": "da81b975d3eca1183db97ea6aa3fed9ffba15b997ad9f97cf60efd801b22ae7f",
+          "dtype": "bfloat16",
+          "example_count": 1,
+          "path": "shard-00017.safetensors",
+          "records": [
+            {
+              "chunk_index": 9,
+              "content_sha256": "536039291ff42e4d8e031af00ced031e577c032709bef56455c2e9351db4c60f",
+              "example_id": "0efe14e5610b717a145c57420fc5e21b",
+              "length": 2048,
+              "offset": 0,
+              "source_record_index": 157,
+              "split": "FIT-TRAIN"
+            }
+          ],
+          "sha256": "ad8cf5c5f8ac1aa6e8771b1171be9ca04b1de8706da53db00afe87303454e956",
+          "shape": [
+            1,
+            2048,
+            5120
+          ],
+          "shard_id": 17,
+          "source_revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
+          "stage": 1
+        },
+        {
+          "bytes": 21004696,
+          "count": 2048,
+          "dataset_hash": "da81b975d3eca1183db97ea6aa3fed9ffba15b997ad9f97cf60efd801b22ae7f",
+          "dtype": "bfloat16",
+          "example_count": 1,
+          "path": "shard-00018.safetensors",
+          "records": [
+            {
+              "chunk_index": 10,
+              "content_sha256": "536039291ff42e4d8e031af00ced031e577c032709bef56455c2e9351db4c60f",
+              "example_id": "0efe14e5610b717a145c57420fc5e21b",
+              "length": 2048,
+              "offset": 0,
+              "source_record_index": 157,
+              "split": "FIT-TRAIN"
+            }
+          ],
+          "sha256": "b3536d956dede051c5a3c6e3791ddf7835fd8a7cc466cb9cc6f5d81743c4435f",
+          "shape": [
+            1,
+            2048,
+            5120
+          ],
+          "shard_id": 18,
+          "source_revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
+          "stage": 1
+        },
+        {
+          "bytes": 12594776,
+          "count": 1228,
+          "dataset_hash": "da81b975d3eca1183db97ea6aa3fed9ffba15b997ad9f97cf60efd801b22ae7f",
+          "dtype": "bfloat16",
+          "example_count": 1,
+          "path": "shard-00019.safetensors",
+          "records": [
+            {
+              "chunk_index": 11,
+              "content_sha256": "536039291ff42e4d8e031af00ced031e577c032709bef56455c2e9351db4c60f",
+              "example_id": "0efe14e5610b717a145c57420fc5e21b",
+              "length": 1228,
+              "offset": 0,
+              "source_record_index": 157,
+              "split": "FIT-TRAIN"
+            }
+          ],
+          "sha256": "ddf7d7408d0f4636cf022eb8a646148c4324239d52ca27737ede05f1193707b6",
+          "shape": [
+            1,
+            1228,
+            5120
+          ],
+          "shard_id": 19,
+          "source_revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
+          "stage": 1
+        }
+      ],
+      "source_revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
+      "split": "FIT-TRAIN",
+      "stage": 1,
+      "status": "STAGE_COMPLETE",
+      "tokenizer_hash": "135547ffd6ba69bf188782195b85e2c33b124c7238c0d4e2d95e5cba74ebe716"
+    },
+    "layer_devices": {},
+    "layer_reports": [
+      {
+        "capture_manifest": "runs\\20260817-windows-real-method-proof-01\\capture\\layer-0000-FIT-TRAIN.json",
+        "layer": 0,
+        "metadata": {
+          "activation_bytes_written": 756514384,
+          "compute_seconds": 9.825561300036497,
+          "hidden_bytes_read": 378854536,
+          "hidden_bytes_written": 378854536,
+          "kind": "native_qwen3_5_decoder_layer",
+          "layer": 0,
+          "layer_receipt": {
+            "attention_implementation": "sdpa",
+            "compute_dtype": "bfloat16",
+            "layer": 0,
+            "source_bytes": 766546368,
+            "source_index_hash": "77042094076611b69791a610065f28b7013b8c621795fa86ddccc8bac7d1b9df",
+            "source_tensor_count": 14,
+            "source_tensor_hashes": [
+              {
+                "dtype": "bfloat16",
+                "sha256": "91767f47282a7a9d90fbe77c8fdc5b98aab09b9cd6c1021522d7514ba43ac71f",
+                "shape": [
+                  5120
+                ],
+                "source_name": "model.language_model.layers.0.input_layernorm.weight",
+                "source_shard": "model-00001-of-00018.safetensors"
+              },
+              {
+                "dtype": "bfloat16",
+                "sha256": "53d79a7c7ab8260a4455b7c52b662fe81cd00109ff4c8c642730b4228dd06a8b",
+                "shape": [
+                  48
+                ],
+                "source_name": "model.language_model.layers.0.linear_attn.A_log",
+                "source_shard": "model-00001-of-00018.safetensors"
+              },
+              {
+                "dtype": "bfloat16",
+                "sha256": "32af1caf05b7d1a6f501ef8c6057394068c7089ee051d9bb7ea6881e627e09c3",
+                "shape": [
+                  10240,
+                  1,
+                  4
+                ],
+                "source_name": "model.language_model.layers.0.linear_attn.conv1d.weight",
+                "source_shard": "model-00001-of-00018.safetensors"
+              },
+              {
+                "dtype": "bfloat16",
+                "sha256": "176bb9f23604787c76d2de2b4a67100e4852f80de42c066f74858a4c1ee7ff0e",
+                "shape": [
+                  48
+                ],
+                "source_name": "model.language_model.layers.0.linear_attn.dt_bias",
+                "source_shard": "model-00001-of-00018.safetensors"
+              },
+              {
+                "dtype": "bfloat16",
+                "sha256": "28aefac533cea08864390a8708abae15476b06004c60515b07900acad00b0070",
+                "shape": [
+                  48,
+                  5120
+                ],
+                "source_name": "model.language_model.layers.0.linear_attn.in_proj_a.weight",
+                "source_shard": "model-00001-of-00018.safetensors"
+              },
+              {
+                "dtype": "bfloat16",
+                "sha256": "a1c2bd2ae0195457c93ec97df7e6c6505db7221bc04a3ccfb995ed925f4af208",
+                "shape": [
+                  48,
+                  5120
+                ],
+                "source_name": "model.language_model.layers.0.linear_attn.in_proj_b.weight",
+                "source_shard": "model-00001-of-00018.safetensors"
+              },
+              {
+                "dtype": "bfloat16",
+                "sha256": "1d70fcfa37dbc8d0abf4b624b88e1bd065985e0cfb19a46778ca068327004e12",
+                "shape": [
+                  10240,
+                  5120
+                ],
+                "source_name": "model.language_model.layers.0.linear_attn.in_proj_qkv.weight",
+                "source_shard": "model-00001-of-00018.safetensors"
+              },
+              {
+                "dtype": "bfloat16",
+                "sha256": "fb06226fec5702f1ea1099398e4e37b28993df210e0546e33573c55271dc4b05",
+                "shape": [
+                  6144,
+                  5120
+                ],
+                "source_name": "model.language_model.layers.0.linear_attn.in_proj_z.weight",
+                "source_shard": "model-00001-of-00018.safetensors"
+              },
+              {
+                "dtype": "bfloat16",
+                "sha256": "c3ae00ea947b686f6e7fc7c3075f7316a0ae286b12b839bda0f988453c761aec",
+                "shape": [
+                  128
+                ],
+                "source_name": "model.language_model.layers.0.linear_attn.norm.weight",
+                "source_shard": "model-00001-of-00018.safetensors"
+              },
+              {
+                "dtype": "bfloat16",
+                "sha256": "486a9d9193114e10fe15b80410b8ebd9ed564e53ccdb23c82910d91b90589cef",
+                "shape": [
+                  5120,
+                  6144
+                ],
+                "source_name": "model.language_model.layers.0.linear_attn.out_proj.weight",
+                "source_shard": "model-00001-of-00018.safetensors"
+              },
+              {
+                "dtype": "bfloat16",
+                "sha256": "d3a021babe82ddcd9552530a7461379e84862bf85d7fbfe7954d6c4543795993",
+                "shape": [
+                  5120,
+                  17408
+                ],
+                "source_name": "model.language_model.layers.0.mlp.down_proj.weight",
+                "source_shard": "model-00001-of-00018.safetensors"
+              },
+              {
+                "dtype": "bfloat16",
+                "sha256": "3d79a5cf4201aed36362e0db31831b11ea8e9fec255197480e059c40a4318926",
+                "shape": [
+                  17408,
+                  5120
+                ],
+                "source_name": "model.language_model.layers.0.mlp.gate_proj.weight",
+                "source_shard": "model-00001-of-00018.safetensors"
+              },
+              {
+                "dtype": "bfloat16",
+                "sha256": "56cd20cdf49cb0e64af2069d19137f279d73bbe48f36c16212e029acd4d18ac5",
+                "shape": [
+                  17408,
+                  5120
+                ],
+                "source_name": "model.language_model.layers.0.mlp.up_proj.weight",
+                "source_shard": "model-00001-of-00018.safetensors"
+              },
+              {
+                "dtype": "bfloat16",
+                "sha256": "f608aafd0e8670aa3db3306d7e912e4f775db866927ea023ec944f5dde1a3c11",
+                "shape": [
+                  5120
+                ],
+                "source_name": "model.language_model.layers.0.post_attention_layernorm.weight",
+                "source_shard": "model-00001-of-00018.safetensors"
+              }
+            ]
+          },
+          "load_seconds": 3.2091127999592572,
+          "peak_vram_bytes": 1469683200,
+          "read_seconds": 0.009550400078296661,
+          "source_weight_bytes": 766546368,
+          "tokens_per_second": 3759.367161079963,
+          "write_seconds": 4.652826799836475
+        },
+        "stage": 1
+      }
+    ],
+    "layers": [
+      0
+    ],
+    "replayed_layers": 1,
+    "schema_version": 1,
+    "shard_tokens": 2048,
+    "source_revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
+    "source_snapshot": "runs\\20260815-030931-windows\\source",
+    "split": "FIT-TRAIN",
+    "stage_zero": {
+      "code_commit": "8062dcccf6d2b94acd40fa03dc862ec462af58e3",
+      "count": 36939,
+      "dataset_hash": "da81b975d3eca1183db97ea6aa3fed9ffba15b997ad9f97cf60efd801b22ae7f",
+      "metadata": {
+        "example_count": 20,
+        "kind": "token_embedding_hidden_states",
+        "shard_tokens": 2048,
+        "token_count": 36939,
+        "tokens_per_second": 40922.5254912285,
+        "weight_receipt": {
+          "source_index_hash": "77042094076611b69791a610065f28b7013b8c621795fa86ddccc8bac7d1b9df",
+          "tensor": {
+            "dtype": "bfloat16",
+            "sha256": "f529a0d7c21c420c5fb5ec4ca181cb018bdcb0b7d3acace8bd66f6166ffa88a9",
+            "shape": [
+              248320,
+              5120
+            ],
+            "source_name": "model.language_model.embed_tokens.weight",
+            "source_shard": "model-00003-of-00018.safetensors"
+          }
+        }
+      },
+      "schema_version": 1,
+      "shards": [
+        {
+          "bytes": 21004696,
+          "count": 2048,
+          "dataset_hash": "da81b975d3eca1183db97ea6aa3fed9ffba15b997ad9f97cf60efd801b22ae7f",
+          "dtype": "bfloat16",
+          "example_count": 1,
+          "path": "shard-00000.safetensors",
+          "records": [
+            {
+              "chunk_index": 0,
+              "content_sha256": "bf72cfb44f5983e663ace06438579c79c0ad1b846dba1f484a7a0fe3ae1e9169",
+              "example_id": "0367aa876b6f6025b6a7642349d3b541",
+              "length": 2048,
+              "offset": 0,
+              "source_record_index": 135,
+              "split": "FIT-TRAIN"
+            }
+          ],
+          "sha256": "092f6ccfbff732cc1033fd82eb22a2f6003ad208835399db26c725bbeccd2ccc",
+          "shape": [
+            1,
+            2048,
+            5120
+          ],
+          "shard_id": 0,
+          "source_revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
+          "stage": 0
+        },
+        {
+          "bytes": 21004696,
+          "count": 2048,
+          "dataset_hash": "da81b975d3eca1183db97ea6aa3fed9ffba15b997ad9f97cf60efd801b22ae7f",
+          "dtype": "bfloat16",
+          "example_count": 1,
+          "path": "shard-00001.safetensors",
+          "records": [
+            {
+              "chunk_index": 1,
+              "content_sha256": "bf72cfb44f5983e663ace06438579c79c0ad1b846dba1f484a7a0fe3ae1e9169",
+              "example_id": "0367aa876b6f6025b6a7642349d3b541",
+              "length": 2048,
+              "offset": 0,
+              "source_record_index": 135,
+              "split": "FIT-TRAIN"
+            }
+          ],
+          "sha256": "57d7559db2934260f02488b6b3b14df1179c1561388b0dfd4be29d860f8ca4fb",
+          "shape": [
+            1,
+            2048,
+            5120
+          ],
+          "shard_id": 1,
+          "source_revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
+          "stage": 0
+        },
+        {
+          "bytes": 21004696,
+          "count": 2048,
+          "dataset_hash": "da81b975d3eca1183db97ea6aa3fed9ffba15b997ad9f97cf60efd801b22ae7f",
+          "dtype": "bfloat16",
+          "example_count": 1,
+          "path": "shard-00002.safetensors",
+          "records": [
+            {
+              "chunk_index": 2,
+              "content_sha256": "bf72cfb44f5983e663ace06438579c79c0ad1b846dba1f484a7a0fe3ae1e9169",
+              "example_id": "0367aa876b6f6025b6a7642349d3b541",
+              "length": 2048,
+              "offset": 0,
+              "source_record_index": 135,
+              "split": "FIT-TRAIN"
+            }
+          ],
+          "sha256": "871d4163beb5fa4d93e0cedcada66688810f3c0ee2ee0b9e3ac9ba764c612e0f",
+          "shape": [
+            1,
+            2048,
+            5120
+          ],
+          "shard_id": 2,
+          "source_revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
+          "stage": 0
+        },
+        {
+          "bytes": 21004696,
+          "count": 2048,
+          "dataset_hash": "da81b975d3eca1183db97ea6aa3fed9ffba15b997ad9f97cf60efd801b22ae7f",
+          "dtype": "bfloat16",
+          "example_count": 1,
+          "path": "shard-00003.safetensors",
+          "records": [
+            {
+              "chunk_index": 3,
+              "content_sha256": "bf72cfb44f5983e663ace06438579c79c0ad1b846dba1f484a7a0fe3ae1e9169",
+              "example_id": "0367aa876b6f6025b6a7642349d3b541",
+              "length": 2048,
+              "offset": 0,
+              "source_record_index": 135,
+              "split": "FIT-TRAIN"
+            }
+          ],
+          "sha256": "587a1d08066450be91d314999124d5d5d4f31df6acdd872c1d061207d87e78bf",
+          "shape": [
+            1,
+            2048,
+            5120
+          ],
+          "shard_id": 3,
+          "source_revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
+          "stage": 0
+        },
+        {
+          "bytes": 21004696,
+          "count": 2048,
+          "dataset_hash": "da81b975d3eca1183db97ea6aa3fed9ffba15b997ad9f97cf60efd801b22ae7f",
+          "dtype": "bfloat16",
+          "example_count": 1,
+          "path": "shard-00004.safetensors",
+          "records": [
+            {
+              "chunk_index": 4,
+              "content_sha256": "bf72cfb44f5983e663ace06438579c79c0ad1b846dba1f484a7a0fe3ae1e9169",
+              "example_id": "0367aa876b6f6025b6a7642349d3b541",
+              "length": 2048,
+              "offset": 0,
+              "source_record_index": 135,
+              "split": "FIT-TRAIN"
+            }
+          ],
+          "sha256": "e3347b1f0c7fa20f916c699bf739dee4161a50c375dec2f7d0c6378553c9b4ad",
+          "shape": [
+            1,
+            2048,
+            5120
+          ],
+          "shard_id": 4,
+          "source_revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
+          "stage": 0
+        },
+        {
+          "bytes": 2718240,
+          "count": 265,
+          "dataset_hash": "da81b975d3eca1183db97ea6aa3fed9ffba15b997ad9f97cf60efd801b22ae7f",
+          "dtype": "bfloat16",
+          "example_count": 1,
+          "path": "shard-00005.safetensors",
+          "records": [
+            {
+              "chunk_index": 5,
+              "content_sha256": "bf72cfb44f5983e663ace06438579c79c0ad1b846dba1f484a7a0fe3ae1e9169",
+              "example_id": "0367aa876b6f6025b6a7642349d3b541",
+              "length": 265,
+              "offset": 0,
+              "source_record_index": 135,
+              "split": "FIT-TRAIN"
+            }
+          ],
+          "sha256": "0f7e1dcc336fb3e163f2fde8a55c5e14c5efe07cb71fa19e0cf63ea6fdae7a98",
+          "shape": [
+            1,
+            265,
+            5120
+          ],
+          "shard_id": 5,
+          "source_revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
+          "stage": 0
+        },
+        {
+          "bytes": 21004696,
+          "count": 2048,
+          "dataset_hash": "da81b975d3eca1183db97ea6aa3fed9ffba15b997ad9f97cf60efd801b22ae7f",
+          "dtype": "bfloat16",
+          "example_count": 1,
+          "path": "shard-00006.safetensors",
+          "records": [
+            {
+              "chunk_index": 0,
+              "content_sha256": "09b43dec680e9c5afc3ce2854e40eb3c5b5b4894832652919254031a63df641b",
+              "example_id": "0d9883535b67f5f5c6ec0ab3fae7a500",
+              "length": 2048,
+              "offset": 0,
+              "source_record_index": 155,
+              "split": "FIT-TRAIN"
+            }
+          ],
+          "sha256": "6f3ac39806b43b7c4025e1d50ee23fa63ee49d5f3b92d8cae00cfd81619ab536",
+          "shape": [
+            1,
+            2048,
+            5120
+          ],
+          "shard_id": 6,
+          "source_revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
+          "stage": 0
+        },
+        {
+          "bytes": 6461688,
+          "count": 630,
+          "dataset_hash": "da81b975d3eca1183db97ea6aa3fed9ffba15b997ad9f97cf60efd801b22ae7f",
+          "dtype": "bfloat16",
+          "example_count": 1,
+          "path": "shard-00007.safetensors",
+          "records": [
+            {
+              "chunk_index": 1,
+              "content_sha256": "09b43dec680e9c5afc3ce2854e40eb3c5b5b4894832652919254031a63df641b",
+              "example_id": "0d9883535b67f5f5c6ec0ab3fae7a500",
+              "length": 630,
+              "offset": 0,
+              "source_record_index": 155,
+              "split": "FIT-TRAIN"
+            }
+          ],
+          "sha256": "7393fd3e4a01736b0984cc3b66f625a3d38fac066248fd00c229b7d49134bf54",
+          "shape": [
+            1,
+            630,
+            5120
+          ],
+          "shard_id": 7,
+          "source_revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
+          "stage": 0
+        },
+        {
+          "bytes": 21004696,
+          "count": 2048,
+          "dataset_hash": "da81b975d3eca1183db97ea6aa3fed9ffba15b997ad9f97cf60efd801b22ae7f",
+          "dtype": "bfloat16",
+          "example_count": 1,
+          "path": "shard-00008.safetensors",
+          "records": [
+            {
+              "chunk_index": 0,
+              "content_sha256": "536039291ff42e4d8e031af00ced031e577c032709bef56455c2e9351db4c60f",
+              "example_id": "0efe14e5610b717a145c57420fc5e21b",
+              "length": 2048,
+              "offset": 0,
+              "source_record_index": 157,
+              "split": "FIT-TRAIN"
+            }
+          ],
+          "sha256": "3f4a230fec559dd42c3dcb1ffda43961f68c7f9225d8255c0c4be01ec25cb7e6",
+          "shape": [
+            1,
+            2048,
+            5120
+          ],
+          "shard_id": 8,
+          "source_revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
+          "stage": 0
+        },
+        {
+          "bytes": 21004696,
+          "count": 2048,
+          "dataset_hash": "da81b975d3eca1183db97ea6aa3fed9ffba15b997ad9f97cf60efd801b22ae7f",
+          "dtype": "bfloat16",
+          "example_count": 1,
+          "path": "shard-00009.safetensors",
+          "records": [
+            {
+              "chunk_index": 1,
+              "content_sha256": "536039291ff42e4d8e031af00ced031e577c032709bef56455c2e9351db4c60f",
+              "example_id": "0efe14e5610b717a145c57420fc5e21b",
+              "length": 2048,
+              "offset": 0,
+              "source_record_index": 157,
+              "split": "FIT-TRAIN"
+            }
+          ],
+          "sha256": "7d8f7157998ee1e81eb152b0517169504b3d649f450930d34c27a5fe8b0adfca",
+          "shape": [
+            1,
+            2048,
+            5120
+          ],
+          "shard_id": 9,
+          "source_revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
+          "stage": 0
+        },
+        {
+          "bytes": 21004696,
+          "count": 2048,
+          "dataset_hash": "da81b975d3eca1183db97ea6aa3fed9ffba15b997ad9f97cf60efd801b22ae7f",
+          "dtype": "bfloat16",
+          "example_count": 1,
+          "path": "shard-00010.safetensors",
+          "records": [
+            {
+              "chunk_index": 2,
+              "content_sha256": "536039291ff42e4d8e031af00ced031e577c032709bef56455c2e9351db4c60f",
+              "example_id": "0efe14e5610b717a145c57420fc5e21b",
+              "length": 2048,
+              "offset": 0,
+              "source_record_index": 157,
+              "split": "FIT-TRAIN"
+            }
+          ],
+          "sha256": "23b9069e5b715044952388ffe6cf9ffb6a03dd85b2e4893a7f3ffd49416cbbb8",
+          "shape": [
+            1,
+            2048,
+            5120
+          ],
+          "shard_id": 10,
+          "source_revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
+          "stage": 0
+        },
+        {
+          "bytes": 21004696,
+          "count": 2048,
+          "dataset_hash": "da81b975d3eca1183db97ea6aa3fed9ffba15b997ad9f97cf60efd801b22ae7f",
+          "dtype": "bfloat16",
+          "example_count": 1,
+          "path": "shard-00011.safetensors",
+          "records": [
+            {
+              "chunk_index": 3,
+              "content_sha256": "536039291ff42e4d8e031af00ced031e577c032709bef56455c2e9351db4c60f",
+              "example_id": "0efe14e5610b717a145c57420fc5e21b",
+              "length": 2048,
+              "offset": 0,
+              "source_record_index": 157,
+              "split": "FIT-TRAIN"
+            }
+          ],
+          "sha256": "10316563045f5a4d56e2d8b9e48c78169cc384dca2649c85de4cbb9fba1be394",
+          "shape": [
+            1,
+            2048,
+            5120
+          ],
+          "shard_id": 11,
+          "source_revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
+          "stage": 0
+        },
+        {
+          "bytes": 21004696,
+          "count": 2048,
+          "dataset_hash": "da81b975d3eca1183db97ea6aa3fed9ffba15b997ad9f97cf60efd801b22ae7f",
+          "dtype": "bfloat16",
+          "example_count": 1,
+          "path": "shard-00012.safetensors",
+          "records": [
+            {
+              "chunk_index": 4,
+              "content_sha256": "536039291ff42e4d8e031af00ced031e577c032709bef56455c2e9351db4c60f",
+              "example_id": "0efe14e5610b717a145c57420fc5e21b",
+              "length": 2048,
+              "offset": 0,
+              "source_record_index": 157,
+              "split": "FIT-TRAIN"
+            }
+          ],
+          "sha256": "f4dd6b39ce74ad2f0f20836dbaeb1a3afcf9f7b9d7c386a0f0745d3b73fcf636",
+          "shape": [
+            1,
+            2048,
+            5120
+          ],
+          "shard_id": 12,
+          "source_revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
+          "stage": 0
+        },
+        {
+          "bytes": 21004696,
+          "count": 2048,
+          "dataset_hash": "da81b975d3eca1183db97ea6aa3fed9ffba15b997ad9f97cf60efd801b22ae7f",
+          "dtype": "bfloat16",
+          "example_count": 1,
+          "path": "shard-00013.safetensors",
+          "records": [
+            {
+              "chunk_index": 5,
+              "content_sha256": "536039291ff42e4d8e031af00ced031e577c032709bef56455c2e9351db4c60f",
+              "example_id": "0efe14e5610b717a145c57420fc5e21b",
+              "length": 2048,
+              "offset": 0,
+              "source_record_index": 157,
+              "split": "FIT-TRAIN"
+            }
+          ],
+          "sha256": "b5c0595e9d64d373dccaa1dea8e7d62dfa87602fb444d546167da9f202b33d7d",
+          "shape": [
+            1,
+            2048,
+            5120
+          ],
+          "shard_id": 13,
+          "source_revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
+          "stage": 0
+        },
+        {
+          "bytes": 21004696,
+          "count": 2048,
+          "dataset_hash": "da81b975d3eca1183db97ea6aa3fed9ffba15b997ad9f97cf60efd801b22ae7f",
+          "dtype": "bfloat16",
+          "example_count": 1,
+          "path": "shard-00014.safetensors",
+          "records": [
+            {
+              "chunk_index": 6,
+              "content_sha256": "536039291ff42e4d8e031af00ced031e577c032709bef56455c2e9351db4c60f",
+              "example_id": "0efe14e5610b717a145c57420fc5e21b",
+              "length": 2048,
+              "offset": 0,
+              "source_record_index": 157,
+              "split": "FIT-TRAIN"
+            }
+          ],
+          "sha256": "4f7ebfdb75eadf55034834e79e122b666fcab8f6b727afb1b38dbf3cf8253cab",
+          "shape": [
+            1,
+            2048,
+            5120
+          ],
+          "shard_id": 14,
+          "source_revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
+          "stage": 0
+        },
+        {
+          "bytes": 21004696,
+          "count": 2048,
+          "dataset_hash": "da81b975d3eca1183db97ea6aa3fed9ffba15b997ad9f97cf60efd801b22ae7f",
+          "dtype": "bfloat16",
+          "example_count": 1,
+          "path": "shard-00015.safetensors",
+          "records": [
+            {
+              "chunk_index": 7,
+              "content_sha256": "536039291ff42e4d8e031af00ced031e577c032709bef56455c2e9351db4c60f",
+              "example_id": "0efe14e5610b717a145c57420fc5e21b",
+              "length": 2048,
+              "offset": 0,
+              "source_record_index": 157,
+              "split": "FIT-TRAIN"
+            }
+          ],
+          "sha256": "cb9b9563df5ae629e0d27664c17c2629784eb0a44fee1ddc2571d7176cfac4da",
+          "shape": [
+            1,
+            2048,
+            5120
+          ],
+          "shard_id": 15,
+          "source_revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
+          "stage": 0
+        },
+        {
+          "bytes": 21004696,
+          "count": 2048,
+          "dataset_hash": "da81b975d3eca1183db97ea6aa3fed9ffba15b997ad9f97cf60efd801b22ae7f",
+          "dtype": "bfloat16",
+          "example_count": 1,
+          "path": "shard-00016.safetensors",
+          "records": [
+            {
+              "chunk_index": 8,
+              "content_sha256": "536039291ff42e4d8e031af00ced031e577c032709bef56455c2e9351db4c60f",
+              "example_id": "0efe14e5610b717a145c57420fc5e21b",
+              "length": 2048,
+              "offset": 0,
+              "source_record_index": 157,
+              "split": "FIT-TRAIN"
+            }
+          ],
+          "sha256": "207a8e24298cb1cd044c1caa2ed6397304236f334a1473e46e57e68f438ce03e",
+          "shape": [
+            1,
+            2048,
+            5120
+          ],
+          "shard_id": 16,
+          "source_revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
+          "stage": 0
+        },
+        {
+          "bytes": 21004696,
+          "count": 2048,
+          "dataset_hash": "da81b975d3eca1183db97ea6aa3fed9ffba15b997ad9f97cf60efd801b22ae7f",
+          "dtype": "bfloat16",
+          "example_count": 1,
+          "path": "shard-00017.safetensors",
+          "records": [
+            {
+              "chunk_index": 9,
+              "content_sha256": "536039291ff42e4d8e031af00ced031e577c032709bef56455c2e9351db4c60f",
+              "example_id": "0efe14e5610b717a145c57420fc5e21b",
+              "length": 2048,
+              "offset": 0,
+              "source_record_index": 157,
+              "split": "FIT-TRAIN"
+            }
+          ],
+          "sha256": "72e9c165d5a066e4991d4e8fccce9d44c5c77b2a255903064446278037650078",
+          "shape": [
+            1,
+            2048,
+            5120
+          ],
+          "shard_id": 17,
+          "source_revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
+          "stage": 0
+        },
+        {
+          "bytes": 21004696,
+          "count": 2048,
+          "dataset_hash": "da81b975d3eca1183db97ea6aa3fed9ffba15b997ad9f97cf60efd801b22ae7f",
+          "dtype": "bfloat16",
+          "example_count": 1,
+          "path": "shard-00018.safetensors",
+          "records": [
+            {
+              "chunk_index": 10,
+              "content_sha256": "536039291ff42e4d8e031af00ced031e577c032709bef56455c2e9351db4c60f",
+              "example_id": "0efe14e5610b717a145c57420fc5e21b",
+              "length": 2048,
+              "offset": 0,
+              "source_record_index": 157,
+              "split": "FIT-TRAIN"
+            }
+          ],
+          "sha256": "a42c25abd18b208c29f35d9f0cd0574c41dea78c17d10700245f6c6f510a0405",
+          "shape": [
+            1,
+            2048,
+            5120
+          ],
+          "shard_id": 18,
+          "source_revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
+          "stage": 0
+        },
+        {
+          "bytes": 12594776,
+          "count": 1228,
+          "dataset_hash": "da81b975d3eca1183db97ea6aa3fed9ffba15b997ad9f97cf60efd801b22ae7f",
+          "dtype": "bfloat16",
+          "example_count": 1,
+          "path": "shard-00019.safetensors",
+          "records": [
+            {
+              "chunk_index": 11,
+              "content_sha256": "536039291ff42e4d8e031af00ced031e577c032709bef56455c2e9351db4c60f",
+              "example_id": "0efe14e5610b717a145c57420fc5e21b",
+              "length": 1228,
+              "offset": 0,
+              "source_record_index": 157,
+              "split": "FIT-TRAIN"
+            }
+          ],
+          "sha256": "231267ad338fb02c904423d5e3a41253368bbf4bb21ee7469baac77cb5472c5f",
+          "shape": [
+            1,
+            1228,
+            5120
+          ],
+          "shard_id": 19,
+          "source_revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
+          "stage": 0
+        }
+      ],
+      "source_revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
+      "split": "FIT-TRAIN",
+      "stage": 0,
+      "status": "STAGE_COMPLETE",
+      "tokenizer_hash": "135547ffd6ba69bf188782195b85e2c33b124c7238c0d4e2d95e5cba74ebe716"
+    },
+    "status": "STREAMING_CAPTURE_COMPLETE",
+    "tokenizer_hash": "135547ffd6ba69bf188782195b85e2c33b124c7238c0d4e2d95e5cba74ebe716",
+    "tokens": 36939
+  }
+}

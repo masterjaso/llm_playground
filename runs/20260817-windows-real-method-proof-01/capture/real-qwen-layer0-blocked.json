@@ -1,0 +1,7 @@
+{
+  "blocker_code": "REAL_CAPTURE_FAILED",
+  "code_commit": "8062dcccf6d2b94acd40fa03dc862ec462af58e3",
+  "message": "corpus source record file is missing: runs\\20260817-windows-real-method-proof-01\\capture\\corpus-v2.1.jsonl",
+  "native_windows": true,
+  "status": "BLOCKED"
+}
