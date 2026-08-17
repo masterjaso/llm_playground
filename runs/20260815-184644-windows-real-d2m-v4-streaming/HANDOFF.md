@@ -5,7 +5,7 @@
 - Last completed gate: `p16-top4-refined-course-correction-holdout-confirmation`
 - Active blocker: the best >=70% candidate fails the full green gate on holdout (cosine `0.977044` < `0.98`), despite a sufficient exact holdout oracle (`0.982185`).
 - Exact next command: develop a more robust selector using FIT/validation only; do not tune on the opened holdout and do not start representative or 64-layer replay.
-- Current code commit at handoff: `11098c0f02296cce5825a8433d9caf600737afdc`
+- Current code commit at handoff: `81f278460c1e70f9682befa047c75aee608612f7`
 - Safe replay checkpoint: train rolling replay remains durable through layer 29 (stage-0030 manifest); layer 30 was intentionally stopped.
 
 ## Fixed protocol
@@ -136,3 +136,33 @@ future candidate clears the gate, the representative set must be exactly
 layers `0/1/2/3`, `28/29/30/31`, and `60/61/62/63`, labeled respectively
 `LINEAR_A/B/C/FULL_ATTENTION`; only SwiGLU FFNs may be replaced. No reasoning
 effort optimization or reasoning post-training was performed.
+
+## Fresh layer-0 continuation (2026-08-16)
+
+The continuation receipt is `reports/takeover-continuation-20260816.json`.
+The current source head is `81f278460c1e70f9682befa047c75aee608612f7`.
+
+- A new 300,256-token layer-0 capture was materialized from Wikitext-2,
+  Gutenberg Frankenstein/Shakespeare, and CPython asyncio documentation. Its
+  dataset hash is `b9c35dacf0085c5d5a0aa0607713bfeadfd8192058d9b4a05414057e88c72823`;
+  historical overlap was rejected and the historical holdout was not opened.
+- Validation-A has 16,384 rows (`09eee32d...2199aa`); validation-B has 32,768
+  disjoint rows (`99778f...789de9`). Both were excluded from AdamW updates;
+  only A selected the checkpoint and B was evaluated afterward. No A+B
+  selection union is enabled.
+- The strongest verified p16/top4 expert/shared basis remains frozen (tensor
+  SHA `6693d65b...a6acb`; canonical partition hash
+  `c941d4e0...2cbc42`). The selector continuation changed only router and
+  amplitude tensors; the basis hash before/after is identical.
+- Hard-dispatch/regret-weighted BCE produced fresh A/B cosine `0.937225` /
+  `0.937856`, load CV `0.23298` / `0.23575`, and zero dead experts. Soft-load
+  CV was `0.03753` / `0.04074`; the candidate remains below the green gate and
+  is research-only.
+- The FIT-only p16/top4 load-constrained oracle Pareto (1,024-token mmap
+  store; penalties `0` through `2`) reached cosine `0.946803`, NMSE
+  `0.045752`, and load CV `1.25233` with no dead experts. It did not meet the
+  `0.50` load target or green gate.
+
+Decision remains `SELECTOR_GENERALIZATION_BLOCKED_REPLAY_PAUSED`: do not
+start representative or 64-layer replay, and do not open or tune the
+historical holdout. Full evidence and hashes are in the continuation receipt.

@@ -348,5 +348,51 @@
     },
     "holdout_tuning": false,
     "reasoning_post_training": false
+  },
+  "takeover_continuation_20260816": {
+    "status": "SELECTOR_GENERALIZATION_BLOCKED_REPLAY_PAUSED",
+    "code_commit": "81f278460c1e70f9682befa047c75aee608612f7",
+    "report": "reports/takeover-continuation-20260816.json",
+    "fresh_layer0_capture": {
+      "report": "fresh-selector-layer0/reports/fresh-selector-layer0-capture.json",
+      "dataset_hash": "b9c35dacf0085c5d5a0aa0607713bfeadfd8192058d9b4a05414057e88c72823",
+      "train_tokens": 300256,
+      "layers": [0],
+      "historical_holdout_opened": false,
+      "historical_replay_touched": false
+    },
+    "validation_protocol": {
+      "ab_receipt": "fresh-selector-layer0/capture/fresh-selector-validation-ab.json",
+      "selection_split": "validation-A",
+      "selection_count": 16384,
+      "selection_indices_hash": "09eee32dccd33e8516262ee528e95ce920091058f59df2dbee8d32a40e2199aa",
+      "validation_b_count": 32768,
+      "validation_b_indices_hash": "99778f7618dd9bf1e38ca4acf20aa9fdbcf1bc8c59d15bd418124566bd789de9",
+      "fit_excluded_count": 49152,
+      "fit_excluded_indices_hash": "673c3780203357b5fa84f3eb591f9145584a9ffbd8a364f2a81c1bf39b2d07cf",
+      "selection_union_enabled": false,
+      "validation_b_checkpoint_selection": false,
+      "holdout_opened": false
+    },
+    "fresh_selector": {
+      "report": "fresh-selector-layer0/reports/p16-top4-fresh-selector-hard-regret-bce.json",
+      "checkpoint": "layer-checkpoints/fresh-selector/p16-top4-hard-regret-bce",
+      "basis_unchanged": true,
+      "validation_a": {"normalized_mse": 0.13519899272476502, "cosine": 0.937224889989011, "load_cv": 0.23297837895655868, "dead_experts": 0},
+      "validation_b": {"normalized_mse": 0.1332869296680614, "cosine": 0.9378559359465726, "load_cv": 0.23574659032115616, "dead_experts": 0},
+      "decision": "research_candidate_only"
+    },
+    "load_constrained_oracle": {
+      "report": "reports/p16-top4-load-constrained-oracle-20260816.json",
+      "input_store": "evidence/contribution-stores/p16-top4-fit-1024",
+      "cosine": 0.9468026139765952,
+      "normalized_mse": 0.04575237803126283,
+      "load_cv": 1.2523293725781068,
+      "dead_experts": 0,
+      "target_load_cv": 0.5,
+      "green": false
+    },
+    "replay_gate": "BLOCKED_NO_GREEN_CANDIDATE",
+    "holdout_tuning": false
   }
 }
