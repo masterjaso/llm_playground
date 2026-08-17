@@ -1,652 +1,623 @@
-Current branch head is f1e7f162409d78b0e219e2d44c6d6df78f9d10b2; the authoritative state still has replay blocked because no >=70% candidate is green on unseen holdout.
-
-Take over the D2M project from current HEAD:
-
-    f1e7f162409d78b0e219e2d44c6d6df78f9d10b2
+TAKEOVER TASK — FIX BASIS CAPACITY DIAGNOSTICS AND RETURN TO REFINEMENT
 
 Repository:
-    C:\workplace\llm_playground
+C:\workplace\llm_playground
 
 Branch:
-    agent/windows-dense2moe-real-pipeline
-
-Read first and reconcile:
-    runs/20260815-184644-windows-real-d2m-v4-streaming/HANDOFF.md
-    runs/20260815-184644-windows-real-d2m-v4-streaming/state.json
-    runs/20260815-184644-windows-real-d2m-v4-streaming/decision-register.json
-    runs/20260815-184644-windows-real-d2m-v4-streaming/reports/takeover-decision-20260816.json
-
-The project now has exactly TWO active architecture targets.
-
-======================================================================
-TARGETS
-======================================================================
-
-TARGET A — SAFE FALLBACK / MUST LOCK DOWN
-
-    p16/top4
-    16 routed experts
-    expert width 1024
-    shared width 1024
-    top4
-    active width 5120
-    FFN reduction 70.59%
-
-Goal:
-    turn p16/top4 into a robust, validated, usable fallback architecture.
-
-TARGET B — PRIMARY PRODUCT TARGET
-
-    p32/top5
-    32 routed experts
-    expert width 512
-    shared width 1024
-    top5
-    active width 3584
-    FFN reduction 79.41%
-
-Goal:
-    push p32/top5 to a valid usable candidate using the lessons learned from
-    p16/top4.
-
-DO NOT spend additional research time on p32/top4 for now.
-
-Keep its existing artifacts and evidence, but remove it from the active
-decision path.
-
-======================================================================
-FIX THE VALIDATION PROTOCOL FIRST
-======================================================================
-
-The current selector cross-validation incorrectly uses validation-B inside the
-A+B checkpoint-selection union while also describing B as an independent
-confirmation set.
-
-Fix this.
-
-Required protocol:
-
-    FIT:
-        optimizer updates only
-
-    validation-A:
-        checkpoint selection only
-
-    validation-B:
-        independent confirmation only
-        MUST NOT participate in checkpoint selection
-
-    holdout:
-        finalist confirmation only
-
-Therefore:
-
-    selection_indices = validation-A
-    fit_exclude_indices includes validation-A + validation-B
-    validation-B evaluated only AFTER checkpoint selection
-    no selection_union containing validation-B
-
-Update receipts and metadata so they truthfully describe which split influenced
-selection.
-
-Add regression tests enforcing:
-
-    B cannot participate in checkpoint selection
-    A and B are excluded from gradients
-    A and B are disjoint
-
-======================================================================
-CREATE A TRUE FRESH SHADOW DATASET
-======================================================================
-
-Historical validation-B was drawn from previous FIT data and therefore is not
-a fully untouched end-to-end test for the already-trained p16 basis.
-
-Create a fresh LAYER-0-ONLY activation capture from new/diverse text.
-
-Do NOT restart 64-layer replay.
-
-Use the fresh capture for:
-
-    expanded selector FIT
-    genuinely untouched shadow validation-B
-
-Initial target:
-
-    several hundred thousand new token states
-
-If throughput/storage are reasonable:
-
-    approximately 500k-1M selector-training states
-
-Freeze a new validation-B before optimization.
-
-Never use it for:
-
-    gradient updates
-    checkpoint selection
-    loss tuning
-
-Only use it as confirmation.
-
-Do not touch existing holdout during this work.
-
-======================================================================
-p16/top4 — FREEZE THE BASIS
-======================================================================
-
-The current p16 basis has sufficient reconstruction quality to justify treating
-the expert/shared basis as frozen while solving selection.
-
-Do NOT keep jointly changing:
-
-    shared basis
-    routed expert basis
-    selector
-
-during selector-generalization research.
-
-Freeze the strongest verified p16/top4 expert/shared basis.
-
-Record its:
-
-    checkpoint path
-    tensor SHA256
-    partition hash
-    code SHA
-
-Then train only:
-
-    selection router
-    positive amplitude router where applicable
-
-until there is evidence the frozen basis itself is the blocker.
-
-======================================================================
-p16/top4 — ESTABLISH JOINT QUALITY + LOAD FEASIBILITY
-======================================================================
-
-Current evidence shows:
-
-    student holdout cosine ~0.9772
-    student holdout load CV ~0.5003
-
-while:
-
-    exact reconstruction oracle cosine ~0.9822
-    exact oracle load CV ~0.6674
-
-Therefore unconstrained oracle quality alone is NOT enough.
-
-We need to establish whether there exists a routing assignment satisfying
-SIMULTANEOUSLY:
-
-    cosine >= 0.98
-    NMSE <= 0.05
-    load CV <= 0.50
-    dead experts = 0
-
-Implement/run the strongest practical LOAD-CONSTRAINED oracle on clean,
-non-holdout data.
-
-Use a global pricing/Lagrangian or equivalent assignment mechanism.
-
-Report the Pareto curve:
-
-    cosine
-    NMSE
-    load CV
-    dead experts
-
-The key question is:
-
-    Can p16/top4 reach cosine >= .98 while load CV <= .50?
-
-If YES:
-    selector learning is the remaining blocker.
-
-If NO:
-    quantify the closest Pareto point before spending more selector budget.
-
-Do not use holdout to tune load prices.
-
-======================================================================
-FIX THE LOAD-BALANCE OBJECTIVE
-======================================================================
-
-Current evidence shows increasing the differentiable load coefficient either:
-
-    produced the same p16 checkpoint
-
-or:
-
-    made p32 hard top-k load balance much worse.
-
-Therefore do NOT keep sweeping the same coefficient.
-
-The selector objective must align with ACTUAL HARD TOP-K DISPATCH.
-
-Investigate a bounded replacement/addition such as:
-
-    expert-use prices / dual variables from load-constrained oracle targets
-
-    hard-dispatch-aware batch penalties
-
-    straight-through hard top-k load statistics
-
-    per-expert capacity/usage targets
-
-    regret-aware oracle labels that already include expert-use prices
-
-The training target should approximate:
-
-    reconstruction regret
-    +
-    global expert-use cost
-
-rather than learning the unconstrained reconstruction oracle and hoping a
-soft load loss fixes dispatch later.
-
-For every new objective compare:
-
-    predicted soft load
-    actual hard top-k load
-    validation-A load CV
-    untouched validation-B load CV
-
-Reject objectives whose soft balance improves while hard dispatch worsens.
-
-======================================================================
-p16 SELECTOR — DATA BEFORE MODEL SIZE
-======================================================================
-
-Do not resume generic larger-MLP router sweeps.
-
-We already know that simply increasing nonlinear router capacity did not solve
-generalization.
-
-Use the expanded fresh layer-0 dataset first.
-
-Train the selector on substantially more diverse states while keeping:
-
-    basis frozen
-    architecture fixed
-    validation-A fixed
-    fresh validation-B untouched
-
-Track:
-
-    cosine
-    NMSE
-    load CV
-    dead experts
-    exact-set match
-    top-k recall
-    mean Jaccard
-    router entropy
-    top-k margin
-    hard-quartile recall
-    hard-quartile cosine
-
-Prefer REGRET-WEIGHTED selector supervision:
-
-A routing mistake that barely changes reconstruction should matter less than a
-routing mistake with large cosine/reconstruction regret.
-
-======================================================================
-p16 SUCCESS CONDITION
-======================================================================
-
-Do not call p16/top4 locked until:
-
-validation-A:
-
-    NMSE <= .05
-    cosine >= .98
-    dead = 0
-    load CV <= .50
-
-fresh untouched validation-B:
-
-    NMSE <= .05
-    cosine >= .98
-    dead = 0
-    load CV <= .50
-
-Only then authorize ONE new post-selection holdout confirmation.
-
-If holdout also clears all four gates:
-
-    classify p16/top4 as SAFE FALLBACK
-    freeze its complete TRAINABLE SET
-
-The trainable set includes:
-
-    partition method
-    expert/shared geometry
-    top-k
-    routing mode
-    router architecture
-    router inputs
-    amplitude behavior
-    oracle/selector targets
-    load objective
-    loss coefficients
-    optimizer schedule
-    selector dataset protocol
-    checkpoint-selection rule
-
-Once frozen, do not keep tinkering with p16 unless representative-layer
-evidence falsifies it.
-
-======================================================================
-p32/top5 — PRIMARY TARGET
-======================================================================
-
-Treat p32/top5 as the only active high-sparsity target.
-
-Current validation is approximately:
-
-    NMSE       .04484
-    cosine     .96728
-    load CV    .53660
-    dead       0
-
-This is not green, but it is close enough to remain worth serious research.
-
-The current router-only load refinement was harmful.
-
-Do NOT repeat it.
-
-Use lessons from p16:
-
-1. topology-specific p32/top5 basis
-2. hard-token-aware basis refinement
-3. load-constrained oracle targets
-4. regret-aware selector targets
-5. expanded fresh selector data
-6. actual hard top-k load objective
-7. untouched A/B validation protocol
-
-======================================================================
-p32/top5 ORACLE-FIRST DEVELOPMENT
-======================================================================
-
-Before expensive student training, establish stronger p32/top5 capacity
+agent/windows-dense2moe-real-pipeline
+
+Execution:
+Native Windows only.
+
+Current observed remote HEAD:
+f80d1262a24d98232b356681546c721b34a73e15
+
+Before doing anything:
+- Pull/inspect the actual branch HEAD and record it.
+- Preserve all existing runs, captures, checkpoints, reports, partitions, and provenance.
+- Do not reset or overwrite useful artifacts.
+- Do not run representative-layer replay.
+- Do not run 64-layer replay.
+- Do not open or tune against the official holdout.
+- Do not broaden this task into unrelated architecture experiments.
+
+We have exactly TWO active sparse targets for this task:
+
+1. p16/top4
+   - 16 routed experts
+   - routed expert width 1024
+   - shared width 1024
+   - top_k = 4
+   - active FFN width = 5120
+   - FFN reduction = 70.5882%
+   - current safe/proof production target
+
+2. p32/top5
+   - 32 routed experts
+   - routed expert width 512
+   - shared width 1024
+   - top_k = 5
+   - active FFN width = 3584
+   - FFN reduction = 79.41%
+   - preferred aggressive product target
+
+Do NOT work p32/top4 in this takeover.
+Do NOT restart representative/full-model replay.
+The goal is to get p16/top4 and p32/top5 back into productive layer-0 refinement.
+
+============================================================
+MISSION
+============================================================
+
+Resolve one scientific ambiguity first:
+
+The recently reported load-constrained oracle appears to have evaluated
+expert contributions reconstructed from the original dense weights and
+partition plan rather than the ACTUAL TRAINED/FROZEN MoE BASIS.
+
+That means the recent ~0.9468 oracle result cannot yet be used to decide
+whether the trained p16 basis lacks capacity.
+
+Fix this correctly, validate the oracle/load machinery, determine whether
+each trained basis has sufficient capacity on clean fresh data, and then
+immediately resume the appropriate refinement path for each of our two
+targets.
+
+Do not spend another cycle merely adding diagnostics.
+
+The desired endpoint of this takeover is:
+
+  p16/top4 actively refining again
+  AND
+  p32/top5 actively refining again
+
+with the correct refinement objective selected from measured basis/oracle
 evidence.
 
-Current p32 oracle is bounded.
+============================================================
+PHASE 1 — MAKE CONTRIBUTION/ORACLE EVALUATION CHECKPOINT-AWARE
+============================================================
 
-Increase candidate-pool strength methodically when justified.
+Inspect the existing contribution-store and oracle code.
 
-For each oracle run report:
+Currently, contribution generation can reconstruct expert outputs from:
+- original dense Qwen FFN tensors
+- partition definition
 
-    candidate pool size
-    combinations/token
-    candidate-generation method
-    reconstruction cosine
-    NMSE
-    load CV
-    hard-quartile cosine
-    dead experts
-    quality/load Pareto frontier
+That is useful for raw-partition diagnostics, but it is NOT equivalent to
+evaluating a trained/refined MoE checkpoint.
 
-Do not describe bounded p32 evidence as an impossibility proof.
+Implement explicit support for a trained basis/checkpoint.
 
-Decision:
+The contribution/oracle path must be able to accept:
 
-If strongest practical load-aware p32/top5 oracle reaches:
+  --checkpoint <trained MoE checkpoint>
 
-    cosine >= .98
-    NMSE <= .05
-    load CV <= .50
+or an equivalent unambiguous basis artifact.
 
-then aggressively promote p32/top5 to selector training.
+When checkpoint mode is selected, shared/expert outputs MUST come from the
+actual frozen learned tensors in that checkpoint.
 
-If it reaches approximately:
+Do not silently fall back to raw dense partition reconstruction.
 
-    cosine .975-.98
+A trained-checkpoint contribution manifest must record at least:
 
-with acceptable NMSE/load:
+- basis_source = trained_checkpoint
+- checkpoint path
+- checkpoint tensor SHA256/fingerprint
+- partition path and SHA256/fingerprint
+- topology:
+    expert_count
+    expert_width
+    shared_width
+    top_k
+- source model revision
+- dataset/capture identity
+- split identity
+- code commit
+- dtype
+- row count
 
-    continue topology-specific basis/refinement work.
+Keep raw-partition mode if useful, but label it explicitly:
 
-If it remains materially below target after strong basis + candidate search:
+  basis_source = raw_dense_partition
 
-    document the limitation
-    preserve p16 fallback
-    avoid burning uncontrolled training budget.
+There must never again be ambiguity between these two modes.
 
-======================================================================
-ATTENTION-CYCLE REQUIREMENT
-======================================================================
+============================================================
+PHASE 2 — NUMERICALLY PROVE CHECKPOINT CONTRIBUTIONS ARE CORRECT
+============================================================
 
-Qwen uses the repeating 3:1 sequence-mixing cycle:
+Before running a large oracle:
 
-    LINEAR_A
-    LINEAR_B
-    LINEAR_C
-    FULL_ATTENTION
+Take a small deterministic batch of states and compare:
 
-Every layer still contains an FFN.
+A. direct forward execution through the frozen trained MoE basis
+versus
+B. reconstruction from the checkpoint-aware contribution store
 
-Only FFNs are replaced.
+Verify independently:
 
-Once either architecture is ready for representative replay, use:
+- shared contribution
+- every routed expert contribution
+- arbitrary selected top-k expert sums
+- final reconstructed FFN output
 
-    0  1  2  3
-    28 29 30 31
-    60 61 62 63
+Use dtype-appropriate numerical tolerances.
 
-with labels:
+Record:
+- max absolute error
+- mean absolute error
+- MSE
+- cosine agreement
 
-    layer % 4 == 0 -> LINEAR_A
-    layer % 4 == 1 -> LINEAR_B
-    layer % 4 == 2 -> LINEAR_C
-    layer % 4 == 3 -> FULL_ATTENTION
+This equivalence test is a HARD prerequisite.
 
-Do not return to the biased 0/16/32/48/63 sampling.
+If checkpoint-store reconstruction is not numerically equivalent to direct
+checkpoint inference, fix it before continuing.
 
-======================================================================
-FUTURE TWO-TARGET REPRESENTATIVE PLAN
-======================================================================
+Add regression tests so raw-partition and trained-checkpoint modes cannot
+be confused later.
 
-Once p16/top4 is locked:
+============================================================
+PHASE 3 — VERIFY THE LOAD-CONSTRAINED ORACLE ACTUALLY MOVES LOAD
+============================================================
 
-    run p16/top4 across the 12 representative layers.
+The previous p16 load-constrained result had approximately:
 
-Once p32/top5 reaches layer-0 green:
+  cosine = 0.9468
+  NMSE = 0.0458
+  load CV = 1.2523
 
-    run p32/top5 across the same 12-layer matrix.
+and appeared largely unchanged across penalty settings.
 
-Compare by:
+Before trusting that algorithm as a feasibility test, prove that its
+pricing mechanism works.
 
-    depth
-    attention-cycle position
+Add/report, per pricing iteration or penalty point:
 
-We may ultimately choose:
+- reconstruction objective
+- cosine
+- NMSE
+- load CV
+- dead experts
+- expert loads
+- assignment-change fraction from the zero-price assignment
+- assignment-change fraction from previous iteration
+- price min/mean/max
+- convergence reason
 
-    all layers p32/top5
+Test it first on:
+1. synthetic fixture where load prices MUST alter assignment;
+2. small real p16 slice;
+3. full p16 candidate-error table only after the first two work.
 
-or:
+Check objective scaling carefully.
 
-    p32/top5 where green
-    p16/top4 for cycle classes that need additional capacity
+If reconstruction costs dwarf price terms numerically, normalize or
+otherwise fix the pricing scale rather than merely increasing arbitrary
+constants.
 
-A simple heterogeneous topology by attention class is allowed.
+The search must be capable of expressing the actual gate question:
 
-Do not introduce arbitrary per-layer topology differences unless evidence
-requires them.
-
-======================================================================
-PASSIVE TELEMETRY
-======================================================================
-
-Continue collecting low-cost fundamental metrics:
-
-    router entropy
-    top-k margin
-    selected expert IDs
-    expert usage
-    hard dispatch load CV
-    dead experts
-    shared output norm
-    routed output norm
-    shared:routed ratio
-    residual norm
-    reconstruction cosine/NMSE
-    oracle route recall/Jaccard
-    attention-cycle class
-    layer depth
-    latency
-    peak VRAM
+  cosine >= 0.98
+  NMSE <= 0.05
+  load CV <= 0.50
+  dead experts == 0
 
-For normal future generation validation also record passively:
+Final candidate ranking must be:
 
-    prompt tokens
-    generated tokens
-    thinking-segment token count when identifiable
-    answer token count
-    time to first token
-    decode speed
-    stop reason
+1. require CV <= .50, NMSE <= .05, dead == 0 when such points exist;
+2. among gate-feasible points maximize cosine;
+3. tie-break with lower NMSE;
+4. then lower CV.
 
-DO NOT optimize reasoning effort.
-DO NOT perform reasoning post-training.
-These are telemetry only.
+Do not rank primarily by NMSE and accidentally discard the best cosine
+solution.
 
-======================================================================
-HOLDOUT / REPLAY POLICY
-======================================================================
+For p16/top4:
+- use exhaustive C(16,4) = 1820 candidate sets per token;
+- retain the scalable/vectorized/memmapped implementation;
+- do not recreate tens of millions of Python candidate objects.
 
-Holdout is CLOSED during research.
+For p32/top5:
+- use a bounded candidate search suitable for 32 experts;
+- start with a strong practical pool, e.g. 15 experts => C(15,5)=3003
+  candidate sets per token when feasible;
+- if a near-gate result appears candidate-bound, expand search before
+  declaring topology failure;
+- report candidate-pool construction and coverage explicitly.
 
-Do not use it for:
+============================================================
+PHASE 4 — P16/TOP4: ANSWER THE TRAINED-BASIS CAPACITY QUESTION
+============================================================
 
-    architecture selection
-    loss tuning
-    load tuning
-    oracle pricing
-    checkpoint selection
-    dataset decisions
+Use the ACTUAL frozen final refined p16/top4 checkpoint.
 
-Only open it for a candidate that is already green on:
+Known important provenance includes the final continuation tensor SHA:
 
-    validation-A
-    untouched validation-B
+6693d65b1cf2bc731c2ec3d84b7872bc6f79fe8c1363ba422848269e3a7a6acb
 
-Representative and full 64-layer replay stay blocked until at least p16/top4
-is genuinely locked.
+Verify the actual artifact/fingerprint rather than trusting this prompt.
 
-======================================================================
-COMMAND / PROVENANCE REQUIREMENTS
-======================================================================
+The latest fresh selector result was roughly:
 
-Use guarded commands for all CLI work.
+  validation A:
+    cosine ~0.9372
+    CV ~0.2330
 
-Every command must terminate with:
+  validation B:
+    cosine ~0.9379
+    CV ~0.2357
 
-    DONE
-    FAILED
-    TIMEOUT
+This means the frozen model itself generalizes poorly to the new corpus,
+but we do NOT yet know whether the cause is:
 
-Long jobs require:
+A. selector failure,
+B. basis reconstruction-capacity failure,
+or
+C. joint quality/load-capacity failure.
 
-    heartbeat
-    bounded output memory
-    spool logs
-    child-output freshness
+Run on fresh validation-A first:
 
-No silent waits.
+1. frozen student evaluation
+2. trained-basis unconstrained exhaustive reconstruction oracle
+3. trained-basis load-constrained oracle
 
-Every decisive experiment:
+Record:
+- cosine
+- NMSE
+- CV
+- dead experts
+- hard-quartile metrics
+- expert usage
+- student/oracle top-k recall where applicable
 
-1. state hypothesis
-2. state falsifier
-3. state compute budget
-4. state decision enabled
-5. implement
-6. test
-7. commit code
-8. run from committed HEAD
-9. record exact code SHA
-10. record tensor/partition/split hashes
-11. commit results
-12. update HANDOFF/state/decision-register
+Do not use the official holdout.
 
-Do not run decisive experiments from dirty science code.
+Do not use validation-B for iterative hyperparameter tuning.
 
-======================================================================
-IMMEDIATE EXECUTION ORDER
-======================================================================
+============================================================
+P16 DECISION RULE
+============================================================
 
-1. Safely inspect local state and reconcile current HEAD.
+CASE P16-A:
 
-2. Fix validation protocol:
-       A selects
-       B confirms
-       B never participates in selection.
+If trained-basis unconstrained oracle achieves:
 
-3. Add tests proving that contract.
+  cosine >= .98
+  NMSE <= .05
 
-4. Freeze/document the current best p16 expert/shared basis.
+AND the load-constrained oracle can simultaneously achieve:
 
-5. Build fresh layer-0 selector dataset and untouched shadow validation-B.
+  cosine >= .98
+  NMSE <= .05
+  CV <= .50
+  dead == 0
 
-6. Establish p16 load-constrained oracle Pareto feasibility.
+then the p16 BASIS IS GOOD.
 
-7. Design one hard-top-k-aligned load-aware selector target/objective.
+Freeze it.
 
-8. Train p16 selector with expanded data and frozen basis.
+Return directly to SELECTOR REFINEMENT.
 
-9. Iterate only through hypothesis-driven selector experiments until p16 is
-   green on A and fresh B.
+Use the expanded diverse layer-0 FIT corpus while excluding validation A/B
+from optimizer updates.
 
-10. Run one authorized p16 holdout confirmation.
+Focus selector training on oracle regret / hard routing rather than generic
+capacity increases.
 
-11. If green:
-        LOCK p16/top4 SAFE FALLBACK.
+Strong candidates include:
+- hard-dispatch regret weighting
+- reconstruction/cosine regret weighting
+- load prices from the corrected oracle
+- shared-output router feature [x, shared_output]
 
-12. In parallel where compute permits, improve p32/top5 basis/oracle evidence.
+Do not change the frozen basis during this branch.
 
-13. Apply the successful p16 selector/load methodology to p32/top5.
+Optimize on FIT.
+Select on A.
+Use B only as confirmation of selected finalists.
 
-14. Bring p32/top5 to green A+B evidence, then holdout confirmation.
+Goal:
+  A cosine >= .98
+  A NMSE <= .05
+  A CV <= .50
+  dead == 0
 
-15. Only after p16 is locked begin the 12-layer representative gate.
+Then confirm on B without further tuning.
 
-======================================================================
-FINAL PRIORITY
-======================================================================
+------------------------------------------------------------
 
-Do not optimize three architectures.
+CASE P16-B:
 
-We have two:
+If unconstrained trained-basis oracle is >= .98 but no assignment can
+remain >= .98 while satisfying CV <= .50:
 
-    p16/top4 = SAFE FALLBACK
-    p32/top5 = PRIMARY TARGET
+This is a JOINT BASIS/LOAD GEOMETRY problem.
 
-The immediate mission is:
+Return to BASIS REFINEMENT, not selector-only work.
 
-    make p16/top4 unquestionably usable
+Refine the current p16 basis using FIT only with explicit pressure toward:
 
-while developing the methodology required to move:
+- multiple reconstructively competitive experts per token
+- lower oracle load concentration
+- hard-token reconstruction
+- expert diversity
+- preserving total quality
 
-    p32/top5 from .967 validation cosine toward >= .98
+Use the existing basis as initialization.
 
-without sacrificing:
+Do not restart from scratch unless measurements show it is necessary.
 
-    NMSE
-    load balance
-    generalization
+After each meaningful basis refinement:
+- freeze/fingerprint the candidate
+- rerun trained-basis oracle on A
+- require joint quality/load feasibility before selector refinement
 
-Keep working autonomously through these gates.
+------------------------------------------------------------
 
-Do not stop merely to report incremental progress.
+CASE P16-C:
 
-Stop only for:
-    destructive-risk decisions,
-    provenance risk,
-    a genuine architectural fork,
-    or after p16/top4 has been locked and the next major p32/top5 decision
-    boundary is reached.
+If the trained-basis unconstrained oracle itself is below .98 on fresh A:
+
+The basis does not generalize sufficiently.
+
+Return immediately to BASIS REFINEMENT using the newly expanded/diverse
+fresh FIT corpus.
+
+Use:
+- current refined basis as initialization
+- hard-token emphasis
+- contribution/reconstruction losses
+- cosine-aware objective
+- broader fresh token-state distribution
+
+Keep A/B excluded from optimization.
+
+The objective is NOT merely to improve the current router.
+
+The first milestone is:
+
+  trained-basis oracle on A >= .98 cosine
+  NMSE <= .05
+
+Then solve joint CV <= .50.
+
+Only after basis capacity is proven should selector refinement resume.
+
+============================================================
+PHASE 5 — P32/TOP5: APPLY THE SAME CORRECT METHODOLOGY
+============================================================
+
+Once the checkpoint-aware path and corrected oracle have been validated on
+p16, apply the same infrastructure to p32/top5.
+
+Do not reuse a p32/top6 basis and call it a p32/top5 result.
+
+p32/top5 requires its own topology-specific partition/refinement.
+
+Geometry:
+
+  routed experts = 32
+  expert width = 512
+  shared width = 1024
+  top_k = 5
+  active FFN width = 3584
+  FFN reduction = 79.41%
+
+Use the current clean FIT/fresh corpus.
+
+Use the lessons learned from p16:
+
+- hard-token basis refinement
+- cosine-aware reconstruction
+- independent positive routing/coefficients where applicable
+- broad fresh token-state distribution
+- explicit load-aware oracle diagnostics
+- no holdout tuning
+
+If a current trained p32/top5 basis exists:
+- fingerprint it;
+- evaluate it with the checkpoint-aware oracle first.
+
+If there is no valid current trained p32/top5 basis:
+- rerun/consume the current topology-specific p32/top5 partition search;
+- select a small number of promising partition candidates using FIT/A only;
+- initialize p32/top5 refinement from those candidates;
+- do not perform a giant architecture sweep.
+
+For p32/top5, answer the same questions:
+
+1. Can the TRAINED BASIS achieve >= .98 cosine / <= .05 NMSE?
+2. Can it do so while also satisfying CV <= .50 / dead == 0?
+3. If yes, can a learned selector recover that assignment robustly?
+
+Use exactly the same decision logic:
+
+- oracle quality failure -> basis refinement
+- oracle quality green but load feasibility failure -> load-friendly basis refinement
+- oracle joint green -> freeze basis and refine selector
+
+============================================================
+PHASE 6 — ACTUALLY RETURN BOTH TARGETS TO REFINEMENT
+============================================================
+
+Do not stop after generating oracle reports.
+
+For EACH target, once the diagnostic identifies the correct blocker,
+launch a bounded refinement continuation on the appropriate component.
+
+p16/top4:
+- basis continuation if basis/oracle says basis is blocker
+OR
+- selector continuation if basis is jointly feasible
+
+p32/top5:
+- basis continuation if basis/oracle says basis is blocker
+OR
+- selector continuation if basis is jointly feasible
+
+Use short/bounded scientific continuations first.
+
+Require validation telemetry frequently enough to detect direction before
+burning a large GPU budget.
+
+Do not run large multi-hour sweeps until a bounded continuation shows an
+actual improvement.
+
+The refinement loop should retain the best checkpoint by the clean gate
+criteria, not simply final epoch.
+
+============================================================
+DATA SPLIT DISCIPLINE
+============================================================
+
+Maintain strict roles:
+
+FIT:
+- optimizer updates
+- basis refinement
+- selector training
+
+Validation A:
+- candidate selection
+- refinement decisions
+- oracle diagnostics
+
+Validation B:
+- confirmation of selected finalists
+- no optimizer updates
+- do not repeatedly tune against B
+
+Official holdout:
+- CLOSED during this takeover
+
+If existing A/B provenance has been compromised or ambiguous, create a
+replacement clean split from the fresh corpus before spending serious GPU
+budget and document it explicitly.
+
+Every report must identify:
+- FIT rows
+- excluded indices
+- A rows
+- B rows
+- hashes/fingerprints
+- overlap checks
+
+A∩FIT = 0
+B∩FIT = 0
+A∩B = 0
+
+============================================================
+REQUIRED REPORTS
+============================================================
+
+Produce one takeover report summarizing:
+
+INFRASTRUCTURE
+- checkpoint-aware contribution implementation
+- numerical equivalence receipt
+- load-price movement verification
+- tests
+
+P16/TOP4
+- frozen checkpoint fingerprint
+- frozen student A metrics
+- unconstrained trained-basis oracle A metrics
+- load-constrained trained-basis oracle A frontier
+- identified blocker:
+    BASIS_QUALITY
+    BASIS_LOAD_GEOMETRY
+    SELECTOR
+- refinement continuation launched
+- before/after refinement metrics
+
+P32/TOP5
+- topology-specific partition/basis fingerprint
+- student metrics if available
+- trained-basis oracle frontier
+- identified blocker
+- refinement continuation launched
+- before/after refinement metrics
+
+DECISION TABLE
+
+Target      Basis cosine   Joint-gate oracle   Blocker        Next state
+p16/top4    ...            ...                 ...            REFINING
+p32/top5    ...            ...                 ...            REFINING
+
+Also state explicitly:
+
+  HOLDOUT_OPENED = false
+  REPRESENTATIVE_REPLAY_STARTED = false
+  FULL64_REPLAY_STARTED = false
+
+============================================================
+TESTING / CODE QUALITY
+============================================================
+
+Run:
+- focused unit tests for changed oracle/contribution code
+- regression tests distinguishing raw-partition vs trained-checkpoint basis
+- synthetic load-price movement test
+- compilation
+- focused Ruff/static checks
+- native-Windows smoke for the affected commands
+
+Use guarded command execution for potentially long tasks.
+
+Do not allow a silent hung command.
+
+Preserve terminal receipts.
+
+============================================================
+COMMITS
+============================================================
+
+Make clean commits at useful boundaries:
+
+1. checkpoint-aware contribution/oracle correctness
+2. p16 trained-basis diagnosis + refinement state
+3. p32/top5 trained-basis diagnosis + refinement state
+4. final reports/bookkeeping
+
+Push all commits to:
+agent/windows-dense2moe-real-pipeline
+
+Do not leave decisive science only in an uncommitted working tree.
+
+============================================================
+SUCCESS CRITERION FOR THIS TAKEOVER
+============================================================
+
+This takeover is successful when:
+
+1. We can prove that oracle metrics correspond to the ACTUAL trained basis,
+   not reconstructed raw partition weights.
+
+2. Load-constrained assignment has been numerically validated as capable of
+   trading reconstruction quality against expert balance.
+
+3. p16/top4 has a measured blocker classification and is back in the
+   correct refinement loop.
+
+4. p32/top5 has a measured blocker classification and is back in the
+   correct refinement loop.
+
+5. Neither target has been rejected based on a bounded/raw/incorrect oracle.
+
+6. Holdout and representative/full64 replay remain blocked.
+
+7. The agent finishes with concrete before/after refinement numbers, not
+   merely infrastructure changes.
+
+Do not declare either topology solved until the full layer-0 green gate is:
+
+  cosine >= .98
+  NMSE <= .05
+  load CV <= .50
+  dead experts == 0
+
+Proceed autonomously through these phases unless an unrecoverable
+provenance/data error prevents scientifically valid continuation.
