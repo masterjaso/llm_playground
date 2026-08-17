@@ -2,8 +2,8 @@
   "environment_receipt_path": "C:\\workplace\\llm_playground\\runs\\windows-environment-receipt.json",
   "environment_variables": {},
   "memory": {
-    "available": 19965538304,
-    "free": 19965538304,
+    "available": 19978915840,
+    "free": 19978915840,
     "swap_free": 20384104448,
     "swap_total": 23419461632,
     "total": 67767750656
@@ -104,7 +104,7 @@
         "C:\\Program Files\\CMake\\bin\\cmake.EXE",
         "--version"
       ],
-      "elapsed_seconds": 0.1293009999790229,
+      "elapsed_seconds": 0.12409289996139705,
       "returncode": 0,
       "status": "DONE",
       "stderr": "",
@@ -116,7 +116,7 @@
         "C:\\Program Files\\Git\\cmd\\git.EXE",
         "--version"
       ],
-      "elapsed_seconds": 0.13443310000002384,
+      "elapsed_seconds": 0.12267090001842007,
       "returncode": 0,
       "status": "DONE",
       "stderr": "",
@@ -148,7 +148,7 @@
         "C:\\WINDOWS\\system32\\nvidia-smi.EXE",
         "-L"
       ],
-      "elapsed_seconds": 0.18007800000486895,
+      "elapsed_seconds": 0.1699633999960497,
       "returncode": 0,
       "status": "DONE",
       "stderr": "",
@@ -161,7 +161,7 @@
         "--query-gpu=index,name,memory.total,driver_version,pci.bus_id,temperature.gpu,power.limit",
         "--format=csv"
       ],
-      "elapsed_seconds": 0.16880069999024272,
+      "elapsed_seconds": 0.16860119998455048,
       "returncode": 0,
       "status": "DONE",
       "stderr": "",
@@ -173,7 +173,7 @@
         "C:\\workplace\\llm_playground\\.venv\\Scripts\\python.exe",
         "--version"
       ],
-      "elapsed_seconds": 0.11535949999233708,
+      "elapsed_seconds": 0.12470630003372207,
       "returncode": 0,
       "status": "DONE",
       "stderr": "",
