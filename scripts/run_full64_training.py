@@ -27,7 +27,33 @@ def _find_manifest(root: Path, layer: int, role: str) -> Path | None:
     return next((root / name for name in names if (root / name).exists()), None)
 
 
+def _existing_partition(value: Any, roots: tuple[Path, ...] = ()) -> Path | None:
+    if isinstance(value, dict):
+        direct = value.get("partition_path")
+        if direct:
+            candidate = Path(str(direct))
+            for path in (candidate, *(root / candidate for root in roots if not candidate.is_absolute())):
+                if path.exists():
+                    return path
+        for nested in value.values():
+            found = _existing_partition(nested, roots)
+            if found is not None:
+                return found
+    elif isinstance(value, list):
+        for nested in value:
+            found = _existing_partition(nested, roots)
+            if found is not None:
+                return found
+    return None
+
+
 def _find_partition(run_dir: Path, profile: str, layer: int, development_run_dir: Path | None) -> Path | None:
+    if development_run_dir is not None:
+        for candidate in (development_run_dir / "development" / "finalist-lock.json", development_run_dir / "development" / "finalists.json"):
+            if candidate.exists():
+                found = _existing_partition(json.loads(candidate.read_text(encoding="utf-8")), (development_run_dir.parent,))
+                if found is not None:
+                    return found
     candidates = [
         run_dir / "partitions" / f"layer-{layer:04d}.json",
         run_dir / "partitions" / f"{profile}.json",
@@ -73,6 +99,8 @@ def _train_layer(*, method_lock_sha256: str, source_dir: Path, train_manifest: P
 
 def run_full64(*, run_dir: Path, profile: str, layers: str, execute: bool = False, source_dir: Path | None = None, activation_root: Path | None = None, dev_activation_root: Path | None = None, development_run_dir: Path | None = None, representative_run_dir: Path | None = None, device: str = "cpu", epochs: int = 1, microbatch: int = 8, learning_rate: float = 1e-3, resume: bool = False) -> dict[str, Any]:
     lock = run_dir / "method-locks" / f"{profile}.json"
+    if not lock.exists() and representative_run_dir is not None:
+        lock = representative_run_dir / "method-locks" / f"{profile}.json"
     if not lock.exists():
         return {"status": "BLOCKED", "blocker_code": "METHOD_LOCK_REQUIRED", "message": f"no method lock for {profile}"}
     config_path = Path(__file__).resolve().parents[1] / "configs" / f"{profile}.yaml"

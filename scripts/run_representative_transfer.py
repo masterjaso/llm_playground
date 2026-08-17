@@ -75,19 +75,31 @@ def _find_external_manifest(root: Path, tier: str, layer: int) -> Path | None:
     return next((path for path in names if path.exists()), None)
 
 
-def _partition_for(lock: dict[str, Any], *, profile: str, development_run_dir: Path | None) -> Path | None:
-    finalists = lock.get("finalists")
-    if isinstance(finalists, list):
-        for entry in finalists:
-            if isinstance(entry, dict) and entry.get("partition_path"):
-                path = Path(str(entry["partition_path"]))
+def _existing_partition(value: Any, roots: tuple[Path, ...] = ()) -> Path | None:
+    if isinstance(value, dict):
+        direct = value.get("partition_path")
+        if direct:
+            candidate = Path(str(direct))
+            for path in (candidate, *(root / candidate for root in roots if not candidate.is_absolute())):
                 if path.exists():
                     return path
-    direct = lock.get("partition_path")
-    if direct:
-        path = Path(str(direct))
-        if path.exists():
-            return path
+        for nested in value.values():
+            found = _existing_partition(nested, roots)
+            if found is not None:
+                return found
+    elif isinstance(value, list):
+        for nested in value:
+            found = _existing_partition(nested, roots)
+            if found is not None:
+                return found
+    return None
+
+
+def _partition_for(lock: dict[str, Any], *, profile: str, development_run_dir: Path | None) -> Path | None:
+    roots = (development_run_dir.parent,) if development_run_dir is not None else ()
+    found = _existing_partition(lock, roots)
+    if found is not None:
+        return found
     if development_run_dir is None:
         return None
     stem = "p16" if "p16" in profile else "p32"
