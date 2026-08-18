@@ -415,9 +415,17 @@ def capture_activations(
 def iter_activation_shards(manifest_path: str | Path, *, expected_split: str | None = None) -> Iterator[Any]:
     """Yield binary MLP-input tensors from a validated capture manifest."""
 
-    manifest = json.loads(Path(manifest_path).read_text(encoding="utf-8"))
-    if expected_split is not None and manifest.get("split") != expected_split:
-        raise ValueError(f"activation manifest split mismatch: expected {expected_split!r}, got {manifest.get('split')!r}")
+    manifest_path = Path(manifest_path)
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    actual_split = str(manifest.get("split", ""))
+    split_aliases = {
+        "train": {"train", "FIT-TRAIN"},
+        "FIT-TRAIN": {"train", "FIT-TRAIN"},
+        "holdout": {"holdout", "FIT-DEV"},
+        "FIT-DEV": {"holdout", "FIT-DEV"},
+    }
+    if expected_split is not None and actual_split not in split_aliases.get(expected_split, {expected_split}):
+        raise ValueError(f"activation manifest split mismatch: expected {expected_split!r}, got {actual_split!r}")
     try:
         import numpy as np  # type: ignore
         from safetensors import safe_open  # type: ignore
@@ -431,9 +439,10 @@ def iter_activation_shards(manifest_path: str | Path, *, expected_split: str | N
         # runtime used for the streamed corpus.  Fall back to the PyTorch
         # backend and convert only the yielded view to float32; the durable
         # artifact remains BF16 and its hash is still checked above.
+        input_name = str(shard.get("input_tensor") or manifest.get("input_tensor") or "mlp_input")
         try:
             with safe_open(str(path), framework="numpy") as handle:
-                yield np.asarray(handle.get_tensor("mlp_input"))
+                yield np.asarray(handle.get_tensor(input_name))
         except (TypeError, ValueError, RuntimeError):
             with safe_open(str(path), framework="pt", device="cpu") as handle:
-                yield handle.get_tensor("mlp_input").float().numpy()
+                yield handle.get_tensor(input_name).float().numpy()

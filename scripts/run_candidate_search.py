@@ -162,14 +162,35 @@ def _plan_from_payload(payload: dict[str, Any]) -> PartitionPlan:
     return plan
 
 
+def _flatten_routes(value: Any) -> list[tuple[int, ...]]:
+    """Normalize batched route receipts to one top-k tuple per token."""
+
+    result: list[tuple[int, ...]] = []
+
+    def visit(item: Any) -> None:
+        if isinstance(item, np.ndarray):
+            item = item.tolist()
+        if isinstance(item, (list, tuple)):
+            if all(isinstance(value, (int, np.integer)) for value in item):
+                result.append(tuple(int(value) for value in item))
+                return
+            for child in item:
+                visit(child)
+
+    visit(value)
+    return result
+
+
 def _route_jaccard(left: list[list[int]], right: list[list[int]]) -> float:
-    if not left or not right or len(left) != len(right):
+    left_rows = _flatten_routes(left)
+    right_rows = _flatten_routes(right)
+    if not left_rows or not right_rows or len(left_rows) != len(right_rows):
         return 0.0
     total = 0.0
-    for first, second in zip(left, right):
+    for first, second in zip(left_rows, right_rows):
         a, b = set(first), set(second)
         total += len(a & b) / max(1, len(a | b))
-    return total / len(left)
+    return total / len(left_rows)
 
 
 def _pareto_rows(rows: Iterable[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -264,7 +285,7 @@ def _train_finalist_seeds(*, run_dir: Path, source_dir: Path, train_manifest: Pa
                 reload_receipt = _strict_reload_checkpoint(source_dir=source_dir, profile=profile, partition_path=partition_path, checkpoint_dir=checkpoint_dir)
                 results.append({"seed": seed, "status": "REUSED", "checkpoint_dir": str(checkpoint_dir), "reload": reload_receipt, "metrics": metadata.get("holdout_metrics")})
                 continue
-        trained = train_torch_layer(source_dir=source_dir, activation_manifest=train_manifest, selection_manifest=dev_manifest, output_dir=checkpoint_dir, layer=0, profile=profile, partition_path=partition_path, epochs=epochs, microbatch=microbatch, learning_rate=learning_rate, device=device, seed=seed, source_revision=profile.revision, stage_schedule=[{"name": "frozen_basis_selection_amplitude", "epochs": epochs, "train_scales": True, "train_experts": False, "train_shared": False, "use_oracle_targets": True, "train_selection_router": True, "train_amplitude_router": True}], evaluate_holdout=False)
+        trained = train_torch_layer(source_dir=source_dir, activation_manifest=train_manifest, selection_manifest=dev_manifest, selection_split="FIT-DEV", output_dir=checkpoint_dir, layer=0, profile=profile, partition_path=partition_path, epochs=epochs, microbatch=microbatch, learning_rate=learning_rate, device=device, seed=seed, source_revision=profile.revision, stage_schedule=[{"name": "frozen_basis_selection_amplitude", "epochs": epochs, "train_scales": True, "train_experts": False, "train_shared": False, "use_oracle_targets": True, "train_selection_router": True, "train_amplitude_router": True}], evaluate_holdout=False)
         reload_receipt = _strict_reload_checkpoint(source_dir=source_dir, profile=profile, partition_path=partition_path, checkpoint_dir=checkpoint_dir)
         results.append({"seed": seed, "status": trained["status"], "checkpoint_dir": str(checkpoint_dir), "reload": reload_receipt, "metrics": trained.get("holdout_metrics"), "validation_b_metrics": trained.get("validation_b_metrics"), "method_version": method_version})
     return results

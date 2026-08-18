@@ -1945,7 +1945,13 @@ def build_balanced_activation_plan(
         if not count:
             continue
         task = _v21_identity(row, "task") or f"row:{stable_corpus_record_id(row)}"
-        repository = _v21_identity(row, "repository") or f"source:{str(row.get('source_name', 'unknown')).casefold()}"
+        repository_identity = _v21_identity(row, "repository")
+        # Repository concentration is meaningful only for repository-backed
+        # records. Collapsing every dialogue/task record from one public
+        # dataset into a fake repository duplicates the source-family cap and
+        # discards independent task diversity. Non-repository rows remain
+        # bounded by both their task identity and their source family.
+        repository = repository_identity or f"nonrepo-task:{task}"
         family = str(row.get("source_family", "unknown")) or "unknown"
         if "agent" in str(row.get("source_family", "")).casefold() or domain.startswith("agentic"):
             count = min(count, trajectory_token_cap)

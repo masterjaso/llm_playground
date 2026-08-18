@@ -997,7 +997,13 @@ def _token_ids(encoded: Any) -> list[int]:
 
 
 def tokenize_corpus_records(records: Sequence[Mapping[str, Any]], tokenizer: Any, *, split: str, sequence_length: int) -> list[TokenizedExample]:
-    """Tokenize fixed records exactly and chunk without changing token order."""
+    """Tokenize fixed records and apply an optional immutable window cap.
+
+    Corpus V2.2 activation plans retain complete source rows but may cap the
+    contribution of an individual row.  ``sample_tokens`` is the frozen
+    per-row budget; when present, keep a deterministic prefix/suffix window
+    before chunking.  The source text and content hash remain untouched.
+    """
 
     if sequence_length <= 0:
         raise ValueError("sequence_length must be positive")
@@ -1011,7 +1017,21 @@ def tokenize_corpus_records(records: Sequence[Mapping[str, Any]], tokenizer: Any
         except (OSError, RuntimeError, TypeError, ValueError) as exc:
             raise TeacherCaptureBlocked("TOKENIZER_FAILED", f"tokenizer failed for fixed example {record.get('id')}: {exc}", split=split, example_id=record.get("id")) from exc
         ids = _token_ids(encoded)
-        expected_tokens = int(record.get("token_count", len(ids)))
+        sample_tokens_raw = record.get("sample_tokens")
+        if sample_tokens_raw is not None:
+            try:
+                sample_tokens = int(sample_tokens_raw)
+            except (TypeError, ValueError) as exc:
+                raise TeacherCaptureBlocked("SAMPLE_TOKEN_COUNT_INVALID", f"sample_tokens is not an integer for {record.get('id')}", split=split, example_id=record.get("id")) from exc
+            if sample_tokens <= 0:
+                raise TeacherCaptureBlocked("SAMPLE_TOKEN_COUNT_INVALID", f"sample_tokens must be positive for {record.get('id')}", split=split, example_id=record.get("id"))
+            if len(ids) > sample_tokens:
+                prefix = (sample_tokens + 1) // 2
+                suffix = sample_tokens - prefix
+                ids = ids[:prefix] + (ids[-suffix:] if suffix else [])
+            expected_tokens = sample_tokens
+        else:
+            expected_tokens = int(record.get("token_count", len(ids)))
         if expected_tokens != len(ids):
             raise TeacherCaptureBlocked("TOKEN_COUNT_MISMATCH", f"tokenizer produced {len(ids)} tokens but manifest records {expected_tokens}", split=split, example_id=record.get("id"), expected_tokens=expected_tokens, actual_tokens=len(ids))
         for chunk_index, start in enumerate(range(0, len(ids), sequence_length)):

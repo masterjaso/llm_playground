@@ -146,9 +146,11 @@ def _load_split(path: Path, expected: str) -> Any:
     """Load one split and refuse manifests with implicit positional splits."""
 
     payload = _load_manifest(path)
-    if payload.get("split") not in {expected, "both"}:
+    actual = str(payload.get("split", ""))
+    aliases = {"train": {"train", "FIT-TRAIN"}, "holdout": {"holdout", "FIT-DEV"}}
+    if actual not in aliases.get(expected, {expected, "both"}) and actual != "both":
         raise ValueError(f"activation split mismatch for {path}: expected {expected!r}")
-    values = list(iter_activation_shards(path, expected_split=expected if payload.get("split") else None))
+    values = list(iter_activation_shards(path, expected_split=actual if actual else None))
     if not values:
         raise ValueError(f"activation split is empty: {path}")
     import numpy as np  # type: ignore
@@ -206,15 +208,16 @@ class ActivationShardDataset:
     """
 
     def __init__(self, manifest_path: str | Path, *, split: str, microbatch: int = 1) -> None:
-        if split not in {"train", "holdout"}:
-            raise ValueError("split must be train or holdout")
+        if split not in {"train", "holdout", "FIT-TRAIN", "FIT-DEV"}:
+            raise ValueError("split must be train, holdout, FIT-TRAIN, or FIT-DEV")
         if microbatch <= 0:
             raise ValueError("microbatch must be positive")
         self.manifest_path = Path(manifest_path)
         self.split = split
         self.microbatch = microbatch
         payload = _load_manifest(self.manifest_path)
-        if payload.get("split") not in {split, "both"} and not payload.get("train_manifest"):
+        aliases = {"train": {"train", "FIT-TRAIN"}, "holdout": {"holdout", "FIT-DEV"}}
+        if str(payload.get("split", "")) not in aliases.get(split, {split, "both"}) and payload.get("split") != "both" and not payload.get("train_manifest"):
             raise ValueError(f"activation manifest split mismatch for {self.manifest_path}: expected {split!r}")
         self.count = self._manifest_count(payload, split)
         self.dataset_hash = str(payload.get("dataset_hash", ""))
@@ -227,7 +230,13 @@ class ActivationShardDataset:
         reference = payload.get(f"{self.split}_manifest")
         if isinstance(reference, str) and reference not in {"", "pending"}:
             return _load_manifest(_resolve(self.manifest_path, reference))
-        if payload.get("split") == self.split or self.manifest_path.stem.endswith("-" + self.split):
+        aliases = {
+            "train": {"train", "FIT-TRAIN"},
+            "FIT-TRAIN": {"train", "FIT-TRAIN"},
+            "holdout": {"holdout", "FIT-DEV"},
+            "FIT-DEV": {"holdout", "FIT-DEV"},
+        }
+        if payload.get("split") in aliases.get(self.split, {self.split}) or self.manifest_path.stem.endswith("-" + self.split):
             return payload
         raise ValueError(
             f"aggregate activation manifest has no explicit {self.split}_manifest reference"
@@ -235,7 +244,13 @@ class ActivationShardDataset:
 
     def _manifest_count(self, payload: dict[str, Any], split: str) -> int:
         candidate = self._split_manifest(payload) if payload.get(f"{split}_manifest") else payload
-        if candidate.get("split") not in {split, "both"}:
+        aliases = {
+            "train": {"train", "FIT-TRAIN"},
+            "FIT-TRAIN": {"train", "FIT-TRAIN"},
+            "holdout": {"holdout", "FIT-DEV"},
+            "FIT-DEV": {"holdout", "FIT-DEV"},
+        }
+        if candidate.get("split") not in aliases.get(split, {split}) and candidate.get("split") != "both":
             candidate = self._split_manifest(payload)
         return int(candidate.get("count", 0))
 
@@ -244,7 +259,8 @@ class ActivationShardDataset:
         reference = payload.get(f"{self.split}_manifest")
         if isinstance(reference, str) and reference not in {"", "pending"}:
             return _resolve(self.manifest_path, reference)
-        if payload.get("split") == self.split or self.manifest_path.stem.endswith("-" + self.split):
+        aliases = {"train": {"train", "FIT-TRAIN"}, "holdout": {"holdout", "FIT-DEV"}}
+        if payload.get("split") in aliases.get(self.split, {self.split}) or self.manifest_path.stem.endswith("-" + self.split):
             return self.manifest_path
         raise ValueError(f"no explicit {self.split} activation manifest")
 

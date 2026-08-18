@@ -123,6 +123,30 @@ def test_balanced_plan_is_deterministic_and_caps_task_tokens() -> None:
     assert first["status"] == "REBALANCE_REQUIRED"
 
 
+def test_non_repository_records_do_not_share_a_fake_repository_cap() -> None:
+    rows = [
+        {
+            **_row(index, task=f"dialogue-{index}", repo=""),
+            "domain": "general",
+            "source_name": "dialogue/source",
+            "source_family": "dialogue-public",
+            "token_count": 100,
+        }
+        for index in range(4)
+    ]
+    result = build_balanced_activation_plan(
+        rows,
+        planned_tokens=200,
+        target_fractions={"general": 1.0},
+        task_token_cap=50,
+        repository_token_cap=50,
+        source_family_token_cap=200,
+    )
+    assert result["status"] == "READY_FOR_BALANCED_CAPTURE"
+    assert result["selected_tokens"] == 200
+    assert result["concentration"]["repository"]["groups"] == 4
+
+
 def test_immutable_artifacts_refuse_mutation_and_verify(tmp_path) -> None:
     path = tmp_path / "artifact.json"
     digest = write_immutable_json(path, {"status": "frozen", "rows": [1, 2]})
