@@ -179,6 +179,36 @@ def test_source_collapse_and_overrides_are_narrow_and_protected():
     assert dual["override_eligible"] is False
 
 
+def test_structural_slice_without_routing_fields_is_not_false_collapse():
+    # Slice reducers intentionally omit aggregate learned-router counts.  The
+    # decision engine must gate their quality metrics without treating absent
+    # slice routing fields as a source collapse.
+    slice_payload = _structural()
+    slice_payload.pop("learned_load_cv")
+    slice_payload.pop("dead_expert_count")
+    slice_payload["gate_eligible"] = True
+    result = decide_candidate(
+        _structural(),
+        _structural(source_family_slices={"code": slice_payload}),
+    )
+    assert result["source_slice_collapses"] == []
+
+
+def test_blocked_exact_lm_preserves_structural_result_without_lm_veto():
+    result = decide_candidate(
+        _structural(),
+        _structural(),
+        lm_metrics={
+            "status": "BLOCKED_EXACT_KL_RESOURCE_LIMIT",
+            "scientific_evaluation_performed": False,
+        },
+    )
+    assert result["status"] == "LM_EVALUATION_BLOCKED"
+    assert result["decision"] == "RESEARCH_ONLY"
+    assert result["lm_gate"]["overall"] == "BLOCKED_RESOURCE_LIMIT"
+    assert result["lm_gate"]["status"] == "BLOCKED_EXACT_KL_RESOURCE_LIMIT"
+
+
 def test_receipts_round_trip_and_legacy_compatibility(tmp_path):
     structural = build_structural_generalization_receipt(
         source_model={"model": "Qwen/Qwen3.8-27B", "revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0", "layers": 64, "hidden_size": 5120, "dense_intermediate": 17408},

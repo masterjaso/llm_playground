@@ -34,6 +34,36 @@ def _has_nonfinite(metrics: Mapping[str, Any]) -> bool:
 
 
 def _slice_collapses(metrics: Mapping[str, Any]) -> list[str]:
+    # Structural source/domain payloads intentionally carry quality metrics and
+    # sample identities, while learned-router health is an aggregate-level
+    # measurement.  Re-running the full split gate here would turn absent
+    # routing fields into a false slice collapse.  A caller may still provide
+    # an explicit ``overall``/``source_slice_collapse`` result, which remains
+    # authoritative.
+    quality_metric_ids = (
+        "structural.cosine_similarity",
+        "structural.normalized_mse",
+        "structural.target_relative_norm_error",
+        "structural.mean_prediction_to_target_norm_ratio",
+        "structural.p95_abs_relative_norm_error",
+        "quality.dropped_token_count",
+        "quality.invalid_token_count",
+        "quality.non_finite_token_count",
+    )
+
+    def quality_slice_is_red(payload: Mapping[str, Any]) -> bool:
+        for metric_id in quality_metric_ids:
+            spec = get_metric(metric_id)
+            value = _value(payload, metric_id, spec.serialization_field)
+            if value is None:
+                return True
+            if spec.direction == "higher-is-better":
+                if value < float(spec.green):
+                    return True
+            elif value > float(spec.green):
+                return True
+        return False
+
     collapsed: list[str] = []
     for key, values in metrics.items():
         if not key.endswith("_slices") or not isinstance(values, Mapping):
@@ -45,16 +75,29 @@ def _slice_collapses(metrics: Mapping[str, Any]) -> list[str]:
             if overall == "RED" or payload.get("source_slice_collapse") is True:
                 collapsed.append(f"{key}:{identity}")
                 continue
-            try:
-                split = evaluate_structural_split(payload)
-            except (TypeError, ValueError):
+            # Explicit non-red classifications have already been computed by
+            # the producer under its own policy.  Only infer a slice result
+            # when the payload has no explicit classification.
+            if overall in {"GREEN", "YELLOW", "INSUFFICIENT_EVIDENCE"}:
                 continue
-            if split["overall"] == "RED":
+            if quality_slice_is_red(payload):
                 collapsed.append(f"{key}:{identity}")
     return sorted(collapsed)
 
 
 def _lm_gate(lm: Mapping[str, Any]) -> dict[str, Any]:
+    blocked_status = lm.get("status")
+    if isinstance(blocked_status, str) and blocked_status.startswith("BLOCKED_"):
+        return {
+            "overall": "BLOCKED_RESOURCE_LIMIT",
+            "status": blocked_status,
+            "statuses": {},
+            "missing_metrics": [],
+            "red_metrics": [],
+            "yellow_metrics": [],
+            "reason": lm.get("error", "exact LM evaluation was blocked before metric computation"),
+            "gate_eligible": False,
+        }
     metric_ids = (
         "lm.mean_forward_kl",
         "lm.p95_forward_kl",
@@ -187,6 +230,13 @@ def decide_candidate(
             decision = "OVERRIDE_PENDING_PROTECTED_CONFIRMATION"
             status = "PROTECTED_CONFIRMATION_REQUIRED"
             reason = ["authorized untouched protected confirmation required"]
+    elif lm_gate is not None and lm_gate["overall"] == "BLOCKED_RESOURCE_LIMIT":
+        # A resource block is not a failed LM measurement.  Preserve the
+        # structural result and make the absence of LM evidence explicit; a
+        # blocked exact evaluation cannot authorize promotion or an override.
+        decision = "RESEARCH_ONLY"
+        status = "LM_EVALUATION_BLOCKED"
+        reason = [str(lm_gate.get("status", "BLOCKED_RESOURCE_LIMIT"))]
     else:
         decision = "PROMOTE" if dev_gate["overall"] == "GREEN" and (lm_gate is None or lm_gate["overall"] == "GREEN") else "RESEARCH_ONLY"
         status = "STRUCTURAL_LM_GREEN" if decision == "PROMOTE" else "STRUCTURAL_YELLOW"
