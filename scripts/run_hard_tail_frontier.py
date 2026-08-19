@@ -186,6 +186,7 @@ def _partition_contributions(hidden: Any, down: Any, plan: PartitionPlan) -> tup
 
 
 def _oracle(shared: np.ndarray, routed: np.ndarray, target: np.ndarray, *, top_k: int, scratch: Path, iterations: int) -> dict[str, Any]:
+    scratch.mkdir(parents=True, exist_ok=True)
     result = frozen_slice_load_aware_oracle(
         shared,
         routed,
