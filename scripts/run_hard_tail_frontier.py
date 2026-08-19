@@ -353,8 +353,9 @@ def _config_result(
     iterations: int,
     device: str,
     batch_size: int,
+    output_root: Path,
 ) -> dict[str, Any]:
-    scratch = run_root / "scratch" / config.configuration_id
+    scratch = output_root / "scratch" / config.configuration_id
     fit_oracle = _oracle(fit_shared, fit_routed, fit_targets, top_k=config.top_k, scratch=scratch / "fit", iterations=iterations)
     dev_oracle = _oracle(dev_shared, dev_routed, dev_targets, top_k=config.top_k, scratch=scratch / "dev", iterations=iterations)
     fit_base = _prediction(fit_shared, fit_routed, fit_oracle)
@@ -438,7 +439,7 @@ def _config_result(
         fit_train_identity=fit_identity,
         fit_dev_identity=dev_identity,
     )
-    receipt_path = run_root / "results" / "receipts" / f"{config.configuration_id}.json"
+    receipt_path = output_root / "receipts" / f"{config.configuration_id}.json"
     receipt = write_immutable_receipt(receipt_payload, receipt_path)
     validation = validate_structural_receipt(receipt)
     if not validation["valid"]:
@@ -494,6 +495,7 @@ def run_frontier(
     fallback_rate: float = 0.0,
     shared_width: int | None = None,
     residual_width: int | None = None,
+    output_subdir: str = "results",
 ) -> dict[str, Any]:
     prereg = _load_preregistration(preregistration)
     fit_inputs, fit_targets, fit_metadata, fit_payload = _read_manifest_rows(fit_manifest, expected_split="FIT-TRAIN")
@@ -503,7 +505,15 @@ def run_frontier(
     source_model = {"family": "Qwen3.5", "revision": prereg["inputs"]["source_revision"], "path": str(source)}
     runtime_path = REPO_ROOT / str(prereg["runtime"]["lock_path"])
     runtime_payload = json.loads(runtime_path.read_text(encoding="utf-8"))
-    runtime_identity = {"path": str(runtime_path), "sha256": sha256_file(runtime_path), "lock": runtime_payload}
+    runtime_sha = sha256_file(runtime_path)
+    expected_runtime_sha = str(prereg["runtime"].get("lock_sha256", ""))
+    amendment_path = run_root / "planning" / "phase-02-runtime-amendment.json"
+    amendment = json.loads(amendment_path.read_text(encoding="utf-8")) if amendment_path.is_file() else None
+    if runtime_sha != expected_runtime_sha:
+        effective = (amendment or {}).get("effective_runtime", {})
+        if str(effective.get("file_sha256", "")) != runtime_sha:
+            raise ValueError("runtime lock differs from immutable preregistration without a matching phase amendment")
+    runtime_identity = {"path": str(runtime_path), "sha256": runtime_sha, "lock": runtime_payload, "amendment": str(amendment_path) if amendment else None}
     dense_state = _load_dense_mlp(source)
     hidden_fit = _dense_hidden(fit_inputs, dense_state, device=device, batch_size=batch_size)
     hidden_dev = _dense_hidden(dev_inputs, dense_state, device=device, batch_size=batch_size)
@@ -512,6 +522,7 @@ def run_frontier(
     down = torch.as_tensor(dense_state["down_proj.weight"], dtype=torch.float32, device=device)
     selected = set(configuration_ids or [])
     rows: list[dict[str, Any]] = []
+    output_root = run_root / output_subdir
     if fallback_mode not in {"none", "top8", "top10", "residual"}:
         raise ValueError("fallback_mode must be none, top8, top10, or residual")
     if fallback_mode == "none":
@@ -549,7 +560,7 @@ def run_frontier(
             continue
         if selected and config.configuration_id not in selected:
             continue
-        result_path = run_root / "results" / "per-config" / f"{config.configuration_id}.json"
+        result_path = output_root / "per-config" / f"{config.configuration_id}.json"
         if resume and result_path.exists():
             rows.append(json.loads(result_path.read_text(encoding="utf-8")))
             continue
@@ -577,6 +588,7 @@ def run_frontier(
             iterations=iterations,
             device=device,
             batch_size=batch_size,
+            output_root=output_root,
         )
         _write_immutable_json(result_path, result)
         rows.append(result)
@@ -594,7 +606,7 @@ def run_frontier(
         "promotion_eligible": False,
         "stop_rule": "predictor_deferred_until_oracle_clears",
     }
-    _write_immutable_json(run_root / "results" / "hard-tail-frontier.json", summary)
+    _write_immutable_json(output_root / "hard-tail-frontier.json", summary)
     return summary
 
 
@@ -613,6 +625,7 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--fallback-rate", type=float, default=0.0)
     parser.add_argument("--shared-width", type=int, default=None)
     parser.add_argument("--residual-width", type=int, default=None)
+    parser.add_argument("--output-subdir", default="results")
     parser.add_argument("--resume", action="store_true")
     return parser
 
@@ -636,8 +649,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         fallback_rate=float(args.fallback_rate),
         shared_width=args.shared_width,
         residual_width=args.residual_width,
+        output_subdir=str(args.output_subdir),
     )
-    print(json.dumps({"ok": True, "status": summary["status"], "result_count": len(summary["results"]), "path": str(run_root / "results" / "hard-tail-frontier.json")}, sort_keys=True))
+    print(json.dumps({"ok": True, "status": summary["status"], "result_count": len(summary["results"]), "path": str(run_root / str(args.output_subdir) / "hard-tail-frontier.json")}, sort_keys=True))
     return 0
 
 
