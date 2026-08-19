@@ -143,11 +143,13 @@ def main() -> int:
         if result_path.exists():
             try:
                 previous = json.loads(result_path.read_text(encoding="utf-8"))
-                summary_rows.append(previous)
-                counts[str(previous.get("status", "UNKNOWN"))] += 1
-                continue
+                if previous.get("code_commit") == code_commit:
+                    summary_rows.append(previous)
+                    counts[str(previous.get("status", "UNKNOWN"))] += 1
+                    continue
             except (OSError, json.JSONDecodeError):
-                result_path.unlink(missing_ok=True)
+                pass
+            result_path.unlink(missing_ok=True)
         try:
             result = replay_candidate_record(
                 record,
@@ -185,6 +187,7 @@ def main() -> int:
                 "error": f"{type(exc).__name__}: {exc}",
                 "receipt_emitted": False,
             }
+        result["code_commit"] = code_commit
         _write_json(result_path, result)
         summary_rows.append(result)
         counts[str(result.get("status", "UNKNOWN"))] += 1
