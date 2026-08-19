@@ -31,6 +31,7 @@ from dense2moe.config import load_config
 from dense2moe.data import sha256_file, write_immutable_json
 from dense2moe.partition import PartitionPlan, partition_indices
 from dense2moe.provenance import current_git_commit
+from dense2moe.science.v23_accounting import account_v23
 
 try:
     from scripts.run_high_sparsity_search import (
@@ -52,10 +53,51 @@ except ModuleNotFoundError:  # direct ``python scripts/<file>.py`` execution
     from run_topk_architecture_search import _load_mlp  # type: ignore
 
 
-METHOD_VERSION_DEFAULT = "moe-v22-m01"
+METHOD_VERSION_DEFAULT = "moe-v23-m01"
+V23_CANDIDATE_SCHEMA_VERSION = 4
 THRESHOLD_FINGERPRINT_DEFAULT = "sealed-qwen38-promotion-v1"
 SEEDS = (17, 29, 41)
 P32_POOL_SIZES = (1024, 2048, 4096, 8192)
+
+
+def _v23_accounting_payload(*, topology: str, tokens: int, num_hidden_layers: int = 64) -> dict[str, Any]:
+    """Build the immutable arithmetic receipt attached to every V2.3 search.
+
+    Candidate search still exposes only the two active product topologies in
+    this runner.  The broader A--E research registry is layered on separately;
+    this helper ensures even readiness receipts cannot omit the shared/routed,
+    router, scale, calibration, and active-FLOP terms for the product paths.
+    """
+
+    receipt = account_v23(
+        topology,
+        tokens=max(1, int(tokens)),
+        num_hidden_layers=max(1, int(num_hidden_layers)),
+        routing_mode="independent_positive",
+        learnable_scales=True,
+    )
+    return receipt.as_dict()
+
+
+def _write_v23_accounting_receipt(*, run_dir: Path, topologies: Iterable[str], tokens: int, filename: str = "v23-accounting-receipt.json") -> dict[str, Any]:
+    """Persist one deterministic accounting receipt for the search surface."""
+
+    entries = {
+        str(topology): _v23_accounting_payload(topology=str(topology), tokens=tokens)
+        for topology in topologies
+    }
+    payload = {
+        "schema_version": 1,
+        "receipt_type": "dense2moe-v23-accounting",
+        "method_version": METHOD_VERSION_DEFAULT,
+        "status": "PASS",
+        "topologies": entries,
+        "forbidden_topologies": ["p32/top4"],
+        "source": "src/dense2moe/science/v23_accounting.py",
+    }
+    path = run_dir / "development" / filename
+    write_immutable_json(path, payload)
+    return payload
 
 
 def _p32_expert_pool_size(*, routed_experts: int, top_k: int, candidate_budget: int) -> int:
@@ -298,6 +340,12 @@ def _execute_candidate_search(*, run_dir: Path, activation_manifest: Path, dev_m
     name, experts, expert_width, shared_width, top_k = topology_profile[topology]
     profile = _profile(name, experts, expert_width, shared_width)
     profile["top_k"] = top_k
+    accounting_payload = _write_v23_accounting_receipt(
+        run_dir=run_dir,
+        topologies=(topology,),
+        tokens=screen_tokens,
+    )
+    accounting_path = run_dir / "development" / "v23-accounting-receipt.json"
     train_hash = _manifest_identity(activation_manifest)
     dev_hash = _manifest_identity(dev_manifest)
     source_hash_digest = hashlib.sha256()
@@ -398,7 +446,7 @@ def _execute_candidate_search(*, run_dir: Path, activation_manifest: Path, dev_m
         seed_results = _train_finalist_seeds(run_dir=run_dir, source_dir=source_dir, train_manifest=activation_manifest, dev_manifest=dev_manifest, profile_dict=profile, partition_path=partition_path, method_version=method_version, seeds=SEEDS, epochs=epochs, microbatch=microbatch, learning_rate=learning_rate, device=actual_device)
         checkpoint_sha = hashlib.sha256(json.dumps(seed_results, sort_keys=True, default=str).encode()).hexdigest()
         finalist_entries.append({"status": "DEV_FINALIST", "rank": rank, "profile": profile_name, "topology": topology, "partition_strategy": row["partition_strategy"], "partition_path": str(partition_path), "partition_sha256": sha256_file(partition_path), "checkpoint_sha256": checkpoint_sha, "dataset_hash": train_hash, "dev_dataset_hash": dev_hash, "oracle_metrics": {key: value for key, value in row.items() if key not in {"partition", "_routes"}}, "seeds": list(SEEDS), "checkpoints": seed_results, "basis_frozen": True, "external_data_used": False})
-    receipt = {"schema_version": 3, "receipt_type": "dense2moe-development-candidate-search", "status": "DEV_FINALISTS", "topology": topology, "method_version": method_version, "science_identity": identity, "partition": "FIT-TRAIN", "ranking_partition": "FIT-DEV", "activation_manifest": {"path": str(activation_manifest), "sha256": train_hash, "records": _record_count(activation_manifest)}, "dev_manifest": {"path": str(dev_manifest), "sha256": dev_hash, "records": _record_count(dev_manifest)}, "search_class": "EXHAUSTIVE_C(16,4)" if topology == "p16/top4" else "BOUNDED_CORRELATION_POOL_WITH_STABILIZATION", "exhaustive": topology == "p16/top4", "expected_combinations": 1820 if topology == "p16/top4" else None, "evaluated_combinations": 1820 if topology == "p16/top4" else None, "candidate_pool_sizes": list(P32_POOL_SIZES) if topology == "p32/top5" else None, "pool_rounds": pool_rounds if topology == "p32/top5" else [], "partition_families": ["activation_magnitude", "output_contribution", "balanced_signature", "residual_swap_refined"], "profiles": {profile_name: {"status": "DEV_FINALIST", "profile": profile_name, "topology": topology, "finalists": finalist_entries, "checkpoint_sha256": hashlib.sha256(json.dumps(finalist_entries, sort_keys=True, default=str).encode()).hexdigest(), "dataset_hash": train_hash}}, "finalists": finalist_entries, "selector_seeds": list(SEEDS), "amplitude_router_required": True, "opened_evaluation_tiers": [], "promotion_status": "DEV_FINALIST", "threshold_fingerprint": THRESHOLD_FINGERPRINT_DEFAULT, "source_dir": str(source_dir), "source_revision": profile_obj.revision, "code_commit": current_git_commit()}
+    receipt = {"schema_version": V23_CANDIDATE_SCHEMA_VERSION, "receipt_type": "dense2moe-development-candidate-search", "status": "DEV_FINALISTS", "topology": topology, "method_version": method_version, "science_identity": identity, "partition": "FIT-TRAIN", "ranking_partition": "FIT-DEV", "activation_manifest": {"path": str(activation_manifest), "sha256": train_hash, "records": _record_count(activation_manifest)}, "dev_manifest": {"path": str(dev_manifest), "sha256": dev_hash, "records": _record_count(dev_manifest)}, "search_class": "EXHAUSTIVE_C(16,4)" if topology == "p16/top4" else "BOUNDED_CORRELATION_POOL_WITH_STABILIZATION", "exhaustive": topology == "p16/top4", "expected_combinations": 1820 if topology == "p16/top4" else None, "evaluated_combinations": 1820 if topology == "p16/top4" else None, "candidate_pool_sizes": list(P32_POOL_SIZES) if topology == "p32/top5" else None, "pool_rounds": pool_rounds if topology == "p32/top5" else [], "partition_families": ["activation_magnitude", "output_contribution", "balanced_signature", "residual_swap_refined"], "profiles": {profile_name: {"status": "DEV_FINALIST", "profile": profile_name, "topology": topology, "finalists": finalist_entries, "checkpoint_sha256": hashlib.sha256(json.dumps(finalist_entries, sort_keys=True, default=str).encode()).hexdigest(), "dataset_hash": train_hash}}, "finalists": finalist_entries, "selector_seeds": list(SEEDS), "amplitude_router_required": True, "accounting": accounting_payload, "accounting_receipt": {"path": str(accounting_path), "sha256": sha256_file(accounting_path)}, "opened_evaluation_tiers": [], "promotion_status": "DEV_FINALIST", "threshold_fingerprint": THRESHOLD_FINGERPRINT_DEFAULT, "source_dir": str(source_dir), "source_revision": profile_obj.revision, "code_commit": current_git_commit()}
     write_immutable_json(canonical, receipt)
     return receipt
 
@@ -416,7 +464,7 @@ def run_candidate_search(*, run_dir: Path, activation_manifest: Path, dev_manife
         raise ValueError("p32 requires an explicitly bounded positive candidate pool")
     if not execute:
         pool_size = total if topology == "p16/top4" else int(candidate_pool_size)
-        receipt = {"schema_version": 2, "receipt_type": "dense2moe-development-candidate-search", "status": "CANDIDATE_SEARCH_READY", "topology": topology, "partition": "FIT-TRAIN", "ranking_partition": "FIT-DEV", "activation_manifest": {"path": str(activation_manifest), "sha256": sha256_file(activation_manifest), "records": _record_count(activation_manifest)}, "dev_manifest": {"path": str(dev_manifest), "sha256": sha256_file(dev_manifest), "records": _record_count(dev_manifest)}, "search_class": "EXHAUSTIVE_C(16,4)" if topology == "p16/top4" else "BOUNDED_CORRELATION_POOL_NOT_EXHAUSTIVE", "exhaustive": topology == "p16/top4", "candidate_pool_size": pool_size, "basis_freeze_required": True, "selector_seeds_required": list(SEEDS), "amplitude_router_required": True, "opened_evaluation_tiers": [], "promotion_status": "DEV_FINALIST_NOT_YET_EVALUATED", "code_commit": current_git_commit()}
+        receipt = {"schema_version": V23_CANDIDATE_SCHEMA_VERSION, "receipt_type": "dense2moe-development-candidate-search", "status": "CANDIDATE_SEARCH_READY", "topology": topology, "method_version": method_version, "partition": "FIT-TRAIN", "ranking_partition": "FIT-DEV", "activation_manifest": {"path": str(activation_manifest), "sha256": sha256_file(activation_manifest), "records": _record_count(activation_manifest)}, "dev_manifest": {"path": str(dev_manifest), "sha256": sha256_file(dev_manifest), "records": _record_count(dev_manifest)}, "search_class": "EXHAUSTIVE_C(16,4)" if topology == "p16/top4" else "BOUNDED_CORRELATION_POOL_NOT_EXHAUSTIVE", "exhaustive": topology == "p16/top4", "candidate_pool_size": pool_size, "basis_freeze_required": True, "selector_seeds_required": list(SEEDS), "amplitude_router_required": True, "accounting": _v23_accounting_payload(topology=topology, tokens=_record_count(activation_manifest)), "opened_evaluation_tiers": [], "promotion_status": "DEV_FINALIST_NOT_YET_EVALUATED", "code_commit": current_git_commit()}
         output = run_dir / "development" / ("p16-exhaustive-receipt.json" if topology == "p16/top4" else "p32-bounded-pool-receipt.json")
         write_immutable_json(output, receipt)
         return receipt

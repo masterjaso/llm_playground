@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Capture real Qwen layer-0 FFN inputs/targets for METHOD_PROOF_ONLY.
+"""Capture real Qwen layer-0 FFN inputs/targets for development or promotion.
 
 The command reuses :func:`dense2moe.capture.stream_teacher_split`, which
 loads the pinned Qwen embedding and one decoder layer at a time.  It refuses
@@ -26,6 +26,7 @@ from dense2moe.capture import (
     QWEN_SOURCE_REVISION,
     RealCaptureBlocked,
     build_real_capture_receipt,
+    capture_frozen_evaluation_tier,
     stream_teacher_split,
     validate_method_proof_receipt,
     write_real_capture_receipt,
@@ -192,10 +193,16 @@ def capture_real_qwen_layer0(
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--method-proof-receipt", type=Path, required=True)
+    parser.add_argument("--method-proof-receipt", type=Path)
     parser.add_argument("--source-snapshot", type=Path, required=True)
     parser.add_argument("--run-dir", type=Path, required=True)
     parser.add_argument("--runtime-lock", type=Path, required=True)
+    parser.add_argument("--promotion-mode", action="store_true", help="capture one explicitly named frozen evaluation tier")
+    parser.add_argument("--corpus-root", type=Path, help="frozen Corpus V2.2 development-internal-final root for promotion capture")
+    parser.add_argument("--tier", help="explicit frozen evaluation tier for promotion capture")
+    parser.add_argument("--promotion-output-root", type=Path, help="promotion output directory containing only activation shards and layer-0000.json")
+    parser.add_argument("--staging-root", type=Path, help="resumable capture staging directory outside the published output")
+    parser.add_argument("--contamination-ledger", type=Path, help="sealed promotion contamination ledger to bind without modifying")
     parser.add_argument("--source-revision", default=QWEN_SOURCE_REVISION)
     parser.add_argument("--device", default="cuda:1")
     parser.add_argument("--compute-dtype", default="bfloat16")
@@ -205,19 +212,50 @@ def main() -> int:
     parser.add_argument("--resume", action="store_true")
     parser.add_argument("--json", action="store_true", dest="as_json")
     args = parser.parse_args()
-    result = capture_real_qwen_layer0(
-        args.method_proof_receipt,
-        args.source_snapshot,
-        args.run_dir,
-        runtime_lock=args.runtime_lock,
-        source_revision=args.source_revision,
-        device=args.device,
-        compute_dtype=args.compute_dtype,
-        shard_tokens=args.shard_tokens,
-        sequence_length=args.sequence_length,
-        attention_implementation=args.attention_implementation,
-        resume=args.resume,
-    )
+    if args.promotion_mode:
+        if args.method_proof_receipt is not None:
+            parser.error("--method-proof-receipt is not used with --promotion-mode")
+        if args.corpus_root is None or args.tier is None or args.promotion_output_root is None:
+            parser.error("--promotion-mode requires --corpus-root, --tier, and --promotion-output-root")
+        try:
+            result = capture_frozen_evaluation_tier(
+                args.corpus_root,
+                args.source_snapshot,
+                args.promotion_output_root,
+                args.runtime_lock,
+                tier=args.tier,
+                source_revision=args.source_revision,
+                device=args.device,
+                compute_dtype=args.compute_dtype,
+                shard_tokens=args.shard_tokens,
+                sequence_length=args.sequence_length,
+                attention_implementation=args.attention_implementation,
+                staging_root=args.staging_root or args.run_dir / "capture-work" / args.tier,
+                contamination_ledger=args.contamination_ledger,
+            )
+        except (OSError, TypeError, ValueError, RuntimeError, KeyError, RealCaptureBlocked) as exc:
+            result = {
+                "status": "BLOCKED",
+                "blocker_code": getattr(exc, "reason", "PROMOTION_CAPTURE_FAILED"),
+                "message": str(exc),
+                "code_commit": current_git_commit(),
+            }
+    else:
+        if args.method_proof_receipt is None:
+            parser.error("--method-proof-receipt is required unless --promotion-mode is set")
+        result = capture_real_qwen_layer0(
+            args.method_proof_receipt,
+            args.source_snapshot,
+            args.run_dir,
+            runtime_lock=args.runtime_lock,
+            source_revision=args.source_revision,
+            device=args.device,
+            compute_dtype=args.compute_dtype,
+            shard_tokens=args.shard_tokens,
+            sequence_length=args.sequence_length,
+            attention_implementation=args.attention_implementation,
+            resume=args.resume,
+        )
     print(json.dumps(result, ensure_ascii=False, sort_keys=True, indent=2))
     return 0 if result.get("status") != "BLOCKED" else 2
 

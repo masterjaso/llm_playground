@@ -7,6 +7,13 @@ from .activations import (
     capture_multi_layer_activation_shards,
     iter_activation_shards,
 )
+from .promotion import (
+    DEVELOPMENT_TIERS,
+    PROMOTION_EVALUATION_TIERS,
+    PROMOTION_MANIFEST_NAME,
+    build_frozen_evaluation_plan,
+    capture_frozen_evaluation_tier,
+)
 from .real_method_proof import (
     METHOD_PROOF_MIN_TOKENS,
     QWEN_DENSE_INTERMEDIATE_SIZE,
@@ -62,7 +69,10 @@ from .teacher import (
 __all__ = [
     "DEFAULT_DEVICE",
     "DEFAULT_SHARD_TOKENS",
+    "DEVELOPMENT_TIERS",
     "METHOD_PROOF_MIN_TOKENS",
+    "PROMOTION_EVALUATION_TIERS",
+    "PROMOTION_MANIFEST_NAME",
     "QWEN_DENSE_INTERMEDIATE_SIZE",
     "QWEN_HIDDEN_SIZE",
     "QWEN_NUM_HIDDEN_LAYERS",
@@ -81,9 +91,11 @@ __all__ = [
     "TeacherCaptureBlocked",
     "TokenizedExample",
     "activation_partition_deterministic",
+    "build_frozen_evaluation_plan",
     "build_real_capture_receipt",
     "capture_activation_shards",
     "capture_activations",
+    "capture_frozen_evaluation_tier",
     "capture_multi_layer_activation_shards",
     "capture_native_teacher",
     "capture_native_teacher_activations",

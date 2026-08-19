@@ -10,7 +10,9 @@ from pathlib import Path
 from typing import Any
 
 if __package__ in {None, ""}:
-    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+    repository_root = Path(__file__).resolve().parents[1]
+    sys.path.insert(0, str(repository_root))
+    sys.path.insert(0, str(repository_root / "src"))
 
 from dense2moe.data import (
     new_contamination_ledger,
@@ -21,6 +23,7 @@ from dense2moe.data import (
 )
 from dense2moe.evaluation import evaluate_promotion_metrics
 from dense2moe.provenance import current_git_commit
+from dense2moe.state import atomic_write_json
 
 
 def _load_finalist_lock(run_dir: Path) -> tuple[Path, dict[str, Any]] | None:
@@ -39,7 +42,7 @@ def _manifest_for_tier(root: Path, tier: str) -> Path | None:
     return next((path for path in candidates if path.exists()), None)
 
 
-def _direct_metrics(*, lock: dict[str, Any], source_dir: Path, manifest: Path, profile_name: str | None, max_tokens: int = 4096) -> dict[str, Any]:
+def _direct_metrics(*, lock: dict[str, Any], source_dir: Path, manifest: Path, profile_name: str | None, max_tokens: int = 4096, return_candidate_metrics: bool = False) -> dict[str, Any]:
     """Compute promotion metrics from frozen checkpoints, never optimizer data."""
 
     import numpy as np
@@ -69,10 +72,13 @@ def _direct_metrics(*, lock: dict[str, Any], source_dir: Path, manifest: Path, p
     if not values:
         raise ValueError(f"promotion activation manifest is empty: {manifest}")
     inputs = np.concatenate(values, axis=0)[:max_tokens]
+    evaluation_batch_size = 256
     from scripts.run_topk_architecture_search import _load_mlp
 
+    evaluation_device = "cuda:1" if torch.cuda.is_available() else "cpu"
     source_weights = {key: torch.as_tensor(value, dtype=torch.float32) for key, value in _load_mlp(source_dir, 0).items()}
     metric_rows: list[dict[str, Any]] = []
+    candidate_details: list[dict[str, Any]] = []
     for name, entry in profile_entries.items():
         if not isinstance(entry, dict):
             continue
@@ -93,50 +99,79 @@ def _direct_metrics(*, lock: dict[str, Any], source_dir: Path, manifest: Path, p
             checkpoints = candidate.get("checkpoints", [])
             if not checkpoints:
                 raise ValueError(f"finalist {name} has no frozen checkpoints")
+            seed_details: list[dict[str, Any]] = []
             for checkpoint in checkpoints:
                 checkpoint_dir = Path(str(checkpoint.get("checkpoint_dir", "")))
                 tensor_path = checkpoint_dir / "layer-0000.safetensors"
                 if not tensor_path.exists():
                     raise FileNotFoundError(f"frozen finalist checkpoint is missing: {tensor_path}")
-                model = TorchQwen35SwiGLUMoE.from_dense(source_weights["gate_proj.weight"], source_weights["up_proj.weight"], source_weights["down_proj.weight"], routed_experts=profile.routed_experts, shared_intermediate_size=profile.shared_intermediate_size, top_k=profile.top_k, routing_mode=profile.routing_mode, partition=plan, learnable_scales=True)
+                model = TorchQwen35SwiGLUMoE.from_dense(source_weights["gate_proj.weight"], source_weights["up_proj.weight"], source_weights["down_proj.weight"], routed_experts=profile.routed_experts, shared_intermediate_size=profile.shared_intermediate_size, top_k=profile.top_k, routing_mode=profile.routing_mode, partition=plan, learnable_scales=True, device=evaluation_device)
                 raw_state = load_file(str(tensor_path), device="cpu")
                 state = {key[len("model.layers.0."):]: value for key, value in raw_state.items() if key.startswith("model.layers.0.")}
                 missing, unexpected = model.load_state_dict(state, strict=True)
                 if missing or unexpected:
                     raise ValueError(f"strict promotion checkpoint reload failed: {missing}, {unexpected}")
                 model.eval()
-                gate, up, down = (source_weights["gate_proj.weight"], source_weights["up_proj.weight"], source_weights["down_proj.weight"])
+                gate, up, down = (source_weights["gate_proj.weight"].to(evaluation_device), source_weights["up_proj.weight"].to(evaluation_device), source_weights["down_proj.weight"].to(evaluation_device))
                 errors = []
                 cosines = []
                 ratios = []
                 counts = np.zeros(profile.routed_experts, dtype=np.int64)
                 with torch.inference_mode():
-                    for start in range(0, inputs.shape[0], 32):
-                        x = torch.as_tensor(inputs[start:start + 32], dtype=torch.float32)
+                    for start in range(0, inputs.shape[0], evaluation_batch_size):
+                        x = torch.as_tensor(inputs[start : start + evaluation_batch_size], dtype=torch.float32, device=evaluation_device)
                         target = _dense_target_torch(x, gate, up, down)
                         prediction, info = model(x, return_router=True)
                         errors.append(float(torch.sum((prediction - target).square()).item()))
                         cosines.append(float(torch.sum(torch.sum(prediction * target, dim=-1) / (torch.linalg.vector_norm(prediction, dim=-1) * torch.linalg.vector_norm(target, dim=-1) + 1e-12)).item()))
                         ratios.extend((torch.linalg.vector_norm(prediction, dim=-1) / (torch.linalg.vector_norm(target, dim=-1) + 1e-12)).cpu().numpy().tolist())
                         counts += np.bincount(info["indices"].cpu().numpy().reshape(-1), minlength=profile.routed_experts)
-                target_norm = float(np.sum(np.square(np.concatenate([np.asarray(_dense_target_torch(torch.as_tensor(inputs[start:start + 32], dtype=torch.float32), gate, up, down)).numpy() for start in range(0, inputs.shape[0], 32)]))))
+                target_norm = float(
+                    np.sum(
+                        np.square(
+                            np.concatenate(
+                                [
+                                    _dense_target_torch(
+                                        torch.as_tensor(inputs[start : start + evaluation_batch_size], dtype=torch.float32, device=evaluation_device),
+                                        gate,
+                                        up,
+                                        down,
+                                    )
+                                    .detach()
+                                    .cpu()
+                                    .numpy()
+                                    for start in range(0, inputs.shape[0], evaluation_batch_size)
+                                ]
+                            )
+                        )
+                    )
+                )
                 nmse = float(sum(errors) / max(target_norm, 1e-12))
                 cosine = float(sum(cosines) / inputs.shape[0])
                 ratio_array = np.asarray(ratios, dtype=np.float64)
                 from scripts.run_high_sparsity_search import _evaluate_positive_oracle
 
                 oracle_profile = {"name": "p16" if profile.routed_experts == 16 else "p32", "routed_experts": profile.routed_experts, "expert_intermediate_size": profile.expert_intermediate_size, "shared_intermediate_size": profile.shared_intermediate_size, "dense_intermediate_size": profile.dense_intermediate_size, "hidden_size": profile.hidden_size}
-                oracle = _evaluate_positive_oracle(oracle_profile, inputs, {key: value.numpy() for key, value in source_weights.items()}, plan, top_k=profile.top_k, device="cpu", batch_size=32, exact=profile.routed_experts == 16)
-                seed_rows.append({"nmse": nmse, "cosine": cosine, "loadcv": float(counts.std() / max(counts.mean(), 1e-12)), "dead_experts": int(np.sum(counts == 0)), "oracle_regret": max(0.0, nmse - float(oracle["normalized_mse"])), "repeat_variation": 0.0, "median_norm_ratio_error": abs(float(np.median(ratio_array)) - 1.0), "p95_relative_norm_error": float(np.quantile(np.abs(ratio_array - 1.0), 0.95))})
+                oracle = _evaluate_positive_oracle(oracle_profile, inputs, {key: value.numpy() for key, value in source_weights.items()}, plan, top_k=profile.top_k, device=evaluation_device, batch_size=min(512, max_tokens), exact=profile.routed_experts == 16)
+                seed_row = {"nmse": nmse, "cosine": cosine, "loadcv": float(counts.std() / max(counts.mean(), 1e-12)), "dead_experts": int(np.sum(counts == 0)), "oracle_regret": max(0.0, nmse - float(oracle["normalized_mse"])), "repeat_variation": 0.0, "median_norm_ratio_error": abs(float(np.median(ratio_array)) - 1.0), "p95_relative_norm_error": float(np.quantile(np.abs(ratio_array - 1.0), 0.95))}
+                seed_rows.append(seed_row)
+                seed_details.append({"seed": int(checkpoint.get("seed", -1)), "metrics": dict(seed_row)})
+                del model, gate, up, down, oracle
+                if evaluation_device.startswith("cuda"):
+                    torch.cuda.empty_cache()
             mean_nmse = float(np.mean([row["nmse"] for row in seed_rows]))
             repeat_variation = max(abs(float(row["nmse"]) - mean_nmse) for row in seed_rows) / max(mean_nmse, 1e-12)
             for row in seed_rows:
                 row["repeat_variation"] = repeat_variation
             aggregate = {key: (max(row[key] for row in seed_rows) if key in {"nmse", "loadcv", "dead_experts", "oracle_regret", "repeat_variation", "median_norm_ratio_error", "p95_relative_norm_error"} else min(row[key] for row in seed_rows)) for key in seed_rows[0]}
             metric_rows.append(aggregate)
+            candidate_details.append({"profile": name, "rank": int(candidate.get("rank", -1)), "topology": str(candidate.get("topology", "")), "partition_strategy": str(candidate.get("partition_strategy", "")), "partition_sha256": str(candidate.get("partition_sha256", "")), "partition_path": str(partition_path), "seed_metrics": seed_details, "metrics": aggregate})
     if not metric_rows:
         raise ValueError("no direct finalist metrics were produced")
-    return {key: max(float(row[key]) for row in metric_rows) if key != "cosine" else min(float(row[key]) for row in metric_rows) for key in metric_rows[0]}
+    result = {key: max(float(row[key]) for row in metric_rows) if key != "cosine" else min(float(row[key]) for row in metric_rows) for key in metric_rows[0]}
+    if return_candidate_metrics:
+        result["_candidate_metrics"] = candidate_details
+    return result
 
 
 def run_promotion(*, run_dir: Path, method_version: str, tiers: list[str], execute: bool = False, source_dir: Path | None = None, activation_root: Path | None = None, profile: str | None = None, max_tokens: int = 4096) -> dict[str, Any]:
@@ -240,7 +275,10 @@ def run_promotion(*, run_dir: Path, method_version: str, tiers: list[str], execu
             results[tier] = {"status": "BLOCKED", "tier": tier, "message": str(exc)}
             halted = True
             halt_reason = f"promotion could not open {tier}"
-    write_immutable_json(ledger_path, ledger)
+    # The contamination ledger is a one-way mutable state machine: its first
+    # tier opening must be durably published, while immutable metric receipts
+    # remain protected by ``write_immutable_json`` above.
+    atomic_write_json(ledger_path, ledger)
     green = bool(results) and all(item.get("status") == "GREEN" for item in results.values())
     return {"status": "PROMOTION_GREEN" if green else "PROMOTION_REJECTED", "method_version": method_version, "tiers": results, "halted": halted, "halt_reason": halt_reason, "contamination_ledger": str(ledger_path), "finalist_lock": str(finalist_lock_path), "ledger_validation": validate_contamination_ledger(ledger)}
 
