@@ -46,6 +46,17 @@ from .runner import (
     evaluate_structural_candidate_v2,
     evaluate_structural_pair_v2,
 )
+from .replay import (
+    HistoricalCandidate,
+    PairedActivationBatch,
+    ReplayInputError,
+    ReplayValidationError,
+    iter_paired_activation_batches,
+    iter_paired_activation_shards,
+    load_historical_candidate,
+    replay_candidate_record,
+    resolve_artifact_path,
+)
 from .registry import (
     DECISION_POLICY_V2,
     INSUFFICIENT_EVIDENCE,
@@ -126,6 +137,15 @@ __all__ = [
     "evaluate_lm_pair_v2",
     "evaluate_structural_candidate_v2",
     "evaluate_structural_pair_v2",
+    "HistoricalCandidate",
+    "PairedActivationBatch",
+    "ReplayInputError",
+    "ReplayValidationError",
+    "iter_paired_activation_batches",
+    "iter_paired_activation_shards",
+    "load_historical_candidate",
+    "replay_candidate_record",
+    "resolve_artifact_path",
     "DECISION_POLICY_V2",
     "INSUFFICIENT_EVIDENCE",
     "LM_POLICY_VERSION",
