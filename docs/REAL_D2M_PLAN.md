@@ -160,3 +160,51 @@ additional calibration data, longer warm-up, joint loss, wider shared expert,
 top-3 diagnostic, progressive correction, low-rank router/expert correction,
 modestly expanded capacity, then dense upcycling.  Thresholds are immutable
 unless a decision-register entry records the old/new values and rerun scope.
+
+## V2 fresh-data evaluation methodology
+
+The current evaluation contract treats generalization as a governing dimension,
+not as a post-hoc note. FIT-TRAIN and FIT-DEV are computed independently with
+the same masks and metric definitions. FIT is evidence that an optimizer can
+fit a dataset; fresh FIT-DEV structural fidelity is the advancement gate; LM
+output movement is a separate sensitivity observation. No FIT/DEV average or
+weighted scalar promotion score is permitted.
+
+The additive registry in `src/dense2moe/evaluation/registry.py` identifies the
+policies as `dense2moe-ffn-structural-generalization-v2` and
+`dense2moe-layer-patch-lm-output-v2`. It records direction, units, masking,
+epsilon rules, evidence class, split/tier eligibility, minimum sample/group
+counts, thresholds, veto/override behavior, and schema fields. The registry
+and decision policy produce a deterministic policy hash; historical V2.3/V2.4
+receipts remain readable legacy evidence and are never rewritten in place.
+
+Structural V2 reports cosine, normalized MSE, target-relative norm error,
+amplitude ratio, p95 error, learned-router and oracle load health, dead experts,
+entropy, invalid/non-finite counts, bounded token distributions, target-norm
+and hard-token buckets, and source/domain slices. Small slices are explicitly
+diagnostic-only. The generalization report records cosine and NMSE gaps,
+denominator epsilon, route-health changes, checkpoint trajectories, and an
+explicit classification. A GREEN FIT plus RED DEV is
+`GENERALIZATION_REJECT`; `TRAINING_OVERFIT_SIGNAL` is used only when a
+checkpoint trajectory shows FIT improvement, DEV stall/reversal, and a widening
+gap. Otherwise the conservative labels are
+`DISTRIBUTION_GENERALIZATION_FAILURE` or
+`DATA_SPECIFIC_FIT_OR_DISTRIBUTION_SHIFT_SENSITIVITY`.
+
+LM output is an exact, paired, teacher-forced evaluator for exactly one FFN
+layer patch. It reuses the source-identical suffix and computes full-vocabulary
+`KL(teacher || candidate)` with natural logarithms and float32 softmaxes. The
+dense-repeat numerical floor, raw and excess KL, agreement/retention, margin
+flip rates, NLL deltas, per-source/domain metrics, confidence intervals, and
+resource throughput are recorded. If exact suffix or KL replay cannot fit the
+approved native-Windows resources, the evaluator emits an explicit resource
+block instead of substituting Top-K KL or a backbone approximation.
+
+Advancement order is identity/preflight, finite evidence, learned-router and
+dead-expert health, absolute fresh structural gates, source/domain vetoes,
+generalization classification, LM eligibility/veto, and only then the narrow
+single-metric override envelopes (cosine `0.975 <= x < 0.980`; NMSE
+`0.050 < x <= 0.060`). Oracle results remain non-promotion evidence, learned
+loadCV/dead experts/source-slice collapse are non-overridable, and every real
+override still requires authorized untouched protected confirmation. GATE-A,
+SHADOW-B, and SHADOW-C remain sealed by default.

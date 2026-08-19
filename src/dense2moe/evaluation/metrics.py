@@ -254,3 +254,20 @@ def evaluate_whole_model_metrics(
         "overall": overall,
         "promotion_decision": "PROMOTE" if overall == "green" else "REJECT",
     }
+
+
+# Additive V2 surfaces.  The legacy dictionaries and functions above remain
+# unchanged so historical receipts retain their original meanings.
+from .generalization import build_generalization_matrix, classify_generalization, compute_generalization_gaps, evaluate_structural_split  # noqa: E402
+from .lm import StreamingLMMetrics, compute_lm_output_metrics  # noqa: E402
+from .registry import (  # noqa: E402
+    DECISION_POLICY_V2,
+    LM_POLICY_VERSION,
+    METRIC_REGISTRY,
+    POLICY_HASH,
+    STRUCTURAL_POLICY_VERSION,
+    TEST_MATRIX,
+    metric_policy_hash,
+    validate_metric_registry,
+)
+from .structural import StructuralMetricsAccumulator, compute_structural_metrics  # noqa: E402
