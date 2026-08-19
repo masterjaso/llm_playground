@@ -416,6 +416,10 @@ def _config_result(
     )
     fit_widths = config.widths_for_mask(fallback_mask_fit.tolist())
     dev_widths = config.widths_for_mask(fallback_mask_dev.tolist())
+    fit_width_summary = summarize_active_widths(fit_widths).as_dict()
+    dev_width_summary = summarize_active_widths(dev_widths).as_dict()
+    fit_average_reduction = 1.0 - float(fit_width_summary["mean"]) / float(config.dense_width)
+    dev_average_reduction = 1.0 - float(dev_width_summary["mean"]) / float(config.dense_width)
     candidate = {
         **config.as_dict(),
         "configuration_id": config.configuration_id,
@@ -457,12 +461,12 @@ def _config_result(
         "receipt": {"path": str(receipt_path), "sha256": receipt["receipt_sha256"], "compatibility": validation["compatibility"]},
         "compute": {
             **config.as_dict(),
-            "fallback_rate": 0.0,
-            "mean_active_width": config.mean_active_width(0.0),
-            "average_reduction": config.average_reduction(0.0),
+            "fallback_rate": float(config.fallback_rate_budget),
+            "mean_active_width": {"fit_train": fit_width_summary["mean"], "fit_dev": dev_width_summary["mean"]},
+            "average_reduction": {"fit_train": fit_average_reduction, "fit_dev": dev_average_reduction, "conservative": min(fit_average_reduction, dev_average_reduction)},
             "active_width_summary": {
-                "fit_train": summarize_active_widths(fit_widths).as_dict(),
-                "fit_dev": summarize_active_widths(dev_widths).as_dict(),
+                "fit_train": fit_width_summary,
+                "fit_dev": dev_width_summary,
             },
             "fit_train_fallback_rate": float(fallback_mask_fit.mean()),
             "fit_dev_fallback_rate": float(fallback_mask_dev.mean()),
