@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import subprocess
 import sys
 from collections import Counter
 from pathlib import Path
@@ -57,11 +58,26 @@ def _runtime_preflight(repo_root: Path) -> tuple[dict[str, Any], dict[str, Any]]
         raise RuntimeError(f"WINDOWS_RUNTIME_LOCK_REQUIRED: {lock}")
     payload = lock.get("payload", {})
     current_commit = current_git_commit()
-    if str(payload.get("code_commit", "")) != current_commit:
-        raise RuntimeError(
-            "WINDOWS_RUNTIME_LOCK_CODE_COMMIT_MISMATCH: "
-            f"lock={payload.get('code_commit')} current={current_commit}; refresh the lock before replay"
-        )
+    locked_commit = str(payload.get("code_commit", ""))
+    if locked_commit != current_commit:
+        try:
+            changed = {
+                line.strip().replace("/", "\\")
+                for line in subprocess.check_output(
+                    ["git", "diff", "--name-only", f"{locked_commit}..{current_commit}"],
+                    cwd=repo_root,
+                    text=True,
+                ).splitlines()
+                if line.strip()
+            }
+        except (OSError, subprocess.CalledProcessError) as exc:
+            raise RuntimeError(f"WINDOWS_RUNTIME_LOCK_CODE_COMMIT_UNRESOLVED: lock={locked_commit} current={current_commit}") from exc
+        allowed_runtime_receipt_changes = {"runs\\windows-runtime-lock.json", "runs\\windows-environment-receipt.json"}
+        if not changed or not changed.issubset(allowed_runtime_receipt_changes):
+            raise RuntimeError(
+                "WINDOWS_RUNTIME_LOCK_CODE_COMMIT_MISMATCH: "
+                f"lock={locked_commit} current={current_commit} changed={sorted(changed)}; refresh the lock after source changes"
+            )
     environment = collect_environment(repo_root=repo_root)
     checked = check_runtime_lock(environment, repo_root / "runs" / "windows-runtime-lock.json")
     if checked.get("status") != "LOCKED" or not checked.get("ok"):
@@ -70,7 +86,7 @@ def _runtime_preflight(repo_root: Path) -> tuple[dict[str, Any], dict[str, Any]]
         "status": "LOCKED",
         "lock_path": str(repo_root / "runs" / "windows-runtime-lock.json"),
         "lock_sha256": payload.get("lock_sha256"),
-        "code_commit": payload.get("code_commit"),
+        "code_commit": locked_commit,
         "platform": payload.get("platform"),
         "python_version": payload.get("python_version"),
         "torch_version": payload.get("torch_version"),
@@ -110,7 +126,7 @@ def main() -> int:
         selected_pairs = [(index, item) for index, item in selected_pairs if index in wanted]
     if args.max_records is not None:
         selected_pairs = selected_pairs[: max(0, int(args.max_records))]
-    code_commit = current_git_commit()
+    code_commit = str(runtime_identity.get("code_commit") or current_git_commit())
     code_identity = {
         "code_commit": code_commit,
         "metric_policy_version": STRUCTURAL_POLICY_VERSION,
