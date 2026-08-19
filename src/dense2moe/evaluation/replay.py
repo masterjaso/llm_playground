@@ -114,23 +114,29 @@ def _expand_metadata(records: Sequence[Mapping[str, Any]], count: int, split: st
     rows: list[dict[str, Any] | None] = [None] * count
     if not records:
         return tuple({"independent_group": f"{split}:row:{index}", "group_identity": f"{split}:row:{index}"} for index in range(count))
+    cursor = 0
     for item in records:
+        if cursor >= count:
+            break
         try:
-            offset = int(item.get("offset", 0))
             length = int(item.get("length", 0))
         except (TypeError, ValueError) as exc:
-            raise ReplayInputError("activation record offset/length is not an integer") from exc
-        if offset < 0 or length <= 0 or offset + length > count:
-            raise ReplayInputError(f"activation record range is outside shard: offset={offset}, length={length}, count={count}")
-        identity = str(item.get("example_id") or item.get("source_record_index") or f"{split}:record:{offset}")
+            raise ReplayInputError("activation record length is not an integer") from exc
+        if length <= 0:
+            raise ReplayInputError(f"activation record length is not positive: {length}")
+        identity = str(item.get("example_id") or item.get("source_record_index") or f"{split}:record:{cursor}")
         metadata = {"independent_group": identity, "group_identity": identity}
         for key in ("source_family", "domain", "residual_difficulty", "hard_token"):
             if key in item:
                 metadata[key] = item[key]
-        for index in range(offset, offset + length):
-            if rows[index] is not None:
-                raise ReplayInputError(f"activation records overlap at row {index}")
+        # Pilot manifests retain the original example lengths even when a
+        # stable-prefix shard contains fewer rows than the first example.  The
+        # records are ordered, so consume only the prefix represented by this
+        # shard; full captures consume the complete sequence of records.
+        take = min(length, count - cursor)
+        for index in range(cursor, cursor + take):
             rows[index] = dict(metadata)
+        cursor += take
     if any(item is None for item in rows):
         raise ReplayInputError("activation records do not cover the complete shard")
     return tuple(item for item in rows if item is not None)
