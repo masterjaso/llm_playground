@@ -507,7 +507,8 @@ def run_frontier(
     runtime_payload = json.loads(runtime_path.read_text(encoding="utf-8"))
     runtime_sha = sha256_file(runtime_path)
     expected_runtime_sha = str(prereg["runtime"].get("lock_sha256", ""))
-    amendment_path = run_root / "planning" / "phase-02-runtime-amendment.json"
+    amendment_candidates = sorted((run_root / "planning").glob("phase-02-runtime-amendment*.json"))
+    amendment_path = amendment_candidates[-1] if amendment_candidates else run_root / "planning" / "phase-02-runtime-amendment.json"
     amendment = json.loads(amendment_path.read_text(encoding="utf-8")) if amendment_path.is_file() else None
     if runtime_sha != expected_runtime_sha:
         effective = (amendment or {}).get("effective_runtime", {})
