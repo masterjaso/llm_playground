@@ -1,0 +1,96 @@
+{
+  "all_validation_oracle_comparison": {
+    "exact_global_nmse": 0.01398388296365738,
+    "exact_mean_cosine": 0.984875500202179,
+    "exact_mean_token_relative_mse": 0.02990715205669403,
+    "student_global_nmse": 0.022895073518157005,
+    "student_mean_cosine": 0.9815968871116638,
+    "student_mean_token_relative_mse": 0.04889122396707535,
+    "tokens": 16384
+  },
+  "code_commit": "0f7edb3483ee94939d9f0e695d72dc919dc0c2ab",
+  "hard_quartile_oracle_comparison": {
+    "exact_global_nmse": 0.012785853818058968,
+    "exact_mean_cosine": 0.9673048257827759,
+    "exact_mean_token_relative_mse": 0.06348618865013123,
+    "student_global_nmse": 0.022343676537275314,
+    "student_mean_cosine": 0.9571135640144348,
+    "student_mean_token_relative_mse": 0.10872896015644073,
+    "tokens": 4096
+  },
+  "initial_validation": {
+    "cosine": 0.9815968861803412,
+    "dead_experts": 0,
+    "excluded_count": 0,
+    "load_cv": 0.4430058872459237,
+    "mse": 2.0282500179291675e-05,
+    "normalized_mse": 0.022895071756446433,
+    "router_entropy": 2.5928049255162477,
+    "selected_count": 16384,
+    "selected_counts": [
+      8496.0,
+      7196.0,
+      6105.0,
+      5018.0,
+      4426.0,
+      4095.0,
+      4338.0,
+      4355.0,
+      3910.0,
+      3242.0,
+      2920.0,
+      2165.0,
+      2533.0,
+      2222.0,
+      2247.0,
+      2268.0
+    ],
+    "split": "train",
+    "streaming": true,
+    "token_count": 16384
+  },
+  "selector_metrics": {
+    "all_validation": {
+      "exact_set_match": 0.55841064453125,
+      "mean_jaccard": 0.7972045898437499,
+      "topk_recall": 0.863525390625
+    },
+    "hard_quartile": {
+      "exact_set_match": 0.506103515625,
+      "mean_jaccard": 0.745761253720238,
+      "topk_recall": 0.818603515625
+    }
+  },
+  "status": "NONLINEAR_LISTWISE_ROUTER_COMPLETE",
+  "strict_reload_validation": {
+    "cosine": 0.9815968861803412,
+    "dead_experts": 0,
+    "excluded_count": 0,
+    "load_cv": 0.4430058872459237,
+    "mse": 2.0282500179291675e-05,
+    "normalized_mse": 0.022895071756446433,
+    "router_entropy": 2.5928049255162477,
+    "selected_count": 16384,
+    "selected_counts": [
+      8496.0,
+      7196.0,
+      6105.0,
+      5018.0,
+      4426.0,
+      4095.0,
+      4338.0,
+      4355.0,
+      3910.0,
+      3242.0,
+      2920.0,
+      2165.0,
+      2533.0,
+      2222.0,
+      2247.0,
+      2268.0
+    ],
+    "split": "train",
+    "streaming": true,
+    "token_count": 16384
+  }
+}

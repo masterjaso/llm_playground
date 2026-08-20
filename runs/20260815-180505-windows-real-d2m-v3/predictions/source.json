@@ -1,0 +1,19 @@
+{
+  "code_commit": "6617130b4dcd14ea462d4c358ae70c7807d631e4",
+  "contract": {
+    "expected_artifacts": [
+      "source-manifest.json"
+    ],
+    "expected_observations": [
+      "pinned revision",
+      "verified text config geometry",
+      "text tensor inventory"
+    ],
+    "expected_validation_results": [
+      "SOURCE_READY"
+    ]
+  },
+  "phase": "source",
+  "result": "confirmed",
+  "timestamp": "2026-08-15T18:05:37.599799Z"
+}

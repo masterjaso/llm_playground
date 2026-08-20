@@ -1,0 +1,243 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://nehemiah-steward-protocol.local/contracts/deep-surface-taxonomy.schema.json",
+  "title": "NSP Deep Surface Taxonomy",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "epicId",
+    "publicSkills",
+    "skillClasses",
+    "skillMigration",
+    "cliModules",
+    "cliVisibility",
+    "domainLanguage",
+    "personas",
+    "knowledgeFabric",
+    "executionDisciplines",
+    "durableState",
+    "compatibility"
+  ],
+  "properties": {
+    "schemaVersion": { "type": "integer", "const": 1 },
+    "epicId": { "type": "string", "const": "epic-nsp-deep-surface-realignment" },
+    "publicSkills": {
+      "type": "array",
+      "minItems": 8,
+      "maxItems": 8,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "intent", "brand"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^nsp-[a-z]+-[a-z]+$" },
+          "intent": { "type": "string", "minLength": 1 },
+          "brand": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "skillClasses": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["public", "internal", "lifecycle", "worker", "discipline"],
+      "properties": {
+        "public": { "type": "string" },
+        "internal": { "type": "string" },
+        "lifecycle": { "type": "string" },
+        "worker": { "type": "string" },
+        "discipline": { "type": "string" }
+      }
+    },
+    "skillMigration": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["from", "to", "class"],
+        "properties": {
+          "from": { "type": ["string", "null"] },
+          "to": { "type": ["string", "null"] },
+          "class": {
+            "type": "string",
+            "enum": ["public", "internal", "lifecycle", "worker", "discipline"]
+          },
+          "notes": { "type": "string" }
+        }
+      }
+    },
+    "cliModules": {
+      "type": "array",
+      "minItems": 5,
+      "maxItems": 5,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "primaryOperations", "intendedSkillOwner"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "enum": ["project", "knowledge", "work", "maintain", "env"]
+          },
+          "primaryOperations": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 7,
+            "items": { "type": "string" }
+          },
+          "intendedSkillOwner": { "type": ["string", "null"] }
+        }
+      }
+    },
+    "cliVisibility": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["levels", "rootHelpExposes", "advancedDiscovery"],
+      "properties": {
+        "levels": {
+          "type": "array",
+          "items": { "type": "string", "enum": ["normal", "module", "advanced"] }
+        },
+        "rootHelpExposes": {
+          "type": "array",
+          "minItems": 5,
+          "maxItems": 5,
+          "items": { "type": "string" }
+        },
+        "advancedDiscovery": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "domainLanguage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "canonicalRoot",
+        "authorityLifecycle",
+        "semanticOwner",
+        "cliSemanticMutationsAllowed",
+        "admissionPolicy"
+      ],
+      "properties": {
+        "canonicalRoot": { "type": "string", "const": ".docs/domain" },
+        "authorityLifecycle": {
+          "type": "array",
+          "minItems": 4,
+          "maxItems": 4,
+          "items": {
+            "type": "string",
+            "enum": ["inferred", "proposed", "canonical", "deprecated"]
+          }
+        },
+        "semanticOwner": { "type": "string", "const": "nsp-insight-berean" },
+        "cliSemanticMutationsAllowed": { "type": "boolean", "const": false },
+        "admissionPolicy": { "type": "string", "minLength": 1 }
+      }
+    },
+    "personas": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["categoryRenameFrom", "categoryRenameTo", "boundary"],
+      "properties": {
+        "categoryRenameFrom": { "type": "string", "const": "Domain personas" },
+        "categoryRenameTo": { "type": "string", "const": "Project Personas" },
+        "boundary": { "type": "string", "minLength": 1 }
+      }
+    },
+    "knowledgeFabric": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["entryCommand", "lenses", "focusFlag", "unifyExperienceNotStorage"],
+      "properties": {
+        "entryCommand": { "type": "string", "const": "knowledge view" },
+        "lenses": {
+          "type": "array",
+          "minItems": 10,
+          "maxItems": 10,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "enum": [
+              "overview",
+              "architecture",
+              "feature",
+              "code",
+              "domain",
+              "governance",
+              "ownership",
+              "risk",
+              "review",
+              "repair"
+            ]
+          }
+        },
+        "focusFlag": { "type": "string", "const": "--focus" },
+        "unifyExperienceNotStorage": { "type": "boolean", "const": true }
+      }
+    },
+    "executionDisciplines": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "verificationBeforeClaim",
+        "genesisInquiryDepths",
+        "exhaustivePrReview",
+        "adaptiveTestFirst",
+        "workspaceIsolation"
+      ],
+      "properties": {
+        "verificationBeforeClaim": { "type": "boolean", "const": true },
+        "genesisInquiryDepths": {
+          "type": "array",
+          "items": { "type": "string", "enum": ["none", "compact", "deep"] }
+        },
+        "exhaustivePrReview": { "type": "boolean", "const": true },
+        "adaptiveTestFirst": { "type": "boolean", "const": true },
+        "workspaceIsolation": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["optional", "mandatory", "capabilityBased"],
+          "properties": {
+            "optional": { "type": "boolean", "const": true },
+            "mandatory": { "type": "boolean", "const": false },
+            "capabilityBased": { "type": "boolean", "const": true }
+          }
+        }
+      }
+    },
+    "durableState": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["beaconPath", "beaconFields", "metricsPath", "capabilitiesPath", "forbiddenDurablePaths"],
+      "properties": {
+        "beaconPath": { "type": "string", "const": ".nsp/project.json" },
+        "beaconFields": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "metricsPath": { "type": "string", "const": ".nsp/metrics.json" },
+        "capabilitiesPath": { "type": "string", "const": ".nsp/capabilities.json" },
+        "forbiddenDurablePaths": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "compatibility": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["preserveOldCliRootsAsAliases", "preserveProvenanceEnvelope", "semanticJudgmentByCli"],
+      "properties": {
+        "preserveOldCliRootsAsAliases": { "type": "boolean", "const": true },
+        "preserveProvenanceEnvelope": { "type": "boolean", "const": true },
+        "semanticJudgmentByCli": { "type": "boolean", "const": false }
+      }
+    }
+  }
+}

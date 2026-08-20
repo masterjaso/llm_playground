@@ -1,0 +1,149 @@
+{
+  "basis_source": "trained_checkpoint",
+  "checkpoint_path": "runs\\20260815-184644-windows-real-d2m-v4-streaming\\layer-checkpoints\\clean-validation\\p16-top4-refined-course-correction-continue\\layer-0000.safetensors",
+  "checkpoint_tensor_sha256": "6693d65b1cf2bc731c2ec3d84b7872bc6f79fe8c1363ba422848269e3a7a6acb",
+  "code_commit": "a4ae7be746bb9b51c55ea67c6457c46633305d0c",
+  "dtype": "float32",
+  "hidden_size": 5120,
+  "holdout_opened": false,
+  "metrics": {
+    "arbitrary_topk_reconstruction": {
+      "cosine_agreement": 0.9999999999999275,
+      "max_absolute_error": 3.814697265625e-06,
+      "mean_absolute_error": 1.5424575394717976e-07,
+      "mse": 4.114725587369534e-14
+    },
+    "final_ffn_reconstruction": {
+      "cosine_agreement": 0.9999999999999275,
+      "max_absolute_error": 3.814697265625e-06,
+      "mean_absolute_error": 1.5424575394717976e-07,
+      "mse": 4.114725587369534e-14
+    },
+    "routed_all": {
+      "cosine_agreement": 0.9999999999997349,
+      "max_absolute_error": 1.1444091796875e-05,
+      "mean_absolute_error": 9.475255692559248e-08,
+      "mse": 1.6494857662727525e-14
+    },
+    "routed_expert_0": {
+      "cosine_agreement": 0.999999999999901,
+      "max_absolute_error": 1.1444091796875e-05,
+      "mean_absolute_error": 1.2516363554482268e-07,
+      "mse": 4.676816407549937e-14
+    },
+    "routed_expert_1": {
+      "cosine_agreement": 0.9999999999998912,
+      "max_absolute_error": 3.814697265625e-06,
+      "mean_absolute_error": 1.0587175474086052e-07,
+      "mse": 1.934154309393874e-14
+    },
+    "routed_expert_10": {
+      "cosine_agreement": 0.9999999999996572,
+      "max_absolute_error": 1.430511474609375e-06,
+      "mean_absolute_error": 9.648250696159266e-08,
+      "mse": 1.4977932354241264e-14
+    },
+    "routed_expert_11": {
+      "cosine_agreement": 0.9999999999996789,
+      "max_absolute_error": 7.152557373046875e-07,
+      "mean_absolute_error": 8.203960046859749e-08,
+      "mse": 1.0757699376146619e-14
+    },
+    "routed_expert_12": {
+      "cosine_agreement": 0.9999999999997045,
+      "max_absolute_error": 9.5367431640625e-07,
+      "mean_absolute_error": 8.536883129295348e-08,
+      "mse": 1.1827495987547314e-14
+    },
+    "routed_expert_13": {
+      "cosine_agreement": 0.9999999999996259,
+      "max_absolute_error": 5.364418029785156e-07,
+      "mean_absolute_error": 8.7503142509604e-08,
+      "mse": 1.238435288485386e-14
+    },
+    "routed_expert_14": {
+      "cosine_agreement": 0.9999999999996408,
+      "max_absolute_error": 4.0978193283081055e-07,
+      "mean_absolute_error": 8.05677723647591e-08,
+      "mse": 1.0444187701927165e-14
+    },
+    "routed_expert_15": {
+      "cosine_agreement": 0.9999999999996125,
+      "max_absolute_error": 4.023313522338867e-07,
+      "mean_absolute_error": 7.70164644947613e-08,
+      "mse": 9.393571484263835e-15
+    },
+    "routed_expert_2": {
+      "cosine_agreement": 0.9999999999998556,
+      "max_absolute_error": 3.814697265625e-06,
+      "mean_absolute_error": 9.895682813176876e-08,
+      "mse": 1.757529734160417e-14
+    },
+    "routed_expert_3": {
+      "cosine_agreement": 0.9999999999998139,
+      "max_absolute_error": 4.76837158203125e-06,
+      "mean_absolute_error": 1.0431412125200268e-07,
+      "mse": 1.999183377995768e-14
+    },
+    "routed_expert_4": {
+      "cosine_agreement": 0.9999999999998033,
+      "max_absolute_error": 2.86102294921875e-06,
+      "mean_absolute_error": 9.380008365589277e-08,
+      "mse": 1.500244837442811e-14
+    },
+    "routed_expert_5": {
+      "cosine_agreement": 0.9999999999997817,
+      "max_absolute_error": 1.9073486328125e-06,
+      "mean_absolute_error": 1.0115251658504576e-07,
+      "mse": 1.700477332953246e-14
+    },
+    "routed_expert_6": {
+      "cosine_agreement": 0.999999999999745,
+      "max_absolute_error": 9.5367431640625e-07,
+      "mean_absolute_error": 9.095198105768532e-08,
+      "mse": 1.3300531404139752e-14
+    },
+    "routed_expert_7": {
+      "cosine_agreement": 0.9999999999997081,
+      "max_absolute_error": 2.384185791015625e-06,
+      "mean_absolute_error": 9.818085082713423e-08,
+      "mse": 1.6175897127446993e-14
+    },
+    "routed_expert_8": {
+      "cosine_agreement": 0.999999999999674,
+      "max_absolute_error": 1.9073486328125e-06,
+      "mean_absolute_error": 9.627334947026611e-08,
+      "mse": 1.5335199863511675e-14
+    },
+    "routed_expert_9": {
+      "cosine_agreement": 0.9999999999996645,
+      "max_absolute_error": 7.152557373046875e-07,
+      "mean_absolute_error": 9.239747145173283e-08,
+      "mse": 1.363679442460139e-14
+    },
+    "shared": {
+      "cosine_agreement": 0.9999999999998918,
+      "max_absolute_error": 1.9073486328125e-06,
+      "mean_absolute_error": 8.27098119771108e-08,
+      "mse": 1.1903731022129505e-14
+    }
+  },
+  "partition_canonical_sha256": "c941d4e08793fedd1f4665f867abc8e024920581a900c43a38ca0d80ef2cbc42",
+  "partition_path": "runs\\20260815-184644-windows-real-d2m-v4-streaming\\partitions\\high-sparsity-p16-top4.json",
+  "partition_sha256": "6de8c65d27aff4054d791b80d0dfcf273d552f15e2e4de6592cfd3f8220e03be",
+  "rows": 2,
+  "schema_version": 1,
+  "status": "CHECKPOINT_CONTRIBUTION_EQUIVALENCE_PASS",
+  "tolerances": {
+    "cosine_agreement": 0.999999,
+    "max_absolute_error": 5e-05,
+    "mean_absolute_error": 5e-06,
+    "mse": 1e-09
+  },
+  "topology": {
+    "expert_count": 16,
+    "expert_width": 1024,
+    "shared_width": 1024,
+    "top_k": 4
+  }
+}

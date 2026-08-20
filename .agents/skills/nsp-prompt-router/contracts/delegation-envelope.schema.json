@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://nehemiah-steward-protocol.local/contracts/delegation-envelope.schema.json",
+  "title": "NSP Delegation Envelope",
+  "description": "Harness-neutral parent-to-sub-agent entry contract. When NSP_ENTRY_MODE is delegated, the child must skip top-level genesis, broad routing, persona discovery, and epic ownership.",
+  "type": "object",
+  "required": [
+    "NSP_ENTRY_MODE",
+    "ROUTING_STATUS",
+    "EPIC_OWNER",
+    "TASK_TYPE",
+    "OBJECTIVE",
+    "SCOPE",
+    "EXCLUSIONS",
+    "EXPECTED_OUTPUT"
+  ],
+  "additionalProperties": true,
+  "properties": {
+    "NSP_ENTRY_MODE": { "const": "delegated" },
+    "ROUTING_STATUS": { "const": "complete" },
+    "EPIC_OWNER": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Primary/coordinating agent identity or label. Delegated agents must not become epic owners."
+    },
+    "TASK_TYPE": {
+      "type": "string",
+      "enum": [
+        "bounded research",
+        "adversarial review",
+        "implementation",
+        "validation",
+        "direct",
+        "bounded"
+      ]
+    },
+    "OBJECTIVE": { "type": "string", "minLength": 1 },
+    "SCOPE": { "type": "string", "minLength": 1 },
+    "EXCLUSIONS": { "type": "string", "minLength": 1 },
+    "EXPECTED_OUTPUT": { "type": "string", "minLength": 1 },
+    "REQUIRED_CONTEXT": { "type": "string" },
+    "PERSONA": { "type": "string" },
+    "RISK": { "type": "string" },
+    "CONTEXT_POLICY": {
+      "type": "string",
+      "const": "envelope-only",
+      "description": "Delegates must not ingest parent chat history. Use only this envelope, REQUIRED_CONTEXT, and path-local safety guidance."
+    },
+    "EFFORT_CLASS": {
+      "type": "string",
+      "enum": ["lowest-sufficient", "standard", "high"],
+      "description": "Optional harness-owned effort hint. Prefer lowest-sufficient for mechanical implement/validate slices when available. Not a model or provider identity."
+    },
+    "SEPARATION": {
+      "type": "string",
+      "enum": ["orchestrate", "implement", "validate", "research", "adversarial-review"],
+      "description": "Optional role separation for this delegate. Prefer distinct implement vs validate/adversarial-review agents when the harness supports fresh context."
+    },
+    "DO_NOT": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Explicit prohibitions. defaults include no re-genesis, no re-routing, no new epic."
+    }
+  }
+}

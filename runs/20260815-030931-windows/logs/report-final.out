@@ -1,0 +1,52 @@
+{
+  "artifacts": {},
+  "blocker": null,
+  "last_successful_command": "inspect-source",
+  "next_exact_command": "d2m prepare-data --run-dir runs\\20260815-030931-windows",
+  "phase": "pilot",
+  "phase_status": "pending",
+  "run_id": "20260815-030931-windows",
+  "terminal_state": null,
+  "validation": {
+    "pilot": {
+      "layer": 0,
+      "next_exact_command": "d2m prepare-data --run-dir runs\\20260815-030931-windows",
+      "note": "untrained sparse error is a structural pilot, not a retained-quality claim",
+      "real_layer": true,
+      "results": [
+        {
+          "all_expert_reconstruction_mse": 4.0550497530135454e-13,
+          "batch_size": 2,
+          "dense_mse": 0.0,
+          "initial_sparse_relative_mse": 0.7824452430310491,
+          "layer": 0,
+          "profile": "qwen38_p32s1_top2",
+          "source_tensor_shard": "model-00001-of-00018.safetensors",
+          "status": "measured"
+        },
+        {
+          "all_expert_reconstruction_mse": 4.2874514702417876e-13,
+          "batch_size": 2,
+          "dense_mse": 0.0,
+          "initial_sparse_relative_mse": 0.7211312899597953,
+          "layer": 0,
+          "profile": "qwen38_p16s1_top2",
+          "source_tensor_shard": "model-00001-of-00018.safetensors",
+          "status": "measured"
+        },
+        {
+          "all_expert_reconstruction_mse": 4.3557830411121434e-13,
+          "batch_size": 2,
+          "dense_mse": 0.0,
+          "initial_sparse_relative_mse": 0.610205266587065,
+          "layer": 0,
+          "profile": "qwen38_p8s1_top2",
+          "source_tensor_shard": "model-00001-of-00018.safetensors",
+          "status": "measured"
+        }
+      ],
+      "source_dir": "runs\\20260815-030931-windows\\source",
+      "status": "PILOT_COMPLETE"
+    }
+  }
+}

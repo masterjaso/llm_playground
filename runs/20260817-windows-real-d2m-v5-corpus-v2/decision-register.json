@@ -1,0 +1,45 @@
+{
+  "active_targets": {
+    "primary_product": {
+      "expert_width": 512,
+      "ffn_reduction": 0.7941176470588235,
+      "profile": "qwen38_p32s1_top5",
+      "routed_experts": 32,
+      "shared_width": 1024,
+      "top_k": 5,
+      "topology": "p32/top5"
+    },
+    "safe_fallback": {
+      "expert_width": 1024,
+      "ffn_reduction": 0.7058823529411764,
+      "profile": "qwen38_p16s1_top4",
+      "routed_experts": 16,
+      "shared_width": 1024,
+      "top_k": 4,
+      "topology": "p16/top4"
+    }
+  },
+  "blocker": "BASIS_QUALITY",
+  "code_commit": "b750733f3c2c337410f466c9bfc5c7db3042f941",
+  "corpus_v2": {
+    "manifest": "data/public_v2/corpus.jsonl",
+    "receipt": "data/public_v2/corpus-v2-receipt.json",
+    "status": "CORPUS_V2_FROZEN"
+  },
+  "forbidden_targets": [
+    "qwen38_p32s1_top4"
+  ],
+  "historical_holdout_tuning": false,
+  "official_holdout": "CLOSED",
+  "oracle_routing": {
+    "p16_assignment": "exhaustive_top4",
+    "p32_assignment": "bounded_validated_candidate_search",
+    "selector_controls_basis_gradients": false,
+    "status": "IMPLEMENTED"
+  },
+  "parent_run_id": "20260815-184644-windows-real-d2m-v4-streaming",
+  "replay_gate": "BLOCKED_NO_GREEN_CANDIDATE",
+  "run_id": "20260817-windows-real-d2m-v5-corpus-v2",
+  "schema_version": 3,
+  "serious_basis_refinement": "PAUSED_UNTIL_CORPUS_V2_FROZEN_AND_SMOKE_GREEN"
+}

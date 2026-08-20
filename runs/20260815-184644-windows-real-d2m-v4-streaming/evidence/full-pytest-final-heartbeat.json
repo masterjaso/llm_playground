@@ -1,0 +1,25 @@
+{
+  "argv": [
+    "bash",
+    "-lc",
+    "TMPDIR=/tmp .venv/bin/python -m pytest -q --basetemp=/tmp/llm-playground-pytest-final"
+  ],
+  "child_output_stale": false,
+  "completed": 0,
+  "elapsed_seconds": 44.00129567901604,
+  "last_child_output_age_seconds": 1.307814532017801,
+  "last_child_output_at": "2026-08-16T20:02:46.758913+00:00",
+  "last_heartbeat": "2026-08-16T20:02:48.066796+00:00",
+  "output_lines_dropped": 0,
+  "pid": 2808161,
+  "returncode": 0,
+  "started": "2026-08-16T20:02:04.068921+00:00",
+  "status": "SUCCESS",
+  "stderr_bytes": 0,
+  "stderr_log_path": "runs/20260815-184644-windows-real-d2m-v4-streaming/logs/full-pytest-final.err",
+  "stdout_bytes": 160,
+  "stdout_log_path": "runs/20260815-184644-windows-real-d2m-v4-streaming/logs/full-pytest-final.out",
+  "task": "full-pytest-final",
+  "terminal_status": "DONE",
+  "total": null
+}

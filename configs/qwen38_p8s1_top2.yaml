@@ -1,6 +1,6 @@
 name: qwen38_p8s1_top2
 model: Qwen/Qwen3.8-27B
-revision: main
+revision: 1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0
 hidden_size: 5120
 dense_intermediate_size: 17408
 num_hidden_layers: 64
@@ -9,4 +9,3 @@ expert_intermediate_size: 2048
 shared_intermediate_size: 1024
 top_k: 2
 dtype: bfloat16
-

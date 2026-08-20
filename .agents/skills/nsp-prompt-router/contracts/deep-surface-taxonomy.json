@@ -1,0 +1,241 @@
+{
+  "schemaVersion": 1,
+  "epicId": "epic-nsp-deep-surface-realignment",
+  "publicSkills": [
+    {
+      "id": "nsp-adopt-ezra",
+      "intent": "Establish durable knowledge of an existing project",
+      "brand": "ezra"
+    },
+    {
+      "id": "nsp-insight-berean",
+      "intent": "Understand and investigate the project through evidence",
+      "brand": "berean"
+    },
+    {
+      "id": "nsp-plan-genesis",
+      "intent": "Turn ideas into evidence-backed executable plans",
+      "brand": "genesis"
+    },
+    {
+      "id": "nsp-build-bezalel",
+      "intent": "Implement work with right-sized engineering discipline",
+      "brand": "bezalel"
+    },
+    {
+      "id": "nsp-debug-watchman",
+      "intent": "Reproduce, diagnose, repair, and prove defects",
+      "brand": "watchman"
+    },
+    {
+      "id": "nsp-maintain-steward",
+      "intent": "Preserve code, context, domain, and CCB alignment",
+      "brand": "steward"
+    },
+    {
+      "id": "nsp-clean-purify",
+      "intent": "Safely clear ephemeral NSP artifacts without disturbing durable project state",
+      "brand": "purify"
+    },
+    {
+      "id": "nsp-review-discernment",
+      "intent": "Perform exhaustive evidence-backed change review",
+      "brand": "discernment"
+    }
+  ],
+  "skillClasses": {
+    "public": "User-facing semantic entry points discovered as primary skills.",
+    "internal": "Automatic control-plane or shared primitive behavior; not a peer user choice.",
+    "lifecycle": "Triggered by install/update/upgrade flows rather than normal day-to-day selection.",
+    "worker": "Specialized maintain/hygiene worker composed by Steward.",
+    "discipline": "Shared execution discipline referenced by Build/Debug/Review rather than a public skill."
+  },
+  "skillMigration": [
+    {
+      "from": "nsp-genesis-sweep",
+      "to": "nsp-adopt-ezra",
+      "class": "public",
+      "notes": "Adoption orchestration becomes Ezra."
+    },
+    {
+      "from": "nsp-insight-explain",
+      "to": "nsp-insight-berean",
+      "class": "public",
+      "notes": "Insight/explain becomes Berean; Domain curation primarily owned here."
+    },
+    {
+      "from": "nsp-prompt-genesis",
+      "to": "nsp-plan-genesis",
+      "class": "public",
+      "notes": "Planning/genesis becomes Plan Genesis."
+    },
+    {
+      "from": "nsp-pr-review",
+      "to": "nsp-review-discernment",
+      "class": "public",
+      "notes": "PR review becomes Discernment."
+    },
+    {
+      "from": "nsp-prompt-router",
+      "to": null,
+      "class": "internal",
+      "notes": "Automatic routing/control-plane behavior."
+    },
+    {
+      "from": "nsp-agent-workflow",
+      "to": "nsp-build-bezalel",
+      "class": "internal",
+      "notes": "Absorbed as Build execution primitive."
+    },
+    {
+      "from": "nsp-context-genesis",
+      "to": null,
+      "class": "internal",
+      "notes": "Reusable discovery primitive."
+    },
+    {
+      "from": "nsp-context-hygiene",
+      "to": "nsp-maintain-steward",
+      "class": "worker",
+      "notes": "Steward worker."
+    },
+    {
+      "from": "nsp-code-hygiene",
+      "to": "nsp-maintain-steward",
+      "class": "worker",
+      "notes": "Steward worker."
+    },
+    {
+      "from": "nsp-ccb-hygiene",
+      "to": "nsp-maintain-steward",
+      "class": "worker",
+      "notes": "Steward worker."
+    },
+    {
+      "from": "nsp-hygiene-maintain",
+      "to": "nsp-maintain-steward",
+      "class": "internal",
+      "notes": "Absorbed by Steward orchestration."
+    },
+    {
+      "from": null,
+      "to": "nsp-maintain-steward",
+      "class": "public",
+      "notes": "New public Maintain skill composing hygiene workers."
+    },
+    {
+      "from": "nsp-epic-execution",
+      "to": "nsp-build-bezalel",
+      "class": "internal",
+      "notes": "Build EPIC execution mode."
+    },
+    {
+      "from": "nsp-upgrade-version",
+      "to": null,
+      "class": "lifecycle",
+      "notes": "Lifecycle-triggered reconciliation."
+    },
+    {
+      "from": null,
+      "to": "nsp-build-bezalel",
+      "class": "public",
+      "notes": "New public Build skill."
+    },
+    {
+      "from": null,
+      "to": "nsp-debug-watchman",
+      "class": "public",
+      "notes": "New public Debug skill."
+    },
+    {
+      "from": null,
+      "to": "nsp-clean-purify",
+      "class": "public",
+      "notes": "Public artifact cleanup skill over the guarded project cleanup substrate."
+    }
+  ],
+  "cliModules": [
+    {
+      "id": "project",
+      "primaryOperations": ["setup", "validate", "update", "cleanup", "metrics", "(bare status summary)"],
+      "intendedSkillOwner": "nsp-adopt-ezra"
+    },
+    {
+      "id": "knowledge",
+      "primaryOperations": ["build", "validate", "view", "views", "inspect", "impact", "select"],
+      "intendedSkillOwner": "nsp-insight-berean"
+    },
+    {
+      "id": "work",
+      "primaryOperations": ["status", "list", "prepare", "prepare-pr", "close"],
+      "intendedSkillOwner": "nsp-build-bezalel"
+    },
+    {
+      "id": "maintain",
+      "primaryOperations": ["check", "plan", "apply-safe", "status", "close"],
+      "intendedSkillOwner": "nsp-maintain-steward"
+    },
+    {
+      "id": "env",
+      "primaryOperations": ["doctor", "install", "uninstall", "harness", "capability", "migrate"],
+      "intendedSkillOwner": null
+    }
+  ],
+  "cliVisibility": {
+    "levels": ["normal", "module", "advanced"],
+    "rootHelpExposes": ["project", "knowledge", "work", "maintain", "env"],
+    "advancedDiscovery": ["_nsp --help --all", "_nsp <module> --help --advanced"]
+  },
+  "domainLanguage": {
+    "canonicalRoot": ".docs/domain",
+    "authorityLifecycle": ["inferred", "proposed", "canonical", "deprecated"],
+    "semanticOwner": "nsp-insight-berean",
+    "cliSemanticMutationsAllowed": false,
+    "admissionPolicy": "Codify only project-specific or consequential terms; prefer fewer higher-value concepts; never silently promote inferred candidates to canonical."
+  },
+  "personas": {
+    "categoryRenameFrom": "Domain personas",
+    "categoryRenameTo": "Project Personas",
+    "boundary": "Domain Language defines what something means; Personas define who owns, routes, reviews, or validates work involving it."
+  },
+  "knowledgeFabric": {
+    "entryCommand": "knowledge view",
+    "lenses": [
+      "overview",
+      "architecture",
+      "feature",
+      "code",
+      "domain",
+      "governance",
+      "ownership",
+      "risk",
+      "review",
+      "repair"
+    ],
+    "focusFlag": "--focus",
+    "unifyExperienceNotStorage": true
+  },
+  "executionDisciplines": {
+    "verificationBeforeClaim": true,
+    "genesisInquiryDepths": ["none", "compact", "deep"],
+    "exhaustivePrReview": true,
+    "adaptiveTestFirst": true,
+    "workspaceIsolation": {
+      "optional": true,
+      "mandatory": false,
+      "capabilityBased": true
+    }
+  },
+  "durableState": {
+    "beaconPath": ".nsp/project.json",
+    "beaconFields": ["appliedNspVersion", "appliedAt"],
+    "metricsPath": ".nsp/metrics.json",
+    "capabilitiesPath": ".nsp/capabilities.json",
+    "forbiddenDurablePaths": [".nsp/state", ".nsp/config"]
+  },
+  "compatibility": {
+    "preserveOldCliRootsAsAliases": true,
+    "preserveProvenanceEnvelope": true,
+    "semanticJudgmentByCli": false
+  }
+}

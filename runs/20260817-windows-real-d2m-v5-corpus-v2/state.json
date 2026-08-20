@@ -1,0 +1,167 @@
+{
+  "active_blocker": "BASIS_QUALITY",
+  "artifact_paths": {
+    "corpus_manifest": "data/public_v2/corpus.jsonl",
+    "corpus_receipt": "data/public_v2/corpus-v2-receipt.json",
+    "corpus_splits": "data/public_v2/corpus-v2-splits.json",
+    "activation_sampling_plan": "data/public_v2/corpus-v2-receipt.json#activation_sampling_plan",
+    "legacy_canary": "data/public_v2/corpus-v1-canary.jsonl",
+    "oracle_module": "src/dense2moe/training/oracle_refinement.py",
+    "oracle_refinement": "scripts/run_oracle_routed_basis_refinement.py",
+    "parent_handoff": "runs/20260815-184644-windows-real-d2m-v4-streaming/HANDOFF.md",
+    "pilot_data_plan": "runs/20260817-windows-real-d2m-v5-corpus-v2/capture/corpus-v2-pilot-data-plan.json",
+    "pilot_source_manifest": "data/public_v2/corpus-v2-fit-source.jsonl"
+  },
+  "code_commit": "b750733f3c2c337410f466c9bfc5c7db3042f941",
+  "current_phase": "oracle-routed-basis-smoke",
+  "last_successful_command": "freeze-corpus-v2-complete-visible-trajectories-and-balanced-plan",
+  "next_exact_command": "PYTHONPATH=src python scripts/run_oracle_routed_basis_refinement.py --corpus-receipt data/public_v2/corpus-v2-receipt.json --topology p16/top4 --rows 2 --epochs 1",
+  "parent_run_id": "20260815-184644-windows-real-d2m-v4-streaming",
+  "phase_status": "blocked",
+  "prediction_contract": {},
+  "retry_counts": {},
+  "run_id": "20260817-windows-real-d2m-v5-corpus-v2",
+  "schema_version": 2,
+  "selected_profile": "qwen38_p16s1_top4",
+  "source_config_hash": null,
+  "source_index_hash": "e486410804daf54276eb43cc937751a40d97f9fdd7f8366c6fd7e3eecae9d00d",
+  "source_revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
+  "terminal_state": "BLOCKED",
+  "timestamps": {
+    "created": "2026-08-17T04:03:08.270393Z",
+    "updated": "2026-08-17T04:58:00Z"
+  },
+  "validation_results": {
+    "corpus_v2": {
+      "benchmark_denylist": {
+        "matches": [],
+        "status": "PASS",
+        "terms": [
+          "cruxeval",
+          "ds-1000",
+          "human-eval",
+          "humaneval",
+          "livecodebench",
+          "mbpp",
+          "swe-bench",
+          "swe-rebench",
+          "swebench"
+        ]
+      },
+      "budgets": {
+        "FIT-DEV": {
+          "records": 66,
+          "tokens": 358985
+        },
+        "FIT-TRAIN": {
+          "records": 332,
+          "tokens": 1208690
+        },
+        "GATE-A": {
+          "records": 75,
+          "tokens": 390442
+        },
+        "PRESERVATION-CANARY": {
+          "records": 96,
+          "tokens": 106757
+        },
+        "SHADOW-B": {
+          "records": 49,
+          "tokens": 167055
+        },
+        "SHADOW-C": {
+          "records": 58,
+          "tokens": 338928
+        }
+      },
+      "legacy_canary_preserved": true,
+      "manifest": "data/public_v2/corpus.jsonl",
+      "manifest_sha256": "b4e758527717c55127ea04fe3ee4b94087a7dcfd9deea39800c55657c00be35b",
+      "pilot_data_plan": {
+        "holdout_records": 8,
+        "holdout_tokens": 86310,
+        "path": "runs/20260817-windows-real-d2m-v5-corpus-v2/capture/corpus-v2-pilot-data-plan.json",
+        "sha256": "83aa64173abb43367aaaa39761e68c345cf4e18a621f31468e5086fa55d368c0",
+        "source_manifest": "data/public_v2/corpus-v2-fit-source.jsonl",
+        "source_manifest_sha256": "e486410804daf54276eb43cc937751a40d97f9fdd7f8366c6fd7e3eecae9d00d",
+        "status": "CORPUS_VERIFIED",
+        "teacher_capture": "NOT_STARTED",
+        "train_records": 30,
+        "train_tokens": 63421
+      },
+      "receipt": "data/public_v2/corpus-v2-receipt.json",
+      "receipt_sha256": "a62de56317146b5a8d2eb828f95aa65a4561e59ae918a9dea1b509feccc8ff6b",
+      "records": 676,
+      "repository_document_disjoint": true,
+      "splits": "data/public_v2/corpus-v2-splits.json",
+      "splits_sha256": "29a5f3b1dbcea6ea6df5ad3a6c27fad35c7d587bff0d738f9a28e63b5e7a8646",
+      "status": "CORPUS_V2_FROZEN",
+      "terms_recorded": true,
+      "task_ids_recorded": true,
+      "trajectory_complete_visible_sequences": true,
+      "activation_sampling_plan": {
+        "status": "READY_FOR_BALANCED_CAPTURE",
+        "trajectory_window_cap_tokens": 12288,
+        "planned_tokens": 750000,
+        "target_tokens": {
+          "agentic-software-engineering": 210000,
+          "code": 330000,
+          "software-engineering-natural-language": 90000,
+          "structured": 45000,
+          "general": 75000
+        },
+        "raw_source_mixture_out_of_range": ["software-engineering-natural-language", "structured", "general"],
+        "teacher_capture": "NOT_STARTED"
+      },
+      "evaluation_closure": {
+        "official_holdout": "CLOSED_FOR_THIS_RUN",
+        "historical_holdout": "PRIOR_RUN_OPENED_IMMUTABLE_NO_TUNING",
+        "internal_calibration_holdout": "PILOT_PLAN_ONLY",
+        "replay_gate": "BLOCKED"
+      },
+      "tokenizer_exact": "tokenizers.Tokenizer.encode(add_special_tokens=False)",
+      "trajectory_issue_disjoint": true
+    },
+    "oracle_routed_basis": {
+      "basis_stages": [
+        "shared-foundation",
+        "routed-residual",
+        "joint-refreshable"
+      ],
+      "module": "src/dense2moe/training/oracle_refinement.py",
+      "routing": "selector-independent E-step; p16 exhaustive; p32 bounded correlation candidate pool",
+      "serious_optimization": "NOT_STARTED",
+      "smoke": "BLOCKED_MISSING_USABLE_PYTORCH",
+      "smoke_command": "PYTHONPATH=src python scripts/run_oracle_routed_basis_refinement.py --corpus-receipt data/public_v2/corpus-v2-receipt.json --topology p16/top4 --rows 2 --epochs 1",
+      "receipt_artifact_gate": "PASS",
+      "training_or_replay": "NOT_STARTED",
+      "status": "IMPLEMENTED_NOT_GPU_RUN"
+    },
+    "reconciliation": {
+      "active_targets": [
+        "qwen38_p16s1_top4",
+        "qwen38_p32s1_top5"
+      ],
+      "forbidden_targets": [
+        "qwen38_p32s1_top4"
+      ],
+      "full64_replay": "BLOCKED",
+      "historical_holdout": "PRIOR_RUN_OPENED_IMMUTABLE_NO_TUNING",
+      "official_holdout": "CLOSED_FOR_THIS_RUN",
+      "primary_product": "p32/top5",
+      "representative_replay": "BLOCKED",
+      "safe_fallback": "p16/top4",
+      "serious_existing_corpus_refinement": "PAUSED",
+      "status": "RECONCILED_NEW_CHILD_RUN"
+    },
+    "verification": {
+      "artifact_hash_gate": "PASS",
+      "exact_token_audit": "PASS_676_RECORDS_ZERO_MISMATCHES",
+      "forged_receipt_rejection": "PASS",
+      "non_ml_tests": "PASS",
+      "python_compile": "PASS",
+      "receipt_gate": "PASS",
+      "torch_tests": "BLOCKED_MISSING_USABLE_PYTORCH_COLLECTION_ERRORS"
+    }
+  }
+}

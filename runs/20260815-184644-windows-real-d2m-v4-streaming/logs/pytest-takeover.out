@@ -1,0 +1,15 @@
+
+==================================== ERRORS ====================================
+_______________ ERROR collecting tests/test_load_aware_inputs.py _______________
+ImportError while importing test module '/mnt/c/workplace/llm_playground/tests/test_load_aware_inputs.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+/home/jason/.local/share/uv/python/cpython-3.11.15-linux-x86_64-gnu/lib/python3.11/importlib/__init__.py:126: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_load_aware_inputs.py:8: in <module>
+    from scripts.run_load_aware_oracle import _load_arrays
+E   ModuleNotFoundError: No module named 'scripts'
+=========================== short test summary info ============================
+ERROR tests/test_load_aware_inputs.py
+!!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!

@@ -37,6 +37,16 @@ class CoreTests(unittest.TestCase):
         self.assertEqual(profile.total_capacity, 20)
         profile.validate()
 
+    def test_p32_product_target_geometry(self):
+        from dense2moe.config import load_config
+
+        top5 = load_config("configs/qwen38_p32s1_top5.yaml")
+        top4 = load_config("configs/qwen38_p32s1_top4.yaml")
+        self.assertEqual(top5.active_intermediate_size, 3584)
+        self.assertAlmostEqual(top5.sparsity, 0.7941176470588235)
+        self.assertEqual(top4.active_intermediate_size, 3072)
+        self.assertAlmostEqual(top4.sparsity, 0.8235294117647058)
+
     def test_source_manifest_revision_pinned(self):
         from dense2moe.discovery.source import is_pinned_revision
 
@@ -170,6 +180,65 @@ class CoreTests(unittest.TestCase):
         store = StateStore(self.root / "run")
         store.transition(current_phase="source", phase_status="pending", next_exact_command="d2m test")
         self.assertEqual(store.load().next_exact_command, "d2m test")
+
+    def test_shadow_validation_is_disjoint_and_deterministic(self):
+        from dense2moe.training import deterministic_shadow_validation_indices
+
+        first, first_hash = deterministic_shadow_validation_indices(20, excluded_indices=[1, 3, 5], shadow_count=5, seed=9)
+        second, second_hash = deterministic_shadow_validation_indices(20, excluded_indices=[1, 3, 5], shadow_count=5, seed=9)
+        self.assertEqual(first, second)
+        self.assertEqual(first_hash, second_hash)
+        self.assertTrue(set(first).isdisjoint({1, 3, 5}))
+
+    def test_selector_split_contract_excludes_a_and_b_from_fit(self):
+        from dense2moe.training import validate_split_contract
+
+        contract = validate_split_contract(
+            12,
+            selection_indices=[2, 4],
+            validation_b_indices=[7, 9],
+            fit_exclude_indices=[2, 4, 7, 9],
+        )
+        self.assertEqual(contract["selection_indices"], (2, 4))
+        self.assertEqual(contract["validation_b_indices"], (7, 9))
+        self.assertEqual(contract["fit_exclude_indices"], (2, 4, 7, 9))
+        self.assertEqual(contract["fit_indices"], tuple(i for i in range(12) if i not in {2, 4, 7, 9}))
+
+    def test_selector_split_contract_rejects_b_in_selection_union(self):
+        from dense2moe.training import validate_split_contract
+
+        with self.assertRaisesRegex(ValueError, "validation-B cannot participate"):
+            validate_split_contract(
+                12,
+                selection_indices=[2, 4],
+                validation_b_indices=[7, 9],
+                fit_exclude_indices=[2, 4, 7, 9],
+                selection_union_indices=[2, 4, 7, 9],
+            )
+
+    def test_selector_split_contract_rejects_overlapping_a_and_b(self):
+        from dense2moe.training import validate_split_contract
+
+        with self.assertRaisesRegex(ValueError, "must be disjoint"):
+            validate_split_contract(
+                12,
+                selection_indices=[2, 4],
+                validation_b_indices=[4, 9],
+                fit_exclude_indices=[2, 4, 9],
+            )
+
+    def test_hard_dispatch_straight_through_has_hard_forward_and_soft_gradient(self):
+        import torch
+
+        from dense2moe.training.torch_distill import _hard_dispatch_straight_through
+
+        logits = torch.tensor([[2.0, 0.5, -1.0, -2.0]], requires_grad=True)
+        indices = torch.tensor([[0, 2]])
+        dispatch = _hard_dispatch_straight_through(logits, indices, top_k=2)
+        torch.testing.assert_close(dispatch.detach(), torch.tensor([[0.5, 0.0, 0.5, 0.0]]))
+        (dispatch * torch.tensor([[1.0, 2.0, 3.0, 4.0]])).sum().backward()
+        self.assertIsNotNone(logits.grad)
+        self.assertGreater(float(logits.grad.abs().sum()), 0.0)
 
     def test_job_queue_no_duplicate_lease(self):
         queue = JobQueue(self.root / "jobs.sqlite")

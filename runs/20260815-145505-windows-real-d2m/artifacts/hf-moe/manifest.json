@@ -1,0 +1,16 @@
+{
+  "complete": false,
+  "errors": [
+    "missing layers: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63]"
+  ],
+  "format": "dense2moe-manifest-v2",
+  "layers": [],
+  "metadata": {
+    "expected_layers": 64,
+    "profile": "qwen38_p8s1_top2",
+    "profile_hash": "6d1a8ad97a52eb7b4ff4fcc47a0a1cbc7a5abf500a15b807f24394d72629f27c",
+    "source_revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
+    "strict": true
+  },
+  "strict": true
+}

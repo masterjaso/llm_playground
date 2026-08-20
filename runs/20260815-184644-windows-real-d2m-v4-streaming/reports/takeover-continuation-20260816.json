@@ -1,0 +1,85 @@
+{
+  "schema_version": 1,
+  "status": "SELECTOR_GENERALIZATION_BLOCKED_REPLAY_PAUSED",
+  "classification": "FRESH_LAYER0_SELECTOR_AND_FIT_ORACLE_EVIDENCE_HOLDOUT_CLOSED",
+  "code_commit": "81f278460c1e70f9682befa047c75aee608612f7",
+  "evaluation_code_commit": "bcd56df8d723501bc9b99aed50dad1a4afe4646d",
+  "source_revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
+  "hypotheses": [
+    {
+      "name": "fresh_selector_hard_dispatch_regret_bce",
+      "hypothesis": "Hard top-k dispatch regularization and regret-weighted residual BCE improve p16/top4 routing load while the strongest verified expert/shared basis remains frozen.",
+      "falsifier": "A or B remains below the research gate, hard load CV remains above 0.50, or basis tensors change.",
+      "budget": {"epochs": 1, "microbatch": 512, "learning_rate": 0.00001, "hard_load_weight": 0.1, "oracle_weight": 0.1, "oracle_amplitude_weight": 0.05, "oracle_regret_weight": 1.0},
+      "decision": "research_candidate_only",
+      "report": "fresh-selector-layer0/reports/p16-top4-fresh-selector-hard-regret-bce.json",
+      "experiment_code_commit": "ce59145c46d53be6b7add12b101be352a921095d"
+    },
+    {
+      "name": "p16_load_constrained_oracle",
+      "hypothesis": "A bounded load-aware p16/top4 oracle can reach cosine >= 0.98 and load CV <= 0.50 on clean FIT evidence.",
+      "falsifier": "The exact candidate-set Pareto remains below cosine 0.98 or above load CV 0.50.",
+      "budget": {"tokens": 1024, "candidate_pool_size": 16, "max_combinations": 4096, "iterations": 8, "target_load_cv": 0.5, "holdout_opened": false},
+      "decision": "capacity_and_load_gate_not_met",
+      "report": "p16-top4-load-constrained-oracle-20260816.json"
+    }
+  ],
+  "fresh_capture": {
+    "run_dir": "fresh-selector-layer0",
+    "capture_report": "fresh-selector-layer0/reports/fresh-selector-layer0-capture.json",
+    "data_plan": "fresh-selector-layer0/capture/fresh-selector-data-plan.json",
+    "dataset_hash": "b9c35dacf0085c5d5a0aa0607713bfeadfd8192058d9b4a05414057e88c72823",
+    "train_tokens": 300256,
+    "layers": [0],
+    "existing_holdout_opened": false,
+    "historical_replay_touched": false
+  },
+  "validation_protocol": {
+    "ab_receipt": "fresh-selector-layer0/capture/fresh-selector-validation-ab.json",
+    "selection_split": "validation-A",
+    "selection_count": 16384,
+    "selection_indices_hash": "09eee32dccd33e8516262ee528e95ce920091058f59df2dbee8d32a40e2199aa",
+    "validation_b_count": 32768,
+    "validation_b_indices_hash": "99778f7618dd9bf1e38ca4acf20aa9fdbcf1bc8c59d15bd418124566bd789de9",
+    "fit_excluded_count": 49152,
+    "fit_excluded_indices_hash": "673c3780203357b5fa84f3eb591f9145584a9ffbd8a364f2a81c1bf39b2d07cf",
+    "selection_union_enabled": false,
+    "validation_b_checkpoint_selection": false,
+    "optimizer": "AdamW",
+    "holdout_opened": false
+  },
+  "basis": {
+    "profile": "qwen38_p16s1_top4",
+    "checkpoint": "layer-checkpoints/clean-validation/p16-top4-refined-course-correction-continue",
+    "frozen_basis_receipt": "reports/p16-top4-frozen-basis-20260816.json",
+    "tensor_sha256": "6693d65b1cf2bc731c2ec3d84b7872bc6f79fe8c1363ba422848269e3a7a6acb",
+    "partition_file": "partitions/high-sparsity-p16-top4.json",
+    "partition_file_sha256": "6de8c65d27aff4054d791b80d0dfcf273d552f15e2e4de6592cfd3f8220e03be",
+    "partition_canonical_sha256": "c941d4e08793fedd1f4665f867abc8e024920581a900c43a38ca0d80ef2cbc42",
+    "selector_basis_unchanged": true,
+    "selector_basis_hash_before": "b8465c50cbe102e8041f2f9c2dfb852e4516a5c69075793f2217eb076406cf72",
+    "selector_basis_hash_after": "b8465c50cbe102e8041f2f9c2dfb852e4516a5c69075793f2217eb076406cf72"
+  },
+  "fresh_selector_metrics": {
+    "validation_a": {"normalized_mse": 0.13519899272476502, "cosine": 0.937224889989011, "load_cv": 0.23297837895655868, "dead_experts": 0, "hard_load_balance": 1.054278925061226, "soft_load_cv": 0.037530082819324746, "hard_quartile_cosine": 0.8741879463195801},
+    "validation_b": {"normalized_mse": 0.1332869296680614, "cosine": 0.9378559359465726, "load_cv": 0.23574659032115616, "dead_experts": 0, "hard_load_balance": 1.055576454848051, "soft_load_cv": 0.04073510077073493, "hard_quartile_cosine": 0.8747104406356812},
+    "route_validation_a": {"oracle_route_recall": 0.6245269775390625, "oracle_exact_set_match": 0.13427734375, "oracle_mean_jaccard": 0.4995605468750156, "hard_quartile_recall": 0.45001220703125, "hard_quartile_cosine": 0.8741879463195801},
+    "route_validation_b": {"oracle_route_recall": 0.6264572143554688, "oracle_exact_set_match": 0.134368896484375, "oracle_mean_jaccard": 0.5015834263394426, "hard_quartile_recall": 0.450653076171875, "hard_quartile_cosine": 0.8747104406356812}
+  },
+  "p16_load_oracle_summary": {
+    "report": "reports/p16-top4-load-constrained-oracle-20260816.json",
+    "input_store": "evidence/contribution-stores/p16-top4-fit-1024",
+    "tokens": 1024,
+    "cosine": 0.9468026139765952,
+    "global_nmse": 0.04575237803126283,
+    "load_cv": 1.2523293725781068,
+    "dead_experts": 0,
+    "target_load_cv": 0.5,
+    "hard_feasible": false,
+    "pareto_penalties": [0.0, 0.05, 0.1, 0.25, 0.5, 1.0, 2.0]
+  },
+  "replay_gate": "BLOCKED_NO_GREEN_CANDIDATE",
+  "holdout_tuning": false,
+  "representative_replay_started": false,
+  "next_action": "Keep p16/top4 as safe fallback research only; do not replay or open holdout until fresh A and B both clear the green gate."
+}

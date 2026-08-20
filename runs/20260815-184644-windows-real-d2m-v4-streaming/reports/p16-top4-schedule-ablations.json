@@ -1,0 +1,973 @@
+{
+  "budget": {
+    "base_learning_rate": 0.0001,
+    "device": "cuda:1",
+    "microbatch": 512,
+    "seed": 17,
+    "total_stage_epochs": 3
+  },
+  "classification": "TRAIN_DEV_SCHEDULE_SELECTION_HOLDOUT_DEFERRED",
+  "code_commit": "4bb7cd19f4f07a579527e901e0a4229af092ecd8",
+  "holdout_policy": "full holdout is not opened by these schedule ablations; confirm only the selected finalists",
+  "partition": "runs\\20260815-184644-windows-real-d2m-v4-streaming\\partitions\\high-sparsity-p16-top4.json",
+  "profile": "qwen38_p16s1_top4",
+  "results": [
+    {
+      "code_commit": "4bb7cd19f4f07a579527e901e0a4229af092ecd8",
+      "final_selection": {
+        "cosine": 0.9672467894852161,
+        "dead_experts": 0,
+        "load_cv": 0.4560538869846677,
+        "mse": 4.030685604448081e-05,
+        "normalized_mse": 0.045498747868190074,
+        "router_entropy": 2.697793085128069,
+        "selected_count": 16384,
+        "selected_counts": [
+          7736.0,
+          7944.0,
+          6773.0,
+          5284.0,
+          4512.0,
+          4415.0,
+          3581.0,
+          2873.0,
+          3454.0,
+          3804.0,
+          3461.0,
+          2496.0,
+          2872.0,
+          2487.0,
+          2205.0,
+          1639.0
+        ],
+        "split": "train",
+        "streaming": true,
+        "token_count": 16384
+      },
+      "holdout_metrics": {
+        "cosine": null,
+        "dead_experts": null,
+        "load_cv": null,
+        "normalized_mse": null,
+        "selected_counts": [],
+        "split": "holdout",
+        "status": "DEFERRED_UNTIL_FINALIST_CONFIRMATION",
+        "streaming": true
+      },
+      "initial_selection": {
+        "cosine": 0.9276943891309202,
+        "dead_experts": 0,
+        "load_cv": 1.3019502473210516,
+        "mse": 7.489183149118616e-05,
+        "normalized_mse": 0.08453858456844444,
+        "router_entropy": 2.6507784659042954,
+        "selected_count": 16384,
+        "selected_counts": [
+          16112.0,
+          14714.0,
+          11488.0,
+          7187.0,
+          5574.0,
+          4546.0,
+          3297.0,
+          404.0,
+          464.0,
+          560.0,
+          561.0,
+          265.0,
+          140.0,
+          131.0,
+          92.0,
+          1.0
+        ],
+        "split": "train",
+        "streaming": true,
+        "token_count": 16384
+      },
+      "output_dir": "runs\\20260815-184644-windows-real-d2m-v4-streaming\\layer-checkpoints\\high-sparsity-schedule-ablation\\A_warm_joint",
+      "schedule": "A_warm_joint",
+      "stage_schedule": [
+        {
+          "epochs": 1,
+          "name": "router_warm_start",
+          "train_experts": false,
+          "train_scales": false,
+          "use_oracle_targets": true
+        },
+        {
+          "epochs": 2,
+          "learning_rates": {
+            "amplitude_router": 5e-05,
+            "expert_scales": 5e-05,
+            "experts": 0.0001,
+            "selection_router": 5e-05
+          },
+          "name": "joint_expert_router",
+          "train_experts": true,
+          "train_scales": true,
+          "use_oracle_targets": false
+        }
+      ],
+      "status": "TRAINED_DEV_SELECTED",
+      "training_config": {
+        "best_selection_stage": "joint_expert_router",
+        "device": "cuda:1",
+        "epochs": 1,
+        "holdout_evaluation": "deferred",
+        "initial_expert_scales": [
+          0.9999998932564707,
+          1.0000012221294605,
+          1.0000010781804758,
+          1.0000016247872652,
+          1.0000016350541296,
+          1.0000017011228253,
+          1.0000017447824492,
+          1.000001155533654,
+          1.0000011066008727,
+          1.0000010510359565,
+          1.0000009286755949,
+          1.0000019483954736,
+          1.000001818107384,
+          1.00000178843709,
+          1.0000025380145483,
+          1.000002161773717
+        ],
+        "learning_rate": 0.0001,
+        "loss_coefficients": {
+          "cosine": 0.05,
+          "load_balance": 0.05,
+          "mse": 1.0,
+          "router_z_loss": 0.001
+        },
+        "loss_version": "torch-distill-v1",
+        "microbatch": 512,
+        "optimizer": "AdamW",
+        "partition_path": "runs\\20260815-184644-windows-real-d2m-v4-streaming\\partitions\\high-sparsity-p16-top4.json",
+        "router_initialization": "bounded_train_contribution_lstsq",
+        "routing_mode": "independent_positive",
+        "selection_count": 16384,
+        "selection_indices_hash": "7b2ff822febb9191b88d04cacfa6bb80aec3c6dd42f9210683c6b9fd2167b15f",
+        "selection_split": "train_dev_subset",
+        "stage_schedule": [
+          {
+            "epochs": 1,
+            "learning_rate": 0.0001,
+            "learning_rates": {},
+            "name": "router_warm_start",
+            "train_amplitude_router": true,
+            "train_experts": false,
+            "train_scales": false,
+            "train_selection_router": true,
+            "use_oracle_targets": true
+          },
+          {
+            "epochs": 2,
+            "learning_rate": 0.0001,
+            "learning_rates": {
+              "amplitude_router": 5e-05,
+              "expert_scales": 5e-05,
+              "experts": 0.0001,
+              "selection_router": 5e-05
+            },
+            "name": "joint_expert_router",
+            "train_amplitude_router": true,
+            "train_experts": true,
+            "train_scales": true,
+            "train_selection_router": true,
+            "use_oracle_targets": false
+          }
+        ],
+        "stage_selection_metrics": [
+          {
+            "cosine": 0.9335018577985466,
+            "dead_experts": 1,
+            "load_cv": 1.372675523964573,
+            "mse": 5.5490272688984985e-05,
+            "normalized_mse": 0.06263792748873928,
+            "router_entropy": 2.5370764238759875,
+            "selected_count": 16384,
+            "selected_counts": [
+              16318.0,
+              15600.0,
+              12245.0,
+              8303.0,
+              5204.0,
+              3319.0,
+              2635.0,
+              501.0,
+              432.0,
+              321.0,
+              166.0,
+              302.0,
+              79.0,
+              90.0,
+              21.0,
+              0.0
+            ],
+            "split": "train",
+            "stage": "router_warm_start",
+            "streaming": true,
+            "token_count": 16384
+          },
+          {
+            "cosine": 0.9672467894852161,
+            "dead_experts": 0,
+            "load_cv": 0.4560538869846677,
+            "mse": 4.030685604448081e-05,
+            "normalized_mse": 0.045498747868190074,
+            "router_entropy": 2.697793085128069,
+            "selected_count": 16384,
+            "selected_counts": [
+              7736.0,
+              7944.0,
+              6773.0,
+              5284.0,
+              4512.0,
+              4415.0,
+              3581.0,
+              2873.0,
+              3454.0,
+              3804.0,
+              3461.0,
+              2496.0,
+              2872.0,
+              2487.0,
+              2205.0,
+              1639.0
+            ],
+            "split": "train",
+            "stage": "joint_expert_router",
+            "streaming": true,
+            "token_count": 16384
+          }
+        ],
+        "stages": [
+          {
+            "epoch": 1,
+            "epochs": 1,
+            "learning_rates": {
+              "amplitude_router": 0.0001,
+              "selection_router": 0.0001
+            },
+            "loss": 0.30696946382522583,
+            "stage": "router_warm_start",
+            "streaming": true,
+            "train_amplitude_router": true,
+            "train_selection_router": true,
+            "updates": 288
+          },
+          {
+            "epoch": 2,
+            "epochs": 2,
+            "learning_rates": {
+              "amplitude_router": 5e-05,
+              "expert_scales": 5e-05,
+              "experts": 0.0001,
+              "selection_router": 5e-05
+            },
+            "loss": 0.06026386097073555,
+            "stage": "joint_expert_router",
+            "streaming": true,
+            "train_amplitude_router": true,
+            "train_selection_router": true,
+            "updates": 576
+          }
+        ],
+        "streaming_dataset": {
+          "holdout_count": 16598,
+          "holdout_manifest": "runs/20260815-184644-windows-real-d2m-v4-streaming/capture/layer-0000.json",
+          "train_count": 131508,
+          "train_manifest": "runs/20260815-184644-windows-real-d2m-v4-streaming/capture/layer-0000.json"
+        }
+      }
+    },
+    {
+      "code_commit": "4bb7cd19f4f07a579527e901e0a4229af092ecd8",
+      "final_selection": {
+        "cosine": 0.9595552505925298,
+        "dead_experts": 0,
+        "load_cv": 0.45965926691121145,
+        "mse": 4.4351802716846575e-05,
+        "normalized_mse": 0.05006472067894829,
+        "router_entropy": 2.696925565600395,
+        "selected_count": 16384,
+        "selected_counts": [
+          7851.0,
+          7987.0,
+          6753.0,
+          5260.0,
+          4591.0,
+          4489.0,
+          3559.0,
+          2732.0,
+          3367.0,
+          3794.0,
+          3325.0,
+          2297.0,
+          2796.0,
+          2478.0,
+          2201.0,
+          2056.0
+        ],
+        "split": "train",
+        "streaming": true,
+        "token_count": 16384
+      },
+      "holdout_metrics": {
+        "cosine": null,
+        "dead_experts": null,
+        "load_cv": null,
+        "normalized_mse": null,
+        "selected_counts": [],
+        "split": "holdout",
+        "status": "DEFERRED_UNTIL_FINALIST_CONFIRMATION",
+        "streaming": true
+      },
+      "initial_selection": {
+        "cosine": 0.9276943891309202,
+        "dead_experts": 0,
+        "load_cv": 1.3019502473210516,
+        "mse": 7.489183149118616e-05,
+        "normalized_mse": 0.08453858456844444,
+        "router_entropy": 2.6507784659042954,
+        "selected_count": 16384,
+        "selected_counts": [
+          16112.0,
+          14714.0,
+          11488.0,
+          7187.0,
+          5574.0,
+          4546.0,
+          3297.0,
+          404.0,
+          464.0,
+          560.0,
+          561.0,
+          265.0,
+          140.0,
+          131.0,
+          92.0,
+          1.0
+        ],
+        "split": "train",
+        "streaming": true,
+        "token_count": 16384
+      },
+      "output_dir": "runs\\20260815-184644-windows-real-d2m-v4-streaming\\layer-checkpoints\\high-sparsity-schedule-ablation\\B_small_router_scale",
+      "schedule": "B_small_router_scale",
+      "stage_schedule": [
+        {
+          "epochs": 1,
+          "name": "router_warm_start",
+          "train_experts": false,
+          "train_scales": false,
+          "use_oracle_targets": true
+        },
+        {
+          "epochs": 1,
+          "learning_rates": {
+            "amplitude_router": 2e-05,
+            "expert_scales": 2e-05,
+            "selection_router": 2e-05
+          },
+          "name": "router_plus_scale_small_lr",
+          "train_experts": false,
+          "train_scales": true,
+          "use_oracle_targets": false
+        },
+        {
+          "epochs": 1,
+          "learning_rates": {
+            "amplitude_router": 5e-05,
+            "expert_scales": 5e-05,
+            "experts": 0.0001,
+            "selection_router": 5e-05
+          },
+          "name": "joint_expert_router",
+          "train_experts": true,
+          "train_scales": true,
+          "use_oracle_targets": false
+        }
+      ],
+      "status": "TRAINED_DEV_SELECTED",
+      "training_config": {
+        "best_selection_stage": "joint_expert_router",
+        "device": "cuda:1",
+        "epochs": 1,
+        "holdout_evaluation": "deferred",
+        "initial_expert_scales": [
+          0.9999998932564707,
+          1.0000012221294605,
+          1.0000010781804758,
+          1.0000016247872652,
+          1.0000016350541296,
+          1.0000017011228253,
+          1.0000017447824492,
+          1.000001155533654,
+          1.0000011066008727,
+          1.0000010510359565,
+          1.0000009286755949,
+          1.0000019483954736,
+          1.000001818107384,
+          1.00000178843709,
+          1.0000025380145483,
+          1.000002161773717
+        ],
+        "learning_rate": 0.0001,
+        "loss_coefficients": {
+          "cosine": 0.05,
+          "load_balance": 0.05,
+          "mse": 1.0,
+          "router_z_loss": 0.001
+        },
+        "loss_version": "torch-distill-v1",
+        "microbatch": 512,
+        "optimizer": "AdamW",
+        "partition_path": "runs\\20260815-184644-windows-real-d2m-v4-streaming\\partitions\\high-sparsity-p16-top4.json",
+        "router_initialization": "bounded_train_contribution_lstsq",
+        "routing_mode": "independent_positive",
+        "selection_count": 16384,
+        "selection_indices_hash": "7b2ff822febb9191b88d04cacfa6bb80aec3c6dd42f9210683c6b9fd2167b15f",
+        "selection_split": "train_dev_subset",
+        "stage_schedule": [
+          {
+            "epochs": 1,
+            "learning_rate": 0.0001,
+            "learning_rates": {},
+            "name": "router_warm_start",
+            "train_amplitude_router": true,
+            "train_experts": false,
+            "train_scales": false,
+            "train_selection_router": true,
+            "use_oracle_targets": true
+          },
+          {
+            "epochs": 1,
+            "learning_rate": 0.0001,
+            "learning_rates": {
+              "amplitude_router": 2e-05,
+              "expert_scales": 2e-05,
+              "selection_router": 2e-05
+            },
+            "name": "router_plus_scale_small_lr",
+            "train_amplitude_router": true,
+            "train_experts": false,
+            "train_scales": true,
+            "train_selection_router": true,
+            "use_oracle_targets": false
+          },
+          {
+            "epochs": 1,
+            "learning_rate": 0.0001,
+            "learning_rates": {
+              "amplitude_router": 5e-05,
+              "expert_scales": 5e-05,
+              "experts": 0.0001,
+              "selection_router": 5e-05
+            },
+            "name": "joint_expert_router",
+            "train_amplitude_router": true,
+            "train_experts": true,
+            "train_scales": true,
+            "train_selection_router": true,
+            "use_oracle_targets": false
+          }
+        ],
+        "stage_selection_metrics": [
+          {
+            "cosine": 0.9335018577985466,
+            "dead_experts": 1,
+            "load_cv": 1.372675523964573,
+            "mse": 5.5490272688984985e-05,
+            "normalized_mse": 0.06263792748873928,
+            "router_entropy": 2.5370764238759875,
+            "selected_count": 16384,
+            "selected_counts": [
+              16318.0,
+              15600.0,
+              12245.0,
+              8303.0,
+              5204.0,
+              3319.0,
+              2635.0,
+              501.0,
+              432.0,
+              321.0,
+              166.0,
+              302.0,
+              79.0,
+              90.0,
+              21.0,
+              0.0
+            ],
+            "split": "train",
+            "stage": "router_warm_start",
+            "streaming": true,
+            "token_count": 16384
+          },
+          {
+            "cosine": 0.9288502391427755,
+            "dead_experts": 0,
+            "load_cv": 1.174194878457996,
+            "mse": 6.0712572712873224e-05,
+            "normalized_mse": 0.06853290753423627,
+            "router_entropy": 2.6415651366114616,
+            "selected_count": 16384,
+            "selected_counts": [
+              15899.0,
+              13854.0,
+              9552.0,
+              6168.0,
+              4737.0,
+              4281.0,
+              3801.0,
+              1728.0,
+              1329.0,
+              1775.0,
+              775.0,
+              689.0,
+              380.0,
+              430.0,
+              137.0,
+              1.0
+            ],
+            "split": "train",
+            "stage": "router_plus_scale_small_lr",
+            "streaming": true,
+            "token_count": 16384
+          },
+          {
+            "cosine": 0.9595552505925298,
+            "dead_experts": 0,
+            "load_cv": 0.45965926691121145,
+            "mse": 4.4351802716846575e-05,
+            "normalized_mse": 0.05006472067894829,
+            "router_entropy": 2.696925565600395,
+            "selected_count": 16384,
+            "selected_counts": [
+              7851.0,
+              7987.0,
+              6753.0,
+              5260.0,
+              4591.0,
+              4489.0,
+              3559.0,
+              2732.0,
+              3367.0,
+              3794.0,
+              3325.0,
+              2297.0,
+              2796.0,
+              2478.0,
+              2201.0,
+              2056.0
+            ],
+            "split": "train",
+            "stage": "joint_expert_router",
+            "streaming": true,
+            "token_count": 16384
+          }
+        ],
+        "stages": [
+          {
+            "epoch": 1,
+            "epochs": 1,
+            "learning_rates": {
+              "amplitude_router": 0.0001,
+              "selection_router": 0.0001
+            },
+            "loss": 0.30696946382522583,
+            "stage": "router_warm_start",
+            "streaming": true,
+            "train_amplitude_router": true,
+            "train_selection_router": true,
+            "updates": 288
+          },
+          {
+            "epoch": 1,
+            "epochs": 1,
+            "learning_rates": {
+              "amplitude_router": 2e-05,
+              "expert_scales": 2e-05,
+              "selection_router": 2e-05
+            },
+            "loss": 0.06639380007982254,
+            "stage": "router_plus_scale_small_lr",
+            "streaming": true,
+            "train_amplitude_router": true,
+            "train_selection_router": true,
+            "updates": 288
+          },
+          {
+            "epoch": 1,
+            "epochs": 1,
+            "learning_rates": {
+              "amplitude_router": 5e-05,
+              "expert_scales": 5e-05,
+              "experts": 0.0001,
+              "selection_router": 5e-05
+            },
+            "loss": 0.06055345758795738,
+            "stage": "joint_expert_router",
+            "streaming": true,
+            "train_amplitude_router": true,
+            "train_selection_router": true,
+            "updates": 288
+          }
+        ],
+        "streaming_dataset": {
+          "holdout_count": 16598,
+          "holdout_manifest": "runs/20260815-184644-windows-real-d2m-v4-streaming/capture/layer-0000.json",
+          "train_count": 131508,
+          "train_manifest": "runs/20260815-184644-windows-real-d2m-v4-streaming/capture/layer-0000.json"
+        }
+      }
+    },
+    {
+      "code_commit": "4bb7cd19f4f07a579527e901e0a4229af092ecd8",
+      "final_selection": {
+        "cosine": 0.9645189451985061,
+        "dead_experts": 1,
+        "load_cv": 1.372675523964573,
+        "mse": 3.798833525934242e-05,
+        "normalized_mse": 0.04288158039390838,
+        "router_entropy": 2.5370764238759875,
+        "selected_count": 16384,
+        "selected_counts": [
+          16318.0,
+          15600.0,
+          12245.0,
+          8303.0,
+          5204.0,
+          3319.0,
+          2635.0,
+          501.0,
+          432.0,
+          321.0,
+          166.0,
+          302.0,
+          79.0,
+          90.0,
+          21.0,
+          0.0
+        ],
+        "split": "train",
+        "streaming": true,
+        "token_count": 16384
+      },
+      "holdout_metrics": {
+        "cosine": null,
+        "dead_experts": null,
+        "load_cv": null,
+        "normalized_mse": null,
+        "selected_counts": [],
+        "split": "holdout",
+        "status": "DEFERRED_UNTIL_FINALIST_CONFIRMATION",
+        "streaming": true
+      },
+      "initial_selection": {
+        "cosine": 0.9276943891309202,
+        "dead_experts": 0,
+        "load_cv": 1.3019502473210516,
+        "mse": 7.489183149118616e-05,
+        "normalized_mse": 0.08453858456844444,
+        "router_entropy": 2.6507784659042954,
+        "selected_count": 16384,
+        "selected_counts": [
+          16112.0,
+          14714.0,
+          11488.0,
+          7187.0,
+          5574.0,
+          4546.0,
+          3297.0,
+          404.0,
+          464.0,
+          560.0,
+          561.0,
+          265.0,
+          140.0,
+          131.0,
+          92.0,
+          1.0
+        ],
+        "split": "train",
+        "streaming": true,
+        "token_count": 16384
+      },
+      "output_dir": "runs\\20260815-184644-windows-real-d2m-v4-streaming\\layer-checkpoints\\high-sparsity-schedule-ablation\\C_frozen_router_adapt",
+      "schedule": "C_frozen_router_adapt",
+      "stage_schedule": [
+        {
+          "epochs": 1,
+          "name": "router_warm_start",
+          "train_experts": false,
+          "train_scales": false,
+          "use_oracle_targets": true
+        },
+        {
+          "epochs": 1,
+          "learning_rates": {
+            "expert_scales": 5e-05,
+            "experts": 0.0001
+          },
+          "name": "frozen_router_expert_adaptation",
+          "train_amplitude_router": false,
+          "train_experts": true,
+          "train_scales": true,
+          "train_selection_router": false,
+          "use_oracle_targets": false
+        },
+        {
+          "epochs": 1,
+          "learning_rates": {
+            "amplitude_router": 5e-05,
+            "expert_scales": 5e-05,
+            "experts": 0.0001,
+            "selection_router": 5e-05
+          },
+          "name": "joint_expert_router",
+          "train_experts": true,
+          "train_scales": true,
+          "use_oracle_targets": false
+        }
+      ],
+      "status": "TRAINED_DEV_SELECTED",
+      "training_config": {
+        "best_selection_stage": "frozen_router_expert_adaptation",
+        "device": "cuda:1",
+        "epochs": 1,
+        "holdout_evaluation": "deferred",
+        "initial_expert_scales": [
+          0.9999998932564707,
+          1.0000012221294605,
+          1.0000010781804758,
+          1.0000016247872652,
+          1.0000016350541296,
+          1.0000017011228253,
+          1.0000017447824492,
+          1.000001155533654,
+          1.0000011066008727,
+          1.0000010510359565,
+          1.0000009286755949,
+          1.0000019483954736,
+          1.000001818107384,
+          1.00000178843709,
+          1.0000025380145483,
+          1.000002161773717
+        ],
+        "learning_rate": 0.0001,
+        "loss_coefficients": {
+          "cosine": 0.05,
+          "load_balance": 0.05,
+          "mse": 1.0,
+          "router_z_loss": 0.001
+        },
+        "loss_version": "torch-distill-v1",
+        "microbatch": 512,
+        "optimizer": "AdamW",
+        "partition_path": "runs\\20260815-184644-windows-real-d2m-v4-streaming\\partitions\\high-sparsity-p16-top4.json",
+        "router_initialization": "bounded_train_contribution_lstsq",
+        "routing_mode": "independent_positive",
+        "selection_count": 16384,
+        "selection_indices_hash": "7b2ff822febb9191b88d04cacfa6bb80aec3c6dd42f9210683c6b9fd2167b15f",
+        "selection_split": "train_dev_subset",
+        "stage_schedule": [
+          {
+            "epochs": 1,
+            "learning_rate": 0.0001,
+            "learning_rates": {},
+            "name": "router_warm_start",
+            "train_amplitude_router": true,
+            "train_experts": false,
+            "train_scales": false,
+            "train_selection_router": true,
+            "use_oracle_targets": true
+          },
+          {
+            "epochs": 1,
+            "learning_rate": 0.0001,
+            "learning_rates": {
+              "expert_scales": 5e-05,
+              "experts": 0.0001
+            },
+            "name": "frozen_router_expert_adaptation",
+            "train_amplitude_router": false,
+            "train_experts": true,
+            "train_scales": true,
+            "train_selection_router": false,
+            "use_oracle_targets": false
+          },
+          {
+            "epochs": 1,
+            "learning_rate": 0.0001,
+            "learning_rates": {
+              "amplitude_router": 5e-05,
+              "expert_scales": 5e-05,
+              "experts": 0.0001,
+              "selection_router": 5e-05
+            },
+            "name": "joint_expert_router",
+            "train_amplitude_router": true,
+            "train_experts": true,
+            "train_scales": true,
+            "train_selection_router": true,
+            "use_oracle_targets": false
+          }
+        ],
+        "stage_selection_metrics": [
+          {
+            "cosine": 0.9335018577985466,
+            "dead_experts": 1,
+            "load_cv": 1.372675523964573,
+            "mse": 5.5490272688984985e-05,
+            "normalized_mse": 0.06263792748873928,
+            "router_entropy": 2.5370764238759875,
+            "selected_count": 16384,
+            "selected_counts": [
+              16318.0,
+              15600.0,
+              12245.0,
+              8303.0,
+              5204.0,
+              3319.0,
+              2635.0,
+              501.0,
+              432.0,
+              321.0,
+              166.0,
+              302.0,
+              79.0,
+              90.0,
+              21.0,
+              0.0
+            ],
+            "split": "train",
+            "stage": "router_warm_start",
+            "streaming": true,
+            "token_count": 16384
+          },
+          {
+            "cosine": 0.9645189451985061,
+            "dead_experts": 1,
+            "load_cv": 1.372675523964573,
+            "mse": 3.798833525934242e-05,
+            "normalized_mse": 0.04288158039390838,
+            "router_entropy": 2.5370764238759875,
+            "selected_count": 16384,
+            "selected_counts": [
+              16318.0,
+              15600.0,
+              12245.0,
+              8303.0,
+              5204.0,
+              3319.0,
+              2635.0,
+              501.0,
+              432.0,
+              321.0,
+              166.0,
+              302.0,
+              79.0,
+              90.0,
+              21.0,
+              0.0
+            ],
+            "split": "train",
+            "stage": "frozen_router_expert_adaptation",
+            "streaming": true,
+            "token_count": 16384
+          },
+          {
+            "cosine": 0.9636994795873761,
+            "dead_experts": 0,
+            "load_cv": 0.755766495707915,
+            "mse": 4.565244305467786e-05,
+            "normalized_mse": 0.05153289539177822,
+            "router_entropy": 2.6872196309268475,
+            "selected_count": 16384,
+            "selected_counts": [
+              11733.0,
+              10244.0,
+              7422.0,
+              5152.0,
+              4368.0,
+              4232.0,
+              3468.0,
+              2542.0,
+              3088.0,
+              3410.0,
+              2823.0,
+              2061.0,
+              2009.0,
+              1826.0,
+              1140.0,
+              18.0
+            ],
+            "split": "train",
+            "stage": "joint_expert_router",
+            "streaming": true,
+            "token_count": 16384
+          }
+        ],
+        "stages": [
+          {
+            "epoch": 1,
+            "epochs": 1,
+            "learning_rates": {
+              "amplitude_router": 0.0001,
+              "selection_router": 0.0001
+            },
+            "loss": 0.30696946382522583,
+            "stage": "router_warm_start",
+            "streaming": true,
+            "train_amplitude_router": true,
+            "train_selection_router": true,
+            "updates": 288
+          },
+          {
+            "epoch": 1,
+            "epochs": 1,
+            "learning_rates": {
+              "expert_scales": 5e-05,
+              "experts": 0.0001
+            },
+            "loss": 0.07332586497068405,
+            "stage": "frozen_router_expert_adaptation",
+            "streaming": true,
+            "train_amplitude_router": false,
+            "train_selection_router": false,
+            "updates": 288
+          },
+          {
+            "epoch": 1,
+            "epochs": 1,
+            "learning_rates": {
+              "amplitude_router": 5e-05,
+              "expert_scales": 5e-05,
+              "experts": 0.0001,
+              "selection_router": 5e-05
+            },
+            "loss": 0.06148064136505127,
+            "stage": "joint_expert_router",
+            "streaming": true,
+            "train_amplitude_router": true,
+            "train_selection_router": true,
+            "updates": 288
+          }
+        ],
+        "streaming_dataset": {
+          "holdout_count": 16598,
+          "holdout_manifest": "runs/20260815-184644-windows-real-d2m-v4-streaming/capture/layer-0000.json",
+          "train_count": 131508,
+          "train_manifest": "runs/20260815-184644-windows-real-d2m-v4-streaming/capture/layer-0000.json"
+        }
+      }
+    }
+  ],
+  "schema_version": 1,
+  "selection_count": 16384,
+  "selection_hash": "5a7739c753dae98698a8c1a22c6a10409230f0750b33cfc9631594f16d8b8e1c",
+  "selection_split": "train_dev",
+  "status": "P16_TOP4_SCHEDULE_ABLATIONS_COMPLETE_TRAIN_DEV_ONLY"
+}

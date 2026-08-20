@@ -1,0 +1,58 @@
+{
+  "code_commit": "d2e612c44728335c636ec4bbb537f55752b7909e",
+  "corpus": {
+    "dataset_hash": "46b278a85b4cb31a8fe659be2dd146bd9206eb491268220e25440981d06c0a03",
+    "domains": [
+      "code",
+      "general",
+      "instruction/dialogue",
+      "long-context",
+      "reasoning/math"
+    ],
+    "holdout_tokens": 16598,
+    "manifest": "capture/data-plan.json",
+    "receipt": "capture/corpus-receipt.json",
+    "status": "CORPUS_VERIFIED",
+    "train_tokens": 131508,
+    "verification": "metrics/corpus-verify.json"
+  },
+  "full_model_spike": {
+    "generation_equal": true,
+    "report": "artifacts/hf-moe/full-model-spike/full-model-spike.json",
+    "status": "FULL_MODEL_RELOAD_GREEN",
+    "strict_tensor_inventory": true
+  },
+  "native_capture": {
+    "activation_shards_created": false,
+    "available_host_memory_bytes": 39266910208,
+    "blocker_code": "TEACHER_RESOURCE_INSUFFICIENT",
+    "estimated_weight_bytes": 55563006776,
+    "status": "BLOCKED"
+  },
+  "next_exact_command": "d2m capture --run-dir runs/20260815-162258-windows-real-d2m-v2 --layers 0,16,32,48,63 --dataset-manifest runs/20260815-162258-windows-real-d2m-v2/capture/data-plan.json --source-dir runs/20260815-030931-windows/source --source-revision 1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0 --split both --device-map auto --resume",
+  "oracle": {
+    "historical_gaussian_classification": "RANDOM_INPUT_FROZEN_SLICE_DIAGNOSTIC",
+    "methods": [
+      "frozen_slice_simplex_oracle",
+      "frozen_slice_positive_oracle",
+      "frozen_slice_scaled_router_oracle",
+      "trainable_student_proxy"
+    ],
+    "status": "IMPLEMENTED_AND_TESTED"
+  },
+  "parent_run_id": "20260815-145505-windows-real-d2m",
+  "report_type": "dense2moe-v2-completion-summary",
+  "run_id": "20260815-162258-windows-real-d2m-v2",
+  "schema_version": 1,
+  "source": {
+    "config_sha256": "191e0af232104ed8b65258cf3fb2b842e288008baca7633c11b82a1ac7203aab",
+    "index_sha256": "77042094076611b69791a610065f28b7013b8c621795fa86ddccc8bac7d1b9df",
+    "repository": "Qwen/Qwen3.8-27B",
+    "revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0"
+  },
+  "training": {
+    "actual_torch_distillation_implementation": "src/dense2moe/training/torch_distill.py",
+    "status": "BLOCKED_ON_CAPTURE",
+    "unit_contract": "tests/test_torch_target.py::TorchTargetTests::test_actual_torch_distillation_uses_explicit_fixed_splits"
+  }
+}

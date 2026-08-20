@@ -1,0 +1,398 @@
+{
+  "active_blocker": {
+    "kind": "quality_gate_not_met",
+    "reason": "no >=70% reduction finalist meets cosine >=0.98 with dead_experts=0 and load_cv<=0.50",
+    "replay_action": "do_not_resume_representative_or_64_layer_replay"
+  },
+  "artifact_paths": {
+    "artifact": "runs\\20260815-184644-windows-real-d2m-v4-streaming\\capture\\data-plan.json",
+    "decision_register": "runs\\20260815-184644-windows-real-d2m-v4-streaming\\decision-register.json",
+    "environment": "runs\\20260815-184644-windows-real-d2m-v4-streaming\\environment.json",
+    "fact_ledger": "runs\\20260815-184644-windows-real-d2m-v4-streaming\\repository-fact-ledger.json",
+    "source_manifest": "runs\\20260815-184644-windows-real-d2m-v4-streaming\\source-manifest.json"
+  },
+  "code_commit": "b190014c1476ac30775651d0fe7bde317f2098b5",
+  "current_phase": "selector-generalization-blocked",
+  "last_successful_command": "p16-top4-selector-bce-load050",
+  "next_exact_command": "new FIT/validation-only selector architecture; no holdout tuning or replay",
+  "parent_run_id": "20260815-180505-windows-real-d2m-v3",
+  "phase_status": "quality_gate_not_met_replay_paused",
+  "prediction_contract": {
+    "expected_artifacts": [
+      "source-manifest.json"
+    ],
+    "expected_observations": [
+      "pinned revision",
+      "verified text config geometry",
+      "text tensor inventory"
+    ],
+    "expected_validation_results": [
+      "SOURCE_READY"
+    ]
+  },
+  "retry_counts": {},
+  "run_id": "20260815-184644-windows-real-d2m-v4-streaming",
+  "schema_version": 2,
+  "selected_profile": "qwen38_p16s1_top4",
+  "source_config_hash": "191e0af232104ed8b65258cf3fb2b842e288008baca7633c11b82a1ac7203aab",
+  "source_index_hash": "77042094076611b69791a610065f28b7013b8c621795fa86ddccc8bac7d1b9df",
+  "source_revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
+  "terminal_state": null,
+  "timestamps": {
+    "created": "2026-08-15T22:46:50.345978Z",
+    "updated": "2026-08-16T22:10:35Z"
+  },
+  "validation_results": {
+    "architecture_search": {
+      "status": "ARCHITECTURE_FINALIST_TRAINING_COMPLETE",
+      "dev_tokens": 16384,
+      "dev_selection_hash": "5a7739c753dae98698a8c1a22c6a10409230f0750b33cfc9631594f16d8b8e1c",
+      "holdout_confirmation": "reports/architecture-search-holdout-confirmation.json",
+      "finalist_training": "reports/architecture-finalist-training.json",
+      "finalists": ["qwen38_p8s1_top4", "qwen38_p8s1_top6", "qwen38_p16s1_top4"]
+    },
+    "independent_positive_finalist_training": {
+      "status": "INDEPENDENT_POSITIVE_FINALIST_TRAINING_COMPLETE",
+      "routing_mode": "independent_positive",
+      "report": "reports/architecture-finalist-training.json",
+      "best_sparse_candidate": "qwen38_p8s1_top6",
+      "classification": "TRAINABILITY_ROUTER_QUALITY_CONTROL",
+      "best_sparse_status": "TRAINED_VALIDATED",
+      "best_sparse_holdout_normalized_mse": 0.018899123945427157
+    },
+    "high_sparsity_search": {
+      "status": "HIGH_SPARSITY_TRAIN_DEV_SEARCH_COMPLETE",
+      "production_objective": ">=70% active dense-FFN reduction",
+      "primary_candidate": "qwen38_p16s1_top4",
+      "aggressive_candidates": ["qwen38_p16s1_top3", "qwen38_p32s1_top6", "qwen38_p32s1_top4"],
+      "control": "qwen38_p8s1_top6",
+      "representative_replay": "PAUSED",
+      "report": "reports/high-sparsity-partition-search.json",
+      "p8_control_report": "reports/p8-top6-current-head-control.json",
+      "selected_candidates": ["qwen38_p16s1_top4", "qwen38_p16s1_top3", "qwen38_p32s1_top6"]
+    },
+    "p16_schedule_ablations": {
+      "status": "COMPLETE_TRAIN_DEV_ONLY",
+      "report": "reports/p16-top4-schedule-ablations.json",
+      "winner": "A_warm_joint",
+      "winner_train_dev_normalized_mse": 0.045498747868190074,
+      "winner_train_dev_cosine": 0.9672467894852161,
+      "winner_dead_experts": 0,
+      "winner_load_cv": 0.4560538869846677
+    },
+    "equal_compute_finalists": {
+      "status": "COMPLETE_TRAIN_DEV_ONLY",
+      "report": "reports/high-sparsity-equal-compute-finalists.json",
+      "profiles": ["qwen38_p16s1_top3", "qwen38_p32s1_top6"]
+    },
+    "finalist_holdout_confirmation": {
+      "status": "COMPLETE",
+      "report": "reports/high-sparsity-finalist-holdout-confirmation.json",
+      "replay_gate": "BLOCKED_NO_GREEN_CANDIDATE"
+    },
+    "routing_course_correction": {
+      "status": "COMPLETE_HOLDOUT_STILL_BLOCKED",
+      "report": "reports/p16-top4-routing-course-correction.json",
+      "best_holdout_cosine": 0.9714432792328024,
+      "replay_gate": "BLOCKED_NO_GREEN_CANDIDATE"
+    },
+    "train_layer": {
+      "classification": "DENSEISH_QUALITY_UPPER_BOUND",
+      "code_commit": "5f6f55aa6778b7a88aebfe355a5212615b6e58ec",
+      "holdout_metrics": {
+        "cosine": 0.9975998342173662,
+        "dead_experts": 0,
+        "load_cv": 0.23253091698294914,
+        "mse": 2.1820055888248635e-06,
+        "normalized_mse": 0.0020866937502252362,
+        "router_entropy": 1.9829230910109417,
+        "selected_counts": [
+          4988.0,
+          4814.0,
+          5053.0,
+          4387.0,
+          3384.0,
+          3888.0,
+          2024.0,
+          4658.0
+        ],
+        "streaming": true,
+        "token_count": 16598
+      },
+      "initial_holdout": {
+        "cosine": 0.9970147481868462,
+        "dead_experts": 0,
+        "load_cv": 0.8754976775171305,
+        "mse": 3.228410997653901e-06,
+        "normalized_mse": 0.0030873912910511473,
+        "router_entropy": 1.9182094450326752,
+        "selected_counts": [
+          9412.0,
+          10835.0,
+          4280.0,
+          2235.0,
+          1397.0,
+          2400.0,
+          126.0,
+          2511.0
+        ],
+        "streaming": true,
+        "token_count": 16598
+      },
+      "layer": 0,
+      "metadata": "runs\\20260815-184644-windows-real-d2m-v4-streaming\\layer-checkpoints\\layer-0000.json",
+      "next_exact_command": "review runs/20260815-184644-windows-real-d2m-v4-streaming/reports/TOP_K_ARCHITECTURE_SEARCH.md",
+      "oracle_holdout": {
+        "cosine": null,
+        "normalized_mse": null,
+        "status": "bounded-oracle-summary-pending",
+        "streaming": true
+      },
+      "production_candidate": false,
+      "status": "DENSEISH_QUALITY_UPPER_BOUND",
+      "tensor_file": "runs\\20260815-184644-windows-real-d2m-v4-streaming\\layer-checkpoints\\layer-0000.safetensors",
+      "training_config": {
+        "best_holdout_stage": "joint_expert_router",
+        "device": "cuda:1",
+        "epochs": 1,
+        "initial_expert_scales": [
+          1.33768632791999,
+          1.4486789409218284,
+          1.2721615099341383,
+          1.1891688683280732,
+          1.2786186772840638,
+          1.1895783651184764,
+          1.1306088390068985,
+          1.436626954223237
+        ],
+        "learning_rate": 0.0001,
+        "loss_coefficients": {
+          "cosine": 0.05,
+          "load_balance": 0.05,
+          "mse": 1.0,
+          "router_z_loss": 0.001
+        },
+        "loss_version": "torch-distill-v1",
+        "microbatch": 512,
+        "optimizer": "AdamW",
+        "partition_path": "runs/20260815-184644-windows-real-d2m-v4-streaming/partitions/layer-0000-p8s14.json",
+        "routing_mode": "normalized_softmax",
+        "router_initialization": "bounded_train_contribution_lstsq",
+        "stage_holdout_metrics": [
+          {
+            "cosine": 0.997085157597348,
+            "dead_experts": 0,
+            "load_cv": 1.1732919373792918,
+            "mse": 3.1598365404082574e-06,
+            "normalized_mse": 0.003021812223750666,
+            "router_entropy": 1.8233896915791106,
+            "selected_counts": [
+              10774.0,
+              13766.0,
+              4027.0,
+              1520.0,
+              1350.0,
+              914.0,
+              71.0,
+              774.0
+            ],
+            "stage": "router_warm_start",
+            "streaming": true,
+            "token_count": 16598
+          },
+          {
+            "cosine": 0.9969527836032108,
+            "dead_experts": 0,
+            "load_cv": 0.2890825999036431,
+            "mse": 3.3058276916635812e-06,
+            "normalized_mse": 0.0031614263587798697,
+            "router_entropy": 1.9720433482579085,
+            "selected_counts": [
+              5389.0,
+              5875.0,
+              4670.0,
+              4096.0,
+              3214.0,
+              3828.0,
+              1762.0,
+              4362.0
+            ],
+            "stage": "router_plus_scale",
+            "streaming": true,
+            "token_count": 16598
+          },
+          {
+            "cosine": 0.9975998342173662,
+            "dead_experts": 0,
+            "load_cv": 0.23253091698294914,
+            "mse": 2.1820055888248635e-06,
+            "normalized_mse": 0.0020866937502252362,
+            "router_entropy": 1.9829230910109417,
+            "selected_counts": [
+              4988.0,
+              4814.0,
+              5053.0,
+              4387.0,
+              3384.0,
+              3888.0,
+              2024.0,
+              4658.0
+            ],
+            "stage": "joint_expert_router",
+            "streaming": true,
+            "token_count": 16598
+          }
+        ],
+        "stages": [
+          {
+            "epoch": 1,
+            "epochs": 1,
+            "loss": 0.24242006242275238,
+            "stage": "router_warm_start",
+            "streaming": true,
+            "updates": 288
+          },
+          {
+            "epoch": 1,
+            "epochs": 1,
+            "loss": 0.055426862090826035,
+            "stage": "router_plus_scale",
+            "streaming": true,
+            "updates": 288
+          },
+          {
+            "epoch": 1,
+            "epochs": 1,
+            "loss": 0.05294539034366608,
+            "stage": "joint_expert_router",
+            "streaming": true,
+            "updates": 288
+          }
+        ],
+        "streaming_dataset": {
+          "holdout_count": 16598,
+          "holdout_manifest": "runs/20260815-184644-windows-real-d2m-v4-streaming/capture/layer-0000.json",
+          "train_count": 131508,
+          "train_manifest": "runs/20260815-184644-windows-real-d2m-v4-streaming/capture/layer-0000.json"
+        }
+      }
+    }
+  },
+  "takeover_extension": {
+    "status": "HIGH_SPARSITY_RESEARCH_COMPLETE_REPLAY_BLOCKED",
+    "code_commit": "b190014c1476ac30775651d0fe7bde317f2098b5",
+    "current_phase": "selector-generalization-blocked",
+    "last_successful_command": "confirm_refined_course_correction_holdout.py",
+    "best_ge70_checkpoint": "layer-checkpoints/clean-validation/p16-top4-refined-course-correction-continue",
+    "best_ge70_validation": {
+      "normalized_mse": 0.022887117509033616,
+      "cosine": 0.9815988321788609,
+      "dead_experts": 0,
+      "load_cv": 0.44209580869297127
+    },
+    "best_ge70_holdout": {
+      "normalized_mse": 0.02723947770674348,
+      "cosine": 0.977043557273349,
+      "dead_experts": 0,
+      "load_cv": 0.47126541816094275,
+      "strict_reload": true,
+      "green": false
+    },
+    "exact_holdout_oracle": {
+      "cosine": 0.9821853987034983,
+      "bounded_cosine": 0.9821237200268034,
+      "student_vs_exact_topk_recall": 0.8346939390287986,
+      "decision": "capacity_sufficient_selector_generalization_blocker"
+    },
+    "replay_gate": "BLOCKED_NO_GREEN_CANDIDATE",
+    "next_exact_command": "FIT/validation-only selector generalization research; no holdout tuning or replay"
+  },
+  "takeover_followup_20260816": {
+    "status": "SELECTOR_GENERALIZATION_BLOCKED_REPLAY_PAUSED",
+    "code_commit": "b190014c1476ac30775651d0fe7bde317f2098b5",
+    "report": "reports/takeover-decision-20260816.json",
+    "base_head": "718c0c96b8a50b6aebc93bf1d165c6788a8f8ad8",
+    "best_fit_validation_candidate": "layer-checkpoints/clean-validation/p16-top4-selector-cross-validation-residual_bce",
+    "best_fit_validation": {
+      "normalized_mse": 0.020223602055059912,
+      "cosine": 0.9861563111189753,
+      "load_cv": 0.4734706483069833,
+      "dead_experts": 0,
+      "validation_b_cosine": 0.9906046972610056,
+      "validation_b_load_cv": 0.47750668718239075
+    },
+    "holdout_confirmation": {
+      "report": "reports/p16-top4-residual-bce-holdout-confirmation.json",
+      "normalized_mse": 0.027123212598176998,
+      "cosine": 0.9771972329433546,
+      "load_cv": 0.5002657250345942,
+      "dead_experts": 0,
+      "green": false,
+      "exact_oracle_cosine": 0.9821854088159624,
+      "exact_oracle_load_cv": 0.6674033191328232
+    },
+    "p32_research": {
+      "top5_validation": {"normalized_mse": 0.04484423937495194, "cosine": 0.9672818835824728, "load_cv": 0.5365962125999276, "dead_experts": 0},
+      "top4_validation": {"normalized_mse": 0.04630313087226314, "cosine": 0.9648507134988904, "load_cv": 0.678257039834709, "dead_experts": 0},
+      "top5_refinement_final_load_cv": 0.9403722379097005,
+      "top4_refinement_final_load_cv": 1.103198757083291,
+      "oracle_evidence": "reports/load-aware-p32-pool16-fit.json",
+      "decision": "retain_original_finalists_reject_router_only_refinements"
+    },
+    "replay_gate": "BLOCKED_NO_GREEN_CANDIDATE",
+    "representative_layers_if_unblocked": {
+      "LINEAR_A": [0, 28, 60],
+      "LINEAR_B": [1, 29, 61],
+      "LINEAR_C": [2, 30, 62],
+      "FULL_ATTENTION": [3, 31, 63]
+    },
+    "holdout_tuning": false,
+    "reasoning_post_training": false
+  },
+  "takeover_continuation_20260816": {
+    "status": "SELECTOR_GENERALIZATION_BLOCKED_REPLAY_PAUSED",
+    "code_commit": "81f278460c1e70f9682befa047c75aee608612f7",
+    "report": "reports/takeover-continuation-20260816.json",
+    "fresh_layer0_capture": {
+      "report": "fresh-selector-layer0/reports/fresh-selector-layer0-capture.json",
+      "dataset_hash": "b9c35dacf0085c5d5a0aa0607713bfeadfd8192058d9b4a05414057e88c72823",
+      "train_tokens": 300256,
+      "layers": [0],
+      "historical_holdout_opened": false,
+      "historical_replay_touched": false
+    },
+    "validation_protocol": {
+      "ab_receipt": "fresh-selector-layer0/capture/fresh-selector-validation-ab.json",
+      "selection_split": "validation-A",
+      "selection_count": 16384,
+      "selection_indices_hash": "09eee32dccd33e8516262ee528e95ce920091058f59df2dbee8d32a40e2199aa",
+      "validation_b_count": 32768,
+      "validation_b_indices_hash": "99778f7618dd9bf1e38ca4acf20aa9fdbcf1bc8c59d15bd418124566bd789de9",
+      "fit_excluded_count": 49152,
+      "fit_excluded_indices_hash": "673c3780203357b5fa84f3eb591f9145584a9ffbd8a364f2a81c1bf39b2d07cf",
+      "selection_union_enabled": false,
+      "validation_b_checkpoint_selection": false,
+      "holdout_opened": false
+    },
+    "fresh_selector": {
+      "report": "fresh-selector-layer0/reports/p16-top4-fresh-selector-hard-regret-bce.json",
+      "checkpoint": "layer-checkpoints/fresh-selector/p16-top4-hard-regret-bce",
+      "basis_unchanged": true,
+      "validation_a": {"normalized_mse": 0.13519899272476502, "cosine": 0.937224889989011, "load_cv": 0.23297837895655868, "dead_experts": 0, "hard_quartile_recall": 0.45001220703125, "hard_quartile_cosine": 0.8741879463195801},
+      "validation_b": {"normalized_mse": 0.1332869296680614, "cosine": 0.9378559359465726, "load_cv": 0.23574659032115616, "dead_experts": 0, "hard_quartile_recall": 0.450653076171875, "hard_quartile_cosine": 0.8747104406356812},
+      "decision": "research_candidate_only"
+    },
+    "load_constrained_oracle": {
+      "report": "reports/p16-top4-load-constrained-oracle-20260816.json",
+      "input_store": "evidence/contribution-stores/p16-top4-fit-1024",
+      "cosine": 0.9468026139765952,
+      "normalized_mse": 0.04575237803126283,
+      "load_cv": 1.2523293725781068,
+      "dead_experts": 0,
+      "target_load_cv": 0.5,
+      "green": false
+    },
+    "replay_gate": "BLOCKED_NO_GREEN_CANDIDATE",
+    "holdout_tuning": false
+  }
+}

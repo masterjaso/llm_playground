@@ -1,0 +1,40 @@
+{
+  "arrays": {
+    "routed": {
+      "dtype": "float32",
+      "path": "routed.npy",
+      "sha256": "94030fd435562ce9bd011f4340580705c7d97cb39187255a94d00ed612db470c",
+      "shape": [
+        1024,
+        16,
+        5120
+      ]
+    },
+    "shared": {
+      "dtype": "float32",
+      "path": "shared.npy",
+      "sha256": "4c26b661027fe8ba0db9058bc21375aff0bcaf5314af63ccfc6c46b8a9928b66",
+      "shape": [
+        1024,
+        5120
+      ]
+    },
+    "target": {
+      "dtype": "float32",
+      "path": "target.npy",
+      "sha256": "7cde18c99fda4535603d84f0fb68f34be620e82ee0106f20aed103091d755c4f",
+      "shape": [
+        1024,
+        5120
+      ]
+    }
+  },
+  "classification": "FIT_ONLY_SOLVER_CALIBRATION_NO_HOLDOUT",
+  "dataset_hash": "46b278a85b4cb31a8fe659be2dd146bd9206eb491268220e25440981d06c0a03",
+  "format": "dense2moe-contribution-store-v1",
+  "holdout_opened": false,
+  "indices_sha256": "bfce1d918db23ffb4d7d57d5cb1fe1f56ec3e8aa3c9c44521937109823d70ab5",
+  "partition_hash": "6de8c65d27aff4054d791b80d0dfcf273d552f15e2e4de6592cfd3f8220e03be",
+  "schema_version": 1,
+  "split": "train"
+}

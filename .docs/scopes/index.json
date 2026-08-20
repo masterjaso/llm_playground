@@ -1,0 +1,106 @@
+{
+  "global_excludes": [
+    "**/node_modules/**",
+    "**/.git/**",
+    "**/artifacts/**",
+    "**/coverage/**",
+    "**/dist/**"
+  ],
+  "scopes": {
+    "root": {
+      "description": "Repository root entrypoints and package manifest",
+      "include": [
+        "README.md",
+        "package.json",
+        "AGENTS.md"
+      ],
+      "exclude": []
+    },
+    "governance": {
+      "description": "Core guidance and routing docs (legacy scope key name retained)",
+      "include": [
+        ".docs/*.md",
+        ".docs/guidance/**/*.md",
+        ".docs/scopes/index.json",
+        ".docs/scopes/README.md"
+      ],
+      "exclude": [
+        ".docs/features/**",
+        ".docs/technical/**"
+      ]
+    },
+    "features": {
+      "description": "User-facing feature documentation",
+      "include": [
+        ".docs/features/**/*.md"
+      ],
+      "exclude": []
+    },
+    "technical": {
+      "description": "Maintainer technical documentation",
+      "include": [
+        ".docs/technical/**/*.md"
+      ],
+      "exclude": []
+    },
+    "context-hygiene": {
+      "description": "Context hygiene standards and scope alignment",
+      "include": [
+        ".docs/guidance/nsp/**/*.md",
+        ".docs/scopes/**",
+        ".docs/features/README.md"
+      ],
+      "exclude": []
+    },
+    "scripts": {
+      "description": "Governance scripts",
+      "include": [
+        "scripts/**/*.ts"
+      ],
+      "exclude": []
+    },
+    "tooling": {
+      "description": "Tooling and package metadata",
+      "include": [
+        "package.json",
+        "tsconfig.json"
+      ],
+      "exclude": []
+    },
+    "security": {
+      "description": "Security-sensitive docs and scripts",
+      "include": [
+        ".docs/guidance/nsp/stewardship.md",
+        "scripts/secret_*.ts",
+        "scripts/target_validate.ts"
+      ],
+      "exclude": []
+    },
+    "source": {
+      "description": "Likely product source roots",
+      "include": [
+        "src/**"
+      ],
+      "exclude": [
+        "**/node_modules/**",
+        "**/dist/**",
+        "**/coverage/**"
+      ]
+    },
+    "tests": {
+      "description": "Likely test roots",
+      "include": [
+        "tests/**"
+      ],
+      "exclude": []
+    },
+    "docs": {
+      "description": "Likely documentation roots",
+      "include": [
+        "docs/**",
+        ".docs/**"
+      ],
+      "exclude": []
+    }
+  }
+}

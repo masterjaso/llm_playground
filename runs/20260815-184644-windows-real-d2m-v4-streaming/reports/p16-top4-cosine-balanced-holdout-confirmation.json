@@ -1,0 +1,37 @@
+{
+  "checkpoint": "runs\\20260815-184644-windows-real-d2m-v4-streaming\\layer-checkpoints\\high-sparsity-basis-training\\p16-top4-cosine-balanced\\layer-0000.json",
+  "checkpoint_code_commit": "7f325bcf23da3cd92c448f982095b16ff77effd4",
+  "evaluator_code_commit": "7f325bcf23da3cd92c448f982095b16ff77effd4",
+  "metrics": {
+    "cosine": 0.9702287309212,
+    "dead_experts": 0,
+    "load_cv": 0.34288315286246007,
+    "mse": 4.48890151133924e-05,
+    "normalized_mse": 0.04292822519365251,
+    "router_entropy": 2.697666089611465,
+    "selected_count": 16598,
+    "selected_counts": [
+      5205.0,
+      7051.0,
+      6938.0,
+      5623.0,
+      4847.0,
+      4610.0,
+      3954.0,
+      3283.0,
+      3621.0,
+      3880.0,
+      3662.0,
+      2766.0,
+      3338.0,
+      2832.0,
+      2803.0,
+      1979.0
+    ],
+    "split": "holdout",
+    "streaming": true,
+    "token_count": 16598
+  },
+  "status": "P16_TOP4_COSINE_BALANCED_HOLDOUT_CONFIRMATION",
+  "strict_reload": true
+}

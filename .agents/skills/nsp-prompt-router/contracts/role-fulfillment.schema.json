@@ -1,0 +1,68 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://nehemiah-steward-protocol.local/contracts/role-fulfillment.schema.json",
+  "title": "NSP Role Fulfillment",
+  "description": "Compact disclosure of how an agent or harness realized a Role Demand. It must not contain model, provider, harness, vendor, or executor assignment.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["status", "controlLevel", "provenanceConfidence", "unmetItems", "assuranceImpact", "evidenceRefs"],
+  "properties": {
+    "requestedRole": {
+      "type": "string",
+      "enum": ["research-workhorse", "planner", "worker", "judgment", "verifier", "synthesizer", "triage"]
+    },
+    "demandRef": { "type": "string", "maxLength": 240, "pattern": "^[^\\r\\n\\u0000]{1,240}$" },
+    "status": { "type": "string", "enum": ["satisfied", "partially-satisfied", "unsupported", "declined", "unknown"] },
+    "controlLevel": { "type": "string", "enum": ["advisory", "negotiated", "enforced"] },
+    "provenanceConfidence": { "type": "string", "enum": ["verified", "harness-reported", "self-attested", "unavailable"] },
+    "unmetItems": { "type": "array", "maxItems": 8, "items": { "type": "string", "maxLength": 120, "pattern": "^[^\\r\\n\\u0000]{1,120}$" } },
+    "fallbackApplied": { "type": "string", "enum": ["continue", "continue-with-disclosure", "reduce-assurance", "block", "none"] },
+    "assuranceImpact": { "type": "string", "enum": ["none", "reduced", "blocking"] },
+    "evidenceRefs": { "type": "array", "maxItems": 5, "items": { "type": "string", "maxLength": 240, "pattern": "^[^\\r\\n\\u0000]{1,240}$" } },
+    "detailsRef": {
+      "type": "string",
+      "maxLength": 240,
+      "pattern": "^(?!/)(?!.*\\.\\.)(?!.*\\*)(?![A-Za-z]:)(?!.*://)[^\\r\\n\\u0000]{1,240}$"
+    },
+    "independenceClaim": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["claimed", "evidenceRefs"],
+      "properties": {
+        "claimed": { "type": "boolean" },
+        "evidenceRefs": { "type": "array", "maxItems": 5, "items": { "type": "string", "maxLength": 240, "pattern": "^[^\\r\\n\\u0000]{1,240}$" } }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "claimed": { "const": true } }, "required": ["claimed"] },
+          "then": { "properties": { "evidenceRefs": { "minItems": 1 } } }
+        }
+      ]
+    }
+  },
+  "anyOf": [{ "required": ["requestedRole"] }, { "required": ["demandRef"] }],
+  "allOf": [
+    {
+      "if": { "properties": { "controlLevel": { "const": "enforced" } }, "required": ["controlLevel"] },
+      "then": {
+        "properties": {
+          "provenanceConfidence": { "enum": ["verified", "harness-reported"] },
+          "status": { "enum": ["satisfied", "partially-satisfied"] },
+          "evidenceRefs": { "minItems": 1 }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "provenanceConfidence": { "const": "verified" } }, "required": ["provenanceConfidence"] },
+      "then": { "properties": { "evidenceRefs": { "minItems": 1 } } }
+    },
+    {
+      "if": { "properties": { "status": { "const": "satisfied" } }, "required": ["status"] },
+      "then": { "properties": { "unmetItems": { "maxItems": 0 } } }
+    },
+    {
+      "if": { "properties": { "status": { "enum": ["partially-satisfied", "unsupported", "declined", "unknown"] } }, "required": ["status"] },
+      "then": { "properties": { "unmetItems": { "minItems": 1 } } }
+    }
+  ]
+}

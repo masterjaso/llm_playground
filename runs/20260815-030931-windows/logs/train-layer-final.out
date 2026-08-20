@@ -1,0 +1,7 @@
+{
+  "layer": 0,
+  "message": "Placeholder is not a trained layer and cannot advance the quality gate.",
+  "next_exact_command": "d2m train-layers --run-dir runs\\20260815-030931-windows",
+  "path": "runs\\20260815-030931-windows\\layer-checkpoints\\layer-0000.json",
+  "status": "LAYER_CHECKPOINT_PENDING"
+}

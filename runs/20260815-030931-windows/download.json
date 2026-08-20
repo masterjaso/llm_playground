@@ -1,0 +1,8 @@
+{
+  "destination": "C:\\workplace\\llm_playground\\runs\\20260815-030931-windows\\source",
+  "message": "Pinned snapshot downloaded; source files remain immutable.",
+  "model": "Qwen/Qwen3.8-27B",
+  "revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
+  "status": "DOWNLOAD_COMPLETE",
+  "trust_remote_code": false
+}

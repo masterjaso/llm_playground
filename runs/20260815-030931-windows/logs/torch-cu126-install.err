@@ -1,0 +1,5 @@
+  WARNING: The scripts torchfrtrace.exe and torchrun.exe are installed in 'C:\Users\maste\AppData\Local\Programs\Python\Python312\Scripts' which is not on PATH.
+  Consider adding this directory to PATH or, if you prefer to suppress this warning, use --no-warn-script-location.
+
+[notice] A new release of pip is available: 24.2 -> 26.2.1
+[notice] To update, run: C:\Users\maste\AppData\Local\Programs\Python\Python312\python.exe -m pip install --upgrade pip

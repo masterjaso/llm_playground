@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://nehemiah-steward-protocol.local/contracts/ccb-promotion-report.schema.json",
+  "title": "NSP CCB Promotion Report",
+  "description": "Record of an nsp-ccb-hygiene promotion pass. Only evidence-backed links may be promoted into .docs/graph/ccb-reviewed-links.json.",
+  "type": "object",
+  "required": ["schemaVersion", "target", "promoted", "leftUnreviewed", "validationAfterPromotion"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "target": { "type": "string" },
+    "generatedAt": { "type": "string" },
+    "candidateReportPath": { "type": "string" },
+    "promoted": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["type", "source", "target", "evidence"],
+        "properties": {
+          "type": { "type": "string" },
+          "source": { "type": "string" },
+          "target": { "type": "string" },
+          "evidence": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
+          "reviewedBy": { "type": "string" }
+        }
+      }
+    },
+    "leftUnreviewed": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["type", "source", "target", "reason"],
+        "properties": {
+          "type": { "type": "string" },
+          "source": { "type": "string" },
+          "target": { "type": "string" },
+          "reason": { "type": "string" }
+        }
+      }
+    },
+    "validationAfterPromotion": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["command", "result"],
+        "properties": {
+          "command": { "type": "string" },
+          "result": { "enum": ["PASS", "FAIL"] }
+        }
+      }
+    },
+    "ledgerPath": { "const": ".docs/graph/ccb-reviewed-links.json" }
+  }
+}

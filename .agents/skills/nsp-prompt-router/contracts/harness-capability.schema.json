@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://nehemiah-steward-protocol.local/contracts/harness-capability.schema.json",
+  "title": "NSP Harness Capability Descriptor",
+  "description": "Status-aware capability contract for harness adapters.",
+  "type": "object",
+  "required": ["schemaVersion", "harness", "adapterVersion", "capabilities"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "harness": { "type": "string" },
+    "adapterVersion": { "type": "string" },
+    "capabilities": {
+      "type": "object",
+      "properties": {
+        "instruction-bridge-global": { "$ref": "#/$defs/capabilityEntry" },
+        "instruction-bridge-local": { "$ref": "#/$defs/capabilityEntry" },
+        "headless-invocation": { "$ref": "#/$defs/capabilityEntry" },
+        "fresh-context": { "$ref": "#/$defs/capabilityEntry" },
+        "read-files": { "$ref": "#/$defs/capabilityEntry" },
+        "edit-files": { "$ref": "#/$defs/capabilityEntry" },
+        "execute-commands": { "$ref": "#/$defs/capabilityEntry" },
+        "structured-result": { "$ref": "#/$defs/capabilityEntry" },
+        "structured-events": { "$ref": "#/$defs/capabilityEntry" },
+        "streaming-events": { "$ref": "#/$defs/capabilityEntry" },
+        "session-identity": { "$ref": "#/$defs/capabilityEntry" },
+        "resumable-session": { "$ref": "#/$defs/capabilityEntry" },
+        "detached-execution": { "$ref": "#/$defs/capabilityEntry" },
+        "background-execution": { "$ref": "#/$defs/capabilityEntry" },
+        "isolated-workspace": { "$ref": "#/$defs/capabilityEntry" },
+        "cancellation": { "$ref": "#/$defs/capabilityEntry" },
+        "checkpointing": { "$ref": "#/$defs/capabilityEntry" },
+        "parallel-workers": { "$ref": "#/$defs/capabilityEntry" },
+        "read-only-worker": { "$ref": "#/$defs/capabilityEntry" },
+        "write-scope-enforcement": { "$ref": "#/$defs/capabilityEntry" },
+        "network-policy": { "$ref": "#/$defs/capabilityEntry" },
+        "model-selection-harness-owned": { "$ref": "#/$defs/capabilityEntry" }
+      },
+      "additionalProperties": false
+    }
+  },
+  "$defs": {
+    "capabilityEntry": {
+      "type": "object",
+      "required": ["status"],
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": ["supported", "unsupported", "unknown", "probe-required", "conditional"]
+        },
+        "condition": { "type": "string" }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

@@ -1,0 +1,6 @@
+{
+  "status": "SHADOW_VALIDATION_READY_SELECTOR_ONLY",
+  "selected_count": 16384,
+  "identity_hash": "efbbe351adf324a4960afd937ca0f85ca886fdbe55cb0012180610dffc1c2ad4",
+  "output": "runs/20260815-184644-windows-real-d2m-v4-streaming/capture/validation-b-selector-only.json"
+}

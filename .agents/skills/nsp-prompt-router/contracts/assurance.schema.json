@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://nehemiah-steward-protocol.local/contracts/assurance.schema.json",
+  "title": "NSP Assurance Requirements and Result",
+  "description": "Canonical provider-neutral execution assurance. Role-Demand is a deprecated compatibility reader only.",
+  "type": "object",
+  "$defs": {
+    "requirements": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "independentFrom": { "type": "array", "items": { "type": "string" }, "maxItems": 8 },
+        "freshContext": { "type": "boolean" },
+        "validationRequired": { "type": "boolean" },
+        "evidenceRequired": { "type": "boolean" },
+        "onUnmet": { "type": "string", "enum": ["disclose", "reduce-assurance", "block"] },
+        "strength": { "type": "string", "enum": ["advisory", "preferred", "required"] }
+      }
+    },
+    "result": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "impact"],
+      "properties": {
+        "status": { "type": "string", "enum": ["satisfied", "partial", "unmet", "not-applicable"] },
+        "independentFrom": { "type": "array", "items": { "type": "string" } },
+        "independenceEvidenceRefs": { "type": "array", "items": { "type": "string" } },
+        "freshContext": { "type": "boolean" },
+        "evidenceRefs": { "type": "array", "items": { "type": "string" } },
+        "unmetItems": { "type": "array", "items": { "type": "string" } },
+        "impact": { "type": "string", "enum": ["none", "reduced", "blocking"] }
+      }
+    }
+  }
+}

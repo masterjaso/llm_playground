@@ -1,0 +1,25 @@
+{
+  "argv": [
+    "bash",
+    "-lc",
+    ".venv/bin/python scripts/run_load_aware_oracle.py --input runs/20260815-184644-windows-real-d2m-v4-streaming/evidence/contribution-stores/p16-top4-fit-1024 --topology p16/top4 --output runs/20260815-184644-windows-real-d2m-v4-streaming/reports/load-aware-real-store-p16-fit-1024.json --target-load-cv 0.5 --iterations 2 --batch-size 1024 --max-in-memory-bytes 268435456 --storage-dir runs/20260815-184644-windows-real-d2m-v4-streaming/evidence/load-aware-real-store-p16-fit-1024-work"
+  ],
+  "child_output_stale": false,
+  "completed": 0,
+  "elapsed_seconds": 7.580164987011813,
+  "last_child_output_age_seconds": 0.0008288009557873011,
+  "last_child_output_at": "2026-08-16T20:00:57.916264+00:00",
+  "last_heartbeat": "2026-08-16T20:00:57.917174+00:00",
+  "output_lines_dropped": 0,
+  "pid": 2807831,
+  "returncode": 0,
+  "started": "2026-08-16T20:00:50.336894+00:00",
+  "status": "SUCCESS",
+  "stderr_bytes": 0,
+  "stderr_log_path": "runs/20260815-184644-windows-real-d2m-v4-streaming/logs/load-aware-real-store-p16-fit-1024.err",
+  "stdout_bytes": 8085,
+  "stdout_log_path": "runs/20260815-184644-windows-real-d2m-v4-streaming/logs/load-aware-real-store-p16-fit-1024.out",
+  "task": "load-aware-real-store-p16-fit-1024",
+  "terminal_status": "DONE",
+  "total": null
+}

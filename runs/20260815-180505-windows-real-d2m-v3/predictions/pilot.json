@@ -1,0 +1,14 @@
+{
+  "code_commit": "d49036da2bf5f04f5524c043d932423039a793ff",
+  "contract": {
+    "expected_artifacts": [
+      "metrics/pilot.json"
+    ],
+    "expected_validation_results": [
+      "PILOT_COMPLETE"
+    ]
+  },
+  "phase": "pilot",
+  "result": "confirmed",
+  "timestamp": "2026-08-15T20:05:14.065111Z"
+}

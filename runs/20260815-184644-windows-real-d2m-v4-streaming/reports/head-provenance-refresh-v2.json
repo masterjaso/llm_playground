@@ -1,0 +1,609 @@
+{
+  "code_commit": "914fae9d327fc82d4f1702e1d75a51e91221fb18",
+  "results": [
+    {
+      "profile": "qwen38_p8s1_top6",
+      "result": {
+        "code_commit": "914fae9d327fc82d4f1702e1d75a51e91221fb18",
+        "final_selection": {
+          "cosine": 0.9827072494663298,
+          "dead_experts": 0,
+          "load_cv": 0.3291857819499581,
+          "mse": 1.9093332463171463e-05,
+          "normalized_mse": 0.021552728368262813,
+          "router_entropy": 1.953478017821908,
+          "selected_count": 16384,
+          "selected_counts": [
+            16382.0,
+            15372.0,
+            8396.0,
+            6893.0,
+            7147.0,
+            11396.0,
+            16334.0,
+            16384.0
+          ],
+          "split": "train",
+          "streaming": true,
+          "token_count": 16384
+        },
+        "holdout_metrics": {
+          "cosine": 0.9833764382939351,
+          "dead_experts": 0,
+          "load_cv": 0.3284948532151962,
+          "mse": 1.9762360465384373e-05,
+          "normalized_mse": 0.018899123945427157,
+          "router_entropy": 1.9543421288285863,
+          "selected_count": 16598,
+          "selected_counts": [
+            16596.0,
+            15624.0,
+            8765.0,
+            7201.0,
+            6938.0,
+            11345.0,
+            16521.0,
+            16598.0
+          ],
+          "split": "holdout",
+          "streaming": true,
+          "token_count": 16598
+        },
+        "initial_selection": {
+          "cosine": 0.9819653835147619,
+          "dead_experts": 0,
+          "load_cv": 0.30229767232774746,
+          "mse": 2.2591862858689638e-05,
+          "normalized_mse": 0.02550190148658339,
+          "router_entropy": 1.9308107923716307,
+          "selected_count": 16384,
+          "selected_counts": [
+            16384.0,
+            14675.0,
+            9337.0,
+            7398.0,
+            8160.0,
+            9780.0,
+            16214.0,
+            16356.0
+          ],
+          "split": "train",
+          "streaming": true,
+          "token_count": 16384
+        },
+        "layer": 0,
+        "metadata": "runs\\20260815-184644-windows-real-d2m-v4-streaming\\layer-checkpoints\\head-provenance-refresh-v2\\qwen38_p8s1_top6\\layer-0000.json",
+        "oracle_holdout": {
+          "cosine": null,
+          "normalized_mse": null,
+          "status": "bounded-oracle-summary-pending",
+          "streaming": true
+        },
+        "status": "TRAINED_VALIDATED",
+        "tensor_file": "runs\\20260815-184644-windows-real-d2m-v4-streaming\\layer-checkpoints\\head-provenance-refresh-v2\\qwen38_p8s1_top6\\layer-0000.safetensors",
+        "training_config": {
+          "best_selection_stage": "router_warm_start",
+          "device": "cuda:1",
+          "epochs": 1,
+          "holdout_evaluation": "full_holdout_confirmation",
+          "initial_expert_scales": [
+            0.9999998665330977,
+            1.0000000046351245,
+            1.0000013313339173,
+            1.0000014115635474,
+            1.0000015736517966,
+            1.0000024207070288,
+            1.0000014755414406,
+            0.9999992688219852
+          ],
+          "learning_rate": 0.0001,
+          "loss_coefficients": {
+            "cosine": 0.05,
+            "load_balance": 0.05,
+            "mse": 1.0,
+            "router_z_loss": 0.001
+          },
+          "loss_version": "torch-distill-v1",
+          "microbatch": 512,
+          "optimizer": "AdamW",
+          "partition_path": "runs\\20260815-184644-windows-real-d2m-v4-streaming\\partitions\\layer-0000-p8-top6-architecture-finalist.json",
+          "router_initialization": "bounded_train_contribution_lstsq",
+          "routing_mode": "independent_positive",
+          "selection_count": 16384,
+          "selection_indices_hash": "7b2ff822febb9191b88d04cacfa6bb80aec3c6dd42f9210683c6b9fd2167b15f",
+          "selection_split": "train_dev_subset",
+          "stage_schedule": [
+            {
+              "epochs": 1,
+              "learning_rate": 0.0001,
+              "learning_rates": {},
+              "name": "router_warm_start",
+              "train_amplitude_router": true,
+              "train_experts": false,
+              "train_scales": false,
+              "train_selection_router": true,
+              "use_oracle_targets": true
+            },
+            {
+              "epochs": 1,
+              "learning_rate": 0.0001,
+              "learning_rates": {},
+              "name": "router_plus_scale",
+              "train_amplitude_router": true,
+              "train_experts": false,
+              "train_scales": true,
+              "train_selection_router": true,
+              "use_oracle_targets": false
+            },
+            {
+              "epochs": 1,
+              "learning_rate": 0.0001,
+              "learning_rates": {},
+              "name": "joint_expert_router",
+              "train_amplitude_router": true,
+              "train_experts": true,
+              "train_scales": true,
+              "train_selection_router": true,
+              "use_oracle_targets": false
+            }
+          ],
+          "stage_selection_metrics": [
+            {
+              "cosine": 0.9827072494663298,
+              "dead_experts": 0,
+              "load_cv": 0.3291857819499581,
+              "mse": 1.9093332463171463e-05,
+              "normalized_mse": 0.021552728368262813,
+              "router_entropy": 1.953478017821908,
+              "selected_count": 16384,
+              "selected_counts": [
+                16382.0,
+                15372.0,
+                8396.0,
+                6893.0,
+                7147.0,
+                11396.0,
+                16334.0,
+                16384.0
+              ],
+              "split": "train",
+              "stage": "router_warm_start",
+              "streaming": true,
+              "token_count": 16384
+            },
+            {
+              "cosine": 0.9822653564624488,
+              "dead_experts": 0,
+              "load_cv": 0.2918802370658487,
+              "mse": 2.014299998336355e-05,
+              "normalized_mse": 0.0227376026684053,
+              "router_entropy": 1.9548391560092568,
+              "selected_count": 16384,
+              "selected_counts": [
+                16362.0,
+                14183.0,
+                9252.0,
+                7807.0,
+                7977.0,
+                10293.0,
+                16119.0,
+                16311.0
+              ],
+              "split": "train",
+              "stage": "router_plus_scale",
+              "streaming": true,
+              "token_count": 16384
+            },
+            {
+              "cosine": 0.9848914481699467,
+              "dead_experts": 0,
+              "load_cv": 0.2861516582487254,
+              "mse": 2.854364326481118e-05,
+              "normalized_mse": 0.0322203256615207,
+              "router_entropy": 1.9608772909268737,
+              "selected_count": 16384,
+              "selected_counts": [
+                16220.0,
+                14186.0,
+                9310.0,
+                7877.0,
+                8111.0,
+                10280.0,
+                15989.0,
+                16331.0
+              ],
+              "split": "train",
+              "stage": "joint_expert_router",
+              "streaming": true,
+              "token_count": 16384
+            }
+          ],
+          "stages": [
+            {
+              "epoch": 1,
+              "epochs": 1,
+              "learning_rates": {
+                "amplitude_router": 0.0001,
+                "selection_router": 0.0001
+              },
+              "loss": 0.2723970115184784,
+              "stage": "router_warm_start",
+              "streaming": true,
+              "train_amplitude_router": true,
+              "train_selection_router": true,
+              "updates": 288
+            },
+            {
+              "epoch": 1,
+              "epochs": 1,
+              "learning_rates": {
+                "amplitude_router": 0.0001,
+                "expert_scales": 0.0001,
+                "selection_router": 0.0001
+              },
+              "loss": 0.05574380233883858,
+              "stage": "router_plus_scale",
+              "streaming": true,
+              "train_amplitude_router": true,
+              "train_selection_router": true,
+              "updates": 288
+            },
+            {
+              "epoch": 1,
+              "epochs": 1,
+              "learning_rates": {
+                "amplitude_router": 0.0001,
+                "expert_scales": 0.0001,
+                "experts": 0.0001,
+                "selection_router": 0.0001
+              },
+              "loss": 0.053714409470558167,
+              "stage": "joint_expert_router",
+              "streaming": true,
+              "train_amplitude_router": true,
+              "train_selection_router": true,
+              "updates": 288
+            }
+          ],
+          "streaming_dataset": {
+            "holdout_count": 16598,
+            "holdout_manifest": "runs/20260815-184644-windows-real-d2m-v4-streaming/capture/layer-0000.json",
+            "train_count": 131508,
+            "train_manifest": "runs/20260815-184644-windows-real-d2m-v4-streaming/capture/layer-0000.json"
+          }
+        }
+      }
+    },
+    {
+      "profile": "qwen38_p16s1_top4",
+      "result": {
+        "code_commit": "914fae9d327fc82d4f1702e1d75a51e91221fb18",
+        "final_selection": {
+          "cosine": 0.9491384560242295,
+          "dead_experts": 0,
+          "load_cv": 0.28767948249519726,
+          "mse": 6.37453472108973e-05,
+          "normalized_mse": 0.07195633113429076,
+          "router_entropy": 2.6839085333049297,
+          "selected_count": 16384,
+          "selected_counts": [
+            5564.0,
+            5869.0,
+            5005.0,
+            3203.0,
+            3360.0,
+            3432.0,
+            2219.0,
+            2060.0,
+            4010.0,
+            4509.0,
+            3503.0,
+            3552.0,
+            4122.0,
+            5134.0,
+            6245.0,
+            3749.0
+          ],
+          "split": "train",
+          "streaming": true,
+          "token_count": 16384
+        },
+        "holdout_metrics": {
+          "cosine": 0.9457615761458694,
+          "dead_experts": 0,
+          "load_cv": 0.28612232997920845,
+          "mse": 7.151255366356634e-05,
+          "normalized_mse": 0.06838882519672046,
+          "router_entropy": 2.6830496957523593,
+          "selected_count": 16598,
+          "selected_counts": [
+            5720.0,
+            5988.0,
+            5270.0,
+            3122.0,
+            3447.0,
+            3477.0,
+            2284.0,
+            2147.0,
+            3895.0,
+            4721.0,
+            3264.0,
+            3494.0,
+            4159.0,
+            5375.0,
+            5838.0,
+            4191.0
+          ],
+          "split": "holdout",
+          "streaming": true,
+          "token_count": 16598
+        },
+        "initial_selection": {
+          "cosine": 0.910885835532099,
+          "dead_experts": 0,
+          "load_cv": 1.097063708985842,
+          "mse": 0.00012705936983365974,
+          "normalized_mse": 0.14342577912733026,
+          "router_entropy": 2.6080366177484393,
+          "selected_count": 16384,
+          "selected_counts": [
+            10655.0,
+            6202.0,
+            4701.0,
+            954.0,
+            1110.0,
+            460.0,
+            409.0,
+            113.0,
+            758.0,
+            1633.0,
+            948.0,
+            2004.0,
+            3696.0,
+            5288.0,
+            10937.0,
+            15668.0
+          ],
+          "split": "train",
+          "streaming": true,
+          "token_count": 16384
+        },
+        "layer": 0,
+        "metadata": "runs\\20260815-184644-windows-real-d2m-v4-streaming\\layer-checkpoints\\head-provenance-refresh-v2\\qwen38_p16s1_top4\\layer-0000.json",
+        "oracle_holdout": {
+          "cosine": null,
+          "normalized_mse": null,
+          "status": "bounded-oracle-summary-pending",
+          "streaming": true
+        },
+        "status": "VALIDATION_FAILED",
+        "tensor_file": "runs\\20260815-184644-windows-real-d2m-v4-streaming\\layer-checkpoints\\head-provenance-refresh-v2\\qwen38_p16s1_top4\\layer-0000.safetensors",
+        "training_config": {
+          "best_selection_stage": "joint_expert_router",
+          "device": "cuda:1",
+          "epochs": 1,
+          "holdout_evaluation": "full_holdout_confirmation",
+          "initial_expert_scales": [
+            1.0000004460105987,
+            1.0000007857550222,
+            1.000001146610517,
+            1.0000007226429692,
+            1.0000009769542042,
+            1.0000005462200952,
+            1.00000040780425,
+            1.0000011181070767,
+            0.9999998588629032,
+            1.0000012229648534,
+            1.0000012479606137,
+            1.0000010699236612,
+            1.0000012129475762,
+            1.0000023531495459,
+            1.0000005894385773,
+            0.9999994976616855
+          ],
+          "learning_rate": 0.0001,
+          "loss_coefficients": {
+            "cosine": 0.05,
+            "load_balance": 0.05,
+            "mse": 1.0,
+            "router_z_loss": 0.001
+          },
+          "loss_version": "torch-distill-v1",
+          "microbatch": 512,
+          "optimizer": "AdamW",
+          "partition_path": "runs\\20260815-184644-windows-real-d2m-v4-streaming\\partitions\\layer-0000-p16-top4-architecture-finalist.json",
+          "router_initialization": "bounded_train_contribution_lstsq",
+          "routing_mode": "independent_positive",
+          "selection_count": 16384,
+          "selection_indices_hash": "7b2ff822febb9191b88d04cacfa6bb80aec3c6dd42f9210683c6b9fd2167b15f",
+          "selection_split": "train_dev_subset",
+          "stage_schedule": [
+            {
+              "epochs": 1,
+              "learning_rate": 0.0001,
+              "learning_rates": {},
+              "name": "router_warm_start",
+              "train_amplitude_router": true,
+              "train_experts": false,
+              "train_scales": false,
+              "train_selection_router": true,
+              "use_oracle_targets": true
+            },
+            {
+              "epochs": 1,
+              "learning_rate": 0.0001,
+              "learning_rates": {},
+              "name": "router_plus_scale",
+              "train_amplitude_router": true,
+              "train_experts": false,
+              "train_scales": true,
+              "train_selection_router": true,
+              "use_oracle_targets": false
+            },
+            {
+              "epochs": 1,
+              "learning_rate": 0.0001,
+              "learning_rates": {},
+              "name": "joint_expert_router",
+              "train_amplitude_router": true,
+              "train_experts": true,
+              "train_scales": true,
+              "train_selection_router": true,
+              "use_oracle_targets": false
+            }
+          ],
+          "stage_selection_metrics": [
+            {
+              "cosine": 0.9175520935095847,
+              "dead_experts": 0,
+              "load_cv": 1.1668406783196603,
+              "mse": 9.78787324129371e-05,
+              "normalized_mse": 0.11048640863479266,
+              "router_entropy": 2.5344527270644903,
+              "selected_count": 16384,
+              "selected_counts": [
+                10771.0,
+                6744.0,
+                3142.0,
+                981.0,
+                624.0,
+                518.0,
+                371.0,
+                355.0,
+                325.0,
+                1171.0,
+                821.0,
+                1398.0,
+                3678.0,
+                6939.0,
+                11473.0,
+                16225.0
+              ],
+              "split": "train",
+              "stage": "router_warm_start",
+              "streaming": true,
+              "token_count": 16384
+            },
+            {
+              "cosine": 0.8674172158353031,
+              "dead_experts": 0,
+              "load_cv": 0.37262541245479586,
+              "mse": 0.00017452579540986335,
+              "normalized_mse": 0.19700631458543177,
+              "router_entropy": 2.661196291446686,
+              "selected_count": 16384,
+              "selected_counts": [
+                6010.0,
+                5371.0,
+                4554.0,
+                3316.0,
+                3166.0,
+                2565.0,
+                2217.0,
+                1868.0,
+                3795.0,
+                4039.0,
+                3372.0,
+                3190.0,
+                3777.0,
+                4182.0,
+                6622.0,
+                7492.0
+              ],
+              "split": "train",
+              "stage": "router_plus_scale",
+              "streaming": true,
+              "token_count": 16384
+            },
+            {
+              "cosine": 0.9491384560242295,
+              "dead_experts": 0,
+              "load_cv": 0.28767948249519726,
+              "mse": 6.37453472108973e-05,
+              "normalized_mse": 0.07195633113429076,
+              "router_entropy": 2.6839085333049297,
+              "selected_count": 16384,
+              "selected_counts": [
+                5564.0,
+                5869.0,
+                5005.0,
+                3203.0,
+                3360.0,
+                3432.0,
+                2219.0,
+                2060.0,
+                4010.0,
+                4509.0,
+                3503.0,
+                3552.0,
+                4122.0,
+                5134.0,
+                6245.0,
+                3749.0
+              ],
+              "split": "train",
+              "stage": "joint_expert_router",
+              "streaming": true,
+              "token_count": 16384
+            }
+          ],
+          "stages": [
+            {
+              "epoch": 1,
+              "epochs": 1,
+              "learning_rates": {
+                "amplitude_router": 0.0001,
+                "selection_router": 0.0001
+              },
+              "loss": 0.31656402349472046,
+              "stage": "router_warm_start",
+              "streaming": true,
+              "train_amplitude_router": true,
+              "train_selection_router": true,
+              "updates": 288
+            },
+            {
+              "epoch": 1,
+              "epochs": 1,
+              "learning_rates": {
+                "amplitude_router": 0.0001,
+                "expert_scales": 0.0001,
+                "selection_router": 0.0001
+              },
+              "loss": 0.0641782134771347,
+              "stage": "router_plus_scale",
+              "streaming": true,
+              "train_amplitude_router": true,
+              "train_selection_router": true,
+              "updates": 288
+            },
+            {
+              "epoch": 1,
+              "epochs": 1,
+              "learning_rates": {
+                "amplitude_router": 0.0001,
+                "expert_scales": 0.0001,
+                "experts": 0.0001,
+                "selection_router": 0.0001
+              },
+              "loss": 0.05785529688000679,
+              "stage": "joint_expert_router",
+              "streaming": true,
+              "train_amplitude_router": true,
+              "train_selection_router": true,
+              "updates": 288
+            }
+          ],
+          "streaming_dataset": {
+            "holdout_count": 16598,
+            "holdout_manifest": "runs/20260815-184644-windows-real-d2m-v4-streaming/capture/layer-0000.json",
+            "train_count": 131508,
+            "train_manifest": "runs/20260815-184644-windows-real-d2m-v4-streaming/capture/layer-0000.json"
+          }
+        }
+      }
+    }
+  ],
+  "selection_count": 16384,
+  "status": "CURRENT_HEAD_DECISIVE_CONTROLS_COMPLETE"
+}

@@ -1,0 +1,190 @@
+{
+  "capture_kind": "streaming_teacher_mlp_input",
+  "code_commit": "9d7751817b651952c72cb312a6762c61156ac3d5",
+  "count": 1176,
+  "dataset_hash": "46b278a85b4cb31a8fe659be2dd146bd9206eb491268220e25440981d06c0a03",
+  "diagnostic_only": false,
+  "dtype": "bfloat16",
+  "input_stage": 29,
+  "layer": 29,
+  "layer_receipt": {
+    "attention_implementation": "sdpa",
+    "compute_dtype": "bfloat16",
+    "layer": 29,
+    "source_bytes": 766546368,
+    "source_index_hash": "77042094076611b69791a610065f28b7013b8c621795fa86ddccc8bac7d1b9df",
+    "source_tensor_count": 14,
+    "source_tensor_hashes": [
+      {
+        "dtype": "bfloat16",
+        "sha256": "4e8c46fdaf2e059fa067f033e40644760643be7c534ef41be1913ee3d120a639",
+        "shape": [
+          5120
+        ],
+        "source_name": "model.language_model.layers.29.input_layernorm.weight",
+        "source_shard": "model-00008-of-00018.safetensors"
+      },
+      {
+        "dtype": "bfloat16",
+        "sha256": "534a962a4ce6698b94f9b4383eb658cf0c85acd1e37de9408ca7d55a59929f49",
+        "shape": [
+          48
+        ],
+        "source_name": "model.language_model.layers.29.linear_attn.A_log",
+        "source_shard": "model-00008-of-00018.safetensors"
+      },
+      {
+        "dtype": "bfloat16",
+        "sha256": "cb8d512e294bebe522ec5c15a9d921725da9903571c6b63a4cc6fc1f786acd0d",
+        "shape": [
+          10240,
+          1,
+          4
+        ],
+        "source_name": "model.language_model.layers.29.linear_attn.conv1d.weight",
+        "source_shard": "model-00008-of-00018.safetensors"
+      },
+      {
+        "dtype": "bfloat16",
+        "sha256": "d6b60a8af90dfb28bb3609b8e7b9e08fffe8f40284a6ae069a0b1310d59e4681",
+        "shape": [
+          48
+        ],
+        "source_name": "model.language_model.layers.29.linear_attn.dt_bias",
+        "source_shard": "model-00008-of-00018.safetensors"
+      },
+      {
+        "dtype": "bfloat16",
+        "sha256": "1947c796feccd0d16dfd32238e4c602e3880021af8f4d54aa4df8b80867242f6",
+        "shape": [
+          48,
+          5120
+        ],
+        "source_name": "model.language_model.layers.29.linear_attn.in_proj_a.weight",
+        "source_shard": "model-00008-of-00018.safetensors"
+      },
+      {
+        "dtype": "bfloat16",
+        "sha256": "9796b480f78f379c1e94faac832c95d42a0fefcc83c42cf88ccec2bb71683e68",
+        "shape": [
+          48,
+          5120
+        ],
+        "source_name": "model.language_model.layers.29.linear_attn.in_proj_b.weight",
+        "source_shard": "model-00008-of-00018.safetensors"
+      },
+      {
+        "dtype": "bfloat16",
+        "sha256": "cc40a13c173645f1d17cbdd80c089431588abc92d569f8e07cc03e22e0822c5b",
+        "shape": [
+          10240,
+          5120
+        ],
+        "source_name": "model.language_model.layers.29.linear_attn.in_proj_qkv.weight",
+        "source_shard": "model-00008-of-00018.safetensors"
+      },
+      {
+        "dtype": "bfloat16",
+        "sha256": "e054798988f24ef98d31a78319618ea8c9e769ac248abf6d0332bf3bd87958d9",
+        "shape": [
+          6144,
+          5120
+        ],
+        "source_name": "model.language_model.layers.29.linear_attn.in_proj_z.weight",
+        "source_shard": "model-00008-of-00018.safetensors"
+      },
+      {
+        "dtype": "bfloat16",
+        "sha256": "1ee98288ce8a3e7a282c8a455640d3bfe63f36157bc307ec6d29c3effabb1fb2",
+        "shape": [
+          128
+        ],
+        "source_name": "model.language_model.layers.29.linear_attn.norm.weight",
+        "source_shard": "model-00008-of-00018.safetensors"
+      },
+      {
+        "dtype": "bfloat16",
+        "sha256": "ff63ed19ce5935d33cc739b1f01f0f034e1507201c3b055eba3cbc7288eac61c",
+        "shape": [
+          5120,
+          6144
+        ],
+        "source_name": "model.language_model.layers.29.linear_attn.out_proj.weight",
+        "source_shard": "model-00009-of-00018.safetensors"
+      },
+      {
+        "dtype": "bfloat16",
+        "sha256": "23604716c4d0de39bf5fc7b5d923566f1adcc76fbf5f6bbd93a63fd9be41f282",
+        "shape": [
+          5120,
+          17408
+        ],
+        "source_name": "model.language_model.layers.29.mlp.down_proj.weight",
+        "source_shard": "model-00009-of-00018.safetensors"
+      },
+      {
+        "dtype": "bfloat16",
+        "sha256": "01bef378382ffe2591dfd178500bf80bd7d8b53911338dcd2c4eadc70084fbb1",
+        "shape": [
+          17408,
+          5120
+        ],
+        "source_name": "model.language_model.layers.29.mlp.gate_proj.weight",
+        "source_shard": "model-00009-of-00018.safetensors"
+      },
+      {
+        "dtype": "bfloat16",
+        "sha256": "289d6730edf6e9323346334b94e0765a2cb2c193ec2fadfb304b578e1dfc6f57",
+        "shape": [
+          17408,
+          5120
+        ],
+        "source_name": "model.language_model.layers.29.mlp.up_proj.weight",
+        "source_shard": "model-00009-of-00018.safetensors"
+      },
+      {
+        "dtype": "bfloat16",
+        "sha256": "7e733c78aed0ca13f82bc1f5633346ec9975d23f4b733cd16561b660f6d85cd8",
+        "shape": [
+          5120
+        ],
+        "source_name": "model.language_model.layers.29.post_attention_layernorm.weight",
+        "source_shard": "model-00009-of-00018.safetensors"
+      }
+    ]
+  },
+  "output_stage": 30,
+  "quality_gate_eligible": true,
+  "schema_version": 2,
+  "shard_tokens": 2048,
+  "shards": [
+    {
+      "bytes": 12042328,
+      "count": 1176,
+      "dtype": "bfloat16",
+      "path": "streaming/holdout/layer-0029/shard-00000.safetensors",
+      "records": [
+        {
+          "chunk_index": 0,
+          "content_sha256": "8df6082d3a827ab7f052ac27c0a1b50c2dc207db8474cb3e1c14882b09fa7aac",
+          "example_id": "da378a3ec4dfcd6e3c5ef6cdedb43b6d",
+          "length": 1176,
+          "offset": 0,
+          "source_record_index": 1332,
+          "split": "holdout"
+        }
+      ],
+      "sha256": "f8b87805e199e673c384c48b22b8be69a840229ce4c0b979b9651b756a215a74",
+      "shape": [
+        1176,
+        5120
+      ],
+      "shard_id": 0
+    }
+  ],
+  "source_revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
+  "source_snapshot": "runs\\20260815-030931-windows\\source",
+  "split": "holdout",
+  "status": "CAPTURE_COMPLETE",
+  "tokenizer_hash": "135547ffd6ba69bf188782195b85e2c33b124c7238c0d4e2d95e5cba74ebe716"
+}

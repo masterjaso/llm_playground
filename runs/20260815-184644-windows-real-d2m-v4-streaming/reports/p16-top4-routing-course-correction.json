@@ -1,0 +1,50 @@
+{
+  "schema_version": 1,
+  "status": "ROUTING_COURSE_CORRECTION_COMPLETE",
+  "classification": "TRAIN_DEV_ROUTER_SUPERVISION_AND_FULL_HOLDOUT_CONFIRMATION",
+  "profile": "qwen38_p16s1_top4",
+  "routing_mode": "independent_positive",
+  "reduction": 0.7058823529411764,
+  "selection_contract": {
+    "split": "train_dev",
+    "tokens": 16384,
+    "selection_hash": "5a7739c753dae98698a8c1a22c6a10409230f0750b33cfc9631594f16d8b8e1c",
+    "holdout_opened_only_for_green_dev_finalists": true
+  },
+  "implementation": {
+    "oracle_target_mode": "residual_correlation",
+    "positive_amplitude_supervision": "bounded_batched_nonnegative_least_squares",
+    "normalized_baseline_preserved": true,
+    "source": "src/dense2moe/training/torch_distill.py",
+    "code_commit": "4272fc26df6e232373868284b6ae84b7d3b5419b"
+  },
+  "experiments": [
+    {
+      "name": "residual_oracle_load025_cos045",
+      "training_report": "reports/p16-top4-residual-oracle-routing-load025-training.json",
+      "holdout_report": "reports/p16-top4-residual-oracle-routing-load025-holdout-confirmation.json",
+      "dev": {"normalized_mse": 0.03685096892126619, "cosine": 0.9813705421984196, "load_cv": 0.46707213039416084, "dead_experts": 0},
+      "holdout": {"normalized_mse": 0.03995906208655764, "cosine": 0.9714432792328024, "load_cv": 0.497228731410101, "dead_experts": 0, "strict_reload": true},
+      "green_dev": true,
+      "green_holdout": false
+    },
+    {
+      "name": "residual_oracle_load025_cos075",
+      "training_report": "reports/p16-top4-residual-oracle-routing-load025-cos075-training.json",
+      "holdout_report": "reports/p16-top4-residual-oracle-routing-load025-cos075-holdout-confirmation.json",
+      "dev": {"normalized_mse": 0.040644794480313017, "cosine": 0.9813579404726624, "load_cv": 0.45728847405514705, "dead_experts": 0},
+      "holdout": {"normalized_mse": 0.04199612794467653, "cosine": 0.9714159397263601, "load_cv": 0.4897644317020313, "dead_experts": 0, "strict_reload": true},
+      "green_dev": true,
+      "green_holdout": false
+    }
+  ],
+  "diagnosis": {
+    "partition_oracle_holdout": {"normalized_mse": 0.03588413741225899, "cosine": 0.9523099280363222},
+    "conclusion": "residual oracle supervision improves learned-router quality and dispatch balance, but the >=70% candidate still misses the full-holdout cosine gate; do not resume representative replay"
+  },
+  "replay_gate": {
+    "status": "BLOCKED",
+    "thresholds": {"normalized_mse_max": 0.05, "cosine_min": 0.98, "dead_experts_max": 0, "load_cv_max": 0.5},
+    "reason": "holdout cosine remains approximately 0.9714 despite passing holdout NMSE, dead-expert, and load-balance thresholds"
+  }
+}

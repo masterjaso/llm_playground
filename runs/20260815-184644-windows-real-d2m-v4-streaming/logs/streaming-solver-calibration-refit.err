@@ -1,0 +1,18 @@
+Traceback (most recent call last):
+  File "/mnt/c/workplace/llm_playground/scripts/calibrate_streaming_solver.py", line 402, in <module>
+    main()
+  File "/mnt/c/workplace/llm_playground/scripts/calibrate_streaming_solver.py", line 385, in main
+    payload = run(args)
+              ^^^^^^^^^
+  File "/mnt/c/workplace/llm_playground/scripts/calibrate_streaming_solver.py", line 273, in run
+    projected = frozen_slice_load_aware_oracle(
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/mnt/c/workplace/llm_playground/src/dense2moe/partition/oracle.py", line 1118, in frozen_slice_load_aware_oracle
+    unconstrained_weights = _stream_selected_weights(
+                            ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/mnt/c/workplace/llm_playground/src/dense2moe/partition/oracle.py", line 949, in _stream_selected_weights
+    _, fitted = _batched_exact_positive_fit(vectors, residual)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/mnt/c/workplace/llm_playground/src/dense2moe/partition/oracle.py", line 685, in _batched_exact_positive_fit
+    raise ValueError("exact selected-route refit expects one candidate per token")
+ValueError: exact selected-route refit expects one candidate per token

@@ -1,0 +1,212 @@
+{
+  "architecture": {
+    "expert_intermediate_size": 1024,
+    "ffn_reduction": 0.7058823529411764,
+    "partition": "runs/20260815-184644-windows-real-d2m-v4-streaming/partitions/high-sparsity-p16-top4.json",
+    "profile": "qwen38_p16s1_top4",
+    "routed_experts": 16,
+    "routing_mode": "independent_positive",
+    "shared_intermediate_size": 1024,
+    "top_k": 4
+  },
+  "checkpoint": {
+    "basis": "deployed_checkpoint_shared_and_routed_contributions",
+    "directory": "runs/20260815-184644-windows-real-d2m-v4-streaming/layer-checkpoints/clean-validation/p16-top4-residual-ce",
+    "metadata_code_commit": "123ae0dcc7dd114337752ed97be0638d54f65a98",
+    "tensor_sha256": "e33b097e63a88cd9b9a45e91f263dbc94750cc8aecad8d78115797e3e389eae7"
+  },
+  "classification": "TRUE_VALIDATION_ONLY_NO_GRADIENTS_NO_HOLDOUT",
+  "code_commit": "a7f7668f885aa39703bfd1e5196267235c3c8ab2",
+  "compute_budget": {
+    "beam_width": 4,
+    "microbatch": 256,
+    "pool_size": 10,
+    "scope": "hardest_residual_norm_quartile"
+  },
+  "dataset_hash": "46b278a85b4cb31a8fe659be2dd146bd9206eb491268220e25440981d06c0a03",
+  "decision_enabled": "capacity_not_green_move_to_basis_topology",
+  "elapsed_seconds_total": 41.80507237801794,
+  "expected_result": "The exact all-1820-set positive oracle should materially exceed the learned linear selector, especially on the hardest residual quartile.",
+  "falsifier": "Exact oracle mean cosine below 0.98 on the evaluated scope means selector learning alone cannot establish the product gate for this basis.",
+  "hypothesis": "The deployed p16/top4 basis can clear cosine >= 0.98 if expert selection is exact.",
+  "metrics": {
+    "bounded_oracle": {
+      "dead_experts": 0,
+      "elapsed_seconds": 8.016427968395874,
+      "expert_usage_counts": [
+        1898,
+        1459,
+        1456,
+        1644,
+        1206,
+        1201,
+        1292,
+        1373,
+        1390,
+        966,
+        627,
+        329,
+        319,
+        495,
+        227,
+        502
+      ],
+      "expert_usage_fraction": [
+        0.1158447265625,
+        0.08905029296875,
+        0.0888671875,
+        0.100341796875,
+        0.0736083984375,
+        0.07330322265625,
+        0.078857421875,
+        0.08380126953125,
+        0.0848388671875,
+        0.0589599609375,
+        0.03826904296875,
+        0.02008056640625,
+        0.01947021484375,
+        0.03021240234375,
+        0.01385498046875,
+        0.0306396484375
+      ],
+      "global_nmse": 0.01605004231079529,
+      "load_cv": 0.5029958144482088,
+      "mean_cosine": 0.9605210367590189,
+      "mean_token_relative_mse": 0.07892392575740814,
+      "tokens": 4096
+    },
+    "exact_oracle": {
+      "dead_experts": 0,
+      "elapsed_seconds": 0.9028616861905903,
+      "expert_usage_counts": [
+        1843,
+        1374,
+        1414,
+        1606,
+        1196,
+        1213,
+        1280,
+        1393,
+        1407,
+        982,
+        635,
+        327,
+        341,
+        576,
+        275,
+        522
+      ],
+      "expert_usage_fraction": [
+        0.11248779296875,
+        0.0838623046875,
+        0.0863037109375,
+        0.0980224609375,
+        0.072998046875,
+        0.07403564453125,
+        0.078125,
+        0.08502197265625,
+        0.08587646484375,
+        0.0599365234375,
+        0.03875732421875,
+        0.01995849609375,
+        0.02081298828125,
+        0.03515625,
+        0.01678466796875,
+        0.0318603515625
+      ],
+      "global_nmse": 0.015875444889890865,
+      "load_cv": 0.4769728098063407,
+      "mean_cosine": 0.9606898003257811,
+      "mean_token_relative_mse": 0.07859354466199875,
+      "tokens": 4096
+    },
+    "student": {
+      "dead_experts": 0,
+      "elapsed_seconds": 0.0,
+      "expert_usage_counts": [
+        559,
+        588,
+        1034,
+        1473,
+        1170,
+        1387,
+        1417,
+        1852,
+        1893,
+        1557,
+        989,
+        453,
+        487,
+        690,
+        327,
+        508
+      ],
+      "expert_usage_fraction": [
+        0.03411865234375,
+        0.035888671875,
+        0.0631103515625,
+        0.08990478515625,
+        0.0714111328125,
+        0.08465576171875,
+        0.08648681640625,
+        0.113037109375,
+        0.11553955078125,
+        0.09503173828125,
+        0.06036376953125,
+        0.02764892578125,
+        0.02972412109375,
+        0.0421142578125,
+        0.01995849609375,
+        0.031005859375
+      ],
+      "global_nmse": 0.038655101353995594,
+      "load_cv": 0.49553005603127537,
+      "mean_cosine": 0.9416888235136867,
+      "mean_token_relative_mse": 0.2028738558292389,
+      "tokens": 4096
+    }
+  },
+  "oracle": {
+    "all_combinations": 1820,
+    "bounded_beam_width": 4,
+    "bounded_pool_size": 10,
+    "bounded_selection": "residual_correlation_beam_search_exact_final_coefficients",
+    "exact_selection": "all_1820_four_expert_combinations_with_nonnegative_active_face_solves_precomputed_gram"
+  },
+  "schema_version": 1,
+  "selection_comparison": {
+    "bounded_vs_exact": {
+      "exact_set_match": 0.888671875,
+      "mean_jaccard": 0.9524908156622023,
+      "topk_recall": 0.96929931640625
+    },
+    "student_vs_exact": {
+      "exact_set_match": 0.273681640625,
+      "mean_jaccard": 0.5896228608630952,
+      "topk_recall": 0.69390869140625
+    }
+  },
+  "source_revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
+  "status": "EXACT_P16_TOP4_ORACLE_COMPLETE",
+  "validation": {
+    "count": 16384,
+    "holdout": {
+      "count": 16598,
+      "opened": false,
+      "status": "CLOSED"
+    },
+    "identity_hash": "5a7739c753dae98698a8c1a22c6a10409230f0750b33cfc9631594f16d8b8e1c",
+    "residual_norm_quartile_edges": [
+      0.14084108173847198,
+      0.39324045181274414,
+      0.5638304352760315,
+      0.8311173319816589,
+      9.14295768737793
+    ],
+    "scope": "hardest_residual_norm_quartile",
+    "scope_count": 4096,
+    "scope_global_indices_sha256": "5baa5c93fe8c0a17fb87766fab42576139c4fba54af56c814afa8291d075aa99",
+    "scope_residual_norm_max": 9.14295768737793,
+    "scope_residual_norm_min": 0.8311879634857178
+  }
+}

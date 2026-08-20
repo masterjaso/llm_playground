@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://nehemiah-steward-protocol.local/contracts/hygiene-maintain-report.schema.json",
+  "title": "NSP Hygiene Maintain Report",
+  "description": "Diff-scoped maintain work order and readiness state written to .nsp/artifacts/reports/hygiene-maintain-latest.json.",
+  "type": "object",
+  "required": ["comparisonRange", "phases", "maintainReadiness"],
+  "properties": {
+    "comparisonRange": { "type": "string" },
+    "baseRef": { "type": "string" },
+    "headRef": { "type": "string" },
+    "hasParentBranch": { "type": "boolean" },
+    "classification": { "type": "string" },
+    "changedFiles": { "type": "array", "items": { "type": "string" } },
+    "phases": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "status"],
+        "properties": {
+          "id": { "enum": ["code", "context", "ccb"] },
+          "status": { "type": "string" },
+          "skill": { "type": "string" },
+          "directTargets": { "type": "array", "items": { "type": "string" } },
+          "relatedTargets": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    },
+    "maintainReadiness": {
+      "type": "object",
+      "required": ["ready"],
+      "properties": {
+        "ready": { "type": "boolean" },
+        "totalItems": { "type": "number" },
+        "completeItems": { "type": "number" },
+        "blockers": { "type": "array", "items": { "type": "string" } },
+        "statePath": { "type": "string" }
+      }
+    }
+  }
+}

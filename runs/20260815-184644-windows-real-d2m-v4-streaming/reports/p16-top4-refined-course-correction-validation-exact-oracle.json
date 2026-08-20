@@ -1,0 +1,212 @@
+{
+  "architecture": {
+    "expert_intermediate_size": 1024,
+    "ffn_reduction": 0.7058823529411764,
+    "partition": "runs/20260815-184644-windows-real-d2m-v4-streaming/partitions/high-sparsity-p16-top4.json",
+    "profile": "qwen38_p16s1_top4",
+    "routed_experts": 16,
+    "routing_mode": "independent_positive",
+    "shared_intermediate_size": 1024,
+    "top_k": 4
+  },
+  "checkpoint": {
+    "basis": "deployed_checkpoint_shared_and_routed_contributions",
+    "directory": "runs/20260815-184644-windows-real-d2m-v4-streaming/layer-checkpoints/clean-validation/p16-top4-refined-course-correction-continue",
+    "metadata_code_commit": "d9f6119f6059accc11f678f269961f0075ed3781",
+    "tensor_sha256": "6693d65b1cf2bc731c2ec3d84b7872bc6f79fe8c1363ba422848269e3a7a6acb"
+  },
+  "classification": "TRUE_VALIDATION_ONLY_NO_GRADIENTS_NO_HOLDOUT",
+  "code_commit": "1f3915dbeaa9de5bf234d730e5adcc3349c085b9",
+  "compute_budget": {
+    "beam_width": 4,
+    "microbatch": 512,
+    "pool_size": 10,
+    "scope": "all_validation"
+  },
+  "dataset_hash": "46b278a85b4cb31a8fe659be2dd146bd9206eb491268220e25440981d06c0a03",
+  "decision_enabled": "capacity_sufficient_focus_router",
+  "elapsed_seconds_total": 44.95942837902112,
+  "expected_result": "The exact all-1820-set positive oracle should materially exceed the learned linear selector, especially on the hardest residual quartile.",
+  "falsifier": "Exact oracle mean cosine below 0.98 on the evaluated scope means selector learning alone cannot establish the product gate for this basis.",
+  "hypothesis": "The deployed p16/top4 basis can clear cosine >= 0.98 if expert selection is exact.",
+  "metrics": {
+    "bounded_oracle": {
+      "dead_experts": 0,
+      "elapsed_seconds": 8.35495915194042,
+      "expert_usage_counts": [
+        10829,
+        8619,
+        6857,
+        5172,
+        4186,
+        3597,
+        4139,
+        4018,
+        3363,
+        2524,
+        2133,
+        1872,
+        2359,
+        1476,
+        2197,
+        2195
+      ],
+      "expert_usage_fraction": [
+        0.1652374267578125,
+        0.1315155029296875,
+        0.1046295166015625,
+        0.07891845703125,
+        0.063873291015625,
+        0.0548858642578125,
+        0.0631561279296875,
+        0.061309814453125,
+        0.0513153076171875,
+        0.03851318359375,
+        0.0325469970703125,
+        0.028564453125,
+        0.0359954833984375,
+        0.02252197265625,
+        0.0335235595703125,
+        0.0334930419921875
+      ],
+      "global_nmse": 0.01408677935937894,
+      "load_cv": 0.6216793598410282,
+      "mean_cosine": 0.9847965040244162,
+      "mean_token_relative_mse": 0.030059050768613815,
+      "tokens": 16384
+    },
+    "exact_oracle": {
+      "dead_experts": 0,
+      "elapsed_seconds": 3.0512475258437917,
+      "expert_usage_counts": [
+        10621,
+        8428,
+        6669,
+        5012,
+        4054,
+        3497,
+        4131,
+        4074,
+        3491,
+        2635,
+        2270,
+        1903,
+        2385,
+        1898,
+        2233,
+        2235
+      ],
+      "expert_usage_fraction": [
+        0.1620635986328125,
+        0.12860107421875,
+        0.1017608642578125,
+        0.07647705078125,
+        0.061859130859375,
+        0.0533599853515625,
+        0.0630340576171875,
+        0.062164306640625,
+        0.0532684326171875,
+        0.0402069091796875,
+        0.034637451171875,
+        0.0290374755859375,
+        0.0363922119140625,
+        0.028961181640625,
+        0.0340728759765625,
+        0.0341033935546875
+      ],
+      "global_nmse": 0.01398388112624291,
+      "load_cv": 0.5933307686013161,
+      "mean_cosine": 0.9848754992708564,
+      "mean_token_relative_mse": 0.02990715205669403,
+      "tokens": 16384
+    },
+    "student": {
+      "dead_experts": 0,
+      "elapsed_seconds": 0.0,
+      "expert_usage_counts": [
+        8508,
+        7197,
+        6079,
+        5013,
+        4416,
+        4094,
+        4326,
+        4344,
+        3883,
+        3266,
+        2941,
+        2164,
+        2544,
+        2226,
+        2261,
+        2274
+      ],
+      "expert_usage_fraction": [
+        0.12982177734375,
+        0.1098175048828125,
+        0.0927581787109375,
+        0.0764923095703125,
+        0.0673828125,
+        0.062469482421875,
+        0.066009521484375,
+        0.0662841796875,
+        0.0592498779296875,
+        0.049835205078125,
+        0.0448760986328125,
+        0.03302001953125,
+        0.038818359375,
+        0.033966064453125,
+        0.0345001220703125,
+        0.034698486328125
+      ],
+      "global_nmse": 0.022887117553666375,
+      "load_cv": 0.4420958086929714,
+      "mean_cosine": 0.9815988321788609,
+      "mean_token_relative_mse": 0.048865437507629395,
+      "tokens": 16384
+    }
+  },
+  "oracle": {
+    "all_combinations": 1820,
+    "bounded_beam_width": 4,
+    "bounded_pool_size": 10,
+    "bounded_selection": "residual_correlation_beam_search_exact_final_coefficients",
+    "exact_selection": "all_1820_four_expert_combinations_with_nonnegative_active_face_solves_precomputed_gram"
+  },
+  "schema_version": 1,
+  "selection_comparison": {
+    "bounded_vs_exact": {
+      "exact_set_match": 0.91839599609375,
+      "mean_jaccard": 0.96678466796875,
+      "topk_recall": 0.9790496826171875
+    },
+    "student_vs_exact": {
+      "exact_set_match": 0.5582275390625,
+      "mean_jaccard": 0.7970011393229166,
+      "topk_recall": 0.8633575439453125
+    }
+  },
+  "source_revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
+  "status": "EXACT_P16_TOP4_ORACLE_COMPLETE",
+  "validation": {
+    "count": 16384,
+    "holdout": {
+      "count": 16598,
+      "opened": false,
+      "status": "CLOSED"
+    },
+    "identity_hash": "5a7739c753dae98698a8c1a22c6a10409230f0750b33cfc9631594f16d8b8e1c",
+    "residual_norm_quartile_edges": [
+      0.13877281546592712,
+      0.38239965587854385,
+      0.5367705523967743,
+      0.8031990230083466,
+      8.954253196716309
+    ],
+    "scope": "all_validation",
+    "scope_count": 16384,
+    "scope_global_indices_sha256": "7b2ff822febb9191b88d04cacfa6bb80aec3c6dd42f9210683c6b9fd2167b15f",
+    "scope_residual_norm_max": 8.954253196716309,
+    "scope_residual_norm_min": 0.13877281546592712
+  }
+}

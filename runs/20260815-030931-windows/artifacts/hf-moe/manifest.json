@@ -1,0 +1,15 @@
+{
+  "complete": false,
+  "format": "dense2moe-manifest-v1",
+  "layers": [
+    {
+      "path": "runs\\20260815-030931-windows\\layer-checkpoints\\layer-0000.json",
+      "sha256": "bad895eadd4952a8cd04a6b2b807c7ce81b029a9447f40e291ce1da8c02d4d02",
+      "size": 164
+    }
+  ],
+  "metadata": {
+    "expected_layers": 64,
+    "profile": "qwen38_p32s1_top2"
+  }
+}

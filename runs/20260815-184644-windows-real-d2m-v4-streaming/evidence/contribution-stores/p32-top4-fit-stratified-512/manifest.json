@@ -1,0 +1,57 @@
+{
+  "arrays": {
+    "routed": {
+      "dtype": "float32",
+      "path": "routed.npy",
+      "sha256": "bda90a757f47f2b5172da8814e42f56e360a7d110269fa0fc8372be65af0bdd5",
+      "shape": [
+        512,
+        32,
+        5120
+      ]
+    },
+    "shared": {
+      "dtype": "float32",
+      "path": "shared.npy",
+      "sha256": "3828d574daa748bbbac934612623a80ac164e559a66afe5b2d3edd3f6a62ac24",
+      "shape": [
+        512,
+        5120
+      ]
+    },
+    "target": {
+      "dtype": "float32",
+      "path": "target.npy",
+      "sha256": "a711e547e84668df7086ca8c4ccbf46b8e1a0c4fa95499bab83ede591a631b2b",
+      "shape": [
+        512,
+        5120
+      ]
+    }
+  },
+  "budget": {
+    "device": "cuda:1",
+    "holdout_opened": false,
+    "microbatch": 128,
+    "sample_count": 512,
+    "stratify_pool": 4096
+  },
+  "classification": "FIT_ONLY_SOLVER_CALIBRATION_NO_HOLDOUT",
+  "code_commit": "e2de5273aefd74e4b9e02278e4348c91d8d1fe32",
+  "dataset_hash": "46b278a85b4cb31a8fe659be2dd146bd9206eb491268220e25440981d06c0a03",
+  "decision_enabled": "retain the topology as a research finalist and authorize a router/refinement follow-up only when bounded oracle evidence is near-target; never authorize holdout or replay from this step.",
+  "falsifier": "The bounded oracle remains below cosine 0.98 or cannot meet load CV <= 0.50 with dead experts = 0, or any provenance/split check indicates non-FIT data was opened.",
+  "format": "dense2moe-contribution-store-v1",
+  "hardness_max": 8.817391395568848,
+  "hardness_min": 0.22572648525238037,
+  "holdout_opened": false,
+  "hypothesis": "A deterministic stratified FIT contribution store plus a bounded load-aware candidate pool can reveal whether this p32 product partition has sufficient routing capacity without holdout access.",
+  "indices_sha256": "65f14de67e89d3d471d7c12d4b42fbc0549b724f0d8fc53b6a9016320cfc17c9",
+  "partition_hash": "b468086f5d572596033c1085bf0a8abb87a196ca1d4641c3c86b29a568bbdf27",
+  "sample_count": 512,
+  "schema_version": 1,
+  "split": "train",
+  "stratify_pool": 4096,
+  "top_k": 4,
+  "topology": "p32/top4"
+}

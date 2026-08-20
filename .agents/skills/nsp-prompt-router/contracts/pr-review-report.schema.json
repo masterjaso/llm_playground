@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://nehemiah-steward-protocol.local/contracts/pr-review-report.schema.json",
+  "title": "NSP PR Review Report",
+  "description": "Structured verdict record backing an nsp-pr-review output. The deterministic review manifest is the coverage evidence. this record captures the skill's judgment.",
+  "type": "object",
+  "required": ["schemaVersion", "comparisonRange", "verdict", "reviewManifestPath", "maintainReady", "reviewComplete", "findings"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "generatedAt": { "type": "string" },
+    "comparisonRange": { "type": "string" },
+    "baseRef": { "type": "string" },
+    "headRef": { "type": "string" },
+    "verdict": {
+      "enum": ["approved", "approvable-after-confirmations", "request-changes", "not-enough-information"]
+    },
+    "reviewManifestPath": { "type": "string" },
+    "maintainReady": { "type": "boolean" },
+    "reviewComplete": { "type": "boolean" },
+    "proofOfReadPresent": { "type": "boolean" },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["severity", "location", "whatIsWrong"],
+        "properties": {
+          "severity": { "enum": ["critical", "high", "medium", "low", "suggestion"] },
+          "location": { "type": "string" },
+          "whatIsWrong": { "type": "string" },
+          "whyItMatters": { "type": "string" },
+          "suggestedFix": { "type": "string" },
+          "confidence": { "enum": ["high", "medium", "low"] }
+        }
+      }
+    },
+    "blockers": { "type": "array", "items": { "type": "string" } },
+    "confirmationsRequired": { "type": "array", "items": { "type": "string" } }
+  }
+}

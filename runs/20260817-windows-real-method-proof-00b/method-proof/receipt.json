@@ -1,0 +1,89 @@
+{
+  "manifest": {
+    "format": "jsonl",
+    "path": "manifest.jsonl",
+    "sha256": "cfec01df56aec7d7676b7dea28b04f21aab1093a5df0cf4ca88765418050bf05"
+  },
+  "method_proof_policy": {
+    "benchmark_checkpoint_selection": false,
+    "benchmark_gradients": false,
+    "diversity_buckets": [
+      "code",
+      "technical"
+    ],
+    "eligible_split": "FIT-TRAIN",
+    "excluded_splits": [
+      "FIT-DEV",
+      "GATE-A",
+      "SHADOW-B",
+      "SHADOW-C",
+      "PRESERVATION-CANARY",
+      "BENCHMARK-CANARY-EXCLUDED"
+    ],
+    "minimum_tokens": 32768,
+    "source_manifest": "data\\public_v21\\corpus-v2.1.jsonl",
+    "source_manifest_sha256": "61621e236d43867331f0a53540db76a70b06c8b7a73fc0081a9a74ed5f8f19b0"
+  },
+  "provenance": {
+    "content_hash_deduplicated": true,
+    "retained_per_row": true,
+    "source_manifest_immutable": true,
+    "stable_ids": true
+  },
+  "receipt_hash_basis": "canonical JSON excluding receipt_sha256",
+  "receipt_sha256": "e4302c76a5e4e38753364215a7a8bd8548dd01379811be46d0199f3dc94ad27d",
+  "receipt_type": "dense2moe-method-proof-data",
+  "schema_version": 1,
+  "selection": {
+    "bucket_token_counts": {
+      "code": 26434,
+      "technical": 10505
+    },
+    "bucket_token_targets": {
+      "code": 8192,
+      "technical": 8192
+    },
+    "content_deduplication": true,
+    "domain_counts": {
+      "code": 1,
+      "code/repository": 1,
+      "structured": 1
+    },
+    "eligible_rows": 321,
+    "evaluation_overlap_checked": true,
+    "evaluation_splits_excluded": [
+      "FIT-DEV",
+      "GATE-A",
+      "SHADOW-B",
+      "SHADOW-C",
+      "PRESERVATION-CANARY"
+    ],
+    "excluded_benchmark_rows": 72,
+    "excluded_non_fit_rows": 389,
+    "provenance_complete": true,
+    "selected_ids": [
+      "0367aa876b6f6025b6a7642349d3b541",
+      "0d9883535b67f5f5c6ec0ab3fae7a500",
+      "0efe14e5610b717a145c57420fc5e21b"
+    ],
+    "selected_rows": 3,
+    "selected_tokens": 36939,
+    "source_family_counts": {
+      "permissive-repository": 1,
+      "real-repository": 2
+    },
+    "split": "FIT-TRAIN"
+  },
+  "split_overlap_audit": {
+    "checked_against": [
+      "FIT-DEV",
+      "GATE-A",
+      "SHADOW-B",
+      "SHADOW-C",
+      "PRESERVATION-CANARY",
+      "BENCHMARK-CANARY-EXCLUDED"
+    ],
+    "status": "PASS"
+  },
+  "status": "METHOD_PROOF_READY"
+}

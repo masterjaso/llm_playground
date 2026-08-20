@@ -1,0 +1,32 @@
+{
+  "artifact_hashes": {
+    "source_config_hash": "191e0af232104ed8b65258cf3fb2b842e288008baca7633c11b82a1ac7203aab",
+    "source_index_hash": "77042094076611b69791a610065f28b7013b8c621795fa86ddccc8bac7d1b9df"
+  },
+  "code_commit": "a4675b319eba1e4cb87dcb2fe3aeaec220657ee0",
+  "commands": [
+    "uv sync --extra runtime --extra dev",
+    "uv run --extra runtime --extra dev pytest -q",
+    "uv run --extra runtime --extra dev ruff check .",
+    "uv run --extra runtime --extra dev mypy src",
+    "d2m pilot --run-dir runs/20260815-145505-windows-real-d2m --json",
+    "d2m oracle-study --run-dir runs/20260815-145505-windows-real-d2m --layer 0 --json"
+  ],
+  "created_at": "2026-08-15T15:36:14.787258Z",
+  "determinism": "tiny target save/reload and capture resume gates pass; real oracle uses fixed seed 17",
+  "parent_run_id": "20260815-030931-windows",
+  "profile": "qwen38_p8s1_top2",
+  "profile_hash": "6d1a8ad97a52eb7b4ff4fcc47a0a1cbc7a5abf500a15b807f24394d72629f27c",
+  "run_id": "20260815-145505-windows-real-d2m",
+  "seeds": {
+    "architecture_spike": 4,
+    "calibration_default": 17,
+    "holdout_default": 29,
+    "pilot": 17
+  },
+  "source_config_hash": "191e0af232104ed8b65258cf3fb2b842e288008baca7633c11b82a1ac7203aab",
+  "source_index_hash": "77042094076611b69791a610065f28b7013b8c621795fa86ddccc8bac7d1b9df",
+  "source_repository": "Qwen/Qwen3.8-27B",
+  "source_revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
+  "status": "PARTIAL"
+}

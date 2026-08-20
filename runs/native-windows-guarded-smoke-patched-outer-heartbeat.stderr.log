@@ -1,0 +1,17 @@
+usage: run_guarded_command.py [-h] [--name NAME]
+                              [--category {FAST,MEDIUM,LONG_RUNNING}]
+                              [--timeout TIMEOUT] [--cwd CWD]
+                              [--heartbeat-path HEARTBEAT_PATH]
+                              [--heartbeat-interval HEARTBEAT_INTERVAL]
+                              [--stdout-log-path STDOUT_LOG_PATH]
+                              [--stderr-log-path STDERR_LOG_PATH]
+                              [--tail-bytes TAIL_BYTES]
+                              [--child-output-stale-after CHILD_OUTPUT_STALE_AFTER]
+                              [--long-running] [--check]
+                              ...
+run_guarded_command.py: error: argument --name: expected one argument
+[31;1mException: [0mC:\workplace\llm_playground\scripts\Invoke-GuardedCommand-Smoke.ps1:62[0m
+[31;1m[0m[36;1mLine |[0m
+[31;1m[0m[36;1m[36;1m  62 | [0m             [36;1mthrow "$Name did not emit required marker: $marker`n$text[0m .[0m
+[31;1m[0m[36;1m[36;1m[0m[36;1m[0m[36;1m     | [31;1m             ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~[0m
+[31;1m[0m[36;1m[36;1m[0m[36;1m[0m[36;1m[31;1m[31;1m[36;1m     | [31;1mwindows-smoke-success did not emit required marker: __CMD_START__ [0m

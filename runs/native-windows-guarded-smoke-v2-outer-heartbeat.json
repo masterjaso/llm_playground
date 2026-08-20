@@ -1,0 +1,27 @@
+{
+  "argv": [
+    "/mnt/c/WINDOWS/System32/cmd.exe",
+    "/d",
+    "/s",
+    "/c",
+    "set D2M_PYTHON=C:\\Users\\maste\\AppData\\Local\\Programs\\Python\\Python312\\python.exe&& C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File C:\\workplace\\llm_playground\\scripts\\Invoke-GuardedCommand-Smoke.ps1 -Output C:\\workplace\\llm_playground\\docs\\windows-guarded-command-smoke-receipt.json -HeartbeatSeconds 60"
+  ],
+  "child_output_stale": false,
+  "completed": 0,
+  "elapsed_seconds": 1.200094106956385,
+  "last_child_output_age_seconds": 0.025718764984048903,
+  "last_child_output_at": "2026-08-16T19:21:42.161961+00:00",
+  "last_heartbeat": "2026-08-16T19:21:42.187770+00:00",
+  "output_lines_dropped": 0,
+  "pid": 2797267,
+  "returncode": 1,
+  "started": "2026-08-16T19:21:40.987540+00:00",
+  "status": "FAILED",
+  "stderr_bytes": 349,
+  "stderr_log_path": "runs/native-windows-guarded-smoke-v2-outer-heartbeat.stderr.log",
+  "stdout_bytes": 0,
+  "stdout_log_path": "runs/native-windows-guarded-smoke-v2-outer-heartbeat.stdout.log",
+  "task": "native-windows-guarded-smoke-v2",
+  "terminal_status": "FAILED",
+  "total": null
+}

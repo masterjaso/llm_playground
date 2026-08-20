@@ -1,0 +1,6 @@
+{
+  "manifest": "runs\\20260815-030931-windows\\text-checkpoint\\text-filter-manifest.json",
+  "materialized": true,
+  "status": "TEXT_CHECKPOINT_READY",
+  "tensor_count": 851
+}

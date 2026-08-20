@@ -1,0 +1,92 @@
+{
+  "all_validation": {
+    "dead_experts": 0,
+    "expert_usage_counts": [
+      6642,
+      5065,
+      5876,
+      5232,
+      4689,
+      4507,
+      4571,
+      4265,
+      3924,
+      3516,
+      3111,
+      2184,
+      2717,
+      2359,
+      3005,
+      3873
+    ],
+    "global_nmse": 0.03376320004463196,
+    "load_cv": 0.29779591275001693,
+    "mean_cosine": 0.9758708477020264,
+    "mean_token_relative_mse": 0.05693640187382698,
+    "student_mean_cosine_unscaled": 0.972970724105835,
+    "tokens": 16384
+  },
+  "checkpoint": {
+    "metadata_code_commit": "123ae0dcc7dd114337752ed97be0638d54f65a98",
+    "tensor_sha256": "e33b097e63a88cd9b9a45e91f263dbc94750cc8aecad8d78115797e3e389eae7"
+  },
+  "classification": "TRUE_FIT_ONLY_SCALE_VALIDATION_ONLY_NO_GRADIENTS_NO_HOLDOUT",
+  "code_commit": "d02fe4084117a3610288d6372b0d29227a35c793",
+  "dataset_hash": "46b278a85b4cb31a8fe659be2dd146bd9206eb491268220e25440981d06c0a03",
+  "decision": "reject_shared_scale_variant",
+  "elapsed_seconds": 20.74316400801763,
+  "falsifier": "The exact positive oracle with the FIT-fitted scale remains below the current unscaled ceiling or does not improve the hard quartile.",
+  "fit_scale": {
+    "method": "least_squares_shared_to_dense_target",
+    "rows": 115124,
+    "validation_excluded": true,
+    "value": 1.145970991850116
+  },
+  "hard_quartile": {
+    "dead_experts": 0,
+    "expert_usage_counts": [
+      6642,
+      5065,
+      5876,
+      5232,
+      4689,
+      4507,
+      4571,
+      4265,
+      3924,
+      3516,
+      3111,
+      2184,
+      2717,
+      2359,
+      3005,
+      3873
+    ],
+    "global_nmse": 0.028767088428139687,
+    "load_cv": 0.29779591275001693,
+    "mean_cosine": 0.95824134349823,
+    "mean_token_relative_mse": 0.08835434168577194,
+    "student_mean_cosine_unscaled": 0.9416887760162354,
+    "tokens": 4096
+  },
+  "hypothesis": "A single FIT-fitted shared-branch scale can recover the residual angular gap without changing active geometry.",
+  "residual_quartile_edges": [
+    0.14084108173847198,
+    0.39324045181274414,
+    0.5638304352760315,
+    0.8311173319816589,
+    9.14295768737793
+  ],
+  "schema_version": 1,
+  "source_revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
+  "status": "SHARED_SCALE_FROZEN_ORACLE_COMPLETE",
+  "validation": {
+    "count": 16384,
+    "holdout": {
+      "count": 16598,
+      "opened": false,
+      "status": "CLOSED"
+    },
+    "identity_hash": "5a7739c753dae98698a8c1a22c6a10409230f0750b33cfc9631594f16d8b8e1c"
+  }
+}

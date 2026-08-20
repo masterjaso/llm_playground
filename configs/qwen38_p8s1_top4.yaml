@@ -1,0 +1,12 @@
+name: qwen38_p8s1_top4
+model: Qwen/Qwen3.8-27B
+revision: 1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0
+hidden_size: 5120
+dense_intermediate_size: 17408
+num_hidden_layers: 64
+routed_experts: 8
+expert_intermediate_size: 2048
+shared_intermediate_size: 1024
+top_k: 4
+routing_mode: independent_positive
+dtype: bfloat16

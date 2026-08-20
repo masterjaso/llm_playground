@@ -1,0 +1,42 @@
+{
+  "cuda_available": true,
+  "device_count": 2,
+  "devices": [
+    {
+      "bf16_matmul": {
+        "ok": true,
+        "seconds": 0.15210269996896386
+      },
+      "bf16_supported": true,
+      "compute_capability": [
+        8,
+        9
+      ],
+      "free_memory": 7354712064,
+      "index": 0,
+      "name": "NVIDIA GeForce RTX 4060",
+      "total_memory": 8585216000
+    },
+    {
+      "bf16_matmul": {
+        "ok": true,
+        "seconds": 0.059249999991152436
+      },
+      "bf16_supported": true,
+      "compute_capability": [
+        12,
+        0
+      ],
+      "free_memory": 15806234624,
+      "index": 1,
+      "name": "NVIDIA GeForce RTX 5060 Ti",
+      "total_memory": 17102864384
+    }
+  ],
+  "platform": "Windows-11-10.0.26200-SP0",
+  "python": "3.12.6 (tags/v3.12.6:a4a2d2b, Sep  6 2024, 20:11:23) [MSC v.1940 64 bit (AMD64)]",
+  "python_executable": "C:\\workplace\\llm_playground\\.venv\\Scripts\\python.exe",
+  "status": "WINDOWS_CUDA_READY",
+  "torch": "2.13.0+cu130",
+  "torch_cuda": "13.0"
+}

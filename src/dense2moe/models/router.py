@@ -43,23 +43,27 @@ def topk_router(logits: Any, top_k: int) -> tuple[Any, Any]:
         values = logits if logits.ndim > 1 else logits.unsqueeze(0)
         if top_k > values.shape[-1]:
             raise ValueError("top_k cannot exceed expert count")
+        if not torch.isfinite(values).all():
+            raise ValueError("router logits must be finite")
         selected_logits, torch_indices = torch.topk(values, top_k, dim=-1)
         torch_weights = torch.softmax(selected_logits, dim=-1)
         return torch_indices, torch_weights
     try:
         import numpy as np  # type: ignore
 
-        values = np.asarray(logits)
-        if values.ndim == 1:
-            values = values[None, :]
-        if top_k > values.shape[-1]:
+        numpy_values = np.asarray(logits)
+        if numpy_values.ndim == 1:
+            numpy_values = numpy_values[None, :]
+        if top_k > numpy_values.shape[-1]:
             raise ValueError("top_k cannot exceed expert count")
+        if not np.isfinite(numpy_values).all():
+            raise ValueError("router logits must be finite")
         # Stable descending sort makes ties reproducible across platforms.
-        order = np.argsort(-values, axis=-1, kind="stable")[:, :top_k]
-        selected_logits = np.take_along_axis(values, order, axis=-1)
-        selected = np.exp(selected_logits - np.max(selected_logits, axis=-1, keepdims=True))
+        numpy_order = np.argsort(-numpy_values, axis=-1, kind="stable")[:, :top_k]
+        numpy_selected_logits = np.take_along_axis(numpy_values, numpy_order, axis=-1)
+        selected = np.exp(numpy_selected_logits - np.max(numpy_selected_logits, axis=-1, keepdims=True))
         weights = normalize_topk_weights(selected)
-        return order, weights
+        return numpy_order, weights
     except ImportError:
         rows = logits if isinstance(logits, list) and logits and isinstance(logits[0], list) else [logits]
         fallback_indices: list[list[int]] = []
@@ -67,6 +71,8 @@ def topk_router(logits: Any, top_k: int) -> tuple[Any, Any]:
         for row in rows:
             if top_k > len(row):
                 raise ValueError("top_k cannot exceed expert count")
+            if not all(math.isfinite(float(value)) for value in row):
+                raise ValueError("router logits must be finite")
             chosen = sorted(range(len(row)), key=lambda index: (-row[index], index))[:top_k]
             selected = _softmax_row([row[index] for index in chosen])
             fallback_indices.append(chosen)

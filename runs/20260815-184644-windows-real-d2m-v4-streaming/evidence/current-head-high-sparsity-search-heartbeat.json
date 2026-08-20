@@ -1,0 +1,25 @@
+{
+  "argv": [
+    "bash",
+    "-lc",
+    ".venv/bin/python scripts/run_high_sparsity_search.py --run-dir runs/20260815-184644-windows-real-d2m-v4-streaming --source-dir runs/20260815-030931-windows/source --device cuda:1 --dev-tokens 16384 --batch-size 512 --seed 20260815"
+  ],
+  "child_output_stale": false,
+  "completed": 0,
+  "elapsed_seconds": 719.3153949269908,
+  "last_child_output_age_seconds": 0.0007272749789990485,
+  "last_child_output_at": "2026-08-16T19:52:44.516417+00:00",
+  "last_heartbeat": "2026-08-16T19:52:44.518562+00:00",
+  "output_lines_dropped": 0,
+  "pid": 2803005,
+  "returncode": 0,
+  "started": "2026-08-16T19:40:45.245535+00:00",
+  "status": "SUCCESS",
+  "stderr_bytes": 0,
+  "stderr_log_path": "runs/20260815-184644-windows-real-d2m-v4-streaming/logs/current-head-high-sparsity-search.err",
+  "stdout_bytes": 289157,
+  "stdout_log_path": "runs/20260815-184644-windows-real-d2m-v4-streaming/logs/current-head-high-sparsity-search.out",
+  "task": "current-head-high-sparsity-search",
+  "terminal_status": "DONE",
+  "total": null
+}

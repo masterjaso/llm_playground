@@ -1,0 +1,8 @@
+{
+  "artifact": "runs\\20260815-030931-windows\\capture\\data-plan.json",
+  "holdout_seed": 29,
+  "seed": 17,
+  "source": "local calibration corpus required",
+  "status": "DATA_PLAN_READY",
+  "tokens": 100000
+}

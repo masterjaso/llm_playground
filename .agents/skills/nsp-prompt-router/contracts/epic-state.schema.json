@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://nehemiah-steward-protocol.local/contracts/epic-state.schema.json",
+  "title": "NSP Epic Ralph State (STATE.json)",
+  "description": "Resumable epic state maintained by nsp-epic-execution under .nsp/artifacts/tmp/ralph/<epic-id>/STATE.json.",
+  "type": "object",
+  "required": ["schemaVersion", "epicId", "currentPhase", "phaseStatuses", "lastUpdated"],
+  "properties": {
+    "schemaVersion": { "type": "number" },
+    "epicId": { "type": "string" },
+    "repo": { "type": "string" },
+    "baseBranch": { "type": "string" },
+    "baselineCommit": { "type": "string" },
+    "workBranch": { "type": "string" },
+    "currentPhase": { "type": "string" },
+    "currentWorkItem": { "type": ["string", "null"] },
+    "phaseStatuses": {
+      "type": "object",
+      "additionalProperties": {
+        "enum": ["not-started", "planned", "in-progress", "blocked", "implemented", "validating", "done", "deferred", "superseded"]
+      }
+    },
+    "workItems": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["title", "status"],
+        "properties": {
+          "phase": { "type": "string" },
+          "title": { "type": "string" },
+          "status": { "enum": ["not-started", "planned", "in-progress", "blocked", "implemented", "validating", "done", "deferred", "superseded"] }
+        }
+      }
+    },
+    "validationLedgerPath": { "type": "string" },
+    "decisionLogPath": { "type": "string" },
+    "riskRegisterPath": { "type": "string" },
+    "lastAgentHandoff": { "type": "string" },
+    "nextAgentInstructions": { "type": "string" },
+    "blockers": { "type": "array", "items": { "type": "string" } },
+    "openRisks": { "type": "array", "items": { "type": "string" } },
+    "lastUpdated": { "type": "string" }
+  }
+}

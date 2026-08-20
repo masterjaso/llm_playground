@@ -1,0 +1,25 @@
+{
+  "argv": [
+    "bash",
+    "-lc",
+    ".venv/bin/python scripts/calibrate_streaming_solver.py --run-dir runs/20260815-184644-windows-real-d2m-v4-streaming --source-dir runs/20260815-030931-windows/source --device cuda:0 --sample-count 1024 --stratify-pool 4096 --microbatch 128 --max-in-memory-bytes 1073741824 --store-dir runs/20260815-184644-windows-real-d2m-v4-streaming/evidence/contribution-stores/p16-top4-fit-1024 --output-name streaming-solver-calibration-store-p16-1024.json"
+  ],
+  "child_output_stale": false,
+  "completed": 0,
+  "elapsed_seconds": 39.89685645001009,
+  "last_child_output_age_seconds": 1.1997564710327424,
+  "last_child_output_at": "2026-08-16T20:00:39.231907+00:00",
+  "last_heartbeat": "2026-08-16T20:00:40.431773+00:00",
+  "output_lines_dropped": 0,
+  "pid": 2807651,
+  "returncode": 0,
+  "started": "2026-08-16T20:00:00.538586+00:00",
+  "status": "SUCCESS",
+  "stderr_bytes": 0,
+  "stderr_log_path": "runs/20260815-184644-windows-real-d2m-v4-streaming/logs/streaming-solver-calibration-store-p16-1024.err",
+  "stdout_bytes": 2594,
+  "stdout_log_path": "runs/20260815-184644-windows-real-d2m-v4-streaming/logs/streaming-solver-calibration-store-p16-1024.out",
+  "task": "streaming-solver-calibration-store-p16-1024",
+  "terminal_status": "DONE",
+  "total": null
+}

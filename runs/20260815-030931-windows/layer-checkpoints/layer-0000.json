@@ -1,0 +1,9 @@
+{
+  "layer": 0,
+  "metrics": {
+    "loss": null
+  },
+  "schema_version": 1,
+  "source": "no activation target supplied",
+  "status": "synthetic-pending"
+}

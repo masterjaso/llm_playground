@@ -1,0 +1,8 @@
+{
+  "message": "Layer workers require captured activations and a verified source checkpoint.",
+  "profile": "qwen38_p32s1_top2",
+  "queue": {
+    "pending": 64
+  },
+  "status": "QUEUE_READY"
+}

@@ -1,0 +1,8 @@
+{
+  "count": 0,
+  "layer": 0,
+  "message": "No corpus was supplied; empty capture is a manifest only.",
+  "path": "runs\\20260815-030931-windows\\capture\\layer-0000.json",
+  "sha256": "d365ecdc4097e110aa8d8b43aa69967abd95443a9acbc178a2a4f5f307cd1375",
+  "status": "CAPTURE_EMPTY_PENDING"
+}

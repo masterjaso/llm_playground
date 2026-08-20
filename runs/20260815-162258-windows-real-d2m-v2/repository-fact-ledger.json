@@ -1,0 +1,166 @@
+{
+  "facts": {
+    "disk": {
+      "status": "verified",
+      "value": {
+        "/": {
+          "free": 346521460736,
+          "total": 999137734656,
+          "used": 652616273920
+        }
+      }
+    },
+    "driver": {
+      "status": "verified",
+      "value": null
+    },
+    "exposed_ram": {
+      "status": "verified",
+      "value": 50515243008
+    },
+    "gpus": {
+      "status": "verified",
+      "value": "GPU 0: NVIDIA GeForce RTX 5060 Ti (UUID: GPU-49db48ba-f49e-6bf4-1d37-0eef00b47376)\nGPU 1: NVIDIA GeForce RTX 4060 (UUID: GPU-750f2411-a4ee-0f5a-40d0-9bef4e9143dc)\n"
+    },
+    "llama_cpp_support": {
+      "status": "unknown",
+      "value": null
+    },
+    "nsp_epic_execution_skill": {
+      "note": "Required NSP skill was not fabricated when absent.",
+      "path": "/mnt/c/workplace/llm_playground/.agents/skills/nsp-epic-execution/SKILL.md",
+      "status": "unknown",
+      "value": null
+    },
+    "operating_system": {
+      "status": "verified",
+      "value": "Linux"
+    },
+    "pytorch_compatibility": {
+      "status": "unknown",
+      "value": {
+        "compiled_cuda": null,
+        "cuda_available": false,
+        "devices": [],
+        "installed": true,
+        "version": "2.13.0+cpu"
+      }
+    },
+    "source_config_shape": {
+      "status": "verified",
+      "value": {
+        "dense_intermediate_size": 17408,
+        "full_attention_interval": 4,
+        "hidden_size": 5120,
+        "layer_types": [
+          "linear_attention",
+          "linear_attention",
+          "linear_attention",
+          "full_attention",
+          "linear_attention",
+          "linear_attention",
+          "linear_attention",
+          "full_attention",
+          "linear_attention",
+          "linear_attention",
+          "linear_attention",
+          "full_attention",
+          "linear_attention",
+          "linear_attention",
+          "linear_attention",
+          "full_attention",
+          "linear_attention",
+          "linear_attention",
+          "linear_attention",
+          "full_attention",
+          "linear_attention",
+          "linear_attention",
+          "linear_attention",
+          "full_attention",
+          "linear_attention",
+          "linear_attention",
+          "linear_attention",
+          "full_attention",
+          "linear_attention",
+          "linear_attention",
+          "linear_attention",
+          "full_attention",
+          "linear_attention",
+          "linear_attention",
+          "linear_attention",
+          "full_attention",
+          "linear_attention",
+          "linear_attention",
+          "linear_attention",
+          "full_attention",
+          "linear_attention",
+          "linear_attention",
+          "linear_attention",
+          "full_attention",
+          "linear_attention",
+          "linear_attention",
+          "linear_attention",
+          "full_attention",
+          "linear_attention",
+          "linear_attention",
+          "linear_attention",
+          "full_attention",
+          "linear_attention",
+          "linear_attention",
+          "linear_attention",
+          "full_attention",
+          "linear_attention",
+          "linear_attention",
+          "linear_attention",
+          "full_attention",
+          "linear_attention",
+          "linear_attention",
+          "linear_attention",
+          "full_attention"
+        ],
+        "model_type": "qwen3_5_text",
+        "num_hidden_layers": 64,
+        "shape_verified": true
+      }
+    },
+    "source_license": {
+      "status": "unknown",
+      "value": "unknown"
+    },
+    "source_model_availability": {
+      "status": "verified",
+      "value": "Qwen/Qwen3.8-27B"
+    },
+    "source_revision": {
+      "status": "verified",
+      "value": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0"
+    },
+    "source_tensor_naming": {
+      "status": "verified",
+      "value": 851
+    },
+    "source_text_model_class": {
+      "status": "verified",
+      "value": "qwen3_5_text"
+    },
+    "swap": {
+      "status": "verified",
+      "value": 8589934592
+    },
+    "target_moe_class": {
+      "status": "unknown",
+      "value": "requires native Transformers compatibility check"
+    },
+    "target_routing_semantics": {
+      "status": "verified",
+      "value": "top-k normalized weights"
+    },
+    "wsl_status": {
+      "note": "native Windows run; WSL is not required",
+      "status": "verified",
+      "value": true
+    }
+  },
+  "schema_version": 2,
+  "updated": "2026-08-15T17:09:09.892492Z"
+}

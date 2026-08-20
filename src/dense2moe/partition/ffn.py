@@ -61,26 +61,70 @@ def partition_indices(
     shared_intermediate_size: int,
     *,
     strategy: str = "contiguous",
+    scores: Any | None = None,
+    seed: int = 0,
 ) -> PartitionPlan:
     if dense_intermediate_size <= 0 or routed_experts <= 0 or expert_intermediate_size <= 0 or shared_intermediate_size <= 0:
         raise ValueError("partition dimensions must be positive")
     if shared_intermediate_size + routed_experts * expert_intermediate_size != dense_intermediate_size:
         raise ValueError("partition capacity must equal dense_intermediate_size")
     indices = list(range(dense_intermediate_size))
-    if strategy not in {"contiguous", "interleave"}:
+    if strategy not in {"contiguous", "interleave", "activation_magnitude", "output_contribution", "balanced_signature", "random"}:
         raise ValueError(f"unknown partition strategy: {strategy}")
-    if strategy == "interleave":
+    if strategy in {"activation_magnitude", "output_contribution", "balanced_signature"}:
+        if scores is None:
+            raise ValueError(f"{strategy} requires deterministic neuron scores")
+        try:
+            import numpy as np  # type: ignore
+
+            values = np.asarray(scores)
+            if strategy == "balanced_signature":
+                shared, groups = balanced_signature_partition(
+                    values,
+                    routed_experts=routed_experts,
+                    expert_intermediate_size=expert_intermediate_size,
+                    shared_intermediate_size=shared_intermediate_size,
+                    seed=seed,
+                )
+                plan = PartitionPlan(
+                    dense_intermediate_size,
+                    routed_experts,
+                    expert_intermediate_size,
+                    shared_intermediate_size,
+                    shared,
+                    groups,
+                )
+                plan.validate()
+                return plan
+            if values.ndim > 1:
+                values = np.mean(np.abs(values), axis=tuple(range(values.ndim - 1)))
+            if values.shape[0] != dense_intermediate_size:
+                raise ValueError("partition scores do not match dense width")
+            order = sorted(range(dense_intermediate_size), key=lambda i: (-float(values[i]), i))
+        except ImportError:
+            order = list(range(dense_intermediate_size))
+        shared = tuple(order[:shared_intermediate_size])
+        remaining = order[shared_intermediate_size:]
+        groups = tuple(tuple(remaining[i * expert_intermediate_size : (i + 1) * expert_intermediate_size]) for i in range(routed_experts))
+    elif strategy == "random":
+        import random
+
+        order = list(range(dense_intermediate_size))
+        random.Random(seed).shuffle(order)
+        shared = tuple(order[:shared_intermediate_size])
+        remaining = order[shared_intermediate_size:]
+        groups = tuple(tuple(remaining[i * expert_intermediate_size : (i + 1) * expert_intermediate_size]) for i in range(routed_experts))
+    elif strategy == "interleave":
         # A deterministic permutation gives each expert a spread of source
         # neurons while keeping the shared block stable.
         shared = tuple(indices[:shared_intermediate_size])
         remaining = indices[shared_intermediate_size:]
-        groups = [remaining[offset::routed_experts][:expert_intermediate_size] for offset in range(routed_experts)]
-        plan = PartitionPlan(dense_intermediate_size, routed_experts, expert_intermediate_size, shared_intermediate_size, shared, tuple(tuple(group) for group in groups))
+        groups = tuple(tuple(remaining[offset::routed_experts][:expert_intermediate_size]) for offset in range(routed_experts))
     else:
         shared = tuple(indices[:shared_intermediate_size])
         remaining = indices[shared_intermediate_size:]
-        groups = [remaining[i * expert_intermediate_size : (i + 1) * expert_intermediate_size] for i in range(routed_experts)]
-        plan = PartitionPlan(dense_intermediate_size, routed_experts, expert_intermediate_size, shared_intermediate_size, shared, tuple(tuple(group) for group in groups))
+        groups = tuple(tuple(remaining[i * expert_intermediate_size : (i + 1) * expert_intermediate_size]) for i in range(routed_experts))
+    plan = PartitionPlan(dense_intermediate_size, routed_experts, expert_intermediate_size, shared_intermediate_size, shared, tuple(tuple(group) for group in groups))
     plan.validate()
     return plan
 
@@ -107,6 +151,53 @@ def _concat(values: Sequence[Any], axis: int = 0) -> Any:
             result.extend(value)
         return result
     return values
+
+
+def balanced_signature_partition(
+    signatures: Any,
+    *,
+    routed_experts: int,
+    expert_intermediate_size: int,
+    shared_intermediate_size: int,
+    seed: int = 0,
+) -> tuple[tuple[int, ...], tuple[tuple[int, ...], ...]]:
+    """Partition neurons from genuine multi-sample signatures.
+
+    ``signatures`` must retain a sample axis (``[samples, neurons, ...]``).
+    The complete flattened vector for each neuron is used to produce a
+    deterministic ordering; no scalar mean is substituted for the signature.
+    """
+
+    import hashlib
+
+    try:
+        import numpy as np  # type: ignore
+    except ImportError as exc:
+        raise RuntimeError("numpy is required for signature partitioning") from exc
+    values = np.asarray(signatures, dtype=np.float64)
+    if values.ndim < 2:
+        raise ValueError("balanced_signature requires a multi-sample signature array")
+    neuron_count = int(values.shape[1])
+    expected = int(shared_intermediate_size + routed_experts * expert_intermediate_size)
+    if neuron_count != expected:
+        raise ValueError("signature neuron dimension does not match partition capacity")
+    axes = (1, 0, *range(2, values.ndim))
+    flattened = np.transpose(values, axes).reshape(neuron_count, -1)
+    norms = np.linalg.norm(flattened, axis=1, keepdims=True)
+    normalized = flattened / np.maximum(norms, 1e-12)
+    order = sorted(
+        range(neuron_count),
+        key=lambda index: hashlib.sha256(
+            f"{seed}:".encode() + np.asarray(normalized[index], dtype=np.float32).tobytes()
+        ).hexdigest(),
+    )
+    shared = tuple(order[:shared_intermediate_size])
+    remaining = order[shared_intermediate_size:]
+    groups = tuple(
+        tuple(remaining[offset::routed_experts][:expert_intermediate_size])
+        for offset in range(routed_experts)
+    )
+    return shared, groups
 
 
 def partition_ffn_weights(weight: Any, plan: PartitionPlan, bias: Any | None = None) -> dict[str, Any]:

@@ -1,0 +1,13 @@
+{
+  "created": "2026-08-15T08:37:01.987421Z",
+  "default_profile": "qwen38_p32s1_top2",
+  "fallback_profiles": [
+    "qwen38_p16s1_top2",
+    "qwen38_p8s1_top2"
+  ],
+  "schema_version": 1,
+  "source_checkpoint_immutable": true,
+  "trust_remote_code": false,
+  "use_powershell": true,
+  "windows_native": true
+}

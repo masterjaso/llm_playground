@@ -1,0 +1,76 @@
+{
+  "code_commit": "9d7751817b651952c72cb312a6762c61156ac3d5",
+  "dataset_hash": "46b278a85b4cb31a8fe659be2dd146bd9206eb491268220e25440981d06c0a03",
+  "execution_schedule": {
+    "attention_implementation": "sdpa",
+    "compute_dtype": "bfloat16",
+    "embedding": "cuda:0",
+    "layers_0_17": "cuda:1",
+    "layers_18_63": "cuda:0"
+  },
+  "falsifier": "any selected layer fails the stated MLP-input equality/tolerance under the matched native schedule",
+  "first_divergence_in_mismatched_schedule": {
+    "finding": "late CPU execution differed from the native main-device transfer path; no transformer-contract mismatch remained after matching device schedule",
+    "layer": 18
+  },
+  "gate": "STREAMED_TEACHER_EQUIVALENCE_GREEN",
+  "hypothesis": "targeted native layer replay is equivalent to the validated teacher when the reference execution-device contract is preserved",
+  "legacy_whole_model_capture_invoked": false,
+  "parent_run_id": "20260815-180505-windows-real-d2m-v3",
+  "profile_hash": "6d1a8ad97a52eb7b4ff4fcc47a0a1cbc7a5abf500a15b807f24394d72629f27",
+  "reference": "existing V3 validated 1176-token text-only diagnostic",
+  "run_id": "20260815-184644-windows-real-d2m-v4-streaming",
+  "schedule_reason": "The concrete native reference forward routes embedding and the late offloaded path through the CUDA:0 main device; matching that observed dispatch reproduces the native MLP inputs. Production streaming defaults to one layer on CUDA:1.",
+  "schema_version": 1,
+  "selected_layers": {
+    "0": {
+      "array_equal": false,
+      "cosine": 1.0001275539398193,
+      "count": 1176,
+      "hidden": 5120,
+      "max_abs": 2.9802322387695312e-08,
+      "normalized_mse": 8.987628194353207e-20
+    },
+    "16": {
+      "array_equal": true,
+      "cosine": 1.000022530555725,
+      "count": 1176,
+      "hidden": 5120,
+      "max_abs": 0.0,
+      "normalized_mse": 0.0
+    },
+    "32": {
+      "array_equal": true,
+      "cosine": 1.0003184080123901,
+      "count": 1176,
+      "hidden": 5120,
+      "max_abs": 0.0,
+      "normalized_mse": 0.0
+    },
+    "48": {
+      "array_equal": true,
+      "cosine": 1.0000371932983398,
+      "count": 1176,
+      "hidden": 5120,
+      "max_abs": 0.0,
+      "normalized_mse": 0.0
+    },
+    "63": {
+      "array_equal": true,
+      "cosine": 1.000095009803772,
+      "count": 1176,
+      "hidden": 5120,
+      "max_abs": 0.0,
+      "normalized_mse": 0.0
+    }
+  },
+  "selected_profile": "qwen38_p8s1_top2",
+  "source_revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
+  "status": "STREAMED_TEACHER_EQUIVALENCE_GREEN",
+  "streamed_capture": "evidence/streaming-reference-native-map-63",
+  "target": {
+    "array_equality": "true where storage permits",
+    "cosine": "essentially 1.0",
+    "normalized_mse_max": 1e-07
+  }
+}

@@ -1,0 +1,160 @@
+{
+  "code_commit": "9d7751817b651952c72cb312a6762c61156ac3d5",
+  "completed_shard_ids": [
+    0
+  ],
+  "dataset_hash": "46b278a85b4cb31a8fe659be2dd146bd9206eb491268220e25440981d06c0a03",
+  "input_stage": 16,
+  "layer": 16,
+  "layer_receipt": {
+    "attention_implementation": "eager",
+    "compute_dtype": "bfloat16",
+    "layer": 16,
+    "source_bytes": 766546368,
+    "source_index_hash": "77042094076611b69791a610065f28b7013b8c621795fa86ddccc8bac7d1b9df",
+    "source_tensor_count": 14,
+    "source_tensor_hashes": [
+      {
+        "dtype": "bfloat16",
+        "sha256": "ee9e9a6cfb8eccb332917c775df42c7e88be535f538bea07cff4da6348c4bb9b",
+        "shape": [
+          5120
+        ],
+        "source_name": "model.language_model.layers.16.input_layernorm.weight",
+        "source_shard": "model-00006-of-00018.safetensors"
+      },
+      {
+        "dtype": "bfloat16",
+        "sha256": "0c34c9be4389d366479d782864c0cb042739096fc3fd921b49ed7a36549fc6f8",
+        "shape": [
+          48
+        ],
+        "source_name": "model.language_model.layers.16.linear_attn.A_log",
+        "source_shard": "model-00006-of-00018.safetensors"
+      },
+      {
+        "dtype": "bfloat16",
+        "sha256": "9e9bfaf7b87eda15128f5618b25ea5331a9e57fa5887e1074a63eb50af7da632",
+        "shape": [
+          10240,
+          1,
+          4
+        ],
+        "source_name": "model.language_model.layers.16.linear_attn.conv1d.weight",
+        "source_shard": "model-00006-of-00018.safetensors"
+      },
+      {
+        "dtype": "bfloat16",
+        "sha256": "72c056d07b75c1128991c97bdbe6f09242f0faa740eb35c2f8d003a28c2444cb",
+        "shape": [
+          48
+        ],
+        "source_name": "model.language_model.layers.16.linear_attn.dt_bias",
+        "source_shard": "model-00006-of-00018.safetensors"
+      },
+      {
+        "dtype": "bfloat16",
+        "sha256": "842984fae42885d0fbbefd9f800f0f97ac85771b9d3c4dfb86b5a877f8935203",
+        "shape": [
+          48,
+          5120
+        ],
+        "source_name": "model.language_model.layers.16.linear_attn.in_proj_a.weight",
+        "source_shard": "model-00006-of-00018.safetensors"
+      },
+      {
+        "dtype": "bfloat16",
+        "sha256": "1e425c0bcff487768be911a0c4a2f8f4bae8a2f9793b9e457bb6385036201c8b",
+        "shape": [
+          48,
+          5120
+        ],
+        "source_name": "model.language_model.layers.16.linear_attn.in_proj_b.weight",
+        "source_shard": "model-00006-of-00018.safetensors"
+      },
+      {
+        "dtype": "bfloat16",
+        "sha256": "9472fb9850998febd426c41c26b999776a646c6ddf148a0df43c5427e1add5d1",
+        "shape": [
+          10240,
+          5120
+        ],
+        "source_name": "model.language_model.layers.16.linear_attn.in_proj_qkv.weight",
+        "source_shard": "model-00006-of-00018.safetensors"
+      },
+      {
+        "dtype": "bfloat16",
+        "sha256": "f1987397209525f1b0c64711a7ba294c9162b342bb1dc393b713860ba48f0aa9",
+        "shape": [
+          6144,
+          5120
+        ],
+        "source_name": "model.language_model.layers.16.linear_attn.in_proj_z.weight",
+        "source_shard": "model-00006-of-00018.safetensors"
+      },
+      {
+        "dtype": "bfloat16",
+        "sha256": "a4b048f0a8f7d98104b8afbc69483084b229e7b72c7a661aecb0f4f314413e0b",
+        "shape": [
+          128
+        ],
+        "source_name": "model.language_model.layers.16.linear_attn.norm.weight",
+        "source_shard": "model-00006-of-00018.safetensors"
+      },
+      {
+        "dtype": "bfloat16",
+        "sha256": "9e7ccb86ed9e89043d7dbf3d8b840d59433d90fdae7641b53a2b8bf2b11cca41",
+        "shape": [
+          5120,
+          6144
+        ],
+        "source_name": "model.language_model.layers.16.linear_attn.out_proj.weight",
+        "source_shard": "model-00006-of-00018.safetensors"
+      },
+      {
+        "dtype": "bfloat16",
+        "sha256": "febea7e77aa3708928a1c90ad19829597b00d12c984ef882f048a42be10a403d",
+        "shape": [
+          5120,
+          17408
+        ],
+        "source_name": "model.language_model.layers.16.mlp.down_proj.weight",
+        "source_shard": "model-00006-of-00018.safetensors"
+      },
+      {
+        "dtype": "bfloat16",
+        "sha256": "5ee6e3f20e0ec1238a3d38e44ecfa981dab4b4c9665be640fd595eb8a153ee1e",
+        "shape": [
+          17408,
+          5120
+        ],
+        "source_name": "model.language_model.layers.16.mlp.gate_proj.weight",
+        "source_shard": "model-00006-of-00018.safetensors"
+      },
+      {
+        "dtype": "bfloat16",
+        "sha256": "5b62a8921917d9af706603547c2f24298f2aa1faad59a3c99e86dbb4d95170a4",
+        "shape": [
+          17408,
+          5120
+        ],
+        "source_name": "model.language_model.layers.16.mlp.up_proj.weight",
+        "source_shard": "model-00006-of-00018.safetensors"
+      },
+      {
+        "dtype": "bfloat16",
+        "sha256": "a7804d12c69373a991c09bcb19593bc758da6122b3edbb099bc821cbd6d66f3f",
+        "shape": [
+          5120
+        ],
+        "source_name": "model.language_model.layers.16.post_attention_layernorm.weight",
+        "source_shard": "model-00006-of-00018.safetensors"
+      }
+    ]
+  },
+  "next_stage": 17,
+  "schema_version": 1,
+  "source_revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
+  "split": "holdout",
+  "status": "LAYER_COMPLETE"
+}

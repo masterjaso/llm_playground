@@ -1,0 +1,55 @@
+{
+  "blocker": {
+    "exact": "Approved representative calibration corpus and its tokenizer/split manifest are not available in scope.",
+    "exact_command": "d2m prepare-data --run-dir runs/20260815-145505-windows-real-d2m --corpus-manifest <approved-jsonl>",
+    "recommended": "Provide a corpus manifest with fixed train/holdout IDs and tokenizer revision.",
+    "viable_options": [
+      "supply an approved local/public corpus manifest",
+      "authorize a specific permissively licensed dataset",
+      "continue architecture-only fallback study"
+    ],
+    "why_external": "The agent cannot authorize or invent a licensed corpus; empty/synthetic data would violate the evidence contract.",
+    "work_attempted": [
+      "binary resumable capture implementation",
+      "real source layer-0 pilot",
+      "oracle partition ablation",
+      "control-plane repairs"
+    ]
+  },
+  "code_commit": "a4675b319eba1e4cb87dcb2fe3aeaec220657ee0",
+  "created_at": "2026-08-15T15:36:14.787258Z",
+  "inferences": [
+    "p8 oracle ceiling is red; router training is not justified for the current decomposition",
+    "the best next scientific fallback is expanded effective capacity or an approved target change"
+  ],
+  "measured_results": {
+    "all_expert_reconstruction_mse": 4.5130571372023476e-13,
+    "best_oracle_normalized_mse": 0.27584055734895174,
+    "best_oracle_variant": "contribution_signature_top2"
+  },
+  "next_exact_command": "d2m prepare-data --run-dir runs/20260815-145505-windows-real-d2m --corpus-manifest <approved-jsonl>",
+  "parent_run_id": "20260815-030931-windows",
+  "phase": "calibration",
+  "phase_status": "blocked",
+  "profile": "qwen38_p8s1_top2",
+  "profile_hash": "6d1a8ad97a52eb7b4ff4fcc47a0a1cbc7a5abf500a15b807f24394d72629f27c",
+  "run_id": "20260815-145505-windows-real-d2m",
+  "source_config_hash": "191e0af232104ed8b65258cf3fb2b842e288008baca7633c11b82a1ac7203aab",
+  "source_index_hash": "77042094076611b69791a610065f28b7013b8c621795fa86ddccc8bac7d1b9df",
+  "source_repository": "Qwen/Qwen3.8-27B",
+  "source_revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
+  "status": "BLOCKED_RESUMABLE",
+  "terminal_state": "BLOCKED",
+  "unresolved_risks": [
+    "approved representative calibration corpus is unavailable",
+    "full model assembly/reload/end-to-end evaluation not yet possible",
+    "GGUF support remains unvalidated"
+  ],
+  "verified_facts": [
+    "canonical run preserved as parent_run_id",
+    "source revision/config/index pinned",
+    "control-plane and strict checkpoint contracts green",
+    "native Qwen3.5 dense runtime inspected",
+    "real layer-0 pilot and bounded oracle study executed"
+  ]
+}

@@ -1,0 +1,29 @@
+{
+  "argv": [
+    "/mnt/c/WINDOWS/System32/WindowsPowerShell/v1.0/powershell.exe",
+    "-NoProfile",
+    "-NonInteractive",
+    "-ExecutionPolicy",
+    "Bypass",
+    "-Command",
+    "$env:D2M_PYTHON=\"C:\\Users\\maste\\AppData\\Local\\Programs\\Python\\Python312\\python.exe\"; & \"C:\\workplace\\llm_playground\\scripts\\Invoke-GuardedCommand-Smoke.ps1\" -Output \"C:\\workplace\\llm_playground\\docs\\windows-guarded-command-smoke-receipt.json\" -HeartbeatSeconds 60"
+  ],
+  "child_output_stale": false,
+  "completed": 0,
+  "elapsed_seconds": 64.57826839596964,
+  "last_child_output_age_seconds": 0.0008617719868198037,
+  "last_child_output_at": "2026-08-16T19:29:04.105569+00:00",
+  "last_heartbeat": "2026-08-16T19:29:04.106483+00:00",
+  "output_lines_dropped": 0,
+  "pid": 2799001,
+  "returncode": 0,
+  "started": "2026-08-16T19:27:59.531125+00:00",
+  "status": "SUCCESS",
+  "stderr_bytes": 0,
+  "stderr_log_path": "runs/native-windows-guarded-smoke-ps51-outer-heartbeat.stderr.log",
+  "stdout_bytes": 10418,
+  "stdout_log_path": "runs/native-windows-guarded-smoke-ps51-outer-heartbeat.stdout.log",
+  "task": "native-windows-guarded-smoke-ps51",
+  "terminal_status": "DONE",
+  "total": null
+}

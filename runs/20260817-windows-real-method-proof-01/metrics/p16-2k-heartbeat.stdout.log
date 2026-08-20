@@ -1,0 +1,202 @@
+{
+  "amplitude_router_frozen": true,
+  "capture_evidence_class": "real-qwen-layer-capture",
+  "capture_receipt_path": "runs\\20260817-windows-real-method-proof-01\\capture\\real-qwen-layer0-receipt.json",
+  "capture_receipt_sha256": "8f1b853e9709f6164d14e8733ef78e8322c10c09eca9ebe884881b2b2da13e46",
+  "capture_receipt_type": "dense2moe-real-qwen-layer-capture",
+  "capture_row_count": 36939,
+  "checkpoint": {
+    "checkpoint_sha256": "bbbf8584f5f0f1f2c59b6a78b8999a9fd25589be76bcc6a63b8f420d2e2e37a0",
+    "files": {
+      "config.json": "2144d2ab8121f6ac789aebe9b1aacbbc401f3899dc570285db8152db8ab15ec4",
+      "model.safetensors": "5b9820e6c16dd56b2a574a51eebe106586a9c3b6640a81bf07918f1f0320749a"
+    },
+    "path": "runs\\20260817-windows-real-method-proof-01\\checkpoints\\p16-2k",
+    "reload_status": "PASS",
+    "reloaded_state_hash": "4a0e8c0e2a56d8aeb0744c8ac5b082bb7face3cbe0828abc7fa8d977724da6f1"
+  },
+  "code_commit": "8062dcccf6d2b94acd40fa03dc862ec462af58e3",
+  "evidence_class": "real-qwen-layer-capture",
+  "failed_gates": [],
+  "final": {
+    "cosine": 0.8547749742865562,
+    "dead_experts": 12,
+    "global_nmse": 25.8364737033844,
+    "loadCV": 1.7320508075688772,
+    "mean_token_relative_mse": 17.89113700389862
+  },
+  "gates": [
+    {
+      "gate": "topology",
+      "status": "PASS",
+      "topology": "p16/top4"
+    },
+    {
+      "gate": "token_count",
+      "requested_tokens": 2048,
+      "status": "PASS"
+    },
+    {
+      "gate": "method_proof_receipt",
+      "selected_record_ids_sha256": "9664a0140ebd813f709d263d7c7dfa1db433f3b5922c946042f74387e6c04703",
+      "selected_tokens": 36939,
+      "sha256": "905752db77c978b6f10a752b06f8cf6459881f0df99bef1e08bc404b2aac584f",
+      "status": "PASS"
+    },
+    {
+      "evidence_class": "real-qwen-layer-capture",
+      "gate": "capture_receipt",
+      "row_count": 36939,
+      "sha256": "8f1b853e9709f6164d14e8733ef78e8322c10c09eca9ebe884881b2b2da13e46",
+      "status": "PASS"
+    },
+    {
+      "gate": "native_windows",
+      "status": "PASS"
+    },
+    {
+      "gate": "source_identity",
+      "status": "PASS"
+    },
+    {
+      "gate": "synthetic_evidence",
+      "status": "PASS"
+    },
+    {
+      "gate": "evaluation_contamination",
+      "status": "PASS"
+    },
+    {
+      "gate": "runtime_lock",
+      "status": "PASS"
+    },
+    {
+      "gate": "shard_hashes",
+      "status": "PASS"
+    },
+    {
+      "gate": "selected_record_identity",
+      "status": "PASS"
+    },
+    {
+      "gate": "native_windows_proof",
+      "status": "PASS"
+    }
+  ],
+  "initial": {
+    "cosine": 0.8580176681280136,
+    "dead_experts": 12,
+    "global_nmse": 0.5099929831922054,
+    "loadCV": 1.7320508075688772,
+    "mean_token_relative_mse": 0.5101168379187584
+  },
+  "layer": 0,
+  "method_proof_receipt_path": "runs\\20260817-windows-real-method-proof-00b\\method-proof\\receipt.json",
+  "method_proof_receipt_sha256": "905752db77c978b6f10a752b06f8cf6459881f0df99bef1e08bc404b2aac584f",
+  "method_proof_selected_record_ids_sha256": "9664a0140ebd813f709d263d7c7dfa1db433f3b5922c946042f74387e6c04703",
+  "method_proof_selected_tokens": 36939,
+  "optimizer_steps": 8,
+  "oracle": {
+    "assurance_level": "exact_all_combinations",
+    "coefficient_fitting": "projected-positive",
+    "exact": false,
+    "final": {
+      "candidate_count": 8,
+      "candidate_set_strategy": "exact_all_combinations",
+      "coefficient_fitting": "projected-positive",
+      "cosine": 0.950758546590805,
+      "dead_experts": 0,
+      "exact": false,
+      "global_nmse": 0.14598790276795626,
+      "loadCV": 0.5059036765712044,
+      "mean_token_relative_mse": 0.16303384117782116
+    },
+    "initial": {
+      "candidate_count": 8,
+      "candidate_set_strategy": "exact_all_combinations",
+      "coefficient_fitting": "projected-positive",
+      "cosine": 0.939181424677372,
+      "dead_experts": 0,
+      "exact": false,
+      "global_nmse": 0.1158173531293869,
+      "loadCV": 0.8215343276947169,
+      "mean_token_relative_mse": 0.1170427119359374
+    }
+  },
+  "oracle_final": {
+    "candidate_count": 8,
+    "candidate_set_strategy": "exact_all_combinations",
+    "coefficient_fitting": "projected-positive",
+    "cosine": 0.950758546590805,
+    "dead_experts": 0,
+    "exact": false,
+    "global_nmse": 0.14598790276795626,
+    "loadCV": 0.5059036765712044,
+    "mean_token_relative_mse": 0.16303384117782116
+  },
+  "oracle_initial": {
+    "candidate_count": 8,
+    "candidate_set_strategy": "exact_all_combinations",
+    "coefficient_fitting": "projected-positive",
+    "cosine": 0.939181424677372,
+    "dead_experts": 0,
+    "exact": false,
+    "global_nmse": 0.1158173531293869,
+    "loadCV": 0.8215343276947169,
+    "mean_token_relative_mse": 0.1170427119359374
+  },
+  "partition_hash": "6276d40e894517ebe0f1b6e3541b8f86c858c7a6fae99373fd70239fa51016a6",
+  "phase_state": "PHASE_01_REAL_METHOD_PROOF_GREEN",
+  "production_promotion_eligible": false,
+  "receipt_sha256": "941356bf4f0b83bf479ca7a665ce97fb07b0c57b5ef2642fd11eac174f577745",
+  "receipt_type": "dense2moe-real-qwen-p16-method-proof",
+  "requested_tokens": 2048,
+  "row_count": 2048,
+  "sample_count": 2048,
+  "schema_version": 1,
+  "scientific_promotion_eligible": true,
+  "selector_frozen": true,
+  "selector_state_hash_after": "759021f9e35b1df30dd941ebf1391951ac3357109c73c770a4a6b6c484f90402",
+  "selector_state_hash_before": "759021f9e35b1df30dd941ebf1391951ac3357109c73c770a4a6b6c484f90402",
+  "source_model": "Qwen/Qwen3.8-27B",
+  "source_model_type": "qwen3_5_text",
+  "source_revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
+  "status": "REAL_QWEN_P16_METHOD_PROOF_COMPLETE",
+  "terminology": "captured tokens/samples; one row per captured token; not synthetic rows",
+  "token_count": 2048,
+  "topology": "p16/top4",
+  "training": {
+    "assignment_methods": {
+      "exact_all_combinations": 8
+    },
+    "assignment_refresh_steps": 1,
+    "assignment_refreshes": 8,
+    "basis_trainable_parameters": 267386896,
+    "candidate_pool_size": null,
+    "coefficient_constraint": "nonnegative",
+    "epochs": 1,
+    "last_assignment": {
+      "batch_size": 256,
+      "candidate_count": 1820,
+      "coefficient_constraint": "nonnegative",
+      "effective_candidate_pool_size": 16,
+      "mean_residual_mse": 4.851547419093549e-05,
+      "method": "exact_all_combinations",
+      "top_k": 4
+    },
+    "loss_coefficients": {
+      "cosine": 0.05,
+      "mse": 1.0
+    },
+    "loss_last": 0.0012061391025781631,
+    "loss_mean": 0.002076228993246332,
+    "m_step_repeats": 1,
+    "max_candidate_bytes": 67108864,
+    "max_combinations": 4096,
+    "selector_frozen": true,
+    "selector_trainable_parameters": 0,
+    "status": "ORACLE_ROUTED_BASIS_REFINEMENT_COMPLETE",
+    "updates": 8
+  },
+  "wall_time_seconds": 167.71565219998593
+}
