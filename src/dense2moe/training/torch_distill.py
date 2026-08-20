@@ -436,21 +436,20 @@ def _stream_metrics(
 
     import numpy as np  # type: ignore
     import torch
+    from ..evaluation.structural import compute_structural_metrics
+    from ..science.hard_tail import summarize_active_widths
 
     model.eval()
     model.to(device)
     gate_device = gate.to(device)
     up_device = up.to(device)
     down_device = down.to(device)
-    squared_error = 0.0
-    target_norm = 0.0
-    cosine_sum = 0.0
+    prediction_rows: list[Any] = []
+    target_rows: list[Any] = []
+    assignment_rows: list[Any] = []
+    probability_rows: list[Any] = []
+    active_widths: list[int] = []
     token_count = 0
-    loads = np.zeros(model.routed_experts, dtype=np.float64)
-    soft_loads = np.zeros(model.routed_experts, dtype=np.float64)
-    entropy_sum = 0.0
-    margin_sum = 0.0
-    margin_count = 0
     with torch.inference_mode():
         if selected_indices is not None and excluded_indices is not None:
             raise ValueError("selected_indices and excluded_indices are mutually exclusive")
@@ -464,55 +463,61 @@ def _stream_metrics(
             inputs = torch.as_tensor(values, dtype=torch.float32, device=device)
             target = _dense_target_torch(inputs, gate_device, up_device, down_device)
             prediction, info = model(inputs, return_router=True)
-            squared_error += float(torch.sum((prediction - target).square()).item())
-            target_norm += float(torch.sum(target.square()).item())
-            cosine_sum += float(
-                torch.sum(
-                    torch.sum(prediction * target, dim=-1)
-                    / (
-                        torch.linalg.vector_norm(prediction, dim=-1)
-                        * torch.linalg.vector_norm(target, dim=-1)
-                        + 1e-12
-                    )
-                ).item()
-            )
+            prediction_rows.append(prediction.detach().cpu())
+            target_rows.append(target.detach().cpu())
+            assignment_rows.append(info["indices"].detach().cpu().reshape(-1, info["indices"].shape[-1]))
+            probability_rows.append(torch.softmax(info["logits"], dim=-1).detach().cpu().reshape(-1, model.routed_experts))
+            active_widths.extend(int(value) for value in info["active_intermediate_widths"].detach().cpu().reshape(-1).tolist())
             token_count += int(target.shape[0])
-            loads += np.bincount(info["indices"].detach().cpu().reshape(-1).numpy(), minlength=model.routed_experts)
-            soft_loads += torch.softmax(info["logits"], dim=-1).sum(dim=0).detach().cpu().numpy()
-            entropy_sum += float(
-                torch.sum(
-                    -(torch.softmax(info["logits"], dim=-1) * torch.log_softmax(info["logits"], dim=-1)).sum(dim=-1)
-                ).item()
-            )
-            if model.top_k < model.routed_experts:
-                top_values = torch.topk(info["logits"], model.top_k + 1, dim=-1).values
-                margin_sum += float(torch.sum(top_values[:, model.top_k - 1] - top_values[:, model.top_k]).item())
-                margin_count += int(target.shape[0])
             del inputs, target, prediction, info
     if token_count <= 0:
         raise ValueError(f"activation split is empty: {dataset.manifest_path}")
-    mean_target_norm = target_norm / (token_count * int(down.shape[0]))
-    hard_distribution = loads / max(float(token_count * model.top_k), 1.0)
-    soft_distribution = soft_loads / max(float(token_count), 1.0)
-    return {
-        "normalized_mse": (squared_error / (token_count * int(down.shape[0]))) / (mean_target_norm + 1e-12),
-        "mse": squared_error / (token_count * int(down.shape[0])),
-        "cosine": cosine_sum / token_count,
-        "selected_counts": loads.tolist(),
-        "dead_experts": int(np.sum(loads == 0)),
-        "load_cv": float(loads.std() / (loads.mean() + 1e-12)),
-        "hard_load_balance": float(model.routed_experts * np.square(hard_distribution).sum()),
-        "soft_load_balance": float(model.routed_experts * np.square(soft_distribution).sum()),
-        "soft_loads": soft_loads.tolist(),
-        "soft_load_cv": float(soft_loads.std() / (soft_loads.mean() + 1e-12)),
-        "router_entropy": entropy_sum / token_count,
-        "topk_logit_margin": (margin_sum / margin_count) if margin_count else None,
-        "token_count": token_count,
-        "streaming": True,
-        "split": dataset.split,
-        "selected_count": len(selected_indices) if selected_indices is not None else token_count,
-        "excluded_count": len(excluded_indices) if excluded_indices is not None else 0,
-    }
+    predictions = torch.cat(prediction_rows, dim=0).numpy()
+    targets = torch.cat(target_rows, dim=0).numpy()
+    assignments = torch.cat(assignment_rows, dim=0).numpy()
+    probabilities = torch.cat(probability_rows, dim=0).numpy()
+    metadata = tuple(
+        {"independent_group": f"{dataset.split}:{index}"}
+        for index in range(int(targets.shape[0]))
+    )
+    metrics = compute_structural_metrics(
+        targets,
+        predictions,
+        metadata=metadata,
+        learned_assignments=assignments,
+        learned_probabilities=probabilities,
+    )
+    width_summary = summarize_active_widths(active_widths).as_dict()
+    learned_counts = metrics.get("expert_counts") or []
+    soft_loads = probabilities.sum(axis=0).astype(np.float64)
+    soft_mean = float(soft_loads.mean()) if soft_loads.size else 0.0
+    output = dict(metrics)
+    output.update(
+        {
+            "cosine": metrics.get("cosine_similarity"),
+            "selected_counts": learned_counts,
+            "dead_experts": metrics.get("dead_expert_count"),
+            "load_cv": metrics.get("learned_load_cv"),
+            "soft_loads": soft_loads.tolist(),
+            "soft_load_cv": float(soft_loads.std() / (soft_mean + 1e-12)) if soft_loads.size else None,
+            "token_count": token_count,
+            "streaming": True,
+            "split": dataset.split,
+            "selected_count": len(selected_indices) if selected_indices is not None else token_count,
+            "excluded_count": len(excluded_indices) if excluded_indices is not None else 0,
+            "active_intermediate_width_mean": width_summary["mean"],
+            "active_intermediate_width_p50": width_summary["p50"],
+            "active_intermediate_width_p95": width_summary["p95"],
+            "active_intermediate_width_max": width_summary["max"],
+            "active_width_summary": width_summary,
+            "average_ffn_reduction": float(1.0 - width_summary["mean"] / max(float(model.intermediate_size), 1.0)),
+            "dense_fallback_used": False,
+            "dropped_token_count": int(metrics.get("dropped_token_count", 0)),
+            "invalid_token_count": int(metrics.get("invalid_token_count", 0)),
+            "non_finite_token_count": int(metrics.get("non_finite_token_count", 0)),
+        }
+    )
+    return output
 
 
 def _oracle_indices_for_batch(
@@ -567,6 +572,64 @@ def _enable_router_parameters(
         model.amplitude_router.bias.requires_grad = bool(train_amplitude)
 
 
+def _quantile_balance_weights(target: Any, edges: Sequence[float] | None) -> Any:
+    """Return unit-mean per-token weights that equalize target-norm quartiles.
+
+    The three edges are computed once from FIT-TRAIN before optimization and
+    then reused for every batch.  No target-derived value is passed to the
+    model's inference path; this helper is only part of the training loss.
+    """
+
+    import torch
+
+    if edges is None or len(edges) != 3:
+        raise ValueError("quantile-balanced training requires three frozen FIT-TRAIN edges")
+    values = torch.as_tensor([float(value) for value in edges], dtype=target.dtype, device=target.device)
+    if not bool(torch.isfinite(values).all().item()) or not bool((values[1:] >= values[:-1]).all().item()):
+        raise ValueError("quantile edges must be finite and non-decreasing")
+    norms = torch.linalg.vector_norm(target, dim=-1)
+    buckets = (norms > values[0]).to(torch.long) + (norms > values[1]).to(torch.long) + (norms > values[2]).to(torch.long)
+    counts = torch.bincount(buckets, minlength=4).to(dtype=target.dtype)
+    weights = torch.zeros_like(norms)
+    for bucket in range(4):
+        mask = buckets == bucket
+        if bool(mask.any().item()):
+            weights[mask] = 1.0 / torch.clamp(counts[bucket], min=1.0)
+    total = weights.sum()
+    if not bool(torch.isfinite(total).item()) or float(total.item()) <= 0.0:
+        return torch.ones_like(norms)
+    return weights * (float(norms.numel()) / total)
+
+
+def _fit_target_norm_quantile_edges(
+    dataset: ActivationShardDataset,
+    *,
+    gate: Any,
+    up: Any,
+    down: Any,
+    microbatch: int,
+    device: str,
+) -> tuple[float, float, float]:
+    """Compute frozen target-norm quartile edges from FIT-TRAIN only."""
+
+    import torch
+
+    gate_device = gate.to(device)
+    up_device = up.to(device)
+    down_device = down.to(device)
+    norms: list[Any] = []
+    with torch.inference_mode():
+        for values in dataset.iter_batches(microbatch):
+            inputs = torch.as_tensor(values, dtype=torch.float32, device=device)
+            target = _dense_target_torch(inputs, gate_device, up_device, down_device)
+            norms.append(torch.linalg.vector_norm(target, dim=-1).detach().cpu())
+    if not norms:
+        raise ValueError("cannot compute quantile edges from an empty FIT-TRAIN split")
+    combined = torch.cat(norms)
+    edges = torch.quantile(combined, torch.tensor([0.25, 0.50, 0.75], dtype=combined.dtype))
+    return tuple(float(value) for value in edges.tolist())  # type: ignore[return-value]
+
+
 def _optimizer_parameter_groups(
     model: TorchQwen35SwiGLUMoE,
     *,
@@ -591,6 +654,10 @@ def _optimizer_parameter_groups(
         (
             "experts",
             [parameter for module in (*model.expert_gate_proj, *model.expert_up_proj, *model.expert_down_proj) for parameter in module.parameters()],
+        ),
+        (
+            "residual",
+            list(model.residual_corrector.parameters()) if model.residual_corrector is not None else [],
         ),
     ]
     output: list[dict[str, Any]] = []
@@ -620,6 +687,7 @@ def _train_stage_streaming(
     train_scales: bool,
     train_experts: bool,
     train_shared: bool = False,
+    train_residual: bool = False,
     device: str,
     stage: str,
     use_oracle_targets: bool = False,
@@ -633,6 +701,8 @@ def _train_stage_streaming(
     loss_coefficients: Mapping[str, float] | None = None,
     oracle_regret_weight: float = 0.0,
     expert_use_prices: Sequence[float] | None = None,
+    quantile_balanced: bool = False,
+    quantile_edges: Sequence[float] | None = None,
     excluded_indices: Sequence[int] | None = None,
     epoch_callback: Callable[[TorchQwen35SwiGLUMoE, str, int], Mapping[str, Any]] | None = None,
 ) -> dict[str, Any]:
@@ -656,6 +726,8 @@ def _train_stage_streaming(
             raise ValueError("expert_use_prices must contain one value per routed expert")
         if any(not math.isfinite(float(price)) for price in expert_use_prices):
             raise ValueError("expert_use_prices must contain finite values")
+    if quantile_balanced and (quantile_edges is None or len(quantile_edges) != 3):
+        raise ValueError("quantile-balanced stages require frozen FIT-TRAIN quantile edges")
 
     for parameter in model.parameters():
         parameter.requires_grad = False
@@ -670,6 +742,9 @@ def _train_stage_streaming(
         for module in (model.shared_gate_proj, model.shared_up_proj, model.shared_down_proj):
             for parameter in module.parameters():
                 parameter.requires_grad = True
+    if train_residual and model.residual_corrector is not None:
+        for parameter in model.residual_corrector.parameters():
+            parameter.requires_grad = True
     model.to(device)
     parameter_groups = _optimizer_parameter_groups(model, learning_rate=learning_rate, learning_rates=learning_rates)
     if epochs <= 0:
@@ -698,11 +773,16 @@ def _train_stage_streaming(
             inputs = torch.as_tensor(values, dtype=torch.float32, device=device)
             teacher = _dense_target_torch(inputs, gate_device, up_device, down_device)
             prediction, info = model(inputs, return_router=True, return_contributions=use_oracle_targets)
-            mse = torch.mean((prediction - teacher).square())
-            cosine = 1.0 - torch.mean(
-                torch.sum(prediction * teacher, dim=-1)
-                / (torch.linalg.vector_norm(prediction, dim=-1) * torch.linalg.vector_norm(teacher, dim=-1) + 1e-12)
+            if quantile_balanced:
+                objective_weights = _quantile_balance_weights(teacher, quantile_edges)
+            else:
+                objective_weights = torch.ones(teacher.shape[0], dtype=teacher.dtype, device=teacher.device)
+            per_token_mse = torch.mean((prediction - teacher).square(), dim=-1)
+            per_token_cosine = 1.0 - torch.sum(prediction * teacher, dim=-1) / (
+                torch.linalg.vector_norm(prediction, dim=-1) * torch.linalg.vector_norm(teacher, dim=-1) + 1e-12
             )
+            mse = torch.mean(objective_weights * per_token_mse)
+            cosine = torch.mean(objective_weights * per_token_cosine)
             # Balance the dense softmax distribution, not only the selected
             # top-k mass.  The latter gives a dead expert zero gradient and can
             # never satisfy the explicit dead-expert gate once it collapses.
@@ -824,6 +904,7 @@ def _train_stage_streaming(
         "train_selection_router": train_selection_router,
         "train_amplitude_router": train_amplitude_router,
         "train_shared": train_shared,
+        "train_residual": train_residual,
         "learning_rates": {group["group"]: group["lr"] for group in parameter_groups},
         "loss_coefficients": {str(name): float(value) for name, value in (loss_coefficients or {}).items()},
         "hard_load_balance": float(hard_load_balance.detach().cpu().item()) if updates else None,
@@ -835,6 +916,8 @@ def _train_stage_streaming(
         "oracle_loss_mode": oracle_loss_mode,
         "oracle_amplitude_mode": oracle_amplitude_mode,
         "teacher_forcing_ratio": float(teacher_forcing_ratio),
+        "quantile_balanced": bool(quantile_balanced),
+        "quantile_edges": [float(value) for value in quantile_edges] if quantile_edges is not None else None,
         "fit_excluded_count": len(excluded_indices) if excluded_indices is not None else 0,
         "epoch_validation_metrics": epoch_metrics,
     }
@@ -853,6 +936,7 @@ def _train_stage(
     device: str,
     stage: str,
     oracle_indices: Any | None = None,
+    train_residual: bool = False,
 ) -> dict[str, Any]:
     import torch
 
@@ -865,6 +949,9 @@ def _train_stage(
         for module in (*model.expert_gate_proj, *model.expert_up_proj, *model.expert_down_proj):
             for parameter in module.parameters():
                 parameter.requires_grad = True
+    if train_residual and model.residual_corrector is not None:
+        for parameter in model.residual_corrector.parameters():
+            parameter.requires_grad = True
     model.to(device)
     parameters = [parameter for parameter in model.parameters() if parameter.requires_grad]
     if epochs <= 0 or not parameters:
@@ -966,6 +1053,10 @@ def train_torch_layer(
     initial_checkpoint_dir: str | Path | None = None,
     router_hidden_size: int | None = None,
     router_feature_mode: str = "none",
+    residual_intermediate_size: int = 0,
+    residual_scope: str = "static",
+    fallback_mode: str = "none",
+    fallback_rate_budget: float = 0.3,
 ) -> dict[str, Any]:
     """Run a configurable staged distillation schedule against fixed splits.
 
@@ -1085,6 +1176,10 @@ def train_torch_layer(
         router_feature_mode=router_feature_mode,
         partition=plan,
         learnable_scales=True,
+        residual_intermediate_size=int(residual_intermediate_size),
+        residual_scope=str(residual_scope),
+        fallback_mode=str(fallback_mode),
+        fallback_rate_budget=float(fallback_rate_budget),
     )
     initialized_from_checkpoint = False
     if initial_checkpoint_dir is not None:
@@ -1100,9 +1195,36 @@ def train_torch_layer(
         state = {key[len(tensor_prefix) :]: value for key, value in raw_state.items() if key.startswith(tensor_prefix)}
         if len(state) != len(raw_state):
             raise ValueError(f"initial checkpoint tensor namespace mismatch: {sorted(raw_state)[:3]}")
-        missing, unexpected = model.load_state_dict(state, strict=True)
-        if missing or unexpected:
-            raise ValueError(f"strict initial checkpoint reload failed: missing={missing}, unexpected={unexpected}")
+        expected_keys = set(model.state_dict())
+        state_keys = set(state)
+        if state_keys == expected_keys:
+            missing, unexpected = model.load_state_dict(state, strict=True)
+            if missing or unexpected:
+                raise ValueError(f"strict initial checkpoint reload failed: missing={missing}, unexpected={unexpected}")
+        else:
+            # A learned-router refinement may deliberately replace the
+            # capacity recipe's input-only selector with the preregistered
+            # shared-output feature router.  Transfer every shared, expert,
+            # residual, scale, and amplitude tensor exactly; only the router
+            # namespace may differ and is initialized by the new model.
+            router_names = {name for name in expected_keys if name == "router" or name.startswith("router.")}
+            router_names.update({name for name in state_keys if name == "router" or name.startswith("router.")})
+            common = expected_keys & state_keys
+            missing = sorted(expected_keys - state_keys)
+            unexpected = sorted(state_keys - expected_keys)
+            non_router_missing = [name for name in missing if name not in router_names]
+            non_router_unexpected = [name for name in unexpected if name not in router_names]
+            if non_router_missing or non_router_unexpected or not common:
+                raise ValueError(
+                    "initial checkpoint architecture mismatch outside router namespace: "
+                    f"missing={non_router_missing}, unexpected={non_router_unexpected}"
+                )
+            filtered = {name: state[name] for name in common if name not in router_names}
+            missing_loaded, unexpected_loaded = model.load_state_dict(filtered, strict=False)
+            if any(name not in router_names for name in missing_loaded + unexpected_loaded):
+                raise ValueError(
+                    f"partial initial checkpoint reload failed: missing={missing_loaded}, unexpected={unexpected_loaded}"
+                )
         initialized_from_checkpoint = True
     partition_payload = json.loads(Path(partition_path).read_text(encoding="utf-8"))
     initial_scales = partition_payload.get("initial_expert_scales")
@@ -1124,9 +1246,8 @@ def train_torch_layer(
     # revive the remaining experts.  The labels are derived from the immutable
     # dense-slice contributions, never from holdout targets.
     model.to(device)
+    router_initialization = "initial_checkpoint" if initialized_from_checkpoint else "bounded_train_contribution_lstsq"
     if not initialized_from_checkpoint:
-        if router_hidden_size is not None:
-            raise ValueError("nonlinear router training requires an explicit initial checkpoint")
         warmup_batches = (
             train_dataset.iter_batches(min(microbatch, 512))
             if not fit_excluded_rows
@@ -1142,8 +1263,15 @@ def train_torch_layer(
             warmup_labels = torch.topk(torch.linalg.vector_norm(warmup_contributions, dim=-1), model.top_k, dim=-1).indices
             warmup_targets = torch.zeros((warmup_inputs.shape[0], model.routed_experts), dtype=torch.float32, device=device)
             warmup_targets.scatter_(1, warmup_labels, 1.0)
-            warmup_solution = torch.linalg.lstsq(warmup_inputs, warmup_targets).solution.T
-            model.router.weight.copy_(warmup_solution.to(dtype=model.router.weight.dtype))
+            if router_hidden_size is None and router_feature_mode == "none":
+                warmup_solution = torch.linalg.lstsq(warmup_inputs, warmup_targets).solution.T
+                model.router.weight.copy_(warmup_solution.to(dtype=model.router.weight.dtype))
+            else:
+                # Nonlinear/shared-output routers have no single closed-form
+                # weight matrix.  Keep their bounded zero-output warm start;
+                # the oracle-label stage trains the output projection.
+                warmup_solution = None
+                router_initialization = "zero_output_train_oracle_labels"
         del warmup_values, warmup_inputs, warmup_contributions, warmup_labels, warmup_targets, warmup_solution
     initial_selection = _stream_metrics(
         model,
@@ -1200,9 +1328,9 @@ def train_torch_layer(
         return record
     if stage_schedule is None:
         raw_schedule: Sequence[Mapping[str, Any]] = (
-            {"name": "router_warm_start", "epochs": epochs, "train_scales": False, "train_experts": False, "use_oracle_targets": True},
-            {"name": "router_plus_scale", "epochs": epochs, "train_scales": True, "train_experts": False, "use_oracle_targets": False},
-            {"name": "joint_expert_router", "epochs": epochs, "train_scales": True, "train_experts": True, "use_oracle_targets": False},
+            {"name": "router_warm_start", "epochs": epochs, "train_scales": False, "train_experts": False, "train_residual": False, "use_oracle_targets": True},
+            {"name": "router_plus_scale", "epochs": epochs, "train_scales": True, "train_experts": False, "train_residual": False, "use_oracle_targets": False},
+            {"name": "joint_expert_router", "epochs": epochs, "train_scales": True, "train_experts": True, "train_residual": True, "use_oracle_targets": False},
         )
     else:
         if isinstance(stage_schedule, (str, bytes)) or not isinstance(stage_schedule, Sequence) or not stage_schedule:
@@ -1274,6 +1402,7 @@ def train_torch_layer(
                 "train_scales": bool(raw_stage.get("train_scales", False)),
                 "train_experts": bool(raw_stage.get("train_experts", False)),
                 "train_shared": bool(raw_stage.get("train_shared", False)),
+                "train_residual": bool(raw_stage.get("train_residual", False)),
                 "use_oracle_targets": bool(raw_stage.get("use_oracle_targets", False)),
                 "oracle_target_mode": oracle_target_mode,
                 "oracle_loss_mode": oracle_loss_mode,
@@ -1286,7 +1415,18 @@ def train_torch_layer(
                 "loss_coefficients": loss_coefficients,
                 "oracle_regret_weight": oracle_regret_weight,
                 "expert_use_prices": expert_use_prices,
+                "quantile_balanced": bool(raw_stage.get("quantile_balanced", False)),
             }
+        )
+    quantile_edges: tuple[float, float, float] | None = None
+    if any(bool(stage.get("quantile_balanced", False)) for stage in normalized_schedule):
+        quantile_edges = _fit_target_norm_quantile_edges(
+            train_dataset,
+            gate=gate_tensor,
+            up=up_tensor,
+            down=down_tensor,
+            microbatch=microbatch,
+            device=device,
         )
     for stage_spec in normalized_schedule:
         stage_name = str(stage_spec["name"])
@@ -1321,6 +1461,7 @@ def train_torch_layer(
             train_scales=bool(stage_spec["train_scales"]),
             train_experts=bool(stage_spec["train_experts"]),
             train_shared=bool(stage_spec["train_shared"]),
+            train_residual=bool(stage_spec["train_residual"]),
             device=device,
             stage=stage_name,
             use_oracle_targets=bool(stage_spec["use_oracle_targets"]),
@@ -1334,6 +1475,8 @@ def train_torch_layer(
             loss_coefficients=stage_spec["loss_coefficients"],
             oracle_regret_weight=float(stage_spec["oracle_regret_weight"]),
             expert_use_prices=stage_spec["expert_use_prices"],
+            quantile_balanced=bool(stage_spec["quantile_balanced"]),
+            quantile_edges=quantile_edges,
             excluded_indices=fit_excluded_rows if fit_excluded_rows else None,
             epoch_callback=validation_epoch_callback if has_selection else None,
         )
@@ -1550,10 +1693,16 @@ def train_torch_layer(
             },
             "partition_path": str(partition_path),
             "initial_expert_scales": [float(value) for value in (initial_scales or [1.0] * plan.routed_experts)],
-            "router_initialization": "initial_checkpoint" if initialized_from_checkpoint else "bounded_train_contribution_lstsq",
+            "router_initialization": router_initialization,
             "initial_checkpoint_dir": str(initial_checkpoint_dir) if initial_checkpoint_dir is not None else None,
             "router_hidden_size": router_hidden_size,
             "router_feature_mode": router_feature_mode,
+            "router_initialization_observed": router_initialization,
+            "residual_intermediate_size": int(residual_intermediate_size),
+            "residual_scope": str(residual_scope),
+            "fallback_mode": str(fallback_mode),
+            "fallback_rate_budget": float(fallback_rate_budget),
+            "quantile_edges_fit_train": [float(value) for value in quantile_edges] if quantile_edges is not None else None,
         },
         tensor_file=tensor_path.name,
         tensor_sha256=tensor_hash,

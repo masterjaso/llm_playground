@@ -609,7 +609,11 @@ class TorchQwen35SwiGLUMoE(nn.Module):
             "selected_dispatches": selected_dispatches,
             "nonempty_experts": int(sum(count > 0 for count in expert_token_counts)),
             "dense_intermediate_width": int(self.intermediate_size),
-            "active_intermediate_width": int(self.shared_intermediate_size + self.top_k * self.expert_intermediate_size),
+            # The public active-width field is the actual per-token width,
+            # including the permanent residual branch.  Earlier revisions
+            # reported only shared+routed width here and silently understated
+            # the p16/top6 residual candidate by 256 units.
+            "active_intermediate_width": static_width,
             "static_active_intermediate_width": static_width,
             "fallback_active_intermediate_width": fallback_width,
             "residual_intermediate_size": int(self.residual_intermediate_size),
@@ -617,6 +621,14 @@ class TorchQwen35SwiGLUMoE(nn.Module):
             "fallback_mode": active_fallback_mode,
             "fallback_token_count": fallback_tokens,
             "fallback_rate": fallback_rate,
+            "residual_executed": bool(self.residual_corrector is not None and (
+                self.residual_scope == "static" or fallback_tokens > 0
+            )),
+            "residual_parameter_count": int(
+                sum(parameter.numel() for parameter in self.residual_corrector.parameters())
+                if self.residual_corrector is not None else 0
+            ),
+            "active_intermediate_widths": width_tensor.detach().reshape(*original_shape[:-1]),
             "active_intermediate_width_mean": width_summary.mean,
             "active_intermediate_width_p50": width_summary.p50,
             "active_intermediate_width_p95": width_summary.p95,
@@ -627,7 +639,7 @@ class TorchQwen35SwiGLUMoE(nn.Module):
             "non_finite_token_count": 0,
             "estimated_ffn_reduction": float(
                 1.0
-                - (self.shared_intermediate_size + self.top_k * self.expert_intermediate_size)
+                - static_width
                 / max(self.intermediate_size, 1)
             ),
         }
