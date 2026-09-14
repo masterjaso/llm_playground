@@ -158,10 +158,15 @@ def load_checkpoint(
     if saved_version != expected_version:
         raise ValueError(
             "checkpoint architecture mismatch: "
-            f"checkpoint={saved_version}, model={expected_version}"
+            f"checkpoint={saved_version}, model={expected_version}; "
+            "v3 changes residual, PLE and clipping semantics: start a fresh v3 run; automatic migration is forbidden"
         )
 
     saved_config = state.get("config")
+    if expected_version == 3 and (
+        not isinstance(saved_config, dict) or "architecture_version" not in saved_config
+    ):
+        raise ValueError("v3 checkpoint requires complete versioned config metadata")
     if isinstance(saved_config, dict) and "architecture_version" in saved_config:
         try:
             config_version = int(saved_config["architecture_version"])
@@ -181,6 +186,8 @@ def load_checkpoint(
                 f"checkpoint config mismatch at {mismatch}; only ple.offload may differ"
             )
 
+    if expected_version == 3 and optimizer is not None and state.get("optimizer_state_dict") is None:
+        raise ValueError("v3 training resume requires optimizer state; start a fresh run")
     model.load_state_dict(state["model_state_dict"])
     if optimizer is not None and state.get("optimizer_state_dict") is not None:
         optimizer.load_state_dict(state["optimizer_state_dict"])

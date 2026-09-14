@@ -94,6 +94,19 @@ def _load_config(path: str) -> FlashMiniConfig:
     return FlashMiniConfig.from_dict(data)
 
 
+def _set_gpu_memory_budget(devices, budget):
+    if budget is None:
+        return
+    if budget <= 0 or any(d.type != "cuda" for d in devices):
+        raise ValueError("gpu-memory-gib requires CUDA and a positive budget")
+    for device in devices:
+        free, total = torch.cuda.mem_get_info(device)
+        allowance = min(budget * 2**30 - (total - free), free - 2**30)
+        if allowance <= 0:
+            raise ValueError(f"No memory budget remaining on {device}")
+        torch.cuda.set_per_process_memory_fraction(allowance / total, device)
+
+
 def cmd_train(args) -> int:
     from .training import train
 
@@ -102,6 +115,12 @@ def cmd_train(args) -> int:
     seed = getattr(args, "seed", 0)
     _seed_everything(seed)
     config = _load_config(args.config)
+    from .data import MemmapDataset
+    from .experiment import validate_data_contract
+
+    dataset = MemmapDataset(Path(args.data_dir), split="train")
+    validate_data_contract(dataset, config, config.max_seq_len, args.tokens,
+                           allow_repeated=getattr(args, "allow_repeated_corpus", False))
     device = _device()
     gpu_ids = getattr(args, "model_parallel_gpus", None)
     devices = [torch.device(f"cuda:{int(i)}") for i in gpu_ids.split(",")] if gpu_ids else [device]
@@ -110,16 +129,7 @@ def cmd_train(args) -> int:
     )):
         raise ValueError("model-parallel GPUs must be distinct available CUDA indices")
     budget = getattr(args, "gpu_memory_gib", None)
-    if budget is not None:
-        if budget <= 0 or any(d.type != "cuda" for d in devices):
-            raise ValueError("gpu-memory-gib requires CUDA and a positive budget")
-        for d in devices:
-            free, total = torch.cuda.mem_get_info(d)
-            # Account for existing allocations (including display/other jobs).
-            allowance = min(budget * 2**30 - (total - free), free - 2**30)
-            if allowance <= 0:
-                raise ValueError(f"No memory budget remaining on {d}")
-            torch.cuda.set_per_process_memory_fraction(allowance / total, d)
+    _set_gpu_memory_budget(devices, budget)
     device = devices[0]
     model = FlashMiniModel(config).parallelize(devices)
     from .optim import build_optimizer
@@ -175,6 +185,8 @@ def cmd_train(args) -> int:
         cosine_decay=getattr(args, "cosine_decay", False),
         min_lr_ratio=getattr(args, "min_lr_ratio", 0.0),
         run_metadata=run_metadata,
+        allow_repeated_corpus=getattr(args, "allow_repeated_corpus", False),
+        stop_after_tokens=getattr(args, "stop_after_tokens", None),
     )
     print(json.dumps(summary, indent=2))
     return 0
@@ -183,15 +195,26 @@ def cmd_train(args) -> int:
 def cmd_eval(args) -> int:
     """Run the fixed evaluation suite on a trained checkpoint."""
     from .checkpoint import load_checkpoint
-    from .data import MemmapDataset
+    from .data import MemmapDataset, sha256_file
     from .eval import compute_validation_nll
+    from .experiment import validate_document_boundaries
 
     config = _load_config(args.config)
+    dataset = MemmapDataset(Path(args.data_dir), split="val")
+    validate_document_boundaries(dataset.manifest, config)
+    if dataset.seq_len != config.max_seq_len:
+        raise ValueError("evaluation dataset/config sequence length mismatch")
+    if config.architecture_version >= 3:
+        dataset.verify_integrity()
     model = FlashMiniModel(config).to(_device())
     ckpt = Path(args.checkpoint)
     meta = load_checkpoint(ckpt, model)
-    dataset = MemmapDataset(Path(args.data_dir), split="val")
-    result = compute_validation_nll(model, dataset, _device(), max_batches=args.max_batches)
+    manifest_hash = sha256_file(Path(args.data_dir) / "data_manifest.json")
+    if config.architecture_version >= 3 and meta.get("extra", {}).get("data_manifest_sha256") != manifest_hash:
+        raise ValueError("evaluation dataset differs from checkpoint provenance")
+    start_sequence = getattr(args, "skip_sequences", 0)
+    result = compute_validation_nll(model, dataset, _device(), max_batches=args.max_batches,
+                                    start_sequence=start_sequence)
     if getattr(model, "ple", None) is not None:
         result["ple_off"] = compute_validation_nll(
             model,
@@ -199,9 +222,19 @@ def cmd_eval(args) -> int:
             _device(),
             max_batches=args.max_batches,
             ple_enabled=False,
+            start_sequence=start_sequence,
         )
     result["checkpoint"] = str(ckpt)
     result["step"] = meta["step"]
+    result["architecture_version"] = config.architecture_version
+    result["actual_seq_len"] = dataset.seq_len
+    result["skipped_sequences"] = start_sequence
+    result["data_manifest_sha256"] = manifest_hash
+    result["long_context_validated"] = False
+    result["final_go_eligible"] = False
+    result["seed_scope"] = "single_checkpoint_not_across_seed_confirmation"
+    if config.use_ple:
+        result["ple_off_scope"] = "within_model_memory_reliance_diagnostic_not_B_baseline"
     out_path = Path(args.run_dir) / "eval" / "val_nll.json"
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(json.dumps(result, indent=2))
@@ -257,6 +290,10 @@ def main(argv=None) -> int:
     p.add_argument("--seed", type=int, default=0)
     p.add_argument("--no-checkpoints", action="store_true")
     p.add_argument("--resume", default=None)
+    p.add_argument("--allow-repeated-corpus", action="store_true",
+                   help="Explicit non-decisive override for repeated-corpus mechanism probes")
+    p.add_argument("--stop-after-tokens", type=int,
+                   help="Pause at a gate without changing --tokens or its LR schedule")
     p.set_defaults(func=cmd_train)
 
     p = sub.add_parser("eval")
@@ -265,6 +302,8 @@ def main(argv=None) -> int:
     p.add_argument("--run-dir", required=True)
     p.add_argument("--checkpoint", required=True)
     p.add_argument("--max-batches", type=int, default=None)
+    p.add_argument("--skip-sequences", type=int, default=0,
+                   help="Use the same held-out suffix as the matched B/C comparison")
     p.set_defaults(func=cmd_eval)
 
     args = parser.parse_args(argv)

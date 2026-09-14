@@ -20,6 +20,7 @@ import torch
 
 from .checkpoint import save_checkpoint
 from .config import FlashMiniConfig
+from .experiment import EpochSampler, remaining_sequences, validate_data_contract
 from .metrics import MetricsLogger, write_summary
 from .optim import clip_gradients
 
@@ -245,13 +246,17 @@ def _dataset_identity(dataset: Any) -> dict[str, Any] | None:
     except json.JSONDecodeError:
         return {"split": str(split), "manifest_sha256": hashlib.sha256(raw).hexdigest()}
     split_manifest = manifest.get("splits", {}).get(split, {})
-    return {
+    identity = {
         "split": str(split),
         "manifest_sha256": hashlib.sha256(raw).hexdigest(),
         "input_sha256": split_manifest.get("input_sha256"),
         "labels_sha256": split_manifest.get("labels_sha256"),
         "seq_len": split_manifest.get("seq_len", getattr(dataset, "seq_len", None)),
     }
+    if manifest.get("format_version", 0) >= 3:
+        identity.update({key: manifest.get(key) for key in (
+            "tokenizer", "tokenizer_revision", "dataset", "dataset_revision", "split_method")})
+    return identity
 
 
 def _validate_resume_metadata(
@@ -264,8 +269,25 @@ def _validate_resume_metadata(
     schedule: dict[str, Any],
     dataset_identity: dict[str, Any] | None,
     run_metadata: dict[str, Any],
+    strict: bool = False,
 ) -> list[float] | None:
     metadata = extra.get("training")
+    if strict:
+        required = {"seed", "batch_size", "seq_len", "grad_accum", "schedule",
+                    "base_lrs", "dataset", "run_metadata"}
+        if not isinstance(metadata, dict) or not required.issubset(metadata):
+            raise ValueError("v3 resume requires complete training metadata")
+        if not isinstance(metadata["schedule"], dict) or set(metadata["schedule"]) != set(schedule):
+            raise ValueError("v3 resume requires complete schedule metadata")
+        saved_run = metadata["run_metadata"]
+        required_run = {"config_sha256", "shared_optimizer", "data_contract", "execution_policy",
+                        "tuning_validation_prefix_sequences"}
+        if "source_sha256" in run_metadata:
+            required_run.add("source_sha256")
+        if not isinstance(saved_run, dict) or not required_run.issubset(saved_run):
+            raise ValueError("v3 resume requires complete run provenance")
+        if not isinstance(metadata["base_lrs"], list) or not metadata["base_lrs"]:
+            raise ValueError("v3 resume requires optimizer base learning rates")
     if not isinstance(metadata, dict):
         return None
     expected = {
@@ -302,7 +324,8 @@ def _validate_resume_metadata(
         )
     saved_run_metadata = metadata.get("run_metadata")
     if isinstance(saved_run_metadata, dict):
-        for key in ("config_sha256", "source_sha256"):
+        for key in ("config_sha256", "source_sha256", "shared_optimizer", "data_contract", "execution_policy",
+                    "tuning_validation_prefix_sequences"):
             if key in saved_run_metadata and saved_run_metadata[key] != run_metadata.get(key):
                 raise ValueError(
                     f"resume run metadata mismatch for {key}: "
@@ -346,11 +369,14 @@ def train_step(
     optimizer: torch.optim.Optimizer,
     input_ids: torch.Tensor,
     labels: torch.Tensor,
-    aux_loss_coef: float = 0.01,
+    aux_loss_coef: float | None = None,
     grad_clip: float = 1.0,
     use_amp: bool = True,
 ) -> dict:
     """Run one optimizer update and return finite scalar routing metrics."""
+    if aux_loss_coef is None:
+        config = getattr(model, "config", None)
+        aux_loss_coef = config.moe.aux_loss_coef if getattr(config, "architecture_version", 2) >= 3 else 0.01
     model.train()
     optimizer.zero_grad(set_to_none=True)
     if use_amp and input_ids.is_cuda:
@@ -375,7 +401,14 @@ def train_step(
         raise FloatingPointError("total loss is non-finite before backward")
 
     total_loss.backward()
-    grad_norm = clip_gradients(model, grad_clip)
+    clipping = {}
+    if getattr(getattr(model, "config", None), "architecture_version", 2) >= 3:
+        from .optim import clip_gradient_groups
+        clipping = clip_gradient_groups(model, grad_clip)
+        grad_norm = math.sqrt(sum(clipping[f"grad_norm_{group}_preclip"] ** 2
+                                  for group in ("shared", "ple_dense", "ple_sparse")))
+    else:
+        grad_norm = clip_gradients(model, grad_clip)
     grad_norm_value = _as_float(grad_norm, "gradient norm")
     optimizer.step()
 
@@ -384,6 +417,7 @@ def train_step(
         "total_loss": _as_float(total_loss, "total loss"),
         "grad_norm": grad_norm_value,
         "router_aux_loss": _as_float(aux_tensor, "router auxiliary loss"),
+        **clipping,
     }
     if "router_entropy" in stats:
         metrics["router_entropy"] = _as_float(
@@ -432,7 +466,7 @@ def train(
     log_every: int = 10,
     ckpt_every_tokens: int = 25_000_000,
     resume_from: Path | None = None,
-    aux_loss_coef: float = 0.01,
+    aux_loss_coef: float | None = None,
     seed: int = 0,
     save_checkpoints: bool = True,
     val_dataset=None,
@@ -445,6 +479,8 @@ def train(
     eval_ple_ablation: bool = True,
     eval_dataset=None,
     run_metadata: dict[str, Any] | None = None,
+    allow_repeated_corpus: bool = False,
+    stop_after_tokens: int | None = None,
 ) -> dict:
     """Train for a cumulative padded-token budget and persist a summary.
 
@@ -454,6 +490,10 @@ def train(
     """
     if grad_accum != 1:
         raise ValueError("grad_accum != 1 is unsupported; use grad_accum=1")
+    if aux_loss_coef is None:
+        aux_loss_coef = config.moe.aux_loss_coef if config.architecture_version >= 3 else 0.01
+    if not math.isfinite(aux_loss_coef) or aux_loss_coef < 0:
+        raise ValueError("aux_loss_coef must be finite and nonnegative")
     if total_tokens <= 0:
         raise ValueError("total_tokens must be positive")
     if seq_len <= 0 or batch_size <= 0:
@@ -474,6 +514,27 @@ def train(
         raise ValueError("provide only one of val_dataset and eval_dataset")
     if val_dataset is None:
         val_dataset = eval_dataset
+    contract = validate_data_contract(dataset, config, seq_len, total_tokens,
+                                      allow_repeated=allow_repeated_corpus)
+    seq_len = contract["actual_seq_len"]
+    if val_dataset is not None:
+        from .experiment import validate_document_boundaries
+        validate_document_boundaries(getattr(val_dataset, "manifest", None), config)
+        if config.architecture_version >= 3:
+            if getattr(val_dataset, "split", "val") != "val":
+                raise ValueError("validation requires the val split, not training data")
+            train_identity, val_identity = _dataset_identity(dataset), _dataset_identity(val_dataset)
+            if train_identity and val_identity and train_identity["manifest_sha256"] != val_identity["manifest_sha256"]:
+                raise ValueError("validation must use the same frozen corpus manifest as training")
+        values, targets = val_dataset.get_batch(__import__("numpy").array([0]))
+        if values.ndim != 2 or values.shape != targets.shape or values.shape[1] != seq_len:
+            raise ValueError("validation dataset sequence length mismatch")
+    if stop_after_tokens is not None and not 0 < stop_after_tokens <= total_tokens:
+        raise ValueError("stop_after_tokens must be within the declared schedule budget")
+    if (config.architecture_version >= 3 and stop_after_tokens is not None
+            and stop_after_tokens < total_tokens and (
+                stop_after_tokens % seq_len or (stop_after_tokens // seq_len) % len(dataset) % batch_size)):
+        raise ValueError("v3 pause gates must align with full batches to preserve the update trajectory")
     if warmup_tokens < 0:
         raise ValueError("warmup_tokens must be non-negative")
     if not 0.0 <= min_lr_ratio <= 1.0:
@@ -495,6 +556,28 @@ def train(
     n_seqs = len(dataset)
     dataset_identity = _dataset_identity(dataset)
     run_metadata = dict(run_metadata or {})
+    if config.architecture_version >= 3:
+        run_metadata["data_contract"] = contract
+        run_metadata["execution_policy"] = {
+            "router_aux_loss_coef": aux_loss_coef,
+            "precision": "cuda_bfloat16_autocast" if use_amp and device.type == "cuda" else "no_autocast",
+            "shared_parameter_dtypes": sorted({str(p.dtype) for name, p in model.named_parameters()
+                                                if not name.startswith("ple.")}),
+            "gradient_clip_max_norm": 1.0,
+            "clipping_policy": "independent_shared_ple_dense_ple_sparse_v3",
+            "optimizer_recipe": getattr(optimizer, "_flashmini_recipe", None),
+        }
+        run_metadata["tuning_validation_prefix_sequences"] = (
+            min(len(val_dataset), val_max_batches) if val_max_batches is not None else len(val_dataset)
+        ) if eval_every_tokens and val_dataset is not None else 0
+        shared = {id(p): name for name, p in model.named_parameters() if not name.startswith("ple.")}
+        run_metadata["shared_optimizer"] = [
+            {"family": type(getattr(optimizer, "optimizers", [optimizer])[0]).__name__,
+             "parameters": sorted(shared[id(p)] for p in g["params"] if id(p) in shared),
+             "options": {k: v for k, v in g.items() if k != "params" and not k.startswith("_")}}
+            for g in optimizer.param_groups if any(id(p) in shared for p in g["params"])
+        ]
+        run_metadata["optimizer_family"] = type(optimizer).__name__
     if "config_sha256" not in run_metadata:
         config_values = config.to_dict()
         run_metadata["config_sha256"] = hashlib.sha256(
@@ -513,6 +596,7 @@ def train(
     real_tokens_seen = 0
     previous_wall_clock = 0.0
     evaluations: list[dict[str, Any]] = []
+    clipping_counts = {group: 0 for group in ("shared", "ple_dense", "ple_sparse")}
     start_time = time.monotonic()
 
     if resume_from is not None:
@@ -520,8 +604,40 @@ def train(
 
         meta = load_checkpoint(resume_from, model, optimizer)
         extra = meta.get("extra") or {}
+        if config.architecture_version >= 3:
+            for key in ("training", "rng_state", "tokens_seen", "real_tokens_seen", "clipping_counts"):
+                if key not in extra:
+                    raise ValueError(f"v3 resume requires checkpoint {key}; start a fresh run")
+            saved_tokens, saved_real, saved_step = extra["tokens_seen"], extra["real_tokens_seen"], meta["step"]
+            if any(type(value) is not int or value < 0 for value in (saved_tokens, saved_real, saved_step)):
+                raise ValueError("v3 checkpoint counters must be nonnegative integers")
+            if saved_tokens % seq_len:
+                raise ValueError("v3 checkpoint token count is not aligned with actual sequence length")
+            limit = math.ceil((stop_after_tokens or total_tokens) / seq_len) * seq_len
+            if saved_tokens > limit or saved_real > saved_tokens:
+                raise ValueError("v3 checkpoint counters exceed the declared token budget")
+            epochs, rows = divmod(saved_tokens // seq_len, n_seqs)
+            if saved_tokens < math.ceil(total_tokens / seq_len) * seq_len and rows % batch_size:
+                raise ValueError("v3 checkpoint offset is not a completed optimizer batch")
+            expected_step = epochs * math.ceil(n_seqs / batch_size) + math.ceil(rows / batch_size)
+            if saved_step != expected_step:
+                raise ValueError("v3 checkpoint step is inconsistent with consumed token positions")
+            rng = extra["rng_state"]
+            required_rng = {"sampling", "torch", "python", "numpy"}
+            if torch.cuda.is_available():
+                required_rng.add("cuda")
+            if not isinstance(rng, dict) or any(rng.get(key) is None for key in required_rng):
+                raise ValueError("v3 resume requires complete RNG state")
+            if torch.cuda.is_available() and len(rng["cuda"]) != torch.cuda.device_count():
+                raise ValueError("v3 resume requires matching CUDA RNG device count")
+            counts = extra["clipping_counts"]
+            if not isinstance(counts, dict) or set(counts) != set(clipping_counts):
+                raise ValueError("v3 resume requires complete clipping counters")
+            if any(type(count) is not int or not 0 <= count <= saved_step for count in counts.values()):
+                raise ValueError("v3 clipping counters are inconsistent with optimizer steps")
         saved_base_lrs = _validate_resume_metadata(
             extra if isinstance(extra, dict) else {},
+            strict=config.architecture_version >= 3,
             seed=seed,
             batch_size=batch_size,
             seq_len=seq_len,
@@ -550,6 +666,9 @@ def train(
         )
         if isinstance(extra, dict) and isinstance(extra.get("evaluations"), list):
             evaluations = list(extra["evaluations"])
+        clipping_counts.update(extra.get("clipping_counts", {}))
+
+    sampler = EpochSampler(n_seqs, seed, tokens_seen // seq_len)
 
     next_ckpt_tokens: int | None
     if ckpt_every_tokens:
@@ -589,7 +708,7 @@ def train(
             step=step,
             config=config,
             keep_latest_only=True,
-            extra=_checkpoint_extra(
+            extra={**_checkpoint_extra(
                 tokens_seen=tokens_seen,
                 real_tokens_seen=real_tokens_seen,
                 wall_clock_seconds=elapsed_seconds(),
@@ -598,15 +717,21 @@ def train(
                 evaluations=evaluations,
                 dataset_identity=dataset_identity,
                 run_metadata=run_metadata,
-            ),
+            ), "clipping_counts": dict(clipping_counts)},
         )
 
     try:
-        while tokens_seen < total_tokens:
-            indices = torch.randint(0, n_seqs, (batch_size,), generator=sampling_rng).numpy()
+        while tokens_seen < (stop_after_tokens or total_tokens):
+            if config.architecture_version >= 3:
+                indices = sampler.take(remaining_sequences(tokens_seen, stop_after_tokens or total_tokens,
+                                                          seq_len, batch_size))
+            else:
+                indices = torch.randint(0, n_seqs, (batch_size,), generator=sampling_rng).numpy()
             input_array, label_array = dataset.get_batch(indices)
-            input_ids = torch.as_tensor(input_array, device=device)
-            labels = torch.as_tensor(label_array, device=device)
+            input_ids = torch.as_tensor(input_array, dtype=torch.long, device=device)
+            labels = torch.as_tensor(label_array, dtype=torch.long, device=device)
+            if input_ids.shape != labels.shape or input_ids.ndim != 2 or input_ids.shape[1] != seq_len:
+                raise ValueError("dataset batch sequence length/label shape changed during training")
             batch_tokens = int(input_ids.numel())
             if batch_tokens <= 0:
                 raise ValueError("dataset returned an empty input batch")
@@ -629,6 +754,11 @@ def train(
                 use_amp=use_amp,
             )
             step += 1
+            for group, count in clipping_counts.items():
+                key = f"grad_clipped_{group}"
+                if key in metrics:
+                    clipping_counts[group] = count + int(metrics[key])
+                    metrics[f"grad_clip_fraction_{group}"] = clipping_counts[group] / step
             tokens_seen += batch_tokens
             real_tokens_seen += int((labels != -100).sum().item())
             lr_groups = _learning_rates(optimizer)
@@ -704,7 +834,11 @@ def train(
 
     elapsed = elapsed_seconds()
     summary = {
-        "status": "complete",
+        "status": "complete" if tokens_seen >= total_tokens else "paused",
+        "architecture_version": config.architecture_version,
+        "config": config.to_dict(),
+        "data_contract": contract,
+        "clipping_counts": clipping_counts,
         "steps": step,
         "tokens_seen": tokens_seen,
         "real_tokens_seen": real_tokens_seen,

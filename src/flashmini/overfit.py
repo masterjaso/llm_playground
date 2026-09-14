@@ -15,12 +15,11 @@ import tempfile
 from pathlib import Path
 
 import torch
-import torch.nn.functional as F
 
-from .checkpoint import save_checkpoint, load_checkpoint
+from .checkpoint import load_checkpoint, save_checkpoint
 from .config import FlashMiniConfig
 from .models import FlashMiniModel
-from .optim import build_optimizer, clip_gradients
+from .optim import build_optimizer, clip_gradient_groups, clip_gradients
 
 
 def _finite_nonzero_grads(model: torch.nn.Module) -> dict[str, bool]:
@@ -52,12 +51,13 @@ def run_overfit_test(
     labels = torch.randint(0, config.vocab_size, (4, config.max_seq_len), device=device)
 
     losses = []
+    clip = clip_gradient_groups if config.architecture_version >= 3 else clip_gradients
     for step in range(steps):
         optimizer.zero_grad(set_to_none=True)
         out = model(input_ids, labels=labels)
         loss = out["loss"]
         loss.backward()
-        clip_gradients(model, 1.0)
+        clip(model, 1.0)
         optimizer.step()
         losses.append(loss.item())
 
@@ -89,16 +89,23 @@ def run_overfit_test(
             optimizer.zero_grad(set_to_none=True)
             out = model(input_ids, labels=labels)
             out["loss"].backward()
-            clip_gradients(model, 1.0)
+            clip(model, 1.0)
             optimizer.step()
         save_checkpoint(ckpt2, model, optimizer, step=steps + 5, config=config)
         # Reload ckpt1 into a fresh model and verify it matches
         model2 = FlashMiniModel(config).to(device)
-        meta = load_checkpoint(ckpt1, model2)
-        resume_ok = meta["step"] == steps
+        optimizer2 = build_optimizer(model2, lr=lr)
+        meta = load_checkpoint(ckpt1, model2, optimizer2)
+        for _ in range(5):
+            optimizer2.zero_grad(set_to_none=True)
+            model2(input_ids, labels=labels)["loss"].backward()
+            clip(model2, 1.0)
+            optimizer2.step()
+        resume_ok = meta["step"] == steps and all(
+            torch.equal(v, model2.state_dict()[k]) for k, v in model.state_dict().items())
 
     result = {
-        "pass": all_finite and loss_ok and ple_active and moe_active and resume_ok,
+        "pass": all_finite and loss_ok and (ple_active or not config.use_ple) and moe_active and resume_ok,
         "loss_first": losses[0] if losses else None,
         "loss_last": losses[-1] if losses else None,
         "loss_drop": loss_drop,

@@ -1,0 +1,101 @@
+"""Fail-closed treatment matching, using checkpoint metadata as the authority."""
+
+from __future__ import annotations
+
+import copy
+import math
+
+from .config import FlashMiniConfig
+
+
+def shared_config(config):
+    values = FlashMiniConfig.from_dict(config).to_dict()
+    if values["architecture_version"] >= 3:
+        values["ple"].pop("enabled", None)
+        values["ple"].pop("offload", None)
+    else:
+        values.pop("ple")
+    values.pop("use_ple")
+    return values
+
+
+def _require_equal(a, b, key):
+    if key not in a or key not in b or a[key] is None or b[key] is None:
+        raise ValueError(f"comparison missing {key}")
+    if a[key] != b[key]:
+        raise ValueError(f"comparison {key} mismatch")
+
+
+def _valid_number(value, *, positive=False):
+    return (type(value) in (int, float) and math.isfinite(value)
+            and (value > 0 if positive else value >= 0))
+
+
+def validate_ple_pair(baseline, candidate, evaluation_manifest_hash):
+    """Validate complete checkpoint envelopes before loading weights or evaluating."""
+    bc, cc = baseline["config"], candidate["config"]
+    if bc.get("use_ple") is not False:
+        raise ValueError("baseline must explicitly have PLE OFF")
+    if cc.get("use_ple") is not True:
+        raise ValueError("candidate must explicitly have PLE ON")
+    _require_equal(baseline, candidate, "architecture_version")
+    for saved in (baseline, candidate):
+        if saved["architecture_version"] != saved["config"].get("architecture_version"):
+            raise ValueError("checkpoint/config architecture mismatch")
+    if shared_config(bc) != shared_config(cc):
+        raise ValueError("shared backbone/config mismatch (including sequence length)")
+    b, c = baseline.get("extra", {}), candidate.get("extra", {})
+    for key in ("tokens_seen", "real_tokens_seen", "data_manifest_sha256"):
+        _require_equal(b, c, key)
+    if b["data_manifest_sha256"] != evaluation_manifest_hash:
+        raise ValueError("evaluation dataset manifest mismatch")
+    bt, ct = b.get("training", {}), c.get("training", {})
+    for key in ("seed", "batch_size", "seq_len", "grad_accum", "schedule", "dataset"):
+        _require_equal(bt, ct, key)
+    if bt["seq_len"] != bc["max_seq_len"]:
+        raise ValueError("recorded sequence length differs from config")
+    for key in ("tokenizer", "tokenizer_revision", "dataset_revision"):
+        _require_equal(bt["dataset"], ct["dataset"], key)
+    bm, cm = bt.get("run_metadata", {}), ct.get("run_metadata", {})
+    for key in ("source_sha256", "shared_optimizer", "data_contract"):
+        _require_equal(bm, cm, key)
+    if baseline["architecture_version"] >= 3:
+        _require_equal(bm, cm, "execution_policy")
+        policy = bm["execution_policy"]
+        required = {"router_aux_loss_coef", "precision", "shared_parameter_dtypes", "gradient_clip_max_norm",
+                    "clipping_policy", "optimizer_recipe"}
+        if not isinstance(policy, dict) or not required.issubset(policy):
+            raise ValueError("comparison requires complete execution_policy")
+        recipe = policy["optimizer_recipe"]
+        if not isinstance(recipe, dict) or not {"dense_family", "table_family", "base_lr",
+                "ple_lr_multiplier", "dense_weight_decay", "table_weight_decay", "betas", "eps"}.issubset(recipe):
+            raise ValueError("comparison requires complete recorded optimizer recipe")
+        if (recipe["dense_family"] != "AdamW" or recipe["table_family"] not in ("AdamW", "SparseAdam")
+                or any(not _valid_number(recipe[key], positive=True) for key in ("base_lr", "ple_lr_multiplier", "eps"))
+                or any(not _valid_number(recipe[key]) for key in ("dense_weight_decay", "table_weight_decay"))):
+            raise ValueError("comparison optimizer recipe contains invalid values")
+        betas = recipe["betas"]
+        if not isinstance(betas, (list, tuple)) or len(betas) != 2 or any(
+                not _valid_number(beta) or beta >= 1 for beta in betas):
+            raise ValueError("comparison optimizer recipe has invalid betas")
+        if (not _valid_number(policy["router_aux_loss_coef"])
+                or not _valid_number(policy["gradient_clip_max_norm"], positive=True)
+                or policy["precision"] not in ("no_autocast", "cuda_bfloat16_autocast")
+                or policy["clipping_policy"] != "independent_shared_ple_dense_ple_sparse_v3"
+                or not isinstance(policy["shared_parameter_dtypes"], list)
+                or not policy["shared_parameter_dtypes"]
+                or any(dtype not in ("torch.float16", "torch.bfloat16", "torch.float32", "torch.float64")
+                       for dtype in policy["shared_parameter_dtypes"])):
+            raise ValueError("comparison execution_policy contains invalid values")
+    return {
+        "comparison_type": "B_vs_C_PLE_treatment",
+        "ablation_type": "within_model_memory_reliance_diagnostic_not_B_baseline",
+        "training_seed": bt["seed"],
+        "matched_seed_count": 1,
+        "seed_scope": "paired_single_seed_screening",
+        "confirmation_policy": "at_least_3_full_matched_seeds_for_small_effects",
+        "uncertainty_scope": "fixed_holdout_blocks_not_training_seed_variance",
+        "long_context_validated": False,
+        "final_go_eligible": False,
+        "data_contract": copy.deepcopy(bm["data_contract"]),
+    }

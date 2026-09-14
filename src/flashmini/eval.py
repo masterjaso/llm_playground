@@ -53,6 +53,7 @@ def compute_validation_nll(
     device: torch.device,
     max_batches: int | None = None,
     ple_enabled: bool | None = None,
+    start_sequence: int = 0,
 ) -> dict[str, float | int]:
     """Compute masked-token NLL, perplexity, and top-1 accuracy.
 
@@ -64,6 +65,8 @@ def compute_validation_nll(
         raise ValueError("validation dataset is empty")
     if max_batches is not None and max_batches <= 0:
         raise ValueError("max_batches must be positive")
+    if not 0 <= start_sequence < len(dataset):
+        raise ValueError("start_sequence must address the evaluation dataset")
 
     modes = _snapshot_training_modes(model)
     rng_state = _snapshot_rng()
@@ -74,12 +77,12 @@ def compute_validation_nll(
     try:
         model.eval()
         with torch.no_grad():
-            for index in range(len(dataset)):
+            for index in range(start_sequence, len(dataset)):
                 if max_batches is not None and n_batches >= max_batches:
                     break
                 input_array, label_array = dataset.get_batch(torch.tensor([index]).numpy())
-                input_ids = torch.as_tensor(input_array, device=device)
-                labels = torch.as_tensor(label_array, device=device)
+                input_ids = torch.as_tensor(input_array, dtype=torch.long, device=device)
+                labels = torch.as_tensor(label_array, dtype=torch.long, device=device)
                 kwargs: dict[str, Any] = {"labels": labels}
                 if ple_enabled is not None:
                     kwargs["ple_enabled"] = ple_enabled

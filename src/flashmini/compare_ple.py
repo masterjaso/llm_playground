@@ -11,9 +11,11 @@ import numpy as np
 import torch
 
 from .checkpoint import load_checkpoint
+from .comparison import validate_ple_pair
 from .config import FlashMiniConfig
 from .data import MemmapDataset, sha256_file
 from .eval import compute_validation_nll
+from .experiment import validate_document_boundaries
 from .models import FlashMiniModel
 
 
@@ -30,36 +32,57 @@ class _Slice:
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--run-dirs", nargs="+", required=True)
+    parser.add_argument("--baseline", required=True, help="Explicit no-PLE B run directory")
+    parser.add_argument("--candidate", required=True, help="Explicit PLE-enabled C run directory")
     parser.add_argument("--data-dir", required=True)
     parser.add_argument("--out", required=True)
-    parser.add_argument("--skip-sequences", type=int, default=128)
+    parser.add_argument("--skip-sequences", type=int, default=None,
+                        help="Exclude at least the recorded tuning prefix; default selects it automatically")
     parser.add_argument("--block-sequences", type=int, default=64)
     args = parser.parse_args()
     out = Path(args.out)
     if out.exists():
         raise FileExistsError(out)
     data = MemmapDataset(Path(args.data_dir), "val")
-    if not 0 <= args.skip_sequences < len(data) or args.block_sequences <= 0:
-        raise ValueError("Invalid held-out slice")
+    data.verify_integrity()
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     variants = {}
-    controls = None
-    for run_path in args.run_dirs:
+    records = []
+    for run_path in (args.baseline, args.candidate):
         run = Path(run_path)
         summary = json.loads((run / "summary.json").read_text())
-        comparable = {k: summary[k] for k in ("tokens_seen", "seed", "batch_size", "seq_len", "schedule")}
-        if controls is None:
-            controls = comparable
-        elif controls != comparable:
-            raise ValueError("Runs have different token/seed/batch/schedule controls")
         checkpoint = run / "checkpoints" / f"step_{summary['steps']}.pt"
         saved = torch.load(checkpoint, map_location="cpu", weights_only=False)
+        saved.pop("model_state_dict")
+        saved.pop("optimizer_state_dict", None)
+        for key in ("tokens_seen", "real_tokens_seen"):
+            if summary.get(key) != saved.get("extra", {}).get(key):
+                raise ValueError(f"summary/checkpoint {key} mismatch")
+        records.append((run, checkpoint, saved))
+    if records[0][0].resolve() == records[1][0].resolve():
+        raise ValueError("baseline and candidate must be distinct runs")
+    manifest_hash = sha256_file(Path(args.data_dir) / "data_manifest.json")
+    controls = validate_ple_pair(records[0][2], records[1][2], manifest_hash)
+    validate_document_boundaries(data.manifest, FlashMiniConfig.from_dict(records[0][2]["config"]))
+    tuning_prefix = 0
+    for _, _, saved in records:
+        metadata = saved.get("extra", {}).get("training", {}).get("run_metadata", {})
+        if saved["architecture_version"] >= 3 and "tuning_validation_prefix_sequences" not in metadata:
+            raise ValueError("v3 comparison requires recorded tuning-prefix provenance")
+        tuning_prefix = max(tuning_prefix, metadata.get("tuning_validation_prefix_sequences", 0))
+    if args.skip_sequences is None:
+        args.skip_sequences = tuning_prefix
+    if args.skip_sequences < tuning_prefix:
+        raise ValueError("comparison holdout overlaps the recorded tuning prefix")
+    if not 0 <= args.skip_sequences < len(data) or args.block_sequences <= 0:
+        raise ValueError("Invalid held-out slice: reserve validation sequences outside tuning")
+    if data.seq_len != records[0][2]["config"]["max_seq_len"]:
+        raise ValueError("evaluation dataset sequence length mismatch")
+    for index, (run, checkpoint, saved) in enumerate(records):
         config = FlashMiniConfig.from_dict(saved["config"])
-        del saved
         model = FlashMiniModel(config).to(device).eval()
         load_checkpoint(checkpoint, model)
-        name = run.name
+        name = "baseline" if index == 0 else "candidate"
         result = {"checkpoint": str(checkpoint), "checkpoint_sha256": sha256_file(checkpoint),
                   "modes": {}}
         for enabled in ([True, False] if config.use_ple else [False]):
@@ -82,7 +105,7 @@ def main():
         gc.collect()
         if device.type == "cuda":
             torch.cuda.empty_cache()
-    baseline = next(iter(variants))
+    baseline = "baseline"
     base = variants[baseline]["modes"]["ple_off"]
     comparisons = {}
     rng = np.random.default_rng(17)
@@ -101,9 +124,10 @@ def main():
             "paired_block_bootstrap_nll_delta_95pct": np.quantile(estimates, [0.025, 0.975]).tolist(),
             "ple_off_minus_on_nll": result["modes"]["ple_off"]["nll"] - candidate["nll"],
         }
-    report = {"scope": "small_model_pilot; conditional holdout uncertainty, not across-seed assurance",
+    report = {"scope": "paired_PLE_screening; conditional holdout uncertainty, not across-seed assurance",
               "data_manifest_sha256": sha256_file(Path(args.data_dir) / "data_manifest.json"),
               "skipped_tuning_sequences": args.skip_sequences, "block_sequences": args.block_sequences,
+              "recorded_tuning_prefix_sequences": tuning_prefix,
               "controls": controls, "baseline": baseline, "variants": variants,
               "comparisons": comparisons}
     out.parent.mkdir(parents=True, exist_ok=True)

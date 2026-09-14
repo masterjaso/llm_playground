@@ -10,7 +10,7 @@ import json
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Self
 
 
 @dataclass
@@ -19,7 +19,7 @@ class GateDecision:
     metric_values: dict[str, float]
     thresholds: dict[str, float]
     verdict: str  # PASS | FAIL | AMBIGUOUS
-    checkpoint: Optional[str]
+    checkpoint: str | None
     action: str
     timestamp: float = field(default_factory=time.time)
 
@@ -39,7 +39,7 @@ class GateLogger:
     def __init__(self, path: Path):
         self.path = Path(path)
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        self._f = open(self.path, "a")
+        self._f = open(self.path, "a")  # noqa: SIM115 -- owned by this context manager
 
     def record(self, decision: GateDecision) -> None:
         self._f.write(json.dumps(decision.to_dict()) + "\n")
@@ -48,7 +48,7 @@ class GateLogger:
     def close(self) -> None:
         self._f.close()
 
-    def __enter__(self) -> "GateLogger":
+    def __enter__(self) -> Self:
         return self
 
     def __exit__(self, *exc) -> None:
@@ -66,3 +66,18 @@ def classify_relative(metric: float, baseline: float, threshold: float) -> str:
     if rel >= threshold:
         return "PASS"
     return "FAIL"
+
+
+def final_go_readiness(*, matched_a_control=False, fresh_corpus=False,
+                       scale_confirmation=False, long_context_evaluation=False,
+                       matched_seed_count=1, small_effect=True):
+    """Required evidence gates; a structural long-context probe is insufficient."""
+    missing = [name for name, value in {
+        "matched_A_control": matched_a_control,
+        "fresh_corpus": fresh_corpus,
+        "1B_scaling_confirmation": scale_confirmation,
+        "genuine_long_context_quality_evaluation": long_context_evaluation,
+        "three_matched_seeds_for_small_effect": not small_effect or matched_seed_count >= 3,
+    }.items() if not value]
+    return {"status": "BLOCKED" if missing else "ELIGIBLE_FOR_DECISION_REVIEW",
+            "missing_evidence": missing, "automatic_go": False}
