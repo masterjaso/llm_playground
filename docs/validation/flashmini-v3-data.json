@@ -1,0 +1,91 @@
+{
+  "status": "PASS",
+  "verification_command": ".venv/bin/python -c 'from pathlib import Path; from flashmini.data import verify_dataset_integrity; print(verify_dataset_integrity(Path(\"data/fineweb_v3_2b\")))'",
+  "verification_scope": [
+    "all shard and SQLite SHA256 hashes",
+    "shapes and scored token counts",
+    "no empty-label rows",
+    "deduplicated document split counts"
+  ],
+  "manifest_sha256": "b06f559f65e6969a9dae36d392873610330b8a2425fe27f47518c4d200d42dab",
+  "manifest": {
+    "format_version": 3,
+    "split_algorithm": "sha256_document_hash_threshold_v1",
+    "split_method": "sha256_document_hash_threshold_v1",
+    "dedupe_algorithm": "sqlite_sha256_token_bytes_v1",
+    "seq_len": 256,
+    "eos_id": 50256,
+    "seed": 17,
+    "split_salt": "flashmini-v3-frozen-seed17",
+    "val_fraction": 0.02,
+    "target_train_scored_tokens": 2000000000,
+    "max_source_tokens": null,
+    "source_doc_count": 1930744,
+    "source_empty_doc_count": 0,
+    "source_body_tokens": 2037649833,
+    "unique_doc_count": 1930729,
+    "duplicate_doc_count": 15,
+    "unique_tokens_including_eos": 2039577420,
+    "document_dedupe_db": {
+      "path": "document_dedupe.sqlite3",
+      "sha256": "9e76615cc6a7d1d6b15b876b50389690fa427acef767a8f94906338c883e8416",
+      "bytes": 99418112
+    },
+    "splits": {
+      "train": {
+        "num_sequences": 7812502,
+        "tokens": 2000000512,
+        "raw_tokens": 2000000290,
+        "scored_tokens": 2000000289,
+        "input_dtype": "int32",
+        "labels_dtype": "int32",
+        "input_sha256": "a0693cf1582d3ca28fde19aa0aeeb642e5b485cae380acdfe96fc31f4ac6f74b",
+        "labels_sha256": "8f8f4da1bf22c94dac214c8d1850d8cc917ceb193538bd062401fc76d1b151bc",
+        "documents": 1892346
+      },
+      "val": {
+        "num_sequences": 154599,
+        "tokens": 39577344,
+        "raw_tokens": 39577130,
+        "scored_tokens": 39577129,
+        "input_dtype": "int32",
+        "labels_dtype": "int32",
+        "input_sha256": "57cc71b7a5922fa8f3f9954035c747741d284479194473ae875b0b85f85808a0",
+        "labels_sha256": "d0b6fe40524f286c04caa846d36369898082ba3dbb2d29c301238b9bf20fde4f",
+        "documents": 38383
+      }
+    },
+    "provenance": {
+      "dataset_id": "HuggingFaceFW/fineweb-edu",
+      "dataset_config": "CC-MAIN-2013-20",
+      "dataset_split": "train",
+      "dataset_revision": "87f09149ef4734204d70ed1d046ddc9ca3f2b8f9",
+      "tokenizer_id": "gpt2",
+      "tokenizer_revision": "607a30d783dfa663caf39e06633721c8d4cfcd7e",
+      "tokenizer_eos_token_id": 50256,
+      "streaming_order": "datasets_streaming_fixed_shard_order_v1",
+      "package_versions": {
+        "datasets": "5.0.1",
+        "transformers": "5.15.0",
+        "tokenizers": "0.22.2",
+        "huggingface-hub": "1.27.0",
+        "numpy": "2.5.2"
+      },
+      "python_version": "3.13.14"
+    },
+    "dataset": "HuggingFaceFW/fineweb-edu",
+    "dataset_revision": "87f09149ef4734204d70ed1d046ddc9ca3f2b8f9",
+    "tokenizer": "gpt2",
+    "tokenizer_revision": "607a30d783dfa663caf39e06633721c8d4cfcd7e"
+  },
+  "implied_training_passes": {
+    "100000000": 0.04999999277500104,
+    "250000000": 0.12499998193750261,
+    "1000000000": 0.49999992775001045
+  },
+  "preparer_exit": "Manifest and corpus completed; upstream streaming teardown hung after HTTP bad-file-descriptor warning. Owned process SIGTERM after independent full integrity PASS; not a clean preparer exit.",
+  "limitations": [
+    "Exact tokenized-document dedup only; no near-duplicate or shared-passage exclusion.",
+    "Corpus is a frozen sample of FineWeb-Edu, not a guarantee of distributional representativeness."
+  ]
+}
