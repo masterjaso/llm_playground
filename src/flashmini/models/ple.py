@@ -125,3 +125,251 @@ class PLE(nn.Module):
             return torch.zeros(*input_ids.shape, self.config.d_model,
                                device=self.out_proj.weight.device, dtype=self.out_proj.weight.dtype)
         return self(input_ids, hidden)
+
+
+class PLEV3(nn.Module):
+    """Reduced Qwen4-Exp PLE with grouped heads and causal local convolution.
+
+    v3 uses ``heads_per_ngram`` heads for every order (all bigram heads first,
+    then all trigram heads), XOR hashing with deterministic odd multipliers,
+    and a depthwise kernel-4 convolution dilated by the n-gram order.  The
+    table capacity is intentionally reduced for FlashMini, while the tensor
+    and reset semantics follow the released implementation.
+    """
+
+    def __init__(self, config: PLEConfig):
+        super().__init__()
+        config.__post_init__()
+        if config.architecture_version != 3:
+            raise ValueError("PLEV3 requires PLEConfig architecture_version=3")
+        self.config = config
+        self.ngram = config.ngram
+        self.heads_per_ngram = config.heads_per_ngram
+        self.num_heads = (self.ngram - 1) * self.heads_per_ngram
+        self.hc_count = getattr(config, "hc_count", 4)
+        if self.hc_count != 4:
+            raise ValueError("PLEV3 currently requires four residual streams")
+        self.head_dim = config.head_dim
+        self.embed_dim = config.embed_dim or self.num_heads * self.head_dim
+        if self.embed_dim <= 0 or self.embed_dim % self.num_heads:
+            raise ValueError("PLEV3 embed_dim must be divisible by total n-gram heads")
+        self.eos_id = config.eos_id
+        self.conv_kernel_size = config.conv_kernel_size
+        self.conv_dilation = config.conv_dilation or self.ngram
+
+        candidate = config.ngram_vocab_size_base or config.table_size or config.vocab_size
+        self.sizes = table_sizes(
+            PLEConfig(
+                ngram=config.ngram,
+                vocab_size=config.vocab_size,
+                num_heads=self.num_heads,
+                table_size=candidate,
+            )
+        )
+        offsets = [0]
+        for size in self.sizes[:-1]:
+            offsets.append(offsets[-1] + size)
+        self.register_buffer("head_vocab_sizes", torch.tensor(self.sizes, dtype=torch.long), persistent=False)
+        self.register_buffer("head_offsets", torch.tensor(offsets, dtype=torch.long), persistent=False)
+        self.register_buffer(
+            "layer_multipliers",
+            self._build_multipliers(config.vocab_size, self.ngram, config.hash_seed),
+            persistent=False,
+        )
+
+        self.value_embed = _RowEmbedding(
+            sum(self.sizes),
+            self.embed_dim // self.num_heads,
+            offload=config.offload,
+            sparse=config.sparse,
+        )
+        hc_hidden_size = self.hc_count * config.d_model
+        self.key_proj = nn.Linear(self.embed_dim, hc_hidden_size, bias=False)
+        self.value_proj = nn.Linear(self.embed_dim, config.d_model, bias=False)
+        self.norm_key = _GroupedRMSNorm(hc_hidden_size, self.hc_count, config.d_model)
+        self.norm_query = _GroupedRMSNorm(hc_hidden_size, self.hc_count, config.d_model)
+        self.norm_conv = _GroupedRMSNorm(hc_hidden_size, self.hc_count, config.d_model)
+        self.conv1d = nn.Conv1d(
+            hc_hidden_size,
+            hc_hidden_size,
+            kernel_size=self.conv_kernel_size,
+            groups=hc_hidden_size,
+            dilation=self.conv_dilation,
+            bias=False,
+        )
+        # Qwen initializes the PLE depthwise convolution to zero; its direct
+        # gated lookup remains active while the local-context path learns.
+        nn.init.zeros_(self.conv1d.weight)
+
+    @staticmethod
+    def _splitmix64(value: int) -> int:
+        value &= (1 << 64) - 1
+        value = (value + 0x9E3779B97F4A7C15) & ((1 << 64) - 1)
+        value = ((value ^ (value >> 30)) * 0xBF58476D1CE4E5B9) & ((1 << 64) - 1)
+        value = ((value ^ (value >> 27)) * 0x94D049BB133111EB) & ((1 << 64) - 1)
+        return (value ^ (value >> 31)) & ((1 << 64) - 1)
+
+    @classmethod
+    def _build_multipliers(cls, vocab_size: int, ngram: int, seed: int) -> torch.Tensor:
+        # Keep products in signed int64 while retaining odd, deterministic
+        # multipliers as in the reference hash construction.
+        max_long = (1 << 63) - 1
+        bound = max(1, max_long // max(vocab_size, 1))
+        half = max(1, bound // 2)
+        values = []
+        for index in range(ngram):
+            # FlashMini has a single PLE layer: upstream ple_layer_index=0.
+            mixed = cls._splitmix64((seed + 0x9E3779B97F4A7C15 * (index + 1)) & ((1 << 64) - 1))
+            values.append(2 * (mixed % half) + 1)
+        return torch.tensor(values, dtype=torch.long)
+
+    def _shift_right_ignore_eos(self, token_ids: torch.Tensor, shift: int) -> torch.Tensor:
+        if shift == 0:
+            return token_ids
+        if self.eos_id is None:
+            return F.pad(token_ids[:, :-shift], (shift, 0), value=0)
+        batch_size, seq_len = token_ids.shape
+        positions = torch.arange(seq_len, device=token_ids.device, dtype=torch.long)
+        eos_positions = torch.where(token_ids == self.eos_id, positions, -1)
+        previous_eos_inclusive = torch.cummax(eos_positions, dim=1).values
+        previous_eos = torch.cat(
+            [eos_positions.new_full((batch_size, 1), -1), previous_eos_inclusive[:, :-1]],
+            dim=1,
+        )
+        segment_start = previous_eos + 1
+        position_in_segment = positions.unsqueeze(0) - segment_start
+        source_positions = positions - shift
+        gather_positions = source_positions.clamp_min(0).unsqueeze(0).expand(batch_size, -1)
+        shifted = token_ids.gather(dim=1, index=gather_positions)
+        valid = (position_in_segment >= shift) & (source_positions.unsqueeze(0) >= 0)
+        return torch.where(valid, shifted, token_ids.new_full((), self.eos_id))
+
+    def _ngram_keys(self, input_ids: torch.Tensor) -> torch.Tensor:
+        if input_ids.ndim != 2 or input_ids.dtype != torch.long:
+            raise ValueError("PLE input_ids must be a rank-two int64 tensor")
+        if input_ids.numel() == 0:
+            return input_ids.new_empty((*input_ids.shape, self.num_heads))
+        context_len = self.ngram - 1
+        sentinel = self.eos_id if self.eos_id is not None else 0
+        previous = input_ids.new_full((input_ids.shape[0], context_len), sentinel)
+        history = torch.cat([previous, input_ids], dim=1)
+        shifted = [self._shift_right_ignore_eos(history, shift) for shift in range(self.ngram)]
+        blocks = []
+        for order in range(2, self.ngram + 1):
+            start = (order - 2) * self.heads_per_ngram
+            end = start + self.heads_per_ngram
+            mixed = shifted[0] * self.layer_multipliers[0]
+            for position in range(1, order):
+                mixed = torch.bitwise_xor(
+                    mixed,
+                    shifted[position] * self.layer_multipliers[position],
+                )
+            sizes = self.head_vocab_sizes[start:end]
+            offsets = self.head_offsets[start:end]
+            ids = torch.remainder(mixed.unsqueeze(-1), sizes.view(1, 1, -1))
+            blocks.append(ids + offsets.view(1, 1, -1))
+        return torch.cat(blocks, dim=-1)[:, -input_ids.shape[1] :]
+
+    def _lookup(self, keys: torch.Tensor, target: torch.device) -> torch.Tensor:
+        unique, inverse = keys.reshape(-1).unique(return_inverse=True)
+        values = self.value_embed(unique.to(self.value_embed.weight.device))
+        if self.value_embed.weight.device.type == "cpu" and target.type == "cuda":
+            values = values.pin_memory().to(target, non_blocking=True)
+        else:
+            values = values.to(target)
+        return values[inverse.to(target)].reshape(*keys.shape[:-1], self.embed_dim)
+
+    def _short_conv(self, values: torch.Tensor, input_ids: torch.Tensor) -> torch.Tensor:
+        """Apply depthwise causal convolution independently per EOS segment."""
+
+        if values.shape[1] == 0:
+            return values
+        channels = values.shape[-1]
+        weight = self.conv1d.weight
+        rows = []
+        for row in range(values.shape[0]):
+            if self.eos_id is None:
+                starts = [0]
+            else:
+                eos = torch.where(input_ids[row] == self.eos_id)[0].tolist()
+                starts = [0] + [position + 1 for position in eos if position + 1 < values.shape[1]]
+            ends = starts[1:] + [values.shape[1]]
+            segments = []
+            for start, end in zip(starts, ends):
+                segment = values[row : row + 1, start:end].transpose(1, 2)
+                padded = F.pad(segment, (self.conv_dilation * (self.conv_kernel_size - 1), 0))
+                filtered = F.conv1d(
+                    padded,
+                    weight,
+                    bias=None,
+                    dilation=self.conv_dilation,
+                    groups=channels,
+                )
+                segments.append(F.silu(filtered).transpose(1, 2))
+            rows.append(torch.cat(segments, dim=1))
+        return torch.cat(rows, dim=0)
+
+    def forward(
+        self,
+        input_ids: torch.Tensor,
+        hidden: torch.Tensor | None = None,
+    ) -> torch.Tensor:
+        keys = self._ngram_keys(input_ids)
+        target = self.key_proj.weight.device
+        embeddings = self._lookup(keys, target)
+        if hidden is None:
+            hidden = torch.zeros(
+                *input_ids.shape,
+                self.hc_count * self.config.d_model,
+                device=target,
+                dtype=self.key_proj.weight.dtype,
+            )
+        elif hidden.shape[-1] == self.config.d_model:
+            hidden = hidden.repeat(1, 1, self.hc_count)
+        if hidden.shape[-1] != self.hc_count * self.config.d_model:
+            raise ValueError("PLEV3 hidden state must contain four residual streams")
+        key = self.norm_key(self.key_proj(embeddings))
+        query = self.norm_query(hidden)
+        value = self.value_proj(embeddings)
+        gate = (key.reshape(*key.shape[:-1], self.hc_count, self.config.d_model)
+                * query.reshape(*query.shape[:-1], self.hc_count, self.config.d_model)).sum(
+                    dim=-1, keepdim=True
+                ) / math.sqrt(self.config.d_model)
+        gate = gate.abs().clamp_min(1e-6).sqrt() * gate.sign()
+        gated = torch.sigmoid(gate) * value.unsqueeze(-2)
+        gated = gated.reshape(*gated.shape[:-2], self.hc_count * self.config.d_model)
+        conv_input = self.norm_conv(gated)
+        return gated + self._short_conv(conv_input, input_ids)
+
+    def forward_with_ablation(
+        self,
+        input_ids: torch.Tensor,
+        enabled: bool,
+        hidden: torch.Tensor | None = None,
+    ) -> torch.Tensor:
+        if enabled:
+            return self(input_ids, hidden)
+        width = self.hc_count * self.config.d_model
+        device = hidden.device if hidden is not None else self.key_proj.weight.device
+        dtype = hidden.dtype if hidden is not None else self.key_proj.weight.dtype
+        return torch.zeros(*input_ids.shape, width, device=device, dtype=dtype)
+
+
+class _GroupedRMSNorm(nn.Module):
+    """Per-stream RMS normalization used by v3 GR and PLE."""
+
+    def __init__(self, width: int, groups: int, group_width: int, eps: float = 1e-6):
+        super().__init__()
+        if width != groups * group_width:
+            raise ValueError("Grouped RMS norm dimensions do not multiply")
+        self.groups = groups
+        self.group_width = group_width
+        self.eps = eps
+        self.weight = nn.Parameter(torch.zeros(width))
+
+    def forward(self, value: torch.Tensor) -> torch.Tensor:
+        shape = value.shape
+        grouped = value.reshape(*shape[:-1], self.groups, self.group_width).float()
+        grouped = grouped * torch.rsqrt(grouped.square().mean(dim=-1, keepdim=True) + self.eps)
+        grouped = grouped * (1.0 + self.weight).reshape(self.groups, self.group_width)
+        return grouped.to(value.dtype).reshape(shape)

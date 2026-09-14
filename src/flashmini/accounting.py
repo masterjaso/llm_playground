@@ -9,12 +9,11 @@ Provides:
 
 from __future__ import annotations
 
-import math
 from dataclasses import dataclass, field
 from typing import Any
 
 import torch
-import torch.nn as nn
+from torch import nn
 
 from .config import FlashMiniConfig
 
@@ -54,7 +53,7 @@ def count_parameters(model: nn.Module, config: FlashMiniConfig) -> ParameterCoun
     for name, p in model.named_parameters():
         n = p.numel()
         total += n
-        if name.startswith("embed") or name.startswith("head"):
+        if name.startswith(("embed", "head")):
             embedding_head += n
         elif name.startswith("ple"):
             ple += n
@@ -143,7 +142,15 @@ def estimate_flops_per_token(config: FlashMiniConfig) -> float:
     flops += moe_flops
     flops += n_layers * 2.0 * d * config.moe.num_experts
     if config.use_ple:
-        flops += 4.0 * d * config.ple.num_heads * config.ple.head_dim
+        if config.architecture_version >= 3:
+            flops += 2.0 * config.ple.embed_dim * d * (config.hc_count + 1)
+            flops += 2.0 * config.hc_count * d * config.ple.conv_kernel_size
+        else:
+            flops += 4.0 * d * config.ple.num_heads * config.ple.head_dim
+    if config.architecture_version >= 3:
+        stream_width = config.hc_count * d
+        flops += (2 * n_layers + 1) * 4.0 * stream_width * config.hc_lowrank
+        flops += 2 * n_layers * 2.0 * stream_width * config.hc_count
 
     return flops
 
@@ -171,7 +178,7 @@ class ParameterBudget:
     _config: FlashMiniConfig | None = field(default=None, repr=False)
 
     @classmethod
-    def from_config(cls, config: FlashMiniConfig) -> "ParameterBudget":
+    def from_config(cls, config: FlashMiniConfig) -> ParameterBudget:
         return cls(
             target_core=0,
             vocab_size=config.vocab_size,
@@ -212,9 +219,6 @@ class ParameterBudget:
                           head_dim=self.ple_head_dim))
         with torch.device("meta"):
             return count_parameters(FlashMiniModel(config), config)
-
-    def gdn_ffn_hidden(self) -> int:
-        return max(64, self.d_model * 2)
 
     def ple_params(self) -> int:
         return self._counts().ple

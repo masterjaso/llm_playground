@@ -25,10 +25,23 @@ from ..config import GatedDeltaNetConfig
 class GatedDeltaNet(nn.Module):
     """Gated delta-rule linear-attention layer with an exact chunked scan."""
 
-    def __init__(self, d_model: int, config: GatedDeltaNetConfig):
+    def __init__(
+        self,
+        d_model: int,
+        config: GatedDeltaNetConfig,
+        *,
+        residual_in_mixer: bool | None = None,
+    ):
         super().__init__()
         self.d_model = d_model
         self.config = config
+        # v2 keeps the historical mixer-owned residual.  v3 passes False from
+        # the decoder block so GatedResidual is the only residual owner.
+        self.residual_in_mixer = (
+            config.residual_in_mixer if residual_in_mixer is None else residual_in_mixer
+        )
+        if self.residual_in_mixer is None:
+            self.residual_in_mixer = True
         d = d_model
         ds = config.d_state
         if config.chunk_size <= 0:
@@ -43,7 +56,7 @@ class GatedDeltaNet(nn.Module):
         # a is an independent scalar state decay.
         self.w_decay = nn.Linear(d, 1, bias=False)
         self.w_out = nn.Linear(ds, d, bias=False)
-        self.norm = nn.LayerNorm(d)
+        self.norm = nn.LayerNorm(d) if self.residual_in_mixer else nn.Identity()
 
         if config.use_short_conv:
             # Causal left padding is applied in forward.  The previous
@@ -233,7 +246,7 @@ class GatedDeltaNet(nn.Module):
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         _, steps, _ = x.shape
         if steps == 0:
-            return self.norm(x)
+            return self.norm(x) if self.residual_in_mixer else x
 
         q, k, v, beta, log_decay, gate = self._project(x)
         # CUDA/CPU autocast can otherwise downcast bmm/solve even when the
@@ -250,4 +263,6 @@ class GatedDeltaNet(nn.Module):
         # Explicitly cast back after fp32 recurrence so the projection follows
         # the module/input dtype under ordinary execution and autocast.
         output = self.w_out(output.to(self.w_out.weight.dtype))
-        return output + self.norm(x)
+        if self.residual_in_mixer:
+            return output + self.norm(x)
+        return output
