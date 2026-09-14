@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://nehemiah-steward-protocol.local/contracts/upgrade-reconciliation-report.schema.json",
+  "title": "NSP Upgrade Reconciliation Report",
+  "description": "Record of an nsp-upgrade-version reconciliation pass after _nsp update-version refreshed NSP-managed assets.",
+  "type": "object",
+  "required": ["schemaVersion", "target", "filesRefreshed", "customizationsPreserved", "validation"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "target": { "type": "string" },
+    "generatedAt": { "type": "string" },
+    "fromVersion": { "type": "string" },
+    "toVersion": { "type": "string" },
+    "upgradeReportPath": { "type": "string" },
+    "filesRefreshed": { "type": "array", "items": { "type": "string" } },
+    "customizationsPreserved": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["path", "reason"],
+        "properties": {
+          "path": { "type": "string" },
+          "reason": { "type": "string" }
+        }
+      }
+    },
+    "staleRulesDropped": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["path", "reason"],
+        "properties": {
+          "path": { "type": "string" },
+          "reason": { "type": "string" }
+        }
+      }
+    },
+    "validation": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["command", "result"],
+        "properties": {
+          "command": { "type": "string" },
+          "result": { "enum": ["PASS", "FAIL", "BLOCKED"] }
+        }
+      }
+    },
+    "residualRisks": { "type": "array", "items": { "type": "string" } },
+    "humanReviewRequired": { "type": "boolean" },
+    "agenticReconciliationVersion": {
+      "type": "string",
+      "description": "Must match the beacon agenticReconciliationVersion written only after gates pass."
+    },
+    "agenticBeaconUpdated": {
+      "type": "boolean",
+      "description": "True only when agentic beacon markers were written after validation gates passed."
+    }
+  }
+}

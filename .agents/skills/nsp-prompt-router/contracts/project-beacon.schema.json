@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://nehemiah-steward-protocol.local/contracts/project-beacon.schema.json",
+  "title": "NSP Project Beacon",
+  "description": "Target-project beacon at .nsp/project.json.",
+  "type": "object",
+  "required": ["schemaVersion", "projectId", "nspEnabled", "installMode", "docsRoot", "governanceFile", "compatibility"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "projectId": { "type": "string" },
+    "nspEnabled": { "type": "boolean" },
+    "installMode": { "type": "string", "enum": ["global", "local-only"] },
+    "docsRoot": { "type": "string" },
+    "governanceFile": { "type": "string" },
+    "compatibility": {
+      "type": "object",
+      "required": ["nsp"],
+      "properties": {
+        "nsp": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "appliedNspVersion": {
+      "type": "string",
+      "description": "Deterministic CLI-applied NSP version after a successful update-version."
+    },
+    "appliedAt": {
+      "type": "string",
+      "description": "ISO timestamp when appliedNspVersion was recorded by the deterministic CLI."
+    },
+    "agenticReconciliationVersion": {
+      "type": "string",
+      "description": "Version recorded by nsp-upgrade-version after semantic reconciliation gates pass."
+    },
+    "agenticReconciliationAt": {
+      "type": "string",
+      "description": "ISO timestamp when agentic reconciliation completed."
+    },
+    "agenticReconciliationReport": {
+      "type": "string",
+      "description": "Path to the upgrade reconciliation report written after gates pass."
+    },
+    "migration": {
+      "type": "object",
+      "properties": {
+        "lastMigrationId": { "type": "string" },
+        "previousMode": { "type": "string", "enum": ["global", "local-only"] }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

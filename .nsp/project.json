@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "projectId": "985bd149-32ac-4b9b-9f29-cae64fff1878",
+  "nspEnabled": true,
+  "installMode": "global",
+  "docsRoot": ".docs",
+  "governanceFile": "AGENTS.md",
+  "compatibility": {
+    "nsp": ">=2.0.0"
+  }
+}

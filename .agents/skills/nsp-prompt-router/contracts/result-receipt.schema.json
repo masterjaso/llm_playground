@@ -1,0 +1,83 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://nehemiah-steward-protocol.local/contracts/result-receipt.schema.json",
+  "title": "NSP Result Receipt",
+  "description": "Execution result receipt with opaque optional model provenance.",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "capsuleId",
+    "jobId",
+    "attemptId",
+    "installMode",
+    "executionRealization",
+    "status",
+    "baseRef",
+    "changedPaths",
+    "acceptanceResults",
+    "validationEvidence",
+    "disprovenAssumptions",
+    "remainingRisks",
+    "recommendedClassificationRevision"
+  ],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "capsuleId": { "type": "string" },
+    "jobId": { "type": "string" },
+    "attemptId": { "type": "string" },
+    "installMode": { "type": "string", "enum": ["global", "local-only"] },
+    "executionRealization": {
+      "type": "string",
+      "enum": [
+        "delegated-detached",
+        "delegated-attached",
+        "fresh-process",
+        "native-child-task",
+        "same-session-capsule",
+        "inline-parent"
+      ]
+    },
+    "executor": { "type": "string" },
+    "harness": { "type": "string" },
+    "modelProvenance": {
+      "description": "Opaque model metadata. validation must not interpret it.",
+      "default": null
+    },
+    "roleFulfillment": { "$ref": "role-fulfillment.schema.json" },
+    "assurance": { "$ref": "assurance.schema.json#/$defs/result" },
+    "status": { "type": "string", "enum": ["candidate", "validated", "failed", "blocked"] },
+    "baseRef": { "type": "string" },
+    "headRef": { "type": "string" },
+    "changedPaths": { "type": "array", "items": { "type": "string" } },
+    "acceptanceResults": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["gate", "passed"],
+        "properties": {
+          "gate": { "type": "string" },
+          "passed": { "type": "boolean" },
+          "evidence": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "validationEvidence": { "type": "array", "items": { "type": "string" } },
+    "disprovenAssumptions": { "type": "array", "items": { "type": "string" } },
+    "remainingRisks": { "type": "array", "items": { "type": "string" } },
+    "recommendedClassificationRevision": {
+      "type": ["object", "null"],
+      "required": ["previousClass", "newClass", "reason", "evidence", "reclassifiedAt", "stateImpact"],
+      "properties": {
+        "previousClass": { "type": "string", "enum": ["DIRECT", "BOUNDED", "WORKSTREAM", "EPIC"] },
+        "newClass": { "type": "string", "enum": ["DIRECT", "BOUNDED", "WORKSTREAM", "EPIC"] },
+        "reason": { "type": "string" },
+        "evidence": { "type": "array", "items": { "type": "string" } },
+        "reclassifiedAt": { "type": "string" },
+        "stateImpact": { "type": "string" }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

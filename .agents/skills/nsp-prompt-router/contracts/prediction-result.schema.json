@@ -1,0 +1,92 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://nehemiah-steward-protocol.local/contracts/prediction-result.schema.json",
+  "title": "NSP Prediction Result",
+  "description": "Agent-classified prediction comparison. Tooling validates structure and never chooses the classifier.",
+  "type": "object",
+  "required": [
+    "schemaVersion", "kind", "nspProvenance", "runId", "phaseOrPivId", "contractRef",
+    "classifier", "actualObservations", "evidenceRefs", "contradictionRefs", "nextAction"
+  ],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "kind": { "const": "prediction-result" },
+    "nspProvenance": { "$ref": "#/$defs/provenance" },
+    "runId": { "$ref": "#/$defs/identifier" },
+    "phaseOrPivId": { "$ref": "#/$defs/identifier" },
+    "contractRef": { "$ref": "#/$defs/string240" },
+    "classifier": { "enum": ["expected-match", "benign-deviation", "scope-discovery", "counterexample", "invalid-validation"] },
+    "actualObservations": { "type": "array", "minItems": 1, "maxItems": 5, "items": { "$ref": "#/$defs/string300" } },
+    "evidenceRefs": { "$ref": "#/$defs/requiredEvidenceRefs" },
+    "contradictionRefs": { "$ref": "#/$defs/evidenceRefs" },
+    "nextAction": { "enum": ["continue", "inspect", "replan", "revise-plan", "abandon-hypothesis", "repair-validation"] },
+    "difference": { "$ref": "#/$defs/string600" },
+    "classificationRationale": { "$ref": "#/$defs/string600" },
+    "hypothesisRemainsUsable": { "type": "boolean" },
+    "scopeChanged": { "type": "boolean" },
+    "deviationUnderstood": { "type": "boolean" },
+    "materialInvariantsHold": { "type": "boolean" }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "classifier": { "const": "expected-match" } }, "required": ["classifier"] },
+      "then": { "properties": { "nextAction": { "const": "continue" } } }
+    },
+    {
+      "if": { "properties": { "classifier": { "not": { "const": "expected-match" } } }, "required": ["classifier"] },
+      "then": { "required": ["difference", "classificationRationale", "hypothesisRemainsUsable", "scopeChanged"] }
+    },
+    {
+      "if": { "properties": { "classifier": { "const": "benign-deviation" } }, "required": ["classifier"] },
+      "then": {
+        "required": ["deviationUnderstood", "materialInvariantsHold"],
+        "properties": {
+          "deviationUnderstood": { "const": true },
+          "materialInvariantsHold": { "const": true },
+          "scopeChanged": { "const": false },
+          "hypothesisRemainsUsable": { "const": true },
+          "nextAction": { "const": "continue" }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "classifier": { "const": "scope-discovery" } }, "required": ["classifier"] },
+      "then": { "properties": { "scopeChanged": { "const": true }, "nextAction": { "const": "replan" } } }
+    },
+    {
+      "if": { "properties": { "classifier": { "const": "counterexample" } }, "required": ["classifier"] },
+      "then": {
+        "properties": {
+          "hypothesisRemainsUsable": { "const": false },
+          "nextAction": { "enum": ["revise-plan", "abandon-hypothesis"] },
+          "contradictionRefs": { "minItems": 1 }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "classifier": { "const": "invalid-validation" } }, "required": ["classifier"] },
+      "then": { "properties": { "nextAction": { "const": "repair-validation" } } }
+    }
+  ],
+  "additionalProperties": false,
+  "$defs": {
+    "identifier": { "type": "string", "minLength": 1, "maxLength": 80, "pattern": "^(?!\\.{1,2}$)[a-z0-9][a-z0-9._-]*$" },
+    "string240": { "type": "string", "minLength": 1, "maxLength": 240 },
+    "string300": { "type": "string", "minLength": 1, "maxLength": 300 },
+    "string600": { "type": "string", "minLength": 1, "maxLength": 600 },
+    "evidenceRefs": { "type": "array", "maxItems": 5, "items": { "$ref": "#/$defs/string240" } },
+    "requiredEvidenceRefs": { "type": "array", "minItems": 1, "maxItems": 5, "items": { "$ref": "#/$defs/string240" } },
+    "provenance": {
+      "type": "object",
+      "required": ["schemaVersion", "source", "semanticJudgmentByCli", "authority", "reviewStatus", "intendedSkillOwner", "modelProviderRequired"],
+      "properties": {
+        "schemaVersion": { "const": 1 }, "source": { "const": "deterministic-cli" },
+        "semanticJudgmentByCli": { "const": false },
+        "authority": { "enum": ["deterministic-validator", "deterministic-parser", "heuristic", "safe-repair-candidate"] },
+        "reviewStatus": { "enum": ["reviewed", "unreviewed"] },
+        "intendedSkillOwner": { "type": ["string", "null"] }, "modelProviderRequired": { "const": false }
+      },
+      "additionalProperties": false
+    }
+  }
+}

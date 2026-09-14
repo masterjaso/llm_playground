@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://nehemiah-steward-protocol.local/contracts/execution-class.schema.json",
+  "title": "NSP Execution Class Document",
+  "description": "Execution class classification payload used by NSP classifiers and work artifacts.",
+  "type": "object",
+  "required": ["executionClass"],
+  "properties": {
+    "executionClass": {
+      "type": "string",
+      "enum": ["DIRECT", "BOUNDED", "WORKSTREAM", "EPIC"]
+    },
+    "classificationReason": { "type": "string" },
+    "nextWorkflow": { "type": "string" }
+  },
+  "additionalProperties": false
+}

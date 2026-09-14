@@ -1,0 +1,33 @@
+# Fresh causal B2 baseline. Historical B weights are incompatible.
+architecture_version: 2
+vocab_size: 50257
+d_model: 768
+num_layers: 10
+num_heads: 6
+head_dim: 128
+gdn_per_attention: 3
+max_seq_len: 256
+dropout: 0.0
+use_hyperconnection: true
+use_ple: false
+moe:
+  num_experts: 16
+  top_k: 2
+  shared_experts: 1
+  expert_intermediate: 1536
+  aux_loss_coef: 0.01
+gdn:
+  d_state: 128
+  chunk_size: 64
+  use_short_conv: true
+  short_conv_kernel: 4
+ple:
+  ngram: 3
+  table_size: 50257
+  num_heads: 8
+  head_dim: 256
+  injection_layer: 1
+  eos_id: 50256
+  gate_init: 0.1
+  sparse: true
+  offload: cpu

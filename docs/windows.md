@@ -1,3 +1,21 @@
+<!-- nsp:meta
+id: docs.windows
+kind: document
+scope: features
+persona: prompt-engineering
+status: active
+source: human
+confidence: high
+reviewStatus: reviewed
+graphNode: document:docs/windows.md
+graphTags: docs
+validation: manifest-check,secret-scan
+owner: features
+lastReviewed: 2026-05-23
+replaces: 
+replacedBy: 
+-->
+
 # Native Windows / PowerShell workflow
 
 This project is operated from `C:\workplace\llm_playground` with Windows

@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://nehemiah-steward-protocol.local/contracts/classification-revision.schema.json",
+  "title": "NSP Classification Revision",
+  "description": "Evidence-backed execution-class revision record.",
+  "type": "object",
+  "required": ["previousClass", "newClass", "reason", "evidence", "reclassifiedAt", "stateImpact"],
+  "properties": {
+    "previousClass": {
+      "type": "string",
+      "enum": ["DIRECT", "BOUNDED", "WORKSTREAM", "EPIC"]
+    },
+    "newClass": {
+      "type": "string",
+      "enum": ["DIRECT", "BOUNDED", "WORKSTREAM", "EPIC"]
+    },
+    "reason": { "type": "string" },
+    "evidence": { "type": "array", "items": { "type": "string" } },
+    "reclassifiedAt": { "type": "string" },
+    "stateImpact": { "type": "string" }
+  },
+  "additionalProperties": false
+}

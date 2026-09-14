@@ -1,0 +1,745 @@
+"""Deterministic, resumable training for FlashMini.
+
+The loop deliberately keeps sampling, accounting, schedule, and checkpoint
+metadata together. A resumed run therefore consumes the same batches as an
+uninterrupted run, while its reports retain both padded-token and real-target
+counts.
+"""
+
+from __future__ import annotations
+
+import hashlib
+import json
+import math
+import random
+import time
+from pathlib import Path
+from typing import Any
+
+import torch
+
+from .checkpoint import save_checkpoint
+from .config import FlashMiniConfig
+from .metrics import MetricsLogger, write_summary
+from .optim import clip_gradients
+
+
+def _finite_tensor(value: Any) -> bool:
+    """Return whether a scalar or tensor contains only finite values."""
+    if isinstance(value, torch.Tensor):
+        tensor = value.detach()
+        if tensor.is_sparse:
+            tensor = tensor.coalesce().values()
+        return bool(torch.isfinite(tensor).all().item())
+    try:
+        return math.isfinite(float(value))
+    except (TypeError, ValueError):
+        return False
+
+
+def _as_float(value: Any, name: str) -> float:
+    if isinstance(value, torch.Tensor):
+        if value.numel() == 0:
+            raise FloatingPointError(f"{name} is empty")
+        value = value.detach().float().mean().item()
+    try:
+        result = float(value)
+    except (TypeError, ValueError) as exc:
+        raise FloatingPointError(f"{name} is not numeric") from exc
+    if not math.isfinite(result):
+        raise FloatingPointError(f"{name} is non-finite: {result!r}")
+    return result
+
+
+def _mean_tensor(value: Any, *, device: torch.device) -> torch.Tensor:
+    """Average a scalar/list stat without detaching its autograd graph."""
+    if value is None:
+        return torch.zeros((), device=device)
+    values = list(value) if isinstance(value, (list, tuple)) else [value]
+    if not values:
+        return torch.zeros((), device=device)
+    tensors: list[torch.Tensor] = []
+    for item in values:
+        tensor = item if isinstance(item, torch.Tensor) else torch.as_tensor(item, device=device)
+        if tensor.numel() == 0:
+            continue
+        tensors.append(tensor.mean() if tensor.ndim else tensor)
+    if not tensors:
+        return torch.zeros((), device=device)
+    return torch.stack(tensors).mean()
+
+
+def _check_model_parameters(model: torch.nn.Module) -> None:
+    bad: list[str] = []
+    for name, parameter in model.named_parameters():
+        if not _finite_tensor(parameter):
+            bad.append(name)
+    if bad:
+        raise FloatingPointError(f"non-finite parameters after optimizer step: {', '.join(bad[:8])}")
+
+
+def _learning_rates(optimizer: Any) -> dict[str, float]:
+    groups = getattr(optimizer, "param_groups", None) or []
+    result: dict[str, float] = {}
+    for index, group in enumerate(groups):
+        name = str(group.get("name", f"group_{index}"))
+        if name in result:
+            name = f"{name}_{index}"
+        result[name] = _as_float(group.get("lr", 0.0), f"optimizer {name} lr")
+    return result
+
+
+def _capture_base_lrs(optimizer: Any, saved: list[float] | None = None) -> list[float]:
+    groups = getattr(optimizer, "param_groups", None) or []
+    if saved is not None and len(saved) != len(groups):
+        raise ValueError(
+            "optimizer parameter-group count changed across resume: "
+            f"checkpoint={len(saved)}, current={len(groups)}"
+        )
+    base_lrs: list[float] = []
+    for index, group in enumerate(groups):
+        if saved is not None:
+            base = _as_float(saved[index], f"base lr group {index}")
+        elif "_flashmini_base_lr" in group:
+            base = _as_float(group["_flashmini_base_lr"], f"base lr group {index}")
+        else:
+            base = _as_float(group.get("lr", 0.0), f"base lr group {index}")
+        group["_flashmini_base_lr"] = base
+        base_lrs.append(base)
+    return base_lrs
+
+
+def _schedule_factor(
+    token_position: int,
+    total_tokens: int,
+    warmup_tokens: int,
+    cosine_decay: bool,
+    min_lr_ratio: float,
+) -> float:
+    if warmup_tokens > 0 and token_position < warmup_tokens:
+        return max(0.0, min(1.0, token_position / warmup_tokens))
+    if not cosine_decay:
+        return 1.0
+    decay_start = min(max(warmup_tokens, 0), max(total_tokens, 1))
+    decay_span = max(total_tokens - decay_start, 1)
+    progress = max(0.0, min(1.0, (token_position - decay_start) / decay_span))
+    cosine = 0.5 * (1.0 + math.cos(math.pi * progress))
+    return min_lr_ratio + (1.0 - min_lr_ratio) * cosine
+
+
+def _set_learning_rates(
+    optimizer: Any,
+    base_lrs: list[float],
+    token_position: int,
+    total_tokens: int,
+    warmup_tokens: int,
+    cosine_decay: bool,
+    min_lr_ratio: float,
+) -> None:
+    factor = _schedule_factor(
+        token_position,
+        total_tokens,
+        warmup_tokens,
+        cosine_decay,
+        min_lr_ratio,
+    )
+    groups = getattr(optimizer, "param_groups", None) or []
+    for group, base in zip(groups, base_lrs):
+        group["lr"] = base * factor
+
+
+def _capture_rng_state(sampling_rng: torch.Generator) -> dict[str, Any]:
+    """Capture every RNG used by the training process."""
+    state: dict[str, Any] = {
+        "sampling": sampling_rng.get_state(),
+        "torch": torch.get_rng_state(),
+        "python": random.getstate(),
+    }
+    try:
+        import numpy as np
+
+        state["numpy"] = np.random.get_state()
+    except ImportError:
+        pass
+    if torch.cuda.is_available():
+        state["cuda"] = torch.cuda.get_rng_state_all()
+    return state
+
+
+def _restore_rng_state(
+    state: Any,
+    sampling_rng: torch.Generator,
+    *,
+    seed: int,
+    steps: int,
+    n_seqs: int,
+    batch_size: int,
+) -> None:
+    """Restore checkpoint RNG state, with deterministic fallback for old extras."""
+    if not isinstance(state, dict):
+        # Current checkpoints carry this state. A deterministic skip keeps
+        # hand-authored current-version fixtures useful without pretending an
+        # old checkpoint is resumable by default.
+        sampling_rng.manual_seed(seed)
+        for _ in range(max(steps, 0)):
+            torch.randint(0, n_seqs, (batch_size,), generator=sampling_rng)
+        return
+
+    sampling = state.get("sampling")
+    if sampling is not None:
+        sampling_rng.set_state(sampling)
+    else:
+        sampling_rng.manual_seed(seed)
+        for _ in range(max(steps, 0)):
+            torch.randint(0, n_seqs, (batch_size,), generator=sampling_rng)
+    if state.get("torch") is not None:
+        torch.set_rng_state(state["torch"])
+    if state.get("python") is not None:
+        random.setstate(state["python"])
+    if state.get("numpy") is not None:
+        try:
+            import numpy as np
+
+            np.random.set_state(state["numpy"])
+        except ImportError:
+            pass
+    if state.get("cuda") is not None and torch.cuda.is_available():
+        torch.cuda.set_rng_state_all(state["cuda"])
+
+
+def _training_metadata(
+    *,
+    seed: int,
+    batch_size: int,
+    seq_len: int,
+    grad_accum: int,
+    schedule: dict[str, Any],
+    base_lrs: list[float],
+    dataset_identity: dict[str, Any] | None,
+    run_metadata: dict[str, Any],
+) -> dict[str, Any]:
+    return {
+        "seed": seed,
+        "batch_size": batch_size,
+        "seq_len": seq_len,
+        "grad_accum": grad_accum,
+        "schedule": dict(schedule),
+        "base_lrs": list(base_lrs),
+        "dataset": dataset_identity,
+        "run_metadata": dict(run_metadata),
+    }
+
+
+def _dataset_identity(dataset: Any) -> dict[str, Any] | None:
+    """Read stable shard hashes when training is backed by MemmapDataset."""
+    data_dir = getattr(dataset, "data_dir", None)
+    split = getattr(dataset, "split", None)
+    if data_dir is None or split is None:
+        return None
+    manifest_path = Path(data_dir) / "data_manifest.json"
+    if not manifest_path.is_file():
+        return None
+    raw = manifest_path.read_bytes()
+    try:
+        manifest = json.loads(raw)
+    except json.JSONDecodeError:
+        return {"split": str(split), "manifest_sha256": hashlib.sha256(raw).hexdigest()}
+    split_manifest = manifest.get("splits", {}).get(split, {})
+    return {
+        "split": str(split),
+        "manifest_sha256": hashlib.sha256(raw).hexdigest(),
+        "input_sha256": split_manifest.get("input_sha256"),
+        "labels_sha256": split_manifest.get("labels_sha256"),
+        "seq_len": split_manifest.get("seq_len", getattr(dataset, "seq_len", None)),
+    }
+
+
+def _validate_resume_metadata(
+    extra: dict[str, Any],
+    *,
+    seed: int,
+    batch_size: int,
+    seq_len: int,
+    grad_accum: int,
+    schedule: dict[str, Any],
+    dataset_identity: dict[str, Any] | None,
+    run_metadata: dict[str, Any],
+) -> list[float] | None:
+    metadata = extra.get("training")
+    if not isinstance(metadata, dict):
+        return None
+    expected = {
+        "seed": seed,
+        "batch_size": batch_size,
+        "seq_len": seq_len,
+        "grad_accum": grad_accum,
+    }
+    for key, value in expected.items():
+        if key in metadata and metadata[key] != value:
+            raise ValueError(
+                f"resume {key} mismatch: checkpoint={metadata[key]!r}, current={value!r}"
+            )
+    saved_schedule = metadata.get("schedule")
+    if isinstance(saved_schedule, dict):
+        for key in ("warmup_tokens", "cosine_decay", "min_lr_ratio"):
+            if key in saved_schedule and saved_schedule[key] != schedule[key]:
+                raise ValueError(
+                    f"resume schedule mismatch for {key}: "
+                    f"checkpoint={saved_schedule[key]!r}, current={schedule[key]!r}"
+                )
+        if saved_schedule.get("cosine_decay") and saved_schedule.get("total_tokens") != schedule.get(
+            "total_tokens"
+        ):
+            raise ValueError(
+                "resume schedule mismatch for total_tokens: "
+                f"checkpoint={saved_schedule.get('total_tokens')!r}, "
+                f"current={schedule.get('total_tokens')!r}"
+            )
+    if "dataset" in metadata and metadata["dataset"] != dataset_identity:
+        raise ValueError(
+            "resume dataset manifest mismatch: "
+            f"checkpoint={metadata['dataset']!r}, current={dataset_identity!r}"
+        )
+    saved_run_metadata = metadata.get("run_metadata")
+    if isinstance(saved_run_metadata, dict):
+        for key in ("config_sha256", "source_sha256"):
+            if key in saved_run_metadata and saved_run_metadata[key] != run_metadata.get(key):
+                raise ValueError(
+                    f"resume run metadata mismatch for {key}: "
+                    f"checkpoint={saved_run_metadata[key]!r}, current={run_metadata.get(key)!r}"
+                )
+    base_lrs = metadata.get("base_lrs")
+    return list(base_lrs) if isinstance(base_lrs, list) else None
+
+
+def _checkpoint_extra(
+    *,
+    tokens_seen: int,
+    real_tokens_seen: int,
+    wall_clock_seconds: float,
+    sampling_rng: torch.Generator,
+    training_metadata: dict[str, Any],
+    evaluations: list[dict[str, Any]],
+    dataset_identity: dict[str, Any] | None,
+    run_metadata: dict[str, Any],
+) -> dict[str, Any]:
+    rng_state = _capture_rng_state(sampling_rng)
+    return {
+        "tokens_seen": tokens_seen,
+        "real_tokens_seen": real_tokens_seen,
+        "wall_clock_seconds": wall_clock_seconds,
+        "rng_state": rng_state,
+        # Keep the sampler state easy to inspect for small checkpoint tools.
+        "sampling_rng_state": rng_state["sampling"],
+        "training": training_metadata,
+        "data_manifest": dataset_identity,
+        "data_manifest_sha256": dataset_identity.get("manifest_sha256")
+        if dataset_identity
+        else None,
+        "run_metadata": dict(run_metadata),
+        "evaluations": list(evaluations),
+    }
+
+
+def train_step(
+    model: torch.nn.Module,
+    optimizer: torch.optim.Optimizer,
+    input_ids: torch.Tensor,
+    labels: torch.Tensor,
+    aux_loss_coef: float = 0.01,
+    grad_clip: float = 1.0,
+    use_amp: bool = True,
+) -> dict:
+    """Run one optimizer update and return finite scalar routing metrics."""
+    model.train()
+    optimizer.zero_grad(set_to_none=True)
+    if use_amp and input_ids.is_cuda:
+        with torch.autocast(device_type="cuda", dtype=torch.bfloat16):
+            out = model(input_ids, labels=labels)
+    else:
+        out = model(input_ids, labels=labels)
+
+    if not isinstance(out, dict) or "loss" not in out:
+        raise ValueError("model forward must return a mapping containing loss")
+    loss = out["loss"]
+    if not isinstance(loss, torch.Tensor):
+        loss = torch.as_tensor(loss, device=input_ids.device)
+    if not _finite_tensor(loss):
+        raise FloatingPointError("loss is non-finite before backward")
+    stats = out.get("stats") or {}
+    aux_tensor = _mean_tensor(stats.get("router_aux_loss"), device=loss.device)
+    if not _finite_tensor(aux_tensor):
+        raise FloatingPointError("router auxiliary loss is non-finite")
+    total_loss = loss + aux_loss_coef * aux_tensor
+    if not _finite_tensor(total_loss):
+        raise FloatingPointError("total loss is non-finite before backward")
+
+    total_loss.backward()
+    grad_norm = clip_gradients(model, grad_clip)
+    grad_norm_value = _as_float(grad_norm, "gradient norm")
+    optimizer.step()
+
+    metrics: dict[str, Any] = {
+        "loss": _as_float(loss, "loss"),
+        "total_loss": _as_float(total_loss, "total loss"),
+        "grad_norm": grad_norm_value,
+        "router_aux_loss": _as_float(aux_tensor, "router auxiliary loss"),
+    }
+    if "router_entropy" in stats:
+        metrics["router_entropy"] = _as_float(
+            _mean_tensor(stats["router_entropy"], device=loss.device),
+            "router entropy",
+        )
+    if "expert_load" in stats:
+        loads = stats["expert_load"]
+        load_values = list(loads) if isinstance(loads, (list, tuple)) else [loads]
+        load_tensors = [
+            item.detach().float()
+            if isinstance(item, torch.Tensor)
+            else torch.as_tensor(item, dtype=torch.float32)
+            for item in load_values
+        ]
+        if load_tensors:
+            stacked = torch.stack(load_tensors).mean(0)
+            if not _finite_tensor(stacked):
+                raise FloatingPointError("expert load statistics are non-finite")
+            metrics["expert_load_max"] = _as_float(stacked.max(), "expert load max")
+            metrics["expert_load_mean"] = _as_float(stacked.mean(), "expert load mean")
+            metrics["expert_load_ratio"] = _as_float(
+                stacked.max() / (stacked.mean() + 1e-9),
+                "expert load ratio",
+            )
+            metrics["expert_load_dist"] = [
+                _as_float(value, "expert load") for value in stacked.detach().cpu().tolist()
+            ]
+    for key in ("ple_scale", "ple_norm_ratio"):
+        if key in stats:
+            metrics[key] = _as_float(_mean_tensor(stats[key], device=loss.device), key)
+    return metrics
+
+
+def train(
+    model: torch.nn.Module,
+    optimizer: torch.optim.Optimizer,
+    dataset,
+    config: FlashMiniConfig,
+    run_dir: Path,
+    total_tokens: int,
+    seq_len: int,
+    device: torch.device,
+    batch_size: int = 8,
+    grad_accum: int = 1,
+    log_every: int = 10,
+    ckpt_every_tokens: int = 25_000_000,
+    resume_from: Path | None = None,
+    aux_loss_coef: float = 0.01,
+    seed: int = 0,
+    save_checkpoints: bool = True,
+    val_dataset=None,
+    eval_every_tokens: int = 0,
+    val_max_batches: int | None = None,
+    warmup_tokens: int = 0,
+    cosine_decay: bool = False,
+    min_lr_ratio: float = 0.0,
+    use_amp: bool = True,
+    eval_ple_ablation: bool = True,
+    eval_dataset=None,
+    run_metadata: dict[str, Any] | None = None,
+) -> dict:
+    """Train for a cumulative padded-token budget and persist a summary.
+
+    Gradient accumulation is intentionally explicit: only ``grad_accum=1`` is
+    accepted until a microbatch-aware implementation can account for every
+    sampled batch and checkpoint its pending gradients.
+    """
+    if grad_accum != 1:
+        raise ValueError("grad_accum != 1 is unsupported; use grad_accum=1")
+    if total_tokens <= 0:
+        raise ValueError("total_tokens must be positive")
+    if seq_len <= 0 or batch_size <= 0:
+        raise ValueError("seq_len and batch_size must be positive")
+    if len(dataset) <= 0:
+        raise ValueError("training dataset is empty")
+    if log_every < 0:
+        raise ValueError("log_every must be non-negative")
+    if ckpt_every_tokens < 0:
+        raise ValueError("ckpt_every_tokens must be non-negative")
+    if eval_every_tokens < 0:
+        raise ValueError("eval_every_tokens must be non-negative")
+    if val_max_batches is not None and val_max_batches <= 0:
+        raise ValueError("val_max_batches must be positive")
+    if eval_every_tokens and val_dataset is None and eval_dataset is None:
+        raise ValueError("eval_every_tokens requires val_dataset")
+    if val_dataset is not None and eval_dataset is not None and val_dataset is not eval_dataset:
+        raise ValueError("provide only one of val_dataset and eval_dataset")
+    if val_dataset is None:
+        val_dataset = eval_dataset
+    if warmup_tokens < 0:
+        raise ValueError("warmup_tokens must be non-negative")
+    if not 0.0 <= min_lr_ratio <= 1.0:
+        raise ValueError("min_lr_ratio must be between 0 and 1")
+
+    run_dir = Path(run_dir)
+    if resume_from is None and run_dir.exists():
+        try:
+            has_entries = next(run_dir.iterdir(), None) is not None
+        except OSError:
+            has_entries = True
+        if has_entries:
+            raise FileExistsError(
+                f"run directory already contains artifacts: {run_dir}; pass resume_from to continue"
+            )
+    run_dir.mkdir(parents=True, exist_ok=True)
+    metrics_log = MetricsLogger(run_dir / "metrics.jsonl")
+
+    n_seqs = len(dataset)
+    dataset_identity = _dataset_identity(dataset)
+    run_metadata = dict(run_metadata or {})
+    if "config_sha256" not in run_metadata:
+        config_values = config.to_dict()
+        run_metadata["config_sha256"] = hashlib.sha256(
+            json.dumps(config_values, sort_keys=True, separators=(",", ":")).encode()
+        ).hexdigest()
+    sampling_rng = torch.Generator(device="cpu").manual_seed(seed)
+    schedule = {
+        "warmup_tokens": int(warmup_tokens),
+        "cosine_decay": bool(cosine_decay),
+        "min_lr_ratio": float(min_lr_ratio),
+        "total_tokens": int(total_tokens) if cosine_decay else None,
+    }
+    base_lrs = _capture_base_lrs(optimizer)
+    step = 0
+    tokens_seen = 0
+    real_tokens_seen = 0
+    previous_wall_clock = 0.0
+    evaluations: list[dict[str, Any]] = []
+    start_time = time.monotonic()
+
+    if resume_from is not None:
+        from .checkpoint import load_checkpoint
+
+        meta = load_checkpoint(resume_from, model, optimizer)
+        extra = meta.get("extra") or {}
+        saved_base_lrs = _validate_resume_metadata(
+            extra if isinstance(extra, dict) else {},
+            seed=seed,
+            batch_size=batch_size,
+            seq_len=seq_len,
+            grad_accum=grad_accum,
+            schedule=schedule,
+            dataset_identity=dataset_identity,
+            run_metadata=run_metadata,
+        )
+        if saved_base_lrs is not None:
+            base_lrs = _capture_base_lrs(optimizer, saved_base_lrs)
+        else:
+            base_lrs = _capture_base_lrs(optimizer)
+        step = int(meta["step"])
+        tokens_seen = int(extra.get("tokens_seen", step * batch_size * seq_len))
+        real_tokens_seen = int(extra.get("real_tokens_seen", tokens_seen))
+        previous_wall_clock = _as_float(
+            extra.get("wall_clock_seconds", 0.0), "checkpoint wall clock"
+        )
+        _restore_rng_state(
+            extra.get("rng_state") if isinstance(extra, dict) else None,
+            sampling_rng,
+            seed=seed,
+            steps=step,
+            n_seqs=n_seqs,
+            batch_size=batch_size,
+        )
+        if isinstance(extra, dict) and isinstance(extra.get("evaluations"), list):
+            evaluations = list(extra["evaluations"])
+
+    next_ckpt_tokens: int | None
+    if ckpt_every_tokens:
+        next_ckpt_tokens = ((tokens_seen // ckpt_every_tokens) + 1) * ckpt_every_tokens
+    else:
+        next_ckpt_tokens = None
+    next_eval_tokens: int | None
+    if eval_every_tokens:
+        next_eval_tokens = ((tokens_seen // eval_every_tokens) + 1) * eval_every_tokens
+    else:
+        next_eval_tokens = None
+
+    training_meta = _training_metadata(
+        seed=seed,
+        batch_size=batch_size,
+        seq_len=seq_len,
+        grad_accum=grad_accum,
+        schedule=schedule,
+        base_lrs=base_lrs,
+        dataset_identity=dataset_identity,
+        run_metadata=run_metadata,
+    )
+
+    def elapsed_seconds() -> float:
+        return previous_wall_clock + max(0.0, time.monotonic() - start_time)
+
+    def checkpoint() -> None:
+        if not save_checkpoints:
+            return
+        # Sparse PLE updates avoid a per-step full-table scan. Check all model
+        # storage at the durable checkpoint boundary instead.
+        _check_model_parameters(model)
+        save_checkpoint(
+            run_dir / "checkpoints" / f"step_{step}.pt",
+            model,
+            optimizer,
+            step=step,
+            config=config,
+            keep_latest_only=True,
+            extra=_checkpoint_extra(
+                tokens_seen=tokens_seen,
+                real_tokens_seen=real_tokens_seen,
+                wall_clock_seconds=elapsed_seconds(),
+                sampling_rng=sampling_rng,
+                training_metadata=training_meta,
+                evaluations=evaluations,
+                dataset_identity=dataset_identity,
+                run_metadata=run_metadata,
+            ),
+        )
+
+    try:
+        while tokens_seen < total_tokens:
+            indices = torch.randint(0, n_seqs, (batch_size,), generator=sampling_rng).numpy()
+            input_array, label_array = dataset.get_batch(indices)
+            input_ids = torch.as_tensor(input_array, device=device)
+            labels = torch.as_tensor(label_array, device=device)
+            batch_tokens = int(input_ids.numel())
+            if batch_tokens <= 0:
+                raise ValueError("dataset returned an empty input batch")
+
+            _set_learning_rates(
+                optimizer,
+                base_lrs,
+                tokens_seen + batch_tokens,
+                total_tokens,
+                warmup_tokens,
+                cosine_decay,
+                min_lr_ratio,
+            )
+            metrics = train_step(
+                model,
+                optimizer,
+                input_ids,
+                labels,
+                aux_loss_coef=aux_loss_coef,
+                use_amp=use_amp,
+            )
+            step += 1
+            tokens_seen += batch_tokens
+            real_tokens_seen += int((labels != -100).sum().item())
+            lr_groups = _learning_rates(optimizer)
+            metrics["lr_groups"] = lr_groups
+            metrics["learning_rates"] = lr_groups
+            metrics["lr"] = next(iter(lr_groups.values())) if len(lr_groups) == 1 else lr_groups
+
+            if log_every and step % log_every == 0:
+                elapsed = elapsed_seconds()
+                tok_per_sec = tokens_seen / elapsed if elapsed > 0 else 0.0
+                real_tok_per_sec = real_tokens_seen / elapsed if elapsed > 0 else 0.0
+                metrics_log.log(
+                    event="train",
+                    step=step,
+                    tokens_seen=tokens_seen,
+                    real_tokens_seen=real_tokens_seen,
+                    tok_per_sec=tok_per_sec,
+                    real_tok_per_sec=real_tok_per_sec,
+                    wall_clock=elapsed,
+                    **metrics,
+                )
+
+            if next_eval_tokens is not None and tokens_seen >= next_eval_tokens:
+                from .eval import compute_validation_nll
+
+                validation = {
+                    "ple_on": compute_validation_nll(
+                        model,
+                        val_dataset,
+                        device,
+                        max_batches=val_max_batches,
+                    )
+                }
+                if eval_ple_ablation and getattr(model, "ple", None) is not None:
+                    validation["ple_off"] = compute_validation_nll(
+                        model,
+                        val_dataset,
+                        device,
+                        max_batches=val_max_batches,
+                        ple_enabled=False,
+                    )
+                validation["tokens_seen"] = tokens_seen
+                evaluations.append(validation)
+                validation_record = {
+                    "event": "validation",
+                    "step": step,
+                    "tokens_seen": tokens_seen,
+                    "real_tokens_seen": real_tokens_seen,
+                    "validation": validation,
+                    "val_nll": validation["ple_on"]["nll"],
+                    "val_perplexity": validation["ple_on"]["perplexity"],
+                    "val_top1_accuracy": validation["ple_on"]["top1_accuracy"],
+                }
+                if "ple_off" in validation:
+                    validation_record["val_ple_off_nll"] = validation["ple_off"]["nll"]
+                    validation_record["val_ple_off_top1_accuracy"] = validation["ple_off"][
+                        "top1_accuracy"
+                    ]
+                metrics_log.log(**validation_record)
+                # One validation pass represents the current optimizer state;
+                # skip boundaries crossed by a large batch rather than
+                # recording duplicate measurements of that same state.
+                next_eval_tokens = ((tokens_seen // eval_every_tokens) + 1) * eval_every_tokens
+
+            if next_ckpt_tokens is not None and tokens_seen >= next_ckpt_tokens:
+                checkpoint()
+                while next_ckpt_tokens <= tokens_seen:
+                    next_ckpt_tokens += ckpt_every_tokens
+
+        checkpoint()
+    finally:
+        metrics_log.close()
+
+    elapsed = elapsed_seconds()
+    summary = {
+        "status": "complete",
+        "steps": step,
+        "tokens_seen": tokens_seen,
+        "real_tokens_seen": real_tokens_seen,
+        "wall_clock_seconds": elapsed,
+        "tok_per_sec": tokens_seen / elapsed if elapsed > 0 else 0.0,
+        "real_tok_per_sec": real_tokens_seen / elapsed if elapsed > 0 else 0.0,
+        "seed": seed,
+        "batch_size": batch_size,
+        "seq_len": seq_len,
+        "grad_accum": grad_accum,
+        "schedule": schedule,
+        "data_manifest": dataset_identity,
+        "data_manifest_sha256": dataset_identity.get("manifest_sha256")
+        if dataset_identity
+        else None,
+        "run_metadata": run_metadata,
+        "learning_rates": _learning_rates(optimizer),
+        "evaluations": evaluations,
+    }
+    if torch.cuda.is_available():
+        summary["cuda_memory"] = {
+            str(i): {"peak_allocated_gib": torch.cuda.max_memory_allocated(i) / 2**30,
+                     "peak_reserved_gib": torch.cuda.max_memory_reserved(i) / 2**30}
+            for i in range(torch.cuda.device_count())
+        }
+    write_summary(run_dir / "summary.json", summary)
+    write_summary(
+        run_dir / "run_manifest.json",
+        {
+            "architecture_version": getattr(config, "architecture_version", 2),
+            "config": config.to_dict(),
+            "config_sha256": run_metadata.get("config_sha256"),
+            "data_manifest": dataset_identity,
+            "data_manifest_sha256": summary["data_manifest_sha256"],
+            "training": training_meta,
+        },
+    )
+    return summary

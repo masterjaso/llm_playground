@@ -1,3 +1,21 @@
+<!-- nsp:meta
+id: readme
+kind: readme
+scope: root
+persona: governance-package
+status: active
+source: human
+confidence: high
+reviewStatus: reviewed
+graphNode: document:README.md
+graphTags: 
+validation: manifest-check,secret-scan
+owner: root
+lastReviewed: 2026-05-23
+replaces: 
+replacedBy: 
+-->
+
 # dense2moe
 
 `dense2moe` is a Windows-first, resumable control plane for experiments that
@@ -22,3 +40,6 @@ The repository does not upload models or modify Windows drivers.  A real model
 run must pass discovery, source, structural, quality, and export gates before
 it can be marked `SUCCEEDED`.
 
+The separate [FlashMini conditional-memory experiment](docs/flashmini-ple.md)
+tests causal hybrid language models with CPU-resident n-gram memory. Its v2
+models require fresh training after the original B/C validity defects.

@@ -1,0 +1,38 @@
+# FlashMini Smoke model config
+# Derived from explicit parameter-budget calculator (target ~150M core).
+# 3 GatedDeltaNet : 1 full attention, MoE top-2, PLE enabled.
+
+vocab_size: 50257
+d_model: 512
+num_layers: 8
+num_heads: 4
+head_dim: 128
+gdn_per_attention: 3
+max_seq_len: 2048
+dropout: 0.0
+use_hyperconnection: true
+use_ple: true
+
+moe:
+  num_experts: 16
+  top_k: 2
+  shared_experts: 1
+  expert_intermediate: 1024
+  aux_loss_coef: 0.01
+
+gdn:
+  d_state: 128
+  d_ffn: 1024
+  chunk_size: 64
+  use_short_conv: true
+  short_conv_kernel: 4
+
+ple:
+  enabled: true
+  ngram: 3
+  vocab_size: 50257
+  d_model: 512
+  num_heads: 4
+  head_dim: 64
+  offload: gpu
+  working_set_fraction: 1.0
