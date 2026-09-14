@@ -1,0 +1,90 @@
+{
+  "purpose": "official_shape_structural_causality_not_long_context_quality",
+  "command_template": ".venv/bin/python -m flashmini.context_probe --config configs/flashmini/poc_{a,b,c}_v3.yaml --seq-len 1024 --device cuda:1 --seed 17",
+  "variants": {
+    "a": {
+      "purpose": "structural_causal_execution_probe",
+      "status": "PASS",
+      "structural_only": true,
+      "long_context_capability_claim": false,
+      "interpretation": "Causality and execution only; no long-context quality or capability claim.",
+      "config_path": "configs/flashmini/poc_a_v3.yaml",
+      "config_sha256": "74d3c4d138777fc331c015cd868187b5e24ac32357386e6b9e1ac2b3da2fca37",
+      "architecture_version": 3,
+      "checkpoint": null,
+      "checkpoint_step": null,
+      "checkpoint_config_max_seq_len": 256,
+      "requested_seq_len": 1024,
+      "device": "cuda:1",
+      "seed": 17,
+      "model_class": "flashmini.models.tiny.FlashMiniModel",
+      "capacity": {
+        "fixed_mask_modules_expanded": [],
+        "fixed_mask_capacities_before": [],
+        "fixed_mask_capacities_after": []
+      },
+      "causality": {
+        "prefix_length": 512,
+        "suffix_length": 512,
+        "max_prefix_logit_abs_diff": 0.0000020265579223632812,
+        "passed": true
+      }
+    },
+    "b": {
+      "purpose": "structural_causal_execution_probe",
+      "status": "PASS",
+      "structural_only": true,
+      "long_context_capability_claim": false,
+      "interpretation": "Causality and execution only; no long-context quality or capability claim.",
+      "config_path": "configs/flashmini/poc_b_v3.yaml",
+      "config_sha256": "b9ab4c1defe7ac849c3f0a0cfe48cb0c1145421a8ebc01cef9501ee8247d55be",
+      "architecture_version": 3,
+      "checkpoint": null,
+      "checkpoint_step": null,
+      "checkpoint_config_max_seq_len": 256,
+      "requested_seq_len": 1024,
+      "device": "cuda:1",
+      "seed": 17,
+      "model_class": "flashmini.models.tiny.FlashMiniModel",
+      "capacity": {
+        "fixed_mask_modules_expanded": [],
+        "fixed_mask_capacities_before": [],
+        "fixed_mask_capacities_after": []
+      },
+      "causality": {
+        "prefix_length": 512,
+        "suffix_length": 512,
+        "max_prefix_logit_abs_diff": 0.0000022649765014648438,
+        "passed": true
+      }
+    },
+    "c": {
+      "purpose": "structural_causal_execution_probe",
+      "status": "PASS",
+      "structural_only": true,
+      "long_context_capability_claim": false,
+      "interpretation": "Causality and execution only; no long-context quality or capability claim.",
+      "config_path": "configs/flashmini/poc_c_v3.yaml",
+      "config_sha256": "f20ee1a9773589cc491b48b86c95a0be7d7d04b67c61c6a8afb47771fb66f5df",
+      "architecture_version": 3,
+      "checkpoint": null,
+      "checkpoint_step": null,
+      "checkpoint_config_max_seq_len": 256,
+      "requested_seq_len": 1024,
+      "device": "cuda:1",
+      "seed": 17,
+      "model_class": "flashmini.models.tiny.FlashMiniModel",
+      "capacity": {
+        "fixed_mask_modules_expanded": [],
+        "fixed_mask_capacities_before": [],
+        "fixed_mask_capacities_after": []
+      },
+      "causality": {
+        "prefix_length": 512,
+        "suffix_length": 512,
+        "max_prefix_logit_abs_diff": 0.0000021457672119140625,
+        "passed": true
+      }
+    }
+  }
+}

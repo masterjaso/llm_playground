@@ -4,7 +4,7 @@ kind: document
 scope: features
 persona: platform-engineering
 status: active
-source: agent
+source: model
 confidence: high
 reviewStatus: reviewed
 graphNode: document:docs/flashmini-ple.md
@@ -16,7 +16,12 @@ replaces:
 replacedBy: 
 -->
 
-# FlashMini conditional memory
+# FlashMini conditional memory — historical v2 reference
+
+> This describes v2 only, not the active v3 architecture. Runtime evidence was
+> permanently deleted with user authorization. Use the [v3 contract](flashmini-v3.md)
+> and [v3 commands](flashmini-resume.md). Historical commands below are not runnable
+> against the active configs and must not be used for new experiments.
 
 FlashMini v2 adds trainable bigram/trigram lookup memory to a small causal hybrid
 language model. The table can stay in CPU RAM while the backbone and retrieved

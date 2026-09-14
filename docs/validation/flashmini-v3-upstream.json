@@ -1,0 +1,12 @@
+{
+  "status": "PASS",
+  "upstream_commit": "bd15bc95a89e728bbc1224084eb3b5829428c353",
+  "upstream_source_sha256": "2a44aeadb215acbb5c75939fcc97e9f14bccff5a51c232826427594993f6a760",
+  "checks": [
+    "GR_read_write_gates_and_input_gradients",
+    "PLE_hash_keys_including_EOS",
+    "PLE_one_document_nonzero_convolution_output_and_input_gradients"
+  ],
+  "ple_max_abs_difference": 0.0,
+  "intentional_deviation": "PLE convolution reset after EOS; upstream carries convolution across EOS"
+}

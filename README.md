@@ -40,6 +40,7 @@ The repository does not upload models or modify Windows drivers.  A real model
 run must pass discovery, source, structural, quality, and export gates before
 it can be marked `SUCCEEDED`.
 
-The separate [FlashMini conditional-memory experiment](docs/flashmini-ple.md)
-tests causal hybrid language models with CPU-resident n-gram memory. Its v2
-models require fresh training after the original B/C validity defects.
+The separate [FlashMini v3 experiment](docs/flashmini-v3.md)
+tests matched attention/hybrid controls with optional CPU-resident n-gram memory.
+V3 requires fresh checkpoints and a verified frozen corpus; historical v1/v2
+outcomes do not satisfy its decision gates.

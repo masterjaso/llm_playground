@@ -1,0 +1,208 @@
+{
+  "purpose": "finite_validation_slice_hash_audit_not_universal_collision_proof",
+  "combined_signatures": [
+    {
+      "ngram": 2,
+      "heads": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
+      ],
+      "distinct_contexts": 269772,
+      "distinct_signatures": 269772,
+      "full_signature_collisions": 0
+    },
+    {
+      "ngram": 3,
+      "heads": [
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15
+      ],
+      "distinct_contexts": 444724,
+      "distinct_signatures": 444724,
+      "full_signature_collisions": 0
+    }
+  ],
+  "sequences": 2048,
+  "positions": 524288,
+  "heads": [
+    {
+      "head": 0,
+      "ngram": 2,
+      "capacity": 50261,
+      "distinct_contexts": 269772,
+      "distinct_rows": 50018,
+      "context_collisions": 219754,
+      "context_collision_fraction": 0.8145915810388031
+    },
+    {
+      "head": 1,
+      "ngram": 2,
+      "capacity": 50263,
+      "distinct_contexts": 269772,
+      "distinct_rows": 50020,
+      "context_collisions": 219752,
+      "context_collision_fraction": 0.8145841673709651
+    },
+    {
+      "head": 2,
+      "ngram": 2,
+      "capacity": 50273,
+      "distinct_contexts": 269772,
+      "distinct_rows": 50058,
+      "context_collisions": 219714,
+      "context_collision_fraction": 0.8144433076820426
+    },
+    {
+      "head": 3,
+      "ngram": 2,
+      "capacity": 50287,
+      "distinct_contexts": 269772,
+      "distinct_rows": 50030,
+      "context_collisions": 219742,
+      "context_collision_fraction": 0.814547099031775
+    },
+    {
+      "head": 4,
+      "ngram": 2,
+      "capacity": 50291,
+      "distinct_contexts": 269772,
+      "distinct_rows": 50020,
+      "context_collisions": 219752,
+      "context_collision_fraction": 0.8145841673709651
+    },
+    {
+      "head": 5,
+      "ngram": 2,
+      "capacity": 50311,
+      "distinct_contexts": 269772,
+      "distinct_rows": 50103,
+      "context_collisions": 219669,
+      "context_collision_fraction": 0.814276500155687
+    },
+    {
+      "head": 6,
+      "ngram": 2,
+      "capacity": 50321,
+      "distinct_contexts": 269772,
+      "distinct_rows": 50083,
+      "context_collisions": 219689,
+      "context_collision_fraction": 0.8143506368340673
+    },
+    {
+      "head": 7,
+      "ngram": 2,
+      "capacity": 50329,
+      "distinct_contexts": 269772,
+      "distinct_rows": 50098,
+      "context_collisions": 219674,
+      "context_collision_fraction": 0.814295034325282
+    },
+    {
+      "head": 8,
+      "ngram": 3,
+      "capacity": 50333,
+      "distinct_contexts": 444724,
+      "distinct_rows": 50328,
+      "context_collisions": 394396,
+      "context_collision_fraction": 0.886833181928567
+    },
+    {
+      "head": 9,
+      "ngram": 3,
+      "capacity": 50341,
+      "distinct_contexts": 444724,
+      "distinct_rows": 50333,
+      "context_collisions": 394391,
+      "context_collision_fraction": 0.8868219390003688
+    },
+    {
+      "head": 10,
+      "ngram": 3,
+      "capacity": 50359,
+      "distinct_contexts": 444724,
+      "distinct_rows": 50352,
+      "context_collisions": 394372,
+      "context_collision_fraction": 0.8867792158732157
+    },
+    {
+      "head": 11,
+      "ngram": 3,
+      "capacity": 50363,
+      "distinct_contexts": 444724,
+      "distinct_rows": 50358,
+      "context_collisions": 394366,
+      "context_collision_fraction": 0.886765724359378
+    },
+    {
+      "head": 12,
+      "ngram": 3,
+      "capacity": 50377,
+      "distinct_contexts": 444724,
+      "distinct_rows": 50371,
+      "context_collisions": 394353,
+      "context_collision_fraction": 0.8867364927460627
+    },
+    {
+      "head": 13,
+      "ngram": 3,
+      "capacity": 50383,
+      "distinct_contexts": 444724,
+      "distinct_rows": 50378,
+      "context_collisions": 394346,
+      "context_collision_fraction": 0.8867207526465853
+    },
+    {
+      "head": 14,
+      "ngram": 3,
+      "capacity": 50387,
+      "distinct_contexts": 444724,
+      "distinct_rows": 50378,
+      "context_collisions": 394346,
+      "context_collision_fraction": 0.8867207526465853
+    },
+    {
+      "head": 15,
+      "ngram": 3,
+      "capacity": 50411,
+      "distinct_contexts": 444724,
+      "distinct_rows": 50404,
+      "context_collisions": 394320,
+      "context_collision_fraction": 0.8866622894199548
+    }
+  ],
+  "sampling": "evenly_spaced_validation_sequences",
+  "observed_eos_markers": 738,
+  "document_count_note": "EOS markers observed; sampled rows may contain partial documents",
+  "ple_config": {
+    "enabled": true,
+    "ngram": 3,
+    "vocab_size": 50257,
+    "d_model": 768,
+    "injection_layer": 1,
+    "eos_id": 50256,
+    "sparse": true,
+    "offload": "cpu",
+    "heads_per_ngram": 8,
+    "embed_dim": 2048,
+    "ngram_vocab_size_base": 50257,
+    "hash_seed": 1234,
+    "conv_kernel_size": 4,
+    "conv_dilation": 3,
+    "architecture_version": 3
+  },
+  "architecture_version": 3,
+  "config_sha256": "f20ee1a9773589cc491b48b86c95a0be7d7d04b67c61c6a8afb47771fb66f5df",
+  "data_manifest_sha256": "b06f559f65e6969a9dae36d392873610330b8a2425fe27f47518c4d200d42dab"
+}

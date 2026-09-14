@@ -1,0 +1,40 @@
+{
+  "scope": "independent_read_only_architecture_and_experiment_guardrail_review",
+  "result": "accepted_after_repairs",
+  "independence": "two distinct fresh-context review threads; neither edited source",
+  "reviews": [
+    {
+      "id": "independent_review",
+      "checks": "causality, GR, PLE convolution/hash/config, clipping, provenance, holdout, RNG",
+      "recheck_tests": 38
+    },
+    {
+      "id": "guardrail_review",
+      "checks": "data packing, resume, objective/precision, counter/sampler integrity; final residual recheck",
+      "focused_tests": 40,
+      "packing_equivalence_cases": 63,
+      "final_training_tests": 26,
+      "terminal_partial_resume": "PASS: budget17 rounds to24 tokens, step2, unchanged weights"
+    }
+  ],
+  "resolved_findings": [
+    "nested v3 resume/RNG metadata must be complete",
+    "objective, precision, parameter dtype, clipping and optimizer recipe are recorded and enforced",
+    "empty-label final rows omitted and rejected by integrity checks",
+    "planned PLE semantics match across controls; dataset/config EOS must agree",
+    "train/validation split identity and manifest agreement enforced",
+    "recorded tuning prefix excluded automatically; overlap rejected",
+    "source cap does not admit an oversized complete document",
+    "PLE construction preserves CPU and initialized CUDA RNG streams",
+    "resume counters respect budget, optimizer steps and epoch-relative batch boundaries",
+    "malformed complete optimizer recipes/policies reject"
+  ],
+  "clarified_contract": "weight-only evaluation loading can relocate PLE storage; exact training resume retains original configuration hash",
+  "evidence": [
+    "tests/flashmini/test_v3_training.py",
+    "tests/flashmini/test_v3_architecture.py",
+    "tests/flashmini/test_v3_data.py",
+    "tests/flashmini/test_v3_clipping.py"
+  ],
+  "limitations": "Review acceptance is scoped to inspected source and bounded tests; final real-corpus integrity and GPU runtime evidence are recorded separately."
+}

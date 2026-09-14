@@ -1,0 +1,12 @@
+{
+  "probe": "official-shape consecutive optimizer updates with the CLI memory guard",
+  "command": "OMP_NUM_THREADS=2 MKL_NUM_THREADS=2 .venv/bin/python scripts/flashmini_v3_validate.py --official-shape --official-batch-size 32 --gpu-memory-gib 15 --out /tmp/flashmini-v3-multistep32.json",
+  "batch_size_32": "FAIL_CUDA_OOM",
+  "variant_at_failure": "A3",
+  "requested_allocation_gib": 1.54,
+  "effective_allocator_allowance_gib": 13.80,
+  "resolution": "batch16 PASS: all A/B/C three consecutive official-shape updates and eight-update fresh-corpus pilots under the 15 GiB guard; see flashmini-v3-runtime.json",
+  "second_failure": "batch16 validator initially exhausted the 16 GiB /tmp tmpfs while saving C after A/B pilots passed; project disk was not full",
+  "scratch_resolution": "validator now defaults to disk-backed runs/flashmini/.validation; complete rerun PASS and temporary checkpoints removed automatically",
+  "artifact_retention": "failed probe temporary directory automatically removed; only this small diagnostic retained"
+}
