@@ -21,6 +21,7 @@ import torch
 from .checkpoint import save_checkpoint
 from .config import FlashMiniConfig
 from .experiment import EpochSampler, remaining_sequences, validate_data_contract
+from .fingerprint import enforce_fingerprint_match
 from .metrics import MetricsLogger, write_summary
 from .optim import clip_gradients
 
@@ -551,7 +552,6 @@ def train(
                 f"run directory already contains artifacts: {run_dir}; pass resume_from to continue"
             )
     run_dir.mkdir(parents=True, exist_ok=True)
-    metrics_log = MetricsLogger(run_dir / "metrics.jsonl")
 
     n_seqs = len(dataset)
     dataset_identity = _dataset_identity(dataset)
@@ -635,6 +635,13 @@ def train(
                 raise ValueError("v3 resume requires complete clipping counters")
             if any(type(count) is not int or not 0 <= count <= saved_step for count in counts.values()):
                 raise ValueError("v3 clipping counters are inconsistent with optimizer steps")
+            # Exact v3 resume must refuse a materially different runtime
+            # fingerprint (source, config, data, environment, dirty tree).
+            recorded_fp = (extra.get("run_metadata") or {}).get("execution_fingerprint")
+            current_fp = run_metadata.get("execution_fingerprint")
+            if recorded_fp is None or current_fp is None:
+                raise ValueError("v3 resume requires recorded execution fingerprint")
+            enforce_fingerprint_match(current_fp, recorded_fp)
         saved_base_lrs = _validate_resume_metadata(
             extra if isinstance(extra, dict) else {},
             strict=config.architecture_version >= 3,
@@ -667,6 +674,23 @@ def train(
         if isinstance(extra, dict) and isinstance(extra.get("evaluations"), list):
             evaluations = list(extra["evaluations"])
         clipping_counts.update(extra.get("clipping_counts", {}))
+        # Reconcile the metrics history against the durable checkpoint before
+        # reopening the append stream, so a crash between logging and
+        # checkpointing cannot leave orphaned rows that double-count work.
+        from .data import sha256_file
+        from .metrics_reconcile import reconcile_metrics
+
+        reconcile_metrics(
+            run_dir / "metrics.jsonl",
+            checkpoint_path=resume_from,
+            checkpoint_sha256=sha256_file(resume_from),
+            resumed_step=step,
+            resumed_tokens=tokens_seen,
+            source_sha256=run_metadata.get("source_sha256", ""),
+            freeze_sha256=(run_metadata.get("execution_fingerprint") or {}).get("fingerprint_sha256"),
+        )
+
+    metrics_log = MetricsLogger(run_dir / "metrics.jsonl")
 
     sampler = EpochSampler(n_seqs, seed, tokens_seen // seq_len)
 

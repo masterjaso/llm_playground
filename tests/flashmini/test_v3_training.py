@@ -33,6 +33,28 @@ def make_data(path):
     return MemmapDataset(path)
 
 
+def _test_fingerprint():
+    # A minimal, consistent execution fingerprint for the test fixtures. The
+    # same dict is used for every run so resume fingerprint matching passes.
+    return {
+        "git_commit": "test-commit",
+        "git_dirty": False,
+        "source_sha256": "test-source",
+        "source_files": {},
+        "config_sha256": "test-config",
+        "data_manifest_sha256": "test-data",
+        "python_version": "3.13",
+        "platform": "test",
+        "pyproject_sha256": None,
+        "uv_lock_sha256": None,
+        "requirements_sha256": None,
+        "nvidia_driver_version": "",
+        "torch": {"torch_version": "test", "cuda_available": False,
+                  "cuda_version": None, "device_count": 0, "devices": []},
+        "fingerprint_sha256": "test-fingerprint",
+    }
+
+
 def fit(config, dataset, directory, *, resume=None, stop=None, aux_loss_coef=None, eval_prefix=None,
         ple_lr_multiplier=5):
     torch.manual_seed(17)
@@ -42,7 +64,9 @@ def fit(config, dataset, directory, *, resume=None, stop=None, aux_loss_coef=Non
         seq_len=8, device=torch.device("cpu"), batch_size=2, seed=17,
         log_every=1, ckpt_every_tokens=16, warmup_tokens=16, cosine_decay=True,
         min_lr_ratio=0.1, resume_from=resume, stop_after_tokens=stop,
-        use_amp=False, aux_loss_coef=aux_loss_coef, run_metadata={"source_sha256": "test-source"},
+        use_amp=False, aux_loss_coef=aux_loss_coef,
+        run_metadata={"source_sha256": "test-source",
+                      "execution_fingerprint": _test_fingerprint()},
         val_dataset=MemmapDataset(dataset.data_dir, "val") if eval_prefix is not None else None,
         eval_every_tokens=32 if eval_prefix is not None else 0, val_max_batches=eval_prefix)
     return model, summary
@@ -193,7 +217,9 @@ def test_short_epoch_end_checkpoint_remains_resumable(tmp_path):
     config = tiny_config()
     kwargs = {"total_tokens": 32, "seq_len": 8, "device": torch.device("cpu"),
               "batch_size": 2, "seed": 17, "allow_repeated_corpus": True,
-              "ckpt_every_tokens": 8, "use_amp": False}
+              "ckpt_every_tokens": 8, "use_amp": False,
+              "run_metadata": {"source_sha256": "test-source",
+                               "execution_fingerprint": _test_fingerprint()}}
     torch.manual_seed(17)
     model = FlashMiniModel(config)
     train(model, build_optimizer(model, 0.001), data, config, tmp_path / "run",

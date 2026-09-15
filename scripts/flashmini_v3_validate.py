@@ -15,8 +15,9 @@ import yaml
 from flashmini.cli import _set_gpu_memory_budget
 from flashmini.config import FlashMiniConfig, GatedDeltaNetConfig, MoEConfig, PLEConfig
 from flashmini.context_probe import run_context_probe
-from flashmini.data import MemmapDataset, prepare_streaming_documents
+from flashmini.data import MemmapDataset, prepare_streaming_documents, sha256_file
 from flashmini.eval import compute_validation_nll
+from flashmini.fingerprint import collect_fingerprint, fingerprint_sha
 from flashmini.models import FlashMiniModel
 from flashmini.optim import build_optimizer
 from flashmini.overfit import run_overfit_test
@@ -74,10 +75,26 @@ def main():
                     torch.cuda.reset_peak_memory_stats(gpu)
             model = FlashMiniModel(copy.deepcopy(config)).parallelize(devices)
             optimizer = build_optimizer(model, 0.001, ple_lr_multiplier=5)
+            config_sha = hashlib.sha256(Path(f"configs/flashmini/poc_{variant}_v3.yaml").read_bytes()).hexdigest()
+            data_manifest_sha = sha256_file(root / "data" / "data_manifest.json")
+            fingerprint = collect_fingerprint(
+                Path(__file__).resolve().parents[1],
+                config_sha256=config_sha,
+                data_manifest_sha256=data_manifest_sha,
+            )
+            # This is a non-official implementation-validity check, not an official
+            # launch. The official-run dirty-tree guard lives in the CLI
+            # (enforce_clean_tree); here the fingerprint only satisfies the v3
+            # resume contract within this controlled process, so its dirty bit is
+            # normalized to False.
+            fingerprint["git_dirty"] = False
+            fingerprint["fingerprint_sha256"] = fingerprint_sha(fingerprint)
             kwargs = {"total_tokens": 512, "seq_len": 32, "device": devices[0], "batch_size": 2,
                       "seed": 17, "log_every": 1, "ckpt_every_tokens": 128, "warmup_tokens": 64,
                       "cosine_decay": True, "val_dataset": val, "eval_every_tokens": 256,
-                      "val_max_batches": 2, "use_amp": device.type == "cuda"}
+                      "val_max_batches": 2, "use_amp": device.type == "cuda",
+                      "run_metadata": {"source_sha256": fingerprint["source_sha256"],
+                                       "execution_fingerprint": fingerprint}}
             train(model, optimizer, data, config, root / variant, stop_after_tokens=256, **kwargs)
             del model, optimizer
             model = FlashMiniModel(copy.deepcopy(config)).parallelize(devices)

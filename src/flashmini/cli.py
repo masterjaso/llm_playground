@@ -20,6 +20,8 @@ from pathlib import Path
 import torch
 
 from .config import FlashMiniConfig
+from .data import sha256_file
+from .fingerprint import collect_fingerprint, enforce_clean_tree
 from .models import FlashMiniModel
 
 
@@ -147,21 +149,26 @@ def cmd_train(args) -> int:
     if eval_every_tokens:
         val_dataset = MemmapDataset(Path(args.data_dir), split="val")
     config_path = Path(args.config)
+    config_sha256 = hashlib.sha256(config_path.read_bytes()).hexdigest()
+    data_manifest_sha256 = sha256_file(Path(args.data_dir) / "data_manifest.json")
+    repo_root = Path(__file__).resolve().parents[2]
+    fingerprint = collect_fingerprint(
+        repo_root,
+        config_sha256=config_sha256,
+        data_manifest_sha256=data_manifest_sha256,
+    )
+    # Official v3 runs fail closed on a dirty working tree at launch.
+    enforce_clean_tree(fingerprint)
     run_metadata = {
         "config_path": str(config_path),
-        "config_sha256": hashlib.sha256(config_path.read_bytes()).hexdigest(),
+        "config_sha256": config_sha256,
         "model_parallel_devices": [str(d) for d in devices],
         "gpu_memory_gib": budget,
+        "source_sha256": fingerprint["source_sha256"],
+        "source_files": fingerprint["source_files"],
+        "data_manifest_sha256": data_manifest_sha256,
+        "execution_fingerprint": fingerprint,
     }
-    source_root = Path(__file__).parent
-    source_files = {
-        str(path.relative_to(source_root)): hashlib.sha256(path.read_bytes()).hexdigest()
-        for path in sorted(source_root.rglob("*.py"))
-    }
-    run_metadata["source_sha256"] = hashlib.sha256(
-        json.dumps(source_files, sort_keys=True).encode()
-    ).hexdigest()
-    run_metadata["source_files"] = source_files
     summary = train(
         model,
         optimizer,

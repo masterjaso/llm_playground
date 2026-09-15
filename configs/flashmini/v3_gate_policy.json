@@ -1,0 +1,47 @@
+{
+  "version": 1,
+  "description": "Pre-registered FlashMini v3 PoC gate policy. This file is hashed into the execution freeze manifest and must not change after freeze.",
+  "gates": [
+    {
+      "name": "preflight_2p1m",
+      "stop_after_tokens": 2097152,
+      "optimizer_updates": 512,
+      "eval": { "skip_sequences": 1024, "max_sequences": 8192 },
+      "checks": ["implementation_failure"]
+    },
+    {
+      "name": "gate_100m",
+      "stop_after_tokens": 100663296,
+      "optimizer_updates": 24576,
+      "eval": { "skip_sequences": 1024, "max_sequences": 32768 },
+      "checks": ["training_instability"]
+    },
+    {
+      "name": "final_250m",
+      "stop_after_tokens": 250000000,
+      "optimizer_updates": 61035,
+      "eval": { "skip_sequences": 1024, "max_sequences": null },
+      "checks": ["final_quality"]
+    }
+  ],
+  "verdicts": {
+    "implementation_failure": "NO_GO",
+    "training_instability": "NO_GO",
+    "catastrophic_architecture_failure": "NO_GO",
+    "quality_win": "GO_TO_1B_SCALING",
+    "quality_parity": "GO_TO_1B_SCALING",
+    "ple_pass": "PLE_PASS",
+    "ple_unproven": "PLE_UNPROVEN",
+    "ple_fail": "PLE_FAIL",
+    "needs_seed_confirmation": "NEEDS_SEED_CONFIRMATION"
+  },
+  "thresholds": {
+    "max_nan": 0,
+    "max_nll_implementation_failure": 12.0,
+    "loss_spike_ratio": 3.0,
+    "loss_spike_window_updates": 10,
+    "ple_effective_margin": 0.01,
+    "ple_parity_tolerance": 0.005,
+    "quality_parity_tolerance": 0.02
+  }
+}
