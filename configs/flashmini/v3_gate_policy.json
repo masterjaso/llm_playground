@@ -1,33 +1,59 @@
 {
-  "version": 1,
-  "description": "Pre-registered FlashMini v3 PoC gate policy. This file is hashed into the execution freeze manifest and must not change after freeze.",
+  "version": 2,
+  "description": "Pre-registered FlashMini v3 PoC gate policy. This file is hashed into the execution freeze manifest and must not change after freeze. Stage-first: each training stage is followed by its collective gate; the final report is collective.",
   "gates": [
     {
-      "name": "preflight_2p1m",
+      "name": "train_2p1m",
       "stop_after_tokens": 2097152,
       "optimizer_updates": 512,
       "eval": { "skip_sequences": 1024, "max_sequences": 8192 },
-      "checks": ["implementation_failure"]
+      "checks": ["implementation_failure", "training_instability"]
+    },
+    {
+      "name": "gate_2p1m",
+      "stop_after_tokens": 2097152,
+      "optimizer_updates": 512,
+      "eval": { "skip_sequences": 1024, "max_sequences": 8192 },
+      "checks": ["implementation_failure", "training_instability"]
+    },
+    {
+      "name": "train_100m",
+      "stop_after_tokens": 100663296,
+      "optimizer_updates": 24576,
+      "eval": { "skip_sequences": 1024, "max_sequences": 32768 },
+      "checks": ["implementation_failure", "training_instability"]
     },
     {
       "name": "gate_100m",
       "stop_after_tokens": 100663296,
       "optimizer_updates": 24576,
       "eval": { "skip_sequences": 1024, "max_sequences": 32768 },
-      "checks": ["training_instability"]
+      "checks": ["implementation_failure", "training_instability", "catastrophic_architecture_failure"]
     },
     {
-      "name": "final_250m",
+      "name": "train_250m",
       "stop_after_tokens": 250000000,
-      "optimizer_updates": 61035,
+      "optimizer_updates": 61036,
+      "expected_padded_tokens": 250000128,
+      "eval": { "skip_sequences": 1024, "max_sequences": null },
+      "checks": ["implementation_failure"]
+    },
+    {
+      "name": "final_report",
+      "stop_after_tokens": 250000000,
+      "optimizer_updates": 61036,
+      "expected_padded_tokens": 250000128,
       "eval": { "skip_sequences": 1024, "max_sequences": null },
       "checks": ["final_quality"]
     }
   ],
   "verdicts": {
+    "pass": "PASS",
     "implementation_failure": "NO_GO",
     "training_instability": "NO_GO",
+    "ambiguous_review_required": "AMBIGUOUS_REVIEW_REQUIRED",
     "catastrophic_architecture_failure": "NO_GO",
+    "catastrophic_hybrid_failure": "NO_GO",
     "quality_win": "GO_TO_1B_SCALING",
     "quality_parity": "GO_TO_1B_SCALING",
     "ple_pass": "PLE_PASS",
@@ -42,6 +68,12 @@
     "loss_spike_window_updates": 10,
     "ple_effective_margin": 0.01,
     "ple_parity_tolerance": 0.005,
-    "quality_parity_tolerance": 0.02
+    "quality_parity_tolerance": 0.02,
+    "router_entropy_floor": 1.0,
+    "expert_load_ratio_threshold": 4.0,
+    "expert_load_exceedance_max_fraction": 0.25,
+    "shared_clipping_ambiguity_threshold": 0.98,
+    "catastrophic_hybrid_regression": 0.05,
+    "efficiency_advantage_threshold": 0.15
   }
 }

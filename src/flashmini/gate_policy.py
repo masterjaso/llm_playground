@@ -15,17 +15,42 @@ from .data import sha256_file
 
 DEFAULT_POLICY_PATH = Path(__file__).resolve().parents[2] / "configs" / "flashmini" / "v3_gate_policy.json"
 
-_REQUIRED_GATE_NAMES = ("preflight_2p1m", "gate_100m", "final_250m")
+_REQUIRED_GATE_NAMES = (
+    "train_2p1m",
+    "gate_2p1m",
+    "train_100m",
+    "gate_100m",
+    "train_250m",
+    "final_report",
+)
 _REQUIRED_VERDICTS = (
+    "pass",
     "implementation_failure",
     "training_instability",
+    "ambiguous_review_required",
     "catastrophic_architecture_failure",
+    "catastrophic_hybrid_failure",
     "quality_win",
     "quality_parity",
     "ple_pass",
     "ple_unproven",
     "ple_fail",
     "needs_seed_confirmation",
+)
+_REQUIRED_THRESHOLDS = (
+    "max_nan",
+    "max_nll_implementation_failure",
+    "loss_spike_ratio",
+    "loss_spike_window_updates",
+    "ple_effective_margin",
+    "ple_parity_tolerance",
+    "quality_parity_tolerance",
+    "router_entropy_floor",
+    "expert_load_ratio_threshold",
+    "expert_load_exceedance_max_fraction",
+    "shared_clipping_ambiguity_threshold",
+    "catastrophic_hybrid_regression",
+    "efficiency_advantage_threshold",
 )
 
 
@@ -60,10 +85,27 @@ def _validate_policy(policy: dict[str, Any]) -> None:
     thresholds = policy.get("thresholds")
     if not isinstance(thresholds, dict):
         raise TypeError("gate policy must contain a 'thresholds' mapping")
-    for key in ("max_nan", "max_nll_implementation_failure",
-                "loss_spike_ratio", "loss_spike_window_updates"):
+    for key in _REQUIRED_THRESHOLDS:
         if key not in thresholds:
             raise ValueError(f"gate policy thresholds missing '{key}'")
+    # Exact token/update invariants must be present and correct.
+    expected = {
+        "train_2p1m": (2_097_152, 512),
+        "gate_2p1m": (2_097_152, 512),
+        "train_100m": (100_663_296, 24_576),
+        "gate_100m": (100_663_296, 24_576),
+        "train_250m": (250_000_000, 61_036),
+        "final_report": (250_000_000, 61_036),
+    }
+    by_name = {g.get("name"): g for g in gates if isinstance(g, dict)}
+    for name, (tokens, updates) in expected.items():
+        gate = by_name.get(name)
+        if gate is None:
+            continue
+        if gate.get("stop_after_tokens") != tokens:
+            raise ValueError(f"gate {name} stop_after_tokens must be {tokens}")
+        if gate.get("optimizer_updates") != updates:
+            raise ValueError(f"gate {name} optimizer_updates must be {updates}")
 
 
 def gate_policy_sha256(path: Path | None = None) -> str:

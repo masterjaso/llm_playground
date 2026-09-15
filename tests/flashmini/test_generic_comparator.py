@@ -29,7 +29,9 @@ def _config(gdn: int, use_ple: bool) -> dict:
     }
 
 
-def _envelope(config: dict, *, tokens: int, seed: int, fp_sha: str) -> dict:
+def _envelope(config: dict, *, tokens: int, seed: int, env_sha: str,
+              optimizer_params: list[str] | None = None) -> dict:
+    params = optimizer_params if optimizer_params is not None else ["a"]
     return {
         "config": config,
         "architecture_version": 3,
@@ -48,7 +50,7 @@ def _envelope(config: dict, *, tokens: int, seed: int, fp_sha: str) -> dict:
                             "dataset_revision": "dr", "manifest_sha256": "manifest"},
                 "run_metadata": {
                     "source_sha256": "src",
-                    "shared_optimizer": [{"family": "AdamW", "parameters": ["a"], "options": {}}],
+                    "shared_optimizer": [{"family": "AdamW", "parameters": params, "options": {}}],
                     "data_contract": {"actual_seq_len": 256},
                     "execution_policy": {
                         "router_aux_loss_coef": 0.01, "precision": "cuda_bfloat16_autocast",
@@ -60,7 +62,7 @@ def _envelope(config: dict, *, tokens: int, seed: int, fp_sha: str) -> dict:
                                              "dense_weight_decay": 0.1, "table_weight_decay": 0.0,
                                              "betas": [0.9, 0.999], "eps": 1e-8},
                     },
-                    "execution_fingerprint": {"fingerprint_sha256": fp_sha},
+                    "execution_fingerprint": {"environment_fingerprint_sha256": env_sha},
                 },
             },
         },
@@ -69,45 +71,63 @@ def _envelope(config: dict, *, tokens: int, seed: int, fp_sha: str) -> dict:
 
 class GenericComparatorTests(unittest.TestCase):
     def test_a_vs_b_passes(self):
-        a = _envelope(_config(0, False), tokens=2097152, seed=17, fp_sha="fp")
-        b = _envelope(_config(3, False), tokens=2097152, seed=17, fp_sha="fp")
+        # A and B have different mixer parameter names, so the optimizer
+        # parameter inventories legitimately differ.
+        a = _envelope(_config(0, False), tokens=2097152, seed=17, env_sha="env",
+                      optimizer_params=["attn_0", "attn_1"])
+        b = _envelope(_config(3, False), tokens=2097152, seed=17, env_sha="env",
+                      optimizer_params=["gdn_0", "attn_1"])
         result = validate_generic_pair(a, b, "manifest")
         self.assertEqual(result["comparison_type"], "mixer_treatment")
 
     def test_b_vs_c_passes(self):
-        b = _envelope(_config(3, False), tokens=2097152, seed=17, fp_sha="fp")
-        c = _envelope(_config(3, True), tokens=2097152, seed=17, fp_sha="fp")
+        # B and C have the same mixer, so the optimizer parameter inventory
+        # must match exactly.
+        b = _envelope(_config(3, False), tokens=2097152, seed=17, env_sha="env",
+                      optimizer_params=["gdn_0", "attn_1"])
+        c = _envelope(_config(3, True), tokens=2097152, seed=17, env_sha="env",
+                      optimizer_params=["gdn_0", "attn_1"])
         result = validate_generic_pair(b, c, "manifest")
         self.assertEqual(result["comparison_type"], "ple_treatment")
 
     def test_a_vs_c_passes(self):
-        a = _envelope(_config(0, False), tokens=2097152, seed=17, fp_sha="fp")
-        c = _envelope(_config(3, True), tokens=2097152, seed=17, fp_sha="fp")
+        a = _envelope(_config(0, False), tokens=2097152, seed=17, env_sha="env",
+                      optimizer_params=["attn_0", "attn_1"])
+        c = _envelope(_config(3, True), tokens=2097152, seed=17, env_sha="env",
+                      optimizer_params=["gdn_0", "attn_1"])
         result = validate_generic_pair(a, c, "manifest")
         self.assertEqual(result["comparison_type"], "mixer_and_ple")
 
     def test_rejects_unrelated_config_difference(self):
-        a = _envelope(_config(0, False), tokens=2097152, seed=17, fp_sha="fp")
-        b = _envelope(_config(3, False), tokens=2097152, seed=17, fp_sha="fp")
+        a = _envelope(_config(0, False), tokens=2097152, seed=17, env_sha="env",
+                      optimizer_params=["attn_0", "attn_1"])
+        b = _envelope(_config(3, False), tokens=2097152, seed=17, env_sha="env",
+                      optimizer_params=["gdn_0", "attn_1"])
         b["config"]["d_model"] = 512  # unrelated backbone change
         with self.assertRaises(ValueError):
             validate_generic_pair(a, b, "manifest")
 
     def test_rejects_seed_mismatch(self):
-        a = _envelope(_config(0, False), tokens=2097152, seed=17, fp_sha="fp")
-        b = _envelope(_config(3, False), tokens=2097152, seed=18, fp_sha="fp")
+        a = _envelope(_config(0, False), tokens=2097152, seed=17, env_sha="env",
+                      optimizer_params=["attn_0", "attn_1"])
+        b = _envelope(_config(3, False), tokens=2097152, seed=18, env_sha="env",
+                      optimizer_params=["gdn_0", "attn_1"])
         with self.assertRaises(ValueError):
             validate_generic_pair(a, b, "manifest")
 
-    def test_rejects_fingerprint_mismatch(self):
-        a = _envelope(_config(0, False), tokens=2097152, seed=17, fp_sha="fp1")
-        b = _envelope(_config(3, False), tokens=2097152, seed=17, fp_sha="fp2")
+    def test_rejects_environment_fingerprint_mismatch(self):
+        a = _envelope(_config(0, False), tokens=2097152, seed=17, env_sha="env1",
+                      optimizer_params=["attn_0", "attn_1"])
+        b = _envelope(_config(3, False), tokens=2097152, seed=17, env_sha="env2",
+                      optimizer_params=["gdn_0", "attn_1"])
         with self.assertRaises(ValueError):
             validate_generic_pair(a, b, "manifest")
 
     def test_rejects_same_treatment(self):
-        a = _envelope(_config(3, False), tokens=2097152, seed=17, fp_sha="fp")
-        b = _envelope(_config(3, False), tokens=2097152, seed=17, fp_sha="fp")
+        a = _envelope(_config(3, False), tokens=2097152, seed=17, env_sha="env",
+                      optimizer_params=["gdn_0", "attn_1"])
+        b = _envelope(_config(3, False), tokens=2097152, seed=17, env_sha="env",
+                      optimizer_params=["gdn_0", "attn_1"])
         with self.assertRaises(ValueError):
             validate_generic_pair(a, b, "manifest")
 
@@ -115,10 +135,33 @@ class GenericComparatorTests(unittest.TestCase):
         # C with PLE disabled is not B: it still has gdn_per_attention=3 and
         # use_ple=False, which is exactly B's signature, so a C-off vs B pair
         # has no valid treatment difference and must be rejected.
-        b = _envelope(_config(3, False), tokens=2097152, seed=17, fp_sha="fp")
-        c_off = _envelope(_config(3, False), tokens=2097152, seed=17, fp_sha="fp")
+        b = _envelope(_config(3, False), tokens=2097152, seed=17, env_sha="env",
+                      optimizer_params=["gdn_0", "attn_1"])
+        c_off = _envelope(_config(3, False), tokens=2097152, seed=17, env_sha="env",
+                          optimizer_params=["gdn_0", "attn_1"])
         with self.assertRaises(ValueError):
             validate_generic_pair(b, c_off, "manifest")
+
+    def test_rejects_optimizer_semantics_mismatch(self):
+        # A and B have different mixer names (allowed), but if the optimizer
+        # options (e.g. base LR) differ, the comparison must fail.
+        a = _envelope(_config(0, False), tokens=2097152, seed=17, env_sha="env",
+                      optimizer_params=["attn_0", "attn_1"])
+        b = _envelope(_config(3, False), tokens=2097152, seed=17, env_sha="env",
+                      optimizer_params=["gdn_0", "attn_1"])
+        b["extra"]["training"]["run_metadata"]["shared_optimizer"][0]["options"]["lr"] = 1e-3
+        with self.assertRaises(ValueError):
+            validate_generic_pair(a, b, "manifest")
+
+    def test_rejects_bc_optimizer_inventory_mismatch(self):
+        # B and C have the same mixer, so the optimizer parameter inventory
+        # must match exactly. A different parameter name must fail.
+        b = _envelope(_config(3, False), tokens=2097152, seed=17, env_sha="env",
+                      optimizer_params=["gdn_0", "attn_1"])
+        c = _envelope(_config(3, True), tokens=2097152, seed=17, env_sha="env",
+                      optimizer_params=["gdn_0", "attn_2"])
+        with self.assertRaises(ValueError):
+            validate_generic_pair(b, c, "manifest")
 
 
 if __name__ == "__main__":

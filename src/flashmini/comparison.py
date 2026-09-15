@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import copy
+import json
 import math
 
 from .config import FlashMiniConfig
@@ -29,6 +30,23 @@ def _require_equal(a, b, key):
 def _valid_number(value, *, positive=False):
     return (type(value) in (int, float) and math.isfinite(value)
             and (value > 0 if positive else value >= 0))
+
+
+def _optimizer_semantics(shared_optimizer):
+    """Canonical form of the optimizer groups excluding parameter names.
+
+    A and B/C have different mixer parameter names (full attention vs GDN), so
+    their ``shared_optimizer`` parameter inventories legitimately differ. The
+    shared optimizer *semantics* — the per-group family and options (base LR,
+    betas, eps, weight decay, etc.) — must still be identical.
+    """
+    groups = []
+    for group in shared_optimizer:
+        groups.append({
+            "family": group.get("family"),
+            "options": dict(group.get("options", {})),
+        })
+    return sorted(groups, key=lambda g: json.dumps(g, sort_keys=True, default=str))
 
 
 def validate_ple_pair(baseline, candidate, evaluation_manifest_hash):
@@ -178,13 +196,36 @@ def validate_generic_pair(baseline, candidate, evaluation_manifest_hash):
     for key in ("tokenizer", "tokenizer_revision", "dataset_revision"):
         _require_equal(bt["dataset"], ct["dataset"], key)
     bm, cm = bt.get("run_metadata", {}), ct.get("run_metadata", {})
-    for key in ("source_sha256", "shared_optimizer", "data_contract"):
+    for key in ("source_sha256", "data_contract"):
         _require_equal(bm, cm, key)
-    # Execution environment must match (fingerprint).
+    # Treatment-aware optimizer comparison.
+    # - B vs C (same mixer, PLE differs): the shared-backbone optimizer
+    #   parameter inventory and settings must match exactly.
+    # - A vs B / A vs C (different mixers): the mixer parameter names
+    #   legitimately differ, but the shared optimizer *semantics* (per-group
+    #   family and options: base LR, betas, eps, weight decay, ...) must be
+    #   identical.
+    if "shared_optimizer" not in bm or "shared_optimizer" not in cm:
+        raise ValueError("comparison missing shared_optimizer")
+    if not bm["shared_optimizer"] or not cm["shared_optimizer"]:
+        raise ValueError("comparison shared_optimizer is empty")
+    if difference == "ple_treatment":
+        if bm["shared_optimizer"] != cm["shared_optimizer"]:
+            raise ValueError("B/C shared-backbone optimizer inventory mismatch")
+    else:
+        if _optimizer_semantics(bm["shared_optimizer"]) != _optimizer_semantics(cm["shared_optimizer"]):
+            raise ValueError("shared optimizer semantics mismatch (family/options differ)")
+    # The shared execution environment must match. A/B/C have different
+    # treatment configs, so their full fingerprints legitimately differ; the
+    # treatment-neutral environment fingerprint is the correct comparison key.
     fp_b, fp_c = bm.get("execution_fingerprint"), cm.get("execution_fingerprint")
     if fp_b is None or fp_c is None:
         raise ValueError("comparison requires recorded execution fingerprints")
-    if fp_b.get("fingerprint_sha256") != fp_c.get("fingerprint_sha256"):
+    env_b = fp_b.get("environment_fingerprint_sha256")
+    env_c = fp_c.get("environment_fingerprint_sha256")
+    if env_b is None or env_c is None:
+        raise ValueError("comparison requires recorded environment fingerprints")
+    if env_b != env_c:
         raise ValueError("comparison execution environment fingerprint mismatch")
     if bc.get("architecture_version") >= 3:
         _require_equal(bm, cm, "execution_policy")

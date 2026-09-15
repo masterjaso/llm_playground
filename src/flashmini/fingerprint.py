@@ -109,6 +109,7 @@ def collect_fingerprint(repo_root: Path, *, config_sha256: str | None = None,
         "nvidia_driver_version": _nvidia_driver_version(),
         "torch": _torch_info(),
     }
+    fingerprint["environment_fingerprint_sha256"] = environment_fingerprint_sha256(fingerprint)
     fingerprint["fingerprint_sha256"] = fingerprint_sha(fingerprint)
     return fingerprint
 
@@ -116,6 +117,45 @@ def collect_fingerprint(repo_root: Path, *, config_sha256: str | None = None,
 def fingerprint_sha(fingerprint: dict[str, Any]) -> str:
     """Stable canonical SHA-256 over the fingerprint (excluding its own hash)."""
     payload = {k: v for k, v in fingerprint.items() if k != "fingerprint_sha256"}
+    return hashlib.sha256(
+        json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
+    ).hexdigest()
+
+
+# The treatment-neutral shared execution environment. These fields must be
+# identical across A/B/C for a valid comparison: they describe the runtime
+# environment and provenance, not the treatment-specific model config.
+_ENVIRONMENT_FIELDS = (
+    "git_commit",
+    "git_dirty",
+    "source_sha256",
+    "data_manifest_sha256",
+    "python_version",
+    "platform",
+    "pyproject_sha256",
+    "uv_lock_sha256",
+    "requirements_sha256",
+    "nvidia_driver_version",
+    "torch",
+)
+
+
+def environment_fingerprint(fingerprint: dict[str, Any]) -> dict[str, Any]:
+    """Return the treatment-neutral shared execution environment record.
+
+    This excludes the treatment-specific ``config_sha256``, the treatment
+    name, the per-file ``source_files`` map, and the full ``fingerprint_sha256``.
+    It captures only the shared execution provenance that must be identical
+    across A/B/C for a valid comparison: git commit, clean/dirty, source hash,
+    data manifest hash, Python version, PyTorch/CUDA version, NVIDIA driver,
+    GPU identities and capabilities, platform, and dependency lock hashes.
+    """
+    return {field: fingerprint.get(field) for field in _ENVIRONMENT_FIELDS}
+
+
+def environment_fingerprint_sha256(fingerprint: dict[str, Any]) -> str:
+    """Stable canonical SHA-256 over the treatment-neutral environment record."""
+    payload = environment_fingerprint(fingerprint)
     return hashlib.sha256(
         json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
     ).hexdigest()
