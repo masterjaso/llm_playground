@@ -59,7 +59,7 @@ def _write_metrics(isolated_orch: Path, treatment: str, records: list[dict]) -> 
     metrics_path.write_text("\n".join(json.dumps(r) for r in records), encoding="utf-8")
 
 
-def test_stage_completed_tracking() -> None:
+def test_stage_completed_tracking(isolated_orch: Path) -> None:
     state = _fresh_state()
     assert orch._stage_completed(state, "A", "train_2p1m") is False
     orch._mark_completed(state, "A", "train_2p1m", {"step": 512})
