@@ -877,6 +877,10 @@ def main(argv: list[str] | None = None) -> int:
     plan = full_plan() if args.stage == "all" else plan_for(args.stage, args.treatment)
 
     if args.dry_run:
+        # Validate the freeze prerequisites (config hashes, data manifest, gate
+        # policy, clean tree) WITHOUT launching training or writing state.
+        _verify_freeze_and_environment(state)
+        _log("dry-run", "all", "freeze prerequisites validated")
         _log("dry-run", "all", f"plan (stage-first): {plan}")
         for stage, treatment in plan:
             if _gate_failed(state, treatment, stage):

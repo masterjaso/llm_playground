@@ -131,7 +131,9 @@ def test_checkpoint_discovery_returns_single(isolated_orch: Path) -> None:
     assert ckpt.name == "step_512.pt"
 
 
-def test_dry_run_does_not_launch(isolated_orch: Path) -> None:
+def test_dry_run_does_not_launch(isolated_orch: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    # Isolate from the real freeze check (dirty tree in the test environment).
+    monkeypatch.setattr(orch, "_verify_freeze_and_environment", lambda state: state)
     rc = orch.main(["--dry-run"])
     assert rc == 0
     # A dry run must not write any production state: no state file, no logs.
@@ -139,7 +141,8 @@ def test_dry_run_does_not_launch(isolated_orch: Path) -> None:
     assert not (isolated_orch / "logs").exists()
 
 
-def test_dry_run_reports_failed_gate(isolated_orch: Path) -> None:
+def test_dry_run_reports_failed_gate(isolated_orch: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(orch, "_verify_freeze_and_environment", lambda state: state)
     state = _fresh_state()
     orch._mark_gate_failed(state, "ALL", "gate_2p1m", "implementation_failure")
     orch._save_state(state)
@@ -317,13 +320,15 @@ def test_median_throughput_reads_metrics(isolated_orch: Path) -> None:
     assert orch._median_throughput("B") is None
 
 
-def test_production_state_unchanged_by_suite() -> None:
+def test_production_state_unchanged_by_suite(monkeypatch: pytest.MonkeyPatch) -> None:
     """Regression: the orchestrator test suite must not mutate production state.
 
     Snapshots the real production state path before running a representative
     orchestrator operation against an isolated root, then asserts the
     production path is byte-for-byte unchanged.
     """
+    # Isolate from the real freeze check (dirty tree in the test environment).
+    monkeypatch.setattr(orch, "_verify_freeze_and_environment", lambda state: state)
     before_exists, before_bytes = _snapshot_production_state()
     with tempfile.TemporaryDirectory() as tmp:
         tmp_path = Path(tmp)
