@@ -44,3 +44,7 @@ The separate [FlashMini v3 experiment](docs/flashmini-v3.md)
 tests matched attention/hybrid controls with optional CPU-resident n-gram memory.
 V3 requires fresh checkpoints and a verified frozen corpus; historical v1/v2
 outcomes do not satisfy its decision gates.
+
+## Good resources
+
+https://github.com/FareedKhan-dev/train-llm-from-scratch
