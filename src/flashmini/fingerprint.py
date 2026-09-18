@@ -166,7 +166,14 @@ def _materially_different(a: dict[str, Any], b: dict[str, Any]) -> list[str]:
 
     ``git_dirty`` is compared as a boolean; ``source_files`` is compared via its
     aggregate ``source_sha256``. All other keys are compared by exact value.
+    Environment fields (python_version, torch version, driver, platform) are
+    excluded because resume from external checkpoints (e.g., Kaggle kernels)
+    will differ on these while source/data integrity is preserved.
     """
+    _ENV_KEYS = {
+        "python_version", "torch_version", "nvidia_driver_version",
+        "platform", "cuda_version", "device_count", "devices",
+    }
     diffs: list[str] = []
     keys = set(a) | set(b)
     for key in keys:
@@ -175,6 +182,8 @@ def _materially_different(a: dict[str, Any], b: dict[str, Any]) -> list[str]:
         if key == "source_files":
             if a.get("source_sha256") != b.get("source_sha256"):
                 diffs.append(key)
+            continue
+        if key in _ENV_KEYS:
             continue
         if a.get(key) != b.get(key):
             diffs.append(key)
