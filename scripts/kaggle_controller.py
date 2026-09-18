@@ -23,7 +23,7 @@ Usage:
   python scripts/kaggle_controller.py init
   python scripts/kaggle_controller.py status
   python scripts/kaggle_controller.py run-window --treatment A [--short]
-  python scripts/kaggle_controller.py run-all
+  python scripts/kaggle_controller.py run-window --treatment A --stop-after-tokens 200000000
 """
 from __future__ import annotations
 
@@ -54,11 +54,15 @@ SEQ_LEN = 256
 BATCH_SIZE = 16
 N_SEQS = 7_812_502
 CKPT_EVERY_TOKENS = 4_194_304
-# Conservative usable seconds within the 21600 s quota window (leaves margin
-# for startup, eval passes, and checkpoint writes).
-USABLE_SECONDS = 20_000
-# Measured T4 throughput (2-GPU model parallel "1,0", exact recipe, BF16).
-TOK_PER_SEC = {"A": 1908.8, "B": 1877.0, "C": 1739.8}
+# Pure-training wall-clock budget per window. The Kaggle hard limit is 21,600 s;
+# we reserve ~3,600 s for startup (checkpoint load, model build, migration
+# check, data mmap) plus a safety margin, leaving 18,000 s for training.
+USABLE_SECONDS = 18_000
+# Measured steady-state throughput (tok/s) on 2x T4, model-parallel "1,0",
+# BF16 autocast, exact recipe. A is measured from the short validation window
+# (4,956,160 tokens / 2,733.7 s = 1813 tok/s); B and C are probe values derated
+# ~5% to match the measured-vs-probe gap observed for A.
+TOK_PER_SEC = {"A": 1813.0, "B": 1780.0, "C": 1650.0}
 # Short validation window (for the first end-to-end test).
 SHORT_WINDOW_TOKENS = 5_000_000
 
@@ -338,15 +342,30 @@ def sync_checkpoint_dataset(treatment: str, ckpt_local: Path) -> None:
 # --------------------------------------------------------------------------- #
 # One window
 # --------------------------------------------------------------------------- #
-def run_window(treatment: str, *, short: bool = False) -> None:
+def run_window(
+    treatment: str, *, short: bool = False, stop_after_tokens: int | None = None
+) -> None:
     state = load_state()
     t = state[treatment]
     if t["status"] == "complete":
         print(f"Treatment {treatment} already complete; nothing to do.")
         return
+    if short and stop_after_tokens is not None:
+        raise SystemExit("--short and --stop-after-tokens are mutually exclusive")
 
     tokens_seen = t["tokens_seen"]
-    stop = compute_stop_after_tokens(treatment, tokens_seen, short=short)
+    if stop_after_tokens is None:
+        stop = compute_stop_after_tokens(treatment, tokens_seen, short=short)
+    else:
+        stop = int(stop_after_tokens)
+        if stop <= tokens_seen:
+            raise SystemExit(
+                f"explicit stop {stop} must be greater than tokens_seen {tokens_seen}"
+            )
+        if stop > TARGET_TOKENS:
+            raise SystemExit(f"explicit stop {stop} exceeds target {TARGET_TOKENS}")
+        if stop != TARGET_TOKENS and not _pause_gate_valid(stop):
+            raise SystemExit(f"explicit stop {stop} is not pause-gate valid")
     print(f"\n=== Window for treatment {treatment} ===")
     print(f"  resume tokens_seen: {tokens_seen}")
     print(f"  stop_after_tokens:  {stop}")
@@ -380,7 +399,14 @@ def run_window(treatment: str, *, short: bool = False) -> None:
         raise SystemExit(f"result manifest not found: {result_path}")
     result = json.loads(result_path.read_text())
     latest_rel = result["latest_checkpoint"]
-    latest_local = dest / latest_rel
+    # The result manifest records the absolute Kaggle path
+    # (/kaggle/working/...). The downloaded output lives under dest/, so
+    # resolve the path relative to dest by stripping the /kaggle/working/
+    # prefix (an absolute right-hand side in `dest / rel` would discard dest).
+    rel = latest_rel
+    if rel.startswith("/kaggle/working/"):
+        rel = rel[len("/kaggle/working/"):]
+    latest_local = dest / rel
     if not latest_local.is_file():
         raise SystemExit(f"latest checkpoint not downloaded: {latest_local}")
     actual_sha = _sha256_file(latest_local)
@@ -432,6 +458,8 @@ def main(argv=None) -> int:
     p_run.add_argument("--treatment", required=True, choices=("A", "B", "C"))
     p_run.add_argument("--short", action="store_true",
                        help="use a short validation window (~5M tokens)")
+    p_run.add_argument("--stop-after-tokens", type=int, default=None,
+                       help="override the computed stop with an explicit token count")
     sub.add_parser("run-all", help="run windows until all treatments complete")
     args = parser.parse_args(argv)
 
@@ -440,7 +468,8 @@ def main(argv=None) -> int:
     elif args.cmd == "status":
         show_status()
     elif args.cmd == "run-window":
-        run_window(args.treatment, short=args.short)
+        run_window(args.treatment, short=args.short,
+                   stop_after_tokens=args.stop_after_tokens)
     elif args.cmd == "run-all":
         run_all()
     return 0
