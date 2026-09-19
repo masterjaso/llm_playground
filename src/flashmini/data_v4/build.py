@@ -36,6 +36,7 @@ def _doc_from_record(rec: dict, src: dict, salt: str) -> dict | None:
 
 
 def cmd_build(args) -> int:
+    hf_store.load_token()  # set HF_TOKEN for datasets streaming rate limits
     recipe = recipes_mod.load_recipe(Path(args.recipe))
     reg = registry_mod.load_registry(Path(args.registry))
     rhash = recipes_mod.recipe_hash(recipe)
@@ -121,6 +122,28 @@ def cmd_build(args) -> int:
     print(f"build: docs_this_run={total_docs} shards={len(state.get('published_shards', []))}")
     return 0
 
+def verify_remote_shard(repo: str, local_path: Path, manifest: dict) -> None:
+    """Upload + verify remote size/sha; raises on any mismatch (fail-closed)."""
+    from huggingface_hub import HfApi
+    hf_store.upload_file(repo, local_path, f"shards/{local_path.name}",
+                         commit_message=f"add {manifest['shard_id']}")
+    api = HfApi(token=hf_store.load_token())
+    info = api.get_paths_info(repo, f"shards/{local_path.name}", repo_type="dataset")
+    if isinstance(info, list):
+        info = info[0] if info else None
+    if info is None:
+        raise ValueError("remote file not found after upload")
+    remote_size = getattr(info, "size", None)
+    lfs = getattr(info, "lfs", None)
+    remote_sha = getattr(lfs, "sha256", None) if lfs else None
+    ok = remote_size == manifest["bytes"]
+    if remote_sha is not None:
+        ok = ok and remote_sha == manifest["sha256"]
+    if not ok:
+        raise ValueError(
+            f"remote identity mismatch size={remote_size} sha={remote_sha}")
+
+
 def _flush(buffer: list[dict], out_dir: Path, idx: int, recipe: dict,
            rhash: str, state: dict, src: dict, args) -> int:
     shard_id = f"{recipe['name']}-shard-{idx:06d}"
@@ -138,8 +161,7 @@ def _flush(buffer: list[dict], out_dir: Path, idx: int, recipe: dict,
             info = hf_store.whoami()
             repo = hf_store.repo_id_for("data", info.get("name", ""))
             hf_store.ensure_repo(repo)
-            hf_store.upload_file(repo, out_path, f"shards/{out_path.name}",
-                                 commit_message=f"add {shard_id}")
+            verify_remote_shard(repo, out_path, manifest)
             state["hf_revision"] = hf_store.remote_head_sha(repo)
             out_path.unlink(missing_ok=True)
             manifest["published"] = True
@@ -167,9 +189,67 @@ def cmd_publish(args) -> int:
         return 2
     repo = hf_store.repo_id_for("data", info.get("name", ""))
     hf_store.ensure_repo(repo)
-    pending = [s for s in state.get("published_shards", []) if not s.get("published")]
-    print(f"publish: {len(pending)} pending shards (content only if publishable)")
-    return 0
+    shard_dir = Path(getattr(args, "shard_dir", "training_data/manifests/shards"))
+    published = 0
+    failed = 0
+    for entry in state.get("published_shards", []):
+        if entry.get("published") or not entry.get("publishable_content"):
+            continue
+        local = shard_dir / entry["path"]
+        if not local.exists():
+            print(f"publish: SKIP {entry['shard_id']} (local shard absent)")
+            failed += 1
+            continue
+        try:
+            cache_mod.verify_sha256(local, entry["sha256"])
+            hf_store.upload_file(repo, local, f"shards/{local.name}",
+                                 commit_message=f"add {entry['shard_id']}")
+        except Exception as exc:
+            entry["publish_error"] = f"{type(exc).__name__}: {str(exc)[:160]}"
+            state.setdefault("errors", []).append(
+                {"shard": entry["shard_id"], "error": entry["publish_error"]})
+            failed += 1
+            manifests.save_state(Path(args.state), state)
+            print(f"publish: FAIL {entry['shard_id']} {entry['publish_error']}")
+            continue
+        # Remote verification: size + sha via Hub metadata
+        try:
+            from huggingface_hub import HfApi
+            api = HfApi(token=hf_store.load_token())
+            info_f = api.get_paths_info(repo, f"shards/{local.name}",
+                                        repo_type="dataset")
+            if isinstance(info_f, list):
+                info_f = info_f[0] if info_f else None
+            if info_f is None:
+                raise ValueError("remote file not found after upload")
+            remote_size = getattr(info_f, "size", None)
+            lfs = getattr(info_f, "lfs", None)
+            remote_sha = getattr(lfs, "sha256", None) if lfs else None
+            ok = remote_size == entry["bytes"]
+            if remote_sha is not None:
+                ok = ok and remote_sha == entry["sha256"]
+            if not ok:
+                raise ValueError(
+                    f"remote identity mismatch size={remote_size} sha={remote_sha}")
+        except Exception as exc:
+            entry["publish_error"] = f"verify: {type(exc).__name__}: {str(exc)[:120]}"
+            state.setdefault("errors", []).append(
+                {"shard": entry["shard_id"], "error": entry["publish_error"]})
+            failed += 1
+            manifests.save_state(Path(args.state), state)
+            print(f"publish: VERIFY-FAIL {entry['shard_id']}")
+            continue
+        entry["published"] = True
+        entry["evicted_local"] = True
+        local.unlink()
+        published += 1
+        print(f"publish: OK {entry['shard_id']} verified remotely, evicted local")
+    state["hf_revision"] = hf_store.remote_head_sha(repo)
+    manifests.save_state(Path(args.state), state)
+    print(f"publish: done published={published} failed={failed} "
+          f"pending={[s['shard_id'] for s in state.get('published_shards', []) if not s.get('published') and s.get('publishable_content')]}")
+    return 1 if failed else 0
+
 
 
 def cmd_verify(args) -> int:

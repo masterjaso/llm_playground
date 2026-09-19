@@ -180,6 +180,7 @@ def _register_build_commands(sub, dflt_reg: str, dflt_state: str) -> None:
         c.set_defaults(func=build_mod.cmd_build)
     c = sub.add_parser("publish")
     c.add_argument("--state", default=dflt_state)
+    c.add_argument("--shard-dir", default=str(_repo_root() / "training_data/manifests/shards"))
     c.set_defaults(func=build_mod.cmd_publish)
     c = sub.add_parser("verify")
     c.add_argument("--recipe", required=True)
