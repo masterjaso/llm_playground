@@ -1,0 +1,115 @@
+# Verified facts only — populate revision/license/gating via source-lock.
+# redistribution_class: mirror_allowed | recipe_only | gated_recipe_only | review_required | generated_owned
+sources:
+  fineweb_edu:
+    dataset_id: HuggingFaceFW/fineweb-edu
+    split: train
+    text_field: text
+    domain: general_web
+    language: en
+    license: ODC-By-1.0
+    redistribution_class: mirror_allowed
+    role: foundation general/educational web
+  fineweb:
+    dataset_id: HuggingFaceFW/fineweb
+    config: CC-MAIN-2024-51
+    split: train
+    text_field: text
+    domain: general_web
+    language: en
+    license: ODC-By-1.0
+    redistribution_class: mirror_allowed
+    role: general web overflow
+  nemotron_cc_v2:
+    dataset_id: nvidia/Nemotron-CC-v2
+    split: train
+    text_field: text
+    domain: general_web
+    language: en
+    license: NVIDIA-gated
+    redistribution_class: gated_recipe_only
+    role: general web (gated; recipe-only unless terms permit)
+  common_pile_books:
+    dataset_id: common-pile/pre_1929_books
+    split: train
+    text_field: text
+    domain: books_reference
+    language: en
+    license: public-domain
+    redistribution_class: mirror_allowed
+    role: public-domain books (pre-1929)
+  stackv2_edu:
+    dataset_id: common-pile/stackv2_edu_filtered
+    split: train
+    text_field: text
+    domain: code
+    language: code
+    license: mixed-permissive
+    redistribution_class: review_required
+    role: openly licensed code
+  stack_edu:
+    dataset_id: HuggingFaceTB/stack-edu
+    config: Python
+    split: train
+    text_field: content
+    domain: code
+    language: code
+    license: mixed-permissive
+    redistribution_class: mirror_allowed
+    role: code/problem solving (per-language configs)
+  nemotron_code:
+    dataset_id: nvidia/Nemotron-Pretraining-Code-v1
+    split: train
+    text_field: text
+    domain: code
+    language: code
+    license: NVIDIA-gated
+    redistribution_class: gated_recipe_only
+    role: optional gated code (recipe-only)
+  finemath:
+    dataset_id: HuggingFaceTB/finemath
+    config: finemath-4plus
+    split: train
+    text_field: text
+    domain: math_stem
+    language: en
+    license: mixed-open
+    redistribution_class: mirror_allowed
+    role: math/formal reasoning
+  open_web_math:
+    dataset_id: open-web-math/open-web-math
+    split: train
+    text_field: text
+    domain: math_stem
+    language: en
+    license: CC-BY
+    redistribution_class: mirror_allowed
+    role: math/STEM prose
+  nemotron_math:
+    dataset_id: nvidia/Nemotron-CC-Math-v1
+    split: train
+    text_field: text
+    domain: math_stem
+    language: en
+    license: NVIDIA-gated
+    redistribution_class: gated_recipe_only
+    role: optional gated math (recipe-only)
+  cosmopedia:
+    dataset_id: HuggingFaceTB/cosmopedia-v2
+    config: cosmopedia-v2
+    split: train
+    text_field: text
+    domain: synthetic_edu
+    language: en
+    license: ODC-By-1.0
+    redistribution_class: mirror_allowed
+    role: synthetic educational
+  openthoughts:
+    dataset_id: open-thoughts/OpenThoughts3-1.2M
+    split: train
+    text_field: conversations
+    domain: reasoning
+    language: en
+    license: Apache-2.0
+    redistribution_class: review_required
+    role: reasoning traces (reasoning vs final kept separate downstream)

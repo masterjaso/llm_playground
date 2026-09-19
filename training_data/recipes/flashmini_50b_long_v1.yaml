@@ -1,0 +1,12 @@
+name: flashmini_50b_long_v1
+target_tokens: 500000000000
+seed: 50003
+split_salt: flashmini-v4-split-v1
+val_fraction: 0.002
+domains:
+  code: {weight: 0.50, sources: [stackv2_edu, stack_edu, nemotron_code]}
+  books_reference: {weight: 0.20, sources: [common_pile_books]}
+  general_web: {weight: 0.05, sources: [fineweb_edu]}
+  synthetic_edu: {weight: 0.05, sources: [cosmopedia]}
+  math_stem: {weight: 0.10, sources: [finemath, open_web_math]}
+  reasoning: {weight: 0.10, sources: [openthoughts]}

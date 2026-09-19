@@ -1,0 +1,122 @@
+{
+  "common_pile_books": {
+    "card_sha256": "bdddeb53c66827257adae804a37ca31ce856d23971dfa290a3ac2027b28eb1af",
+    "config": null,
+    "dataset_id": "common-pile/pre_1929_books",
+    "gated": false,
+    "license": "public-domain",
+    "redistribution_class": "mirror_allowed",
+    "revision": "a158135b4765f01d321b5cbe1ff90ebbd354b00f",
+    "split": "train"
+  },
+  "cosmopedia": {
+    "card_sha256": "e09544d7132303ae6bbc6e156e984db0305d81561615476be49eabd4be4b8bed",
+    "config": "cosmopedia-v2",
+    "dataset_id": "HuggingFaceTB/cosmopedia-v2",
+    "gated": false,
+    "license": "ODC-By-1.0",
+    "redistribution_class": "mirror_allowed",
+    "revision": "3ba9d605774198c5868892d7a8deda78031a781f",
+    "split": "train"
+  },
+  "finemath": {
+    "card_sha256": "77b9162c99fc6b5944da8793f18fb99c3b520ab7cdce0cc67ec8a1e47871da61",
+    "config": "finemath-4plus",
+    "dataset_id": "HuggingFaceTB/finemath",
+    "gated": false,
+    "license": "mixed-open",
+    "redistribution_class": "mirror_allowed",
+    "revision": "e92b25a616738fe95dc186b64dfb19f9c8525594",
+    "split": "train"
+  },
+  "fineweb": {
+    "card_sha256": "2fb3e49e8aa62a7429b07b557cc49d578292174843fb6aa561b5fbe6afbff01c",
+    "config": "CC-MAIN-2024-51",
+    "dataset_id": "HuggingFaceFW/fineweb",
+    "gated": false,
+    "license": "ODC-By-1.0",
+    "redistribution_class": "mirror_allowed",
+    "revision": "9bb295ddab0e05d785b879661af7260fed5140fc",
+    "split": "train"
+  },
+  "fineweb_edu": {
+    "card_sha256": "a0cc8998a20499432b28b6575f3046b714938eb8e11b8d59a1d25ddf3716061e",
+    "config": null,
+    "dataset_id": "HuggingFaceFW/fineweb-edu",
+    "gated": false,
+    "license": "ODC-By-1.0",
+    "redistribution_class": "mirror_allowed",
+    "revision": "87f09149ef4734204d70ed1d046ddc9ca3f2b8f9",
+    "split": "train"
+  },
+  "nemotron_cc_v2": {
+    "card_sha256": "3e65dcf6badcfb468dd3b163afd12932f065a10d59b8017a7c56f6344eb8192d",
+    "config": null,
+    "dataset_id": "nvidia/Nemotron-CC-v2",
+    "gated": true,
+    "license": "NVIDIA-gated",
+    "redistribution_class": "gated_recipe_only",
+    "revision": "2669787c66d18601c0e91167fd520be6c1245865",
+    "split": "train"
+  },
+  "nemotron_code": {
+    "card_sha256": "043f53ea67005b261aa064d224da8a6c1af447f6a2ee11c141d325880647d318",
+    "config": null,
+    "dataset_id": "nvidia/Nemotron-Pretraining-Code-v1",
+    "gated": true,
+    "license": "NVIDIA-gated",
+    "redistribution_class": "gated_recipe_only",
+    "revision": "01393d3bd890ddc5c15da8a2c9afb57391277659",
+    "split": "train"
+  },
+  "nemotron_math": {
+    "card_sha256": "e34457ea97edceb31d0385759ecc88d9cac38db11e704878243c6039b6e23a3f",
+    "config": null,
+    "dataset_id": "nvidia/Nemotron-CC-Math-v1",
+    "gated": true,
+    "license": "NVIDIA-gated",
+    "redistribution_class": "gated_recipe_only",
+    "revision": "397a2502f2028c659ba411a6c4935b464a7f03aa",
+    "split": "train"
+  },
+  "open_web_math": {
+    "card_sha256": "c4497f073cd93dfe104d8960f152fcbcbecd97ca1a7245a4cf66b8b8c79936ec",
+    "config": null,
+    "dataset_id": "open-web-math/open-web-math",
+    "gated": false,
+    "license": "CC-BY",
+    "redistribution_class": "mirror_allowed",
+    "revision": "fde8ef8de2300f5e778f56261843dab89f230815",
+    "split": "train"
+  },
+  "openthoughts": {
+    "card_sha256": "8bc5c1c91e5fce307d33b049701606f2a3fb73521c4bae89e16cdacf1aa9b2e1",
+    "config": null,
+    "dataset_id": "open-thoughts/OpenThoughts3-1.2M",
+    "gated": false,
+    "license": "Apache-2.0",
+    "redistribution_class": "review_required",
+    "revision": "61bcf9d4eb38b30295efc2021227a63cc5bb34c8",
+    "split": "train"
+  },
+  "stack_edu": {
+    "card_sha256": "fa264b336a946b87e05e540d449a51968149fbe1ab9b34af340f2d20fc290cd4",
+    "config": "Python",
+    "dataset_id": "HuggingFaceTB/stack-edu",
+    "gated": false,
+    "license": "mixed-permissive",
+    "redistribution_class": "mirror_allowed",
+    "revision": "eeec5caac5cc3758a18f1d3ba4416837a9ba814c",
+    "split": "train"
+  },
+  "stackv2_edu": {
+    "card_sha256": "49a352a903a57d7b4b33b120515df8c2dbd4b55828752e33b58cd628a913e7cd",
+    "config": null,
+    "dataset_id": "common-pile/stackv2_edu_filtered",
+    "gated": false,
+    "license": "mixed-permissive",
+    "redistribution_class": "review_required",
+    "revision": "c354dbe88469a1153e97c6a63ac50591849654de",
+    "split": "train"
+  }
+}

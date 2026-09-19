@@ -1,0 +1,12 @@
+# Benchmarks excluded/flagged from training (record exact revisions on use).
+benchmarks:
+  - HumanEval
+  - MBPP
+  - GSM8K
+  - MATH
+  - MMLU
+  - SWE-bench
+  - IFEval
+  - LongBench
+  - HarmBench
+method: hash-match-flag-v1

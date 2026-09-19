@@ -30,3 +30,10 @@ reports/flashmini/eval/
 !.nsp/artifacts/.gitkeep
 !.nsp/metrics.json
 !.nsp/capabilities.json
+
+# FlashMini data v4 runtime/cache (never bulk data)
+.cache/
+*.parquet
+training_data/manifests/shards/
+training_data/manifests/build_state.json
+training_data/manifests/corpus_manifest.json
