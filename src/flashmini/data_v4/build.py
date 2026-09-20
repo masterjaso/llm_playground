@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 
@@ -9,6 +10,7 @@ from . import cache as cache_mod
 from . import dedupe as dedupe_mod
 from . import filters as filters_mod
 from . import hf_store, manifests, provenance
+from . import packing as packing_mod
 from . import recipes as recipes_mod
 from . import registry as registry_mod
 from . import shards as shards_mod
@@ -143,13 +145,15 @@ def cmd_build(args) -> int:
     print(f"build: docs_this_run={total_docs} shards={len(state.get('published_shards', []))}")
     return 0
 
-def verify_remote_shard(repo: str, local_path: Path, manifest: dict) -> None:
+def verify_remote_shard(repo: str, local_path: Path, manifest: dict,
+                        hf_prefix: str = "shards") -> None:
     """Upload + verify remote size/sha; raises on any mismatch (fail-closed)."""
     from huggingface_hub import HfApi
-    hf_store.upload_file(repo, local_path, f"shards/{local_path.name}",
+    hf_store.upload_file(repo, local_path, f"{hf_prefix}/{local_path.name}",
                          commit_message=f"add {manifest['shard_id']}")
     api = HfApi(token=hf_store.load_token())
-    info = api.get_paths_info(repo, f"shards/{local_path.name}", repo_type="dataset")
+    info = api.get_paths_info(repo, f"{hf_prefix}/{local_path.name}",
+                              repo_type="dataset")
     if isinstance(info, list):
         info = info[0] if info else None
     if info is None:
@@ -167,22 +171,45 @@ def verify_remote_shard(repo: str, local_path: Path, manifest: dict) -> None:
 
 def _flush(buffer: list[dict], out_dir: Path, idx: int, recipe: dict,
            rhash: str, state: dict, src: dict, args) -> int:
-    shard_id = f"{recipe['name']}-shard-{idx:06d}"
+    """Write one buffer as per-class shards: publishable content separated from
+    held (recipe-only) content so licensing gating is document-level, not
+    shard-level."""
+    publishable = [d for d in buffer
+                   if d.get("redistribution_class") in provenance.PUBLISHABLE_CONTENT]
+    held = [d for d in buffer
+            if d.get("redistribution_class") not in provenance.PUBLISHABLE_CONTENT]
+    next_idx = idx
+    if publishable:
+        next_idx = _write_and_maybe_publish(
+            publishable, out_dir, next_idx, recipe, rhash, state, args, held=False)
+    if held:
+        next_idx = _write_and_maybe_publish(
+            held, out_dir, next_idx, recipe, rhash, state, args, held=True)
+    return next_idx
+
+
+def _write_and_maybe_publish(docs: list[dict], out_dir: Path, idx: int,
+                             recipe: dict, rhash: str, state: dict, args,
+                             *, held: bool) -> int:
+    shard_id = f"{recipe['name']}-shard-{idx:06d}" + ("-held" if held else "")
     out_path = out_dir / f"{shard_id}.parquet"
-    manifest = shards_mod.write_shard(buffer, out_path, shard_id=shard_id,
+    manifest = shards_mod.write_shard(docs, out_path, shard_id=shard_id,
                                       recipe_name=recipe["name"], recipe_hash=rhash)
     manifest["split"] = "train"
     manifest["sequence_count"] = manifest["document_count"]
-    first_class = buffer[0].get("redistribution_class", "review_required") if buffer else src.get("redistribution_class", "review_required")
-    ok, reason = provenance.classify_for_publish(first_class)
+    hf_prefix = getattr(args, "hf_prefix", "shards")
+    manifest["remote_path"] = f"{hf_prefix}/{out_path.name}"
+    ok, reason = provenance.classify_for_publish(
+        "review_required" if held else "mirror_allowed")
     manifest["publishable_content"] = ok
     manifest["publish_note"] = reason
-    if not getattr(args, "no_publish", False) and ok:
+    if not held and not getattr(args, "no_publish", False):
         try:
             info = hf_store.whoami()
             repo = hf_store.repo_id_for("data", info.get("name", ""))
             hf_store.ensure_repo(repo)
-            verify_remote_shard(repo, out_path, manifest)
+            verify_remote_shard(repo, out_path, manifest,
+                                hf_prefix=getattr(args, "hf_prefix", "shards"))
             state["hf_revision"] = hf_store.remote_head_sha(repo)
             out_path.unlink(missing_ok=True)
             manifest["published"] = True
@@ -197,8 +224,10 @@ def _flush(buffer: list[dict], out_dir: Path, idx: int, recipe: dict,
     state.setdefault("published_shards", []).append(manifest)
     state["published_bytes"] = state.get("published_bytes", 0) + manifest["bytes"]
     manifests.save_state(Path(args.state), state)
-    print(f"build: shard {shard_id} docs={manifest['document_count']} published={manifest['published']}")
+    print(f"build: shard {shard_id} docs={manifest['document_count']} "
+          f"published={manifest['published']}")
     return idx + 1
+
 
 
 def cmd_publish(args) -> int:
@@ -223,7 +252,8 @@ def cmd_publish(args) -> int:
             continue
         try:
             cache_mod.verify_sha256(local, entry["sha256"])
-            hf_store.upload_file(repo, local, f"shards/{local.name}",
+            remote_path = entry.get("remote_path") or f"shards/{local.name}"
+            hf_store.upload_file(repo, local, remote_path,
                                  commit_message=f"add {entry['shard_id']}")
         except Exception as exc:
             entry["publish_error"] = f"{type(exc).__name__}: {str(exc)[:160]}"
@@ -237,8 +267,7 @@ def cmd_publish(args) -> int:
         try:
             from huggingface_hub import HfApi
             api = HfApi(token=hf_store.load_token())
-            info_f = api.get_paths_info(repo, f"shards/{local.name}",
-                                        repo_type="dataset")
+            info_f = api.get_paths_info(repo, remote_path, repo_type="dataset")
             if isinstance(info_f, list):
                 info_f = info_f[0] if info_f else None
             if info_f is None:
@@ -293,40 +322,131 @@ def cmd_freeze(args) -> int:
     recipe = recipes_mod.load_recipe(Path(args.recipe))
     reg = registry_mod.load_registry(Path(getattr(args, "registry", "training_data/registry/sources.yaml")))
     manifest_path = Path(args.manifest)
-    shard_hashes = [s["sha256"] for s in state.get("published_shards", []) if s.get("sha256")]
+    shards = state.get("published_shards", [])
+    shard_hashes = [s["sha256"] for s in shards if s.get("sha256")]
     fp = shards_mod.corpus_fingerprint(
         registry_hash=registry_mod.registry_hash(reg),
         recipe_hash=recipes_mod.recipe_hash(recipe),
         filter_version=filters_mod.FILTER_VERSION,
         dedupe_version=dedupe_mod.DEDUPE_VERSION,
         split_salt=getattr(args, "split_salt", SPLIT_SALT_DEFAULT),
-        shard_hashes=shard_hashes)
+        shard_hashes=shard_hashes,
+        tokenizer_identity="corpus-is-tokenizer-independent")
     state["corpus_fingerprint"] = fp
     manifests.save_state(Path(args.state), state)
-    corpus = {"recipe_name": recipe["name"], "recipe_hash": recipes_mod.recipe_hash(recipe),
-              "corpus_fingerprint": fp, "shards": state.get("published_shards", []),
-              "format_version": 4}
+    hf_repo = ""
+    hf_revision = state.get("hf_revision", "")
+    try:
+        hf_repo = hf_store.repo_id_for("data", hf_store.whoami().get("name", ""))
+    except RuntimeError:
+        hf_repo = ""
+    split_totals: dict[str, int] = {}
+    for s in shards:
+        for split, count in (s.get("split_distribution") or {}).items():
+            split_totals[split] = split_totals.get(split, 0) + int(count)
+    corpus = {
+        "recipe_name": recipe["name"],
+        "recipe_hash": recipes_mod.recipe_hash(recipe),
+        "corpus_fingerprint": fp,
+        "format_version": 4,
+        "packing_version": packing_mod.PACKING_VERSION,
+        "hf_repo": hf_repo,
+        "hf_revision": hf_revision,
+        "shards": shards,
+        "split_totals": split_totals,
+        "tokenizer": {
+            "note": "corpus is tokenizer-independent; training declares its own "
+                    "tokenizer identity in dataset_identity()",
+            "default_tokenizer_id": getattr(args, "tokenizer", "gpt2"),
+        },
+    }
     manifest_path.parent.mkdir(parents=True, exist_ok=True)
     manifest_path.write_text(json.dumps(corpus, indent=2, sort_keys=True))
-    print(f"freeze: fingerprint={fp} shards={len(corpus['shards'])} -> {manifest_path}")
+    print(f"freeze: fingerprint={fp} shards={len(shards)} "
+          f"splits={split_totals} rev={hf_revision[:12]} -> {manifest_path}")
+    return 0
+
+
+def _smoke_dataset(args):
+    from .sampler import RemoteShardDataset
+    return RemoteShardDataset(
+        Path(args.manifest), split=args.split, seq_len=args.seq_len,
+        seed=args.seed, epoch=args.epoch,
+        cache_dir=Path(args.cache_dir) if args.cache_dir else None,
+        cache_gb=args.cache_gb, hf_repo=args.hf_repo,
+        revision=args.revision, tokenizer_id=args.tokenizer,
+        local_base=Path(args.local_base) if args.local_base else None,
+        max_open_shards=args.max_open_shards)
+
+
+def cmd_resume_check(args) -> int:
+    """Prove resume-equivalence with the trainer's own index source.
+
+    A run is advanced ``--batches`` steps; a second run stops halfway, keeps
+    only the sampler state, and a *fresh* dataset/sampler restores that state
+    and continues.  Every subsequent batch digest must be identical.
+    """
+    steps = max(2, int(args.batches))
+    half = steps // 2
+
+    def digests(dataset, sampler, count):
+        out = []
+        for _ in range(count):
+            indices = sampler.take(args.batch_size)
+            if len(indices) == 0:
+                break
+            x, _y = dataset.get_batch(indices)
+            out.append(hashlib.sha256(x.tobytes()).hexdigest())
+        return out
+
+    uninterrupted = _smoke_dataset(args)
+    a = digests(uninterrupted, uninterrupted.sampler_for(args.seed), steps)
+
+    part = _smoke_dataset(args)
+    sampler = part.sampler_for(args.seed)
+    digests(part, sampler, half)
+    checkpoint = sampler.state()
+    del part, sampler
+
+    fresh = _smoke_dataset(args)
+    resumed_sampler = fresh.sampler_for(args.seed, consumed=checkpoint["consumed"])
+    resumed = digests(fresh, resumed_sampler, steps - half)
+
+    ok = a[half:] == resumed
+    print(f"resume-check: batches={steps} half={half} identical={ok}")
+    if not ok:
+        for i, (left, right) in enumerate(zip(a[half:], resumed)):
+            if left != right:
+                print(f"resume-check: MISMATCH at batch {half + i}")
+                break
+        return 1
+    print(f"resume-check: consumed={resumed_sampler.consumed} "
+          f"next_batch_sha256={resumed[0][:16]} "
+          f"tokens_after_resume={(len(resumed)) * args.batch_size * args.seq_len}")
     return 0
 
 
 def cmd_train_smoke(args) -> int:
-    from .sampler import RemoteShardDataset
-    ds = RemoteShardDataset(Path(args.manifest), split="train",
-                            seq_len=args.seq_len, seed=0, epoch=0)
-    print(f"smoke: sequences={len(ds)} integrity={ds.verify_integrity()}")
+    ds = _smoke_dataset(args)
+    integrity = ds.verify_integrity()
+    print(f"smoke: sequences={len(ds)} integrity={integrity}")
+    print(f"smoke: identity={ds.dataset_identity()}")
+    sampler = ds.sampler_for(args.seed, consumed=args.consumed_batches * args.batch_size)
     seen = 0
-    it = ds.iter_epoch_batches(seed=0, epoch=0, batch_size=args.batch_size)
+    digest = hashlib.sha256()
     for _ in range(args.batches):
-        try:
-            batch = next(it)
-        except StopIteration:
+        batch = sampler.take(args.batch_size)
+        if len(batch) == 0:
             break
         x, y = ds.get_batch(batch)
-        assert x.shape == (len(batch), args.seq_len)
+        assert x.shape == (len(batch), args.seq_len), x.shape
+        assert y.shape == x.shape
+        assert not (x < 0).any()
+        digest.update(x.tobytes())
         seen += len(batch)
-    print(f"smoke: consumed_sequences={seen} resume_ok=True")
+    print(f"smoke: consumed_sequences={seen} tokens={seen * args.seq_len} "
+          f"downloads={ds.downloads} evictions={ds.evictions} "
+          f"batch_sha256={digest.hexdigest()[:16]}")
+    print(f"smoke: cache_root={ds.cache_root} notes={ds.notes[:3]}")
     return 0
 

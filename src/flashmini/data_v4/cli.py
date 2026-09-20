@@ -88,6 +88,9 @@ def cmd_source_lock(args) -> int:
             print(f"lock FAILED {sid}: {type(exc).__name__}: {str(exc)[:160]}")
     lock_path.parent.mkdir(parents=True, exist_ok=True)
     lock_path.write_text(json.dumps(existing, indent=2, sort_keys=True))
+    print(f"wrote {lock_path} ({len(existing)} sources)")
+    return 0
+
 
 def cmd_plan(args) -> int:
     recipe = recipes_mod.load_recipe(Path(args.recipe))
@@ -157,8 +160,6 @@ def main(argv=None) -> int:
     args = build_parser().parse_args(argv)
     return args.func(args)
 
-    print(f"wrote {lock_path} ({len(existing)} sources)")
-    return 0
 
 def _register_build_commands(sub, dflt_reg: str, dflt_state: str) -> None:
     from . import build as build_mod
@@ -176,6 +177,8 @@ def _register_build_commands(sub, dflt_reg: str, dflt_state: str) -> None:
         c.add_argument("--cache-dir", default=None)
         c.add_argument("--cache-gb", type=float, default=None)
         c.add_argument("--split-salt", default="flashmini-v4-split-v1")
+        c.add_argument("--hf-prefix", default="shards",
+                       help="Remote folder for this release (avoids collisions)")
         c.add_argument("--no-publish", action="store_true")
         c.set_defaults(func=build_mod.cmd_build)
     c = sub.add_parser("publish")
@@ -191,14 +194,29 @@ def _register_build_commands(sub, dflt_reg: str, dflt_state: str) -> None:
     c.add_argument("--state", default=dflt_state)
     c.add_argument("--registry", default=dflt_reg)
     c.add_argument("--split-salt", default="flashmini-v4-split-v1")
+    c.add_argument("--tokenizer", default="gpt2")
     c.add_argument("--manifest", default=str(_repo_root() / "training_data/manifests/corpus_manifest.json"))
     c.set_defaults(func=build_mod.cmd_freeze)
-    c = sub.add_parser("train-smoke")
-    c.add_argument("--manifest", default=str(_repo_root() / "training_data/manifests/corpus_manifest.json"))
-    c.add_argument("--seq-len", type=int, default=64)
-    c.add_argument("--batch-size", type=int, default=4)
-    c.add_argument("--batches", type=int, default=10)
-    c.set_defaults(func=build_mod.cmd_train_smoke)
+    for name, fn in (("train-smoke", build_mod.cmd_train_smoke),
+                     ("resume-check", build_mod.cmd_resume_check)):
+        c = sub.add_parser(name)
+        c.add_argument("--manifest", default=str(_repo_root() / "training_data/manifests/corpus_manifest.json"))
+        c.add_argument("--split", default="train")
+        c.add_argument("--seq-len", type=int, default=2048)
+        c.add_argument("--batch-size", type=int, default=4)
+        c.add_argument("--batches", type=int, default=10)
+        c.add_argument("--seed", type=int, default=0)
+        c.add_argument("--epoch", type=int, default=0)
+        c.add_argument("--consumed-batches", type=int, default=0)
+        c.add_argument("--tokenizer", default="gpt2")
+        c.add_argument("--hf-repo", default=None)
+        c.add_argument("--revision", default=None)
+        c.add_argument("--cache-dir", default=None)
+        c.add_argument("--cache-gb", type=float, default=None)
+        c.add_argument("--local-base", default=None,
+                       help="Read shards from a local directory instead of the Hub")
+        c.add_argument("--max-open-shards", type=int, default=4)
+        c.set_defaults(func=fn)
     c = sub.add_parser("status")
     c.add_argument("--state", default=dflt_state)
     c.add_argument("--cache-dir", default=None)

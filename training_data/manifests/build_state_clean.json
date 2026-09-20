@@ -1,0 +1,90 @@
+{
+  "corpus_fingerprint": "",
+  "errors": [],
+  "estimated_tokens_by_domain": {
+    "general_web": 4079920
+  },
+  "exact_duplicates": 0,
+  "hf_revision": "da3f6b67c5bcd51ce555373224c26a014993ee56",
+  "last_successful_operation": "",
+  "near_duplicates": 0,
+  "published_bytes": 5634707,
+  "published_shards": [
+    {
+      "build_version": "flashmini-v4-shard-v1",
+      "bytes": 3072814,
+      "character_count": 7099660,
+      "created_at": 1789864376,
+      "document_count": 1500,
+      "domain_distribution": {
+        "general_web": 1500
+      },
+      "estimated_token_count": 1774915,
+      "evicted_local": true,
+      "format": "parquet_zstd_v1",
+      "language_distribution": {
+        "en": 1500
+      },
+      "license_distribution": {
+        "ODC-By-1.0": 1500
+      },
+      "path": "flashmini_1b_full_v1-shard-000000.parquet",
+      "publish_note": "content_publish_allowed",
+      "publishable_content": true,
+      "published": true,
+      "recipe_hash": "6a38be9e15cc4fabfcf76ba25c0814861c59436284e73a795bf8e5101db79296",
+      "recipe_name": "flashmini_1b_full_v1",
+      "sequence_count": 1500,
+      "sha256": "378820456af775819786d2f1e0e67e7bf9841a86dedb55c7ab81e586ee50a0d9",
+      "shard_id": "flashmini_1b_full_v1-shard-000000",
+      "source_distribution": {
+        "fineweb_edu": 1500
+      },
+      "split": "train"
+    },
+    {
+      "build_version": "flashmini-v4-shard-v1",
+      "bytes": 2561893,
+      "character_count": 5838087,
+      "created_at": 1789864389,
+      "document_count": 1500,
+      "domain_distribution": {
+        "general_web": 1500
+      },
+      "estimated_token_count": 1459521,
+      "evicted_local": true,
+      "format": "parquet_zstd_v1",
+      "language_distribution": {
+        "en": 1500
+      },
+      "license_distribution": {
+        "ODC-By-1.0": 1500
+      },
+      "path": "flashmini_1b_full_v1-shard-000001.parquet",
+      "publish_note": "content_publish_allowed",
+      "publishable_content": true,
+      "published": true,
+      "recipe_hash": "6a38be9e15cc4fabfcf76ba25c0814861c59436284e73a795bf8e5101db79296",
+      "recipe_name": "flashmini_1b_full_v1",
+      "sequence_count": 1500,
+      "sha256": "1d170f3fd3f5a929f3e601b2cf1f51554312ef3c179018889334f9924d58b6f4",
+      "shard_id": "flashmini_1b_full_v1-shard-000001",
+      "source_distribution": {
+        "fineweb": 1000,
+        "fineweb_edu": 500
+      },
+      "split": "train"
+    }
+  ],
+  "recipe_hash": "6a38be9e15cc4fabfcf76ba25c0814861c59436284e73a795bf8e5101db79296",
+  "recipe_name": "flashmini_1b_full_v1",
+  "rejected_documents": {
+    "boilerplate": 2,
+    "too_short": 5
+  },
+  "selected_documents": 0,
+  "source_cursors": {
+    "fineweb": 0,
+    "fineweb_edu": 0
+  }
+}

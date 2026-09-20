@@ -86,6 +86,58 @@ def upload_file(repo_id: str, local_path: Path, path_in_repo: str,
     )
 
 
+def download_file(repo_id: str, path_in_repo: str, dest: Path, *,
+                  revision: str | None = None,
+                  cache_dir: Path | None = None,
+                  min_avail_bytes: int | None = None) -> Path:
+    """Download one file into an explicitly controlled cache and place it at dest.
+
+    The Hugging Face blob cache is confined to ``cache_dir`` (never the user's
+    default ``~/.cache/huggingface``), the destination is written atomically so
+    a killed process can never leave a truncated file that looks valid, and the
+    caller verifies the sha256 before use.
+    """
+    import shutil
+    import tempfile
+    from huggingface_hub import hf_hub_download
+    dest = Path(dest)
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    if min_avail_bytes is not None:
+        from . import cache as cache_mod
+        cache_mod.check_watermark(dest.parent, min_avail_bytes)
+    cached = hf_hub_download(
+        repo_id=repo_id, filename=path_in_repo, repo_type="dataset",
+        revision=revision, token=load_token(),
+        cache_dir=str(cache_dir) if cache_dir else None)
+    fd, tmp = tempfile.mkstemp(prefix=dest.name + ".", suffix=".tmp",
+                               dir=str(dest.parent))
+    os.close(fd)
+    try:
+        shutil.copyfile(cached, tmp)
+        os.replace(tmp, dest)
+    finally:
+        try:
+            Path(tmp).unlink()
+        except OSError:
+            pass
+    return dest
+
+
+def remote_file_info(repo_id: str, path_in_repo: str, *,
+                     revision: str | None = None):
+    """Return Hub metadata for one remote file (size/sha), or None."""
+    from huggingface_hub import HfApi
+    api = HfApi(token=load_token())
+    try:
+        info = api.get_paths_info(repo_id, path_in_repo, repo_type="dataset",
+                                  revision=revision)
+    except Exception:
+        return None
+    if isinstance(info, list):
+        info = info[0] if info else None
+    return info
+
+
 def remote_head_sha(repo_id: str) -> str:
     from huggingface_hub import HfApi
     api = HfApi(token=load_token())

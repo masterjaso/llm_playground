@@ -6,6 +6,8 @@ Hugging Face rather than monolithic local memmaps.
 """
 
 from .canonical import canonicalize_text, content_hash, document_id
+from .packing import PACKING_VERSION, pack_document, tokenizer_identity
+from .sampler import HierarchicalSampler, RemoteShardDataset
 from .splits import VAL_FRACTION_DEFAULT, SPLIT_SALT_DEFAULT, assign_split
 
 __all__ = [
@@ -15,6 +17,11 @@ __all__ = [
     "assign_split",
     "SPLIT_SALT_DEFAULT",
     "VAL_FRACTION_DEFAULT",
+    "RemoteShardDataset",
+    "HierarchicalSampler",
+    "PACKING_VERSION",
+    "pack_document",
+    "tokenizer_identity",
 ]
 
 DATA_V4_VERSION = 4

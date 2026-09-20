@@ -4,7 +4,20 @@
 shard hashes, recipe hash, `corpus_fingerprint_sha256`) live here. Small
 indexes only; never bulk data in Git.
 
-## Pilot evidence (2026-09-19, Gate 0/1 local)
+## Releases
+
+| Release | Namespace | State | Gating | Status |
+|---|---|---|---|---|
+| pilot-1 | `shards/` | `build_state.json` | shard-level (first-document class) | frozen, 95 shards / 91k docs / ~1.71B tokens published |
+| clean-1 | `clean/` | `build_state_clean.json` | **document-level** (per-class shards) | building (resumable) |
+
+The pilot-1 release was produced before per-class partitioning existed, so a
+published pilot shard may contain `review_required` documents mixed with
+`mirror_allowed` ones. Treat pilot-1 as an infrastructure/mixture pilot;
+use clean-1 (or later) for decisive training. `build.py` now partitions each
+buffer by `redistribution_class` and writes separate `*-held` shards for
+non-publishable classes, so only document-level-allowed content is uploaded.
+
 
 - Recipe `flashmini_1b_full_v1` (hash `6a38be9e15cc…`), 2800 docs selected,
   4 canonical Parquet+ZSTD shards, ~36.1M estimated tokens, 55.0 MiB.
