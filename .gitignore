@@ -35,5 +35,5 @@ reports/flashmini/eval/
 .cache/
 *.parquet
 training_data/manifests/shards/
-training_data/manifests/build_state.json
-training_data/manifests/corpus_manifest.json
+training_data/manifests/build_state*.json
+training_data/manifests/corpus_manifest*.json

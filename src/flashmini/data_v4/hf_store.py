@@ -105,10 +105,18 @@ def download_file(repo_id: str, path_in_repo: str, dest: Path, *,
     if min_avail_bytes is not None:
         from . import cache as cache_mod
         cache_mod.check_watermark(dest.parent, min_avail_bytes)
+    # hf_hub_download returns a path inside the controlled cache_dir. That
+    # path is normally a real file, but it can be a symlink into the blob
+    # store. We resolve it explicitly before copying so a concurrent
+    # eviction of the cache never leaves us copying from a half-written or
+    # removed symlink target (which produced checksum mismatches).
     cached = hf_hub_download(
         repo_id=repo_id, filename=path_in_repo, repo_type="dataset",
         revision=revision, token=load_token(),
         cache_dir=str(cache_dir) if cache_dir else None)
+    cached = Path(cached).resolve()
+    if not cached.is_file():
+        raise FileNotFoundError(f"HF cache resolved target missing: {cached}")
     fd, tmp = tempfile.mkstemp(prefix=dest.name + ".", suffix=".tmp",
                                dir=str(dest.parent))
     os.close(fd)
@@ -117,7 +125,7 @@ def download_file(repo_id: str, path_in_repo: str, dest: Path, *,
         os.replace(tmp, dest)
     finally:
         try:
-            Path(tmp).unlink()
+            Path(tmp).unlink(missing_ok=True)
         except OSError:
             pass
     return dest
