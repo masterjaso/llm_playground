@@ -194,6 +194,7 @@ def cmd_train(args) -> int:
         run_metadata=run_metadata,
         allow_repeated_corpus=getattr(args, "allow_repeated_corpus", False),
         stop_after_tokens=getattr(args, "stop_after_tokens", None),
+        pipeline_microbatch_size=getattr(args, "pipeline_microbatch_size", None),
     )
     print(json.dumps(summary, indent=2))
     return 0
@@ -287,6 +288,9 @@ def main(argv=None) -> int:
     p.add_argument("--model-parallel-gpus", help="Visible CUDA indices, e.g. 0,1; consecutive layer sharding")
     p.add_argument("--gpu-memory-gib", type=float, help="Per-device target including existing use; allocator guard, not a system-wide hard cap")
     p.add_argument("--grad-accum", type=int, default=1)
+    p.add_argument("--pipeline-microbatch-size", type=int, default=None,
+                   help="Microbatch size for GPipe pipeline execution; must divide --batch-size. "
+                        "One optimizer update per logical batch (not gradient accumulation).")
     p.add_argument("--log-every", type=int, default=10)
     p.add_argument("--checkpoint-every-tokens", type=int, default=25_000_000)
     p.add_argument("--eval-every-tokens", type=int, default=0)

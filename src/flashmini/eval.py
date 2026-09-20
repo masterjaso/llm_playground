@@ -6,6 +6,7 @@ import math
 import random
 from typing import Any
 
+import numpy as np
 import torch
 import torch.nn.functional as F
 
@@ -134,6 +135,108 @@ def compute_validation_nll(
         "correct_tokens": correct_tokens,
         "tokens": total_tokens,
         "batches": n_batches,
+    }
+
+
+def compute_validation_nll_batched(
+    model: torch.nn.Module,
+    dataset,
+    device: torch.device,
+    batch_size: int,
+    max_batches: int | None = None,
+    ple_enabled: bool | None = None,
+    start_sequence: int = 0,
+) -> dict[str, Any]:
+    """Deterministic batched validation: fixed sequence order, contiguous batching.
+
+    Processes sequences ``start_sequence, start_sequence+1, ...`` in contiguous
+    blocks of ``batch_size`` in ascending index order -- a fully deterministic
+    schedule independent of the training order. Training mode is set to eval and
+    the RNG is snapshotted/restored around the whole call (the same snapshot
+    semantics as :func:`compute_validation_nll`), so the evaluation cannot leak
+    RNG drift back into a resumed training loop. Labels use the same mask
+    (``-100``) and the same masked cross-entropy; the reported NLL, perplexity,
+    and top-1 accuracy are per-token averages over all scored tokens, identical
+    in definition to :func:`compute_validation_nll`.
+    """
+    if not isinstance(batch_size, int) or batch_size <= 0:
+        raise ValueError("batch_size must be a positive integer")
+    if max_batches is not None and (not isinstance(max_batches, int) or max_batches <= 0):
+        raise ValueError("max_batches must be a positive integer")
+
+    nll_sum = 0.0
+    correct_tokens = 0
+    total_tokens = 0
+    n_batches = 0
+
+    modes = _snapshot_training_modes(model)
+    rng_state = _snapshot_rng()
+    try:
+        model.eval()
+        with torch.no_grad():
+            remaining = len(dataset) - start_sequence
+            if max_batches is not None:
+                remaining = min(remaining, max_batches * batch_size)
+            for offset in range(0, remaining, batch_size):
+                batch_indices = np.asarray(
+                    list(range(start_sequence + offset, start_sequence + offset + batch_size)),
+                    dtype=np.int64,
+                )
+                input_array, label_array = dataset.get_batch(batch_indices)
+                input_ids = torch.as_tensor(input_array, dtype=torch.long, device=device)
+                labels = torch.as_tensor(label_array, dtype=torch.long, device=device)
+                kwargs: dict[str, Any] = {"labels": labels}
+                if ple_enabled is not None:
+                    kwargs["ple_enabled"] = ple_enabled
+                out = model(input_ids, **kwargs)
+                logits = out["logits"]
+                if not torch.isfinite(logits).all().item():
+                    raise FloatingPointError("validation logits are non-finite")
+                if logits.shape[-2] != labels.shape[-1]:
+                    raise ValueError(
+                        "validation logits/labels shape mismatch: "
+                        f"logits={tuple(logits.shape)}, labels={tuple(labels.shape)}"
+                    )
+
+                flat_labels = labels.reshape(-1)
+                valid = flat_labels != -100
+                valid_count = int(valid.sum().item())
+                if valid_count:
+                    flat_logits = logits.reshape(-1, logits.size(-1))
+                    token_nll = F.cross_entropy(
+                        flat_logits,
+                        flat_labels,
+                        reduction="none",
+                        ignore_index=-100,
+                    )
+                    nll_sum += float(token_nll[valid].sum().item())
+                    predictions = flat_logits.argmax(dim=-1)
+                    correct_tokens += int((predictions[valid] == flat_labels[valid]).sum().item())
+                    total_tokens += valid_count
+                n_batches += 1
+    finally:
+        _restore_training_modes(modes)
+        _restore_rng(rng_state)
+
+    if total_tokens <= 0:
+        raise ValueError("validation dataset has no non-ignored target tokens")
+    nll = nll_sum / total_tokens
+    if not math.isfinite(nll):
+        raise FloatingPointError("validation NLL is non-finite")
+    perplexity = math.exp(min(nll, math.log(torch.finfo(torch.float64).max)))
+    accuracy = correct_tokens / total_tokens
+    return {
+        "nll": nll,
+        "perplexity": perplexity,
+        "top1_accuracy": accuracy,
+        "top1_token_accuracy": accuracy,
+        "token_accuracy": accuracy,
+        "correct_tokens": correct_tokens,
+        "tokens": total_tokens,
+        "batches": n_batches,
+        "batch_size": batch_size,
+        "start_sequence": start_sequence,
+        "sequences": n_batches * batch_size,
     }
 
 

@@ -18,24 +18,40 @@ def topk_router(
     router: nn.Linear,
     num_experts: int,
     top_k: int,
-) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+) -> tuple[
+    torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, dict[str, torch.Tensor]
+]:
     """Route tokens to top-k experts.
 
-    Returns (expert_indices, expert_weights, router_logits, aux_loss).
+    Returns (expert_indices, expert_weights, router_logits, aux_loss, aux_stats).
+    aux_loss is the frozen C switch-style scalar (byte-identical, so pipeline
+    disabled or whole-batch reproduces C exactly). aux_stats carries the additive
+    sufficient statistics (exp_counts, prob_sum, token_count, slot_count) used to
+    recompute the logical-batch aux exactly in the microbatch pipeline.
     x: (B*T, d_model)
     """
     logits = router(x)  # (N, num_experts)
     weights, indices = torch.topk(logits, top_k, dim=-1)  # (N, top_k)
     weights = F.softmax(weights, dim=-1)
 
-    # Aux load-balancing loss (switch-style): fraction routed * fraction prob
+    # Aux load-balancing loss (switch-style): fraction routed * fraction prob.
+    # Scalar, IDENTICAL to the frozen C reference so the D trajectory is unchanged
+    # whenever the pipeline is disabled or runs whole-batch.
     probs = F.softmax(logits, dim=-1)
-    frac_routed = torch.zeros(num_experts, device=x.device)
-    frac_routed.scatter_add_(0, indices.reshape(-1), torch.ones_like(indices.reshape(-1), dtype=torch.float32))
-    frac_routed = frac_routed / indices.numel()
-    frac_prob = probs.mean(dim=0)
-    aux_loss = num_experts * (frac_routed * frac_prob).sum()
-    return indices, weights, logits, aux_loss
+    counts = torch.zeros(num_experts, device=x.device, dtype=torch.float32)
+    counts.scatter_add_(0, indices.reshape(-1),
+                        torch.ones(indices.numel(), dtype=torch.float32, device=x.device))
+    # Two distinct denominators (frozen C): routed fraction uses votes (N*top_k),
+    # probability fraction uses tokens (N).  Both are additive across
+    # microbatches so the logical-batch aux is exactly recomputable.
+    slot_count = indices.numel()  # N * top_k -> denominator of frac_routed
+    token_count = x.shape[0]      # N         -> denominator of frac_prob
+    frac_routed = counts / slot_count
+    frac_prob = probs.mean(dim=0)  # == prob_sum / N
+    aux_loss = (num_experts * (frac_routed * frac_prob).sum())
+    aux_stats = {"exp_counts": counts, "prob_sum": probs.sum(dim=0),
+                 "token_count": token_count, "slot_count": slot_count}
+    return indices, weights, logits, aux_loss, aux_stats
 
 
 class MoE(nn.Module):
@@ -73,7 +89,7 @@ class MoE(nn.Module):
     ) -> tuple[torch.Tensor, dict[str, torch.Tensor]]:
         B, T, C = x.shape
         flat = x.reshape(B * T, C)
-        indices, weights, logits, aux_loss = topk_router(
+        indices, weights, logits, aux_loss, aux_stats = topk_router(
             flat, self.router, self.config.num_experts, self.config.top_k
         )
 
@@ -99,6 +115,12 @@ class MoE(nn.Module):
             "router_entropy": _router_entropy(logits),
             "expert_load": _expert_load(indices, self.config.num_experts),
         }
+        # Sufficient statistics for exact logical-batch aux aggregation
+        # across pipeline microbatches (sums are additive).
+        stats["router_exp_counts"] = aux_stats["exp_counts"]
+        stats["router_prob_sum"] = aux_stats["prob_sum"]
+        stats["router_token_count"] = torch.as_tensor(aux_stats["token_count"], dtype=torch.float32, device=x.device)
+        stats["router_slot_count"] = torch.as_tensor(aux_stats["slot_count"], dtype=torch.float32, device=x.device)
         return out, stats
 
 

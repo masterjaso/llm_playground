@@ -16,7 +16,8 @@ import torch
 import torch.nn.functional as F
 from torch import nn
 
-from ..config import FlashMiniConfig
+from ..config import FlashMiniConfig, KVConfig
+from ..kvc import KVQuantizer
 from .gated_delta_net import GatedDeltaNet
 from .hyperconnection import GatedResidual, HyperConnection
 from .moe import MoE
@@ -24,14 +25,32 @@ from .ple import PLE, PLEV3
 
 
 class CausalAttention(nn.Module):
+    """v3 rotary causal attention with optional KVC source/reuse roles.
+
+    Plain mode: standard QKV projection, RoPE, SDPA — identical to C.
+
+    KVC source: computes K3/V3, applies RoPE to K3, fake-quantizes BOTH K3 and V3
+    to the shared low-bit bank, and attends Q3 against the quantized bank. The
+    returned bank (dequantized) is the single low-bit tensor used downstream.
+
+    KVC reuse: projects only its Q slice (K and V slices remain allocated but
+    inactive, matching C's parameter layout and initialization); the attention
+    attends Q7 against the EXTERNAL bank produced by the source layer. This
+    preserves matched initialization with C: the full QKV weight tensor is
+    present and initialized identically, but only the first 1/3 slice is used.
+    """
+
     def __init__(self, d_model: int, num_heads: int, head_dim: int, max_seq_len: int, dropout: float = 0.0,
-                 *, architecture_version=2, rope_theta=10000.0):
+                 *, architecture_version=2, rope_theta=10000.0, kvc_role: str | None = None,
+                 quantizer: KVQuantizer | None = None):
         super().__init__()
         self.d_model = d_model
         self.num_heads = num_heads
         self.head_dim = head_dim
         self.architecture_version = architecture_version
         self.rope_theta = rope_theta
+        self.kvc_role = kvc_role  # None, 'source', or 'reuse'
+        self.quantizer = quantizer
         self.qkv = nn.Linear(d_model, 3 * num_heads * head_dim, bias=False)
         self.out = nn.Linear(num_heads * head_dim, d_model, bias=False)
         self.dropout = nn.Dropout(dropout)
@@ -42,22 +61,48 @@ class CausalAttention(nn.Module):
             persistent=False,
         )
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    def _rope(self, t: torch.Tensor, T: int, device: torch.device, dtype) -> torch.Tensor:
+        """Apply rotary positional embedding to a (B, H, T, D) tensor."""
+        frequencies = self.rope_theta ** (-torch.arange(0, self.head_dim, 2, device=device).float() / self.head_dim)
+        angles = torch.arange(T, device=device).float()[:, None] * frequencies[None, :]
+        angles = torch.cat((angles, angles), dim=-1)
+        cos, sin = angles.cos().to(dtype), angles.sin().to(dtype)
+        cos = cos[None, None, :, :]
+        sin = sin[None, None, :, :]
+        first, second = t.chunk(2, dim=-1)
+        return t * cos + torch.cat((-second, first), dim=-1) * sin
+
+    def forward(self, x: torch.Tensor, *, kvc_bank: tuple[torch.Tensor, torch.Tensor] | None = None) -> torch.Tensor | tuple[torch.Tensor, tuple[torch.Tensor, torch.Tensor]]:
+        """Returns the attention output; in source mode, also the KVC bank."""
         B, T, _ = x.shape
         qkv = self.qkv(x).reshape(B, T, 3, self.num_heads, self.head_dim)
         q, k, v = qkv.unbind(dim=2)  # each (B, T, num_heads, head_dim)
         q = q.transpose(1, 2)
         k = k.transpose(1, 2)
         v = v.transpose(1, 2)
+
+        if self.kvc_role == "reuse":
+            # Reuse: Q from own slice, K/V from the external source bank.
+            q_rope = self._rope(q, T, x.device, q.dtype)
+            bank_k, bank_v = kvc_bank
+            out = F.scaled_dot_product_attention(q_rope, bank_k, bank_v, is_causal=True,
+                dropout_p=self.dropout.p if self.training else 0.0)
+            return self.out(out.transpose(1, 2).reshape(B, T, self.num_heads * self.head_dim))
+
+        if self.kvc_role == "source":
+            # Source: RoPE on Q and K, fake-quant K and V, attend Q against bank.
+            q_rope = self._rope(q, T, x.device, q.dtype)
+            k_rope = self._rope(k, T, x.device, k.dtype)
+            bank_k = self.quantizer.quantize_dequantize(k_rope)
+            bank_v = self.quantizer.quantize_dequantize(v)
+            out = F.scaled_dot_product_attention(q_rope, bank_k, bank_v, is_causal=True,
+                dropout_p=self.dropout.p if self.training else 0.0)
+            result = self.out(out.transpose(1, 2).reshape(B, T, self.num_heads * self.head_dim))
+            return result, (bank_k, bank_v)
+
+        # Plain v3 path (unchanged from C)
         if self.architecture_version >= 3:
-            frequencies = self.rope_theta ** (-torch.arange(0, self.head_dim, 2, device=x.device).float() / self.head_dim)
-            angles = torch.arange(T, device=x.device).float()[:, None] * frequencies[None, :]
-            angles = torch.cat((angles, angles), dim=-1)
-            cos, sin = angles.cos().to(q.dtype), angles.sin().to(q.dtype)
-            def rotate(t):
-                first, second = t.chunk(2, dim=-1)
-                return torch.cat((-second, first), dim=-1)
-            q, k = q * cos + rotate(q) * sin, k * cos + rotate(k) * sin
+            q, k = self._rope(q, T, x.device, q.dtype), self._rope(k, T, x.device, k.dtype)
             out = F.scaled_dot_product_attention(q, k, v, is_causal=True,
                 dropout_p=self.dropout.p if self.training else 0.0)
             return self.out(out.transpose(1, 2).reshape(B, T, self.num_heads * self.head_dim))
@@ -70,16 +115,35 @@ class CausalAttention(nn.Module):
 
 
 class Block(nn.Module):
-    """One decoder block: attention-or-GDN + MoE + HyperConnection."""
+    """One decoder block: attention-or-GDN + MoE + HyperConnection.
 
-    def __init__(self, config: FlashMiniConfig, is_attention: bool):
+    For KVC, the first attention block (source) also computes and owns the
+    shared low-bit bank; the reuse block (second attention block) receives that
+    bank as a runtime argument.  The KVC role is resolved from config.kvc_role(i)
+    so the model can be constructed as ``Block(config, i)`` without an extra
+    flag.  Under KVC, the reuse block's K/V slices are INACTIVE but still
+    allocated (same parameter layout / initialization as C).
+    """
+
+    def __init__(self, config: FlashMiniConfig, is_attention: bool, kvc_role: str | None = None):
         super().__init__()
         d = config.d_model
         self.architecture_version = config.architecture_version
         self.norm1 = nn.LayerNorm(d) if config.architecture_version == 2 else nn.Identity()
         if is_attention:
-            self.mixer = CausalAttention(d, config.num_heads, config.head_dim, config.max_seq_len, config.dropout,
-                architecture_version=config.architecture_version, rope_theta=config.rope_theta)
+            quantizer = None
+            if config.kvc.enabled and kvc_role == "source":
+                quantizer = KVQuantizer(
+                    kv_bits=config.kvc.kv_bits,
+                    quant_format=config.kvc.quant_format,
+                    scale_format=config.kvc.scale_format,
+                    scale_group_size=config.kvc.scale_group_size,
+                )
+            self.mixer = CausalAttention(
+                d, config.num_heads, config.head_dim, config.max_seq_len, config.dropout,
+                architecture_version=config.architecture_version, rope_theta=config.rope_theta,
+                kvc_role=kvc_role, quantizer=quantizer,
+            )
         else:
             self.mixer = GatedDeltaNet(
                 d,
@@ -105,13 +169,22 @@ class Block(nn.Module):
             self.attn_hyper_connection = None
             self.mlp_hyper_connection = None
 
-    def forward(self, x: torch.Tensor) -> tuple[torch.Tensor, dict]:
+    def forward(self, x: torch.Tensor, *, kvc_bank=None) -> tuple[torch.Tensor, dict]:
         stats: dict = {}
         if self.architecture_version >= 3:
             if self.attn_hyper_connection is None or self.mlp_hyper_connection is None:
                 raise RuntimeError("v3 block is missing gated residual connections")
             mixed, residual, injection = self.attn_hyper_connection.read_with_injection(x)
-            mixer_out = self.mixer(self.norm1(mixed))
+            role = getattr(self.mixer, "kvc_role", None)
+            if role == "source":
+                mixer_out, bank = self.mixer(self.norm1(mixed))
+                stats["kvc_bank"] = bank
+            elif role == "reuse":
+                if kvc_bank is None:
+                    raise RuntimeError("KVC reuse block requires the source kvc_bank")
+                mixer_out = self.mixer(self.norm1(mixed), kvc_bank=kvc_bank)
+            else:
+                mixer_out = self.mixer(self.norm1(mixed))
             h = self.attn_hyper_connection.write(residual, mixer_out, injection)
             mixed, residual, injection = self.mlp_hyper_connection.read_with_injection(h)
             moe_out, moe_stats = self.moe(self.norm2(mixed))
@@ -140,7 +213,7 @@ class FlashMiniModel(nn.Module):
         # large; use the conventional small LM embedding initialization.
         nn.init.normal_(self.embed.weight, std=0.02)
         self.blocks = nn.ModuleList(
-            [Block(config, config.is_attention_layer(i)) for i in range(config.num_layers)]
+            [Block(config, config.is_attention_layer(i), kvc_role=config.kvc_role(i)) for i in range(config.num_layers)]
         )
         self.norm_f = nn.LayerNorm(config.d_model) if config.architecture_version == 2 else nn.Identity()
         self.head = nn.Linear(config.d_model, config.vocab_size, bias=False)
@@ -226,6 +299,7 @@ class FlashMiniModel(nn.Module):
         if self.config.architecture_version >= 3:
             x = x.repeat(1, 1, self.config.hc_count)
         stats: dict = {}
+        kvc_bank: tuple[torch.Tensor, torch.Tensor] | None = None
         for i, block in enumerate(self.blocks):
             x = x.to(next(block.parameters()).device)
             if self.ple is not None and i == self.config.ple.injection_layer:
@@ -241,9 +315,22 @@ class FlashMiniModel(nn.Module):
                 stats["ple_norm_ratio"] = (ple_out.detach().float().square().mean().sqrt()
                                            / x.detach().float().square().mean().sqrt().clamp_min(1e-8)).to(self.embed.weight.device)
                 x = x + ple_out
-            x, block_stats = block(x)
+            x, block_stats = block(x, kvc_bank=kvc_bank)
+            new_bank = block_stats.get("kvc_bank")
+            if new_bank is not None:
+                kvc_bank = new_bank  # pass through to the reuse block
             for k, v in block_stats.items():
+                if k == "kvc_bank":
+                    continue
                 stats.setdefault(k, []).append(v.to(self.embed.weight.device) if isinstance(v, torch.Tensor) else v)
+            # Carrying the shared K/V bank across a model-parallel stage
+            # boundary moves it to the next block's device while preserving
+            # the autograd graph (the bank is an active compute node, not an
+            # inert constant).
+            if kvc_bank is not None and i + 1 < len(self.blocks):
+                nxt = next(self.blocks[i + 1].parameters()).device
+                if kvc_bank[0].device != nxt:
+                    kvc_bank = (kvc_bank[0].to(nxt), kvc_bank[1].to(nxt))
 
         if self.final_hyper_connection is not None:
             x = self.final_hyper_connection(x.to(self.embed.weight.device))

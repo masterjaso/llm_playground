@@ -32,10 +32,16 @@ class ConfigInvariantTests(unittest.TestCase):
     def test_router_topk(self):
         router = torch.nn.Linear(16, 8, bias=False)
         x = torch.randn(10, 16)
-        indices, weights, logits, aux = topk_router(x, router, 8, 2)
+        indices, weights, logits, aux, stats = topk_router(x, router, 8, 2)
         self.assertEqual(indices.shape, (10, 2))
         self.assertEqual(weights.shape, (10, 2))
         self.assertTrue(torch.isfinite(aux))
+        # Scalar aux must equal the frozen switch-style formula.
+        probs = torch.nn.functional.softmax(logits, -1)
+        fr = torch.zeros(8); fr.scatter_add_(0, indices.reshape(-1), torch.ones(20))
+        fr = fr / 20
+        expected = 8 * (fr * probs.mean(0)).sum()
+        self.assertTrue(torch.allclose(aux, expected))
 
     def test_forward_shapes(self):
         config = FlashMiniConfig(vocab_size=256, d_model=32, num_layers=2, num_heads=2, head_dim=16, max_seq_len=16)

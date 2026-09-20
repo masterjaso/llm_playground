@@ -486,6 +486,7 @@ def train(
     run_metadata: dict[str, Any] | None = None,
     allow_repeated_corpus: bool = False,
     stop_after_tokens: int | None = None,
+    pipeline_microbatch_size: int | None = None,
 ) -> dict:
     """Train for a cumulative padded-token budget and persist a summary.
 
@@ -505,6 +506,14 @@ def train(
         raise ValueError("seq_len and batch_size must be positive")
     if len(dataset) <= 0:
         raise ValueError("training dataset is empty")
+    if pipeline_microbatch_size is not None:
+        if pipeline_microbatch_size <= 0:
+            raise ValueError("pipeline_microbatch_size must be positive")
+        if batch_size % pipeline_microbatch_size:
+            raise ValueError(
+                "pipeline_microbatch_size must divide the logical batch size so that "
+                "each optimizer update consumes a whole logical batch"
+            )
     if log_every < 0:
         raise ValueError("log_every must be non-negative")
     if ckpt_every_tokens < 0:
@@ -570,6 +579,13 @@ def train(
             "gradient_clip_max_norm": 1.0,
             "clipping_policy": "independent_shared_ple_dense_ple_sparse_v3",
             "optimizer_recipe": getattr(optimizer, "_flashmini_recipe", None),
+            "pipeline_microbatch_size": int(pipeline_microbatch_size)
+            if pipeline_microbatch_size is not None
+            else None,
+            "pipeline_schedule": "gpipe"
+            if pipeline_microbatch_size is not None
+            else "monolithic",
+            "optimizer_updates_per_logical_batch": 1,
         }
         run_metadata["tuning_validation_prefix_sequences"] = (
             min(len(val_dataset), val_max_batches) if val_max_batches is not None else len(val_dataset)
@@ -776,14 +792,30 @@ def train(
                 cosine_decay,
                 min_lr_ratio,
             )
-            metrics = train_step(
-                model,
-                optimizer,
-                input_ids,
-                labels,
-                aux_loss_coef=aux_loss_coef,
-                use_amp=use_amp,
-            )
+            if pipeline_microbatch_size is not None:
+                from .pipeline import pipeline_train_step
+                mb = batch_size // pipeline_microbatch_size
+                chunks: list[tuple[torch.Tensor, torch.Tensor]] = [
+                    (input_ids[i * pipeline_microbatch_size:(i + 1) * pipeline_microbatch_size],
+                     labels[i * pipeline_microbatch_size:(i + 1) * pipeline_microbatch_size])
+                    for i in range(mb)
+                ]
+                metrics = pipeline_train_step(
+                    model,
+                    optimizer,
+                    chunks,
+                    aux_loss_coef=aux_loss_coef,
+                    use_amp=use_amp,
+                )
+            else:
+                metrics = train_step(
+                    model,
+                    optimizer,
+                    input_ids,
+                    labels,
+                    aux_loss_coef=aux_loss_coef,
+                    use_amp=use_amp,
+                )
             step += 1
             for group, count in clipping_counts.items():
                 key = f"grad_clipped_{group}"

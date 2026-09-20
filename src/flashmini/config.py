@@ -39,6 +39,42 @@ class GatedDeltaNetConfig:
 
 
 @dataclass
+class KVConfig:
+    """KVC: cross-layer KV sharing + low-bit KV, one on/off feature.
+
+    ``enabled=False`` reproduces treatment C exactly.  ``enabled=True``
+    switches on BOTH mechanisms together: the first global-attention layer of
+    a share group becomes the K/V source and fake-quantizes its K/V bank,
+    and the second attention layer reuses that low-bit bank while generating
+    its own query.
+    """
+
+    enabled: bool = False
+    share_group_size: int = 2
+    kv_bits: int = 4
+    quant_format: str = "e2m1"
+    scale_format: str = "e4m3"
+    scale_group_size: int = 16
+    qat: bool = True
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.enabled, bool) or not isinstance(self.qat, bool):
+            raise ValueError("kvc.enabled and kvc.qat must be booleans")
+        if self.share_group_size != 2:
+            raise ValueError("official PoC_D KVC requires share_group_size=2")
+        if self.kv_bits != 4:
+            raise ValueError("official PoC_D KVC requires kv_bits=4")
+        if self.quant_format != "e2m1":
+            raise ValueError("official PoC_D KVC requires quant_format=e2m1")
+        if self.scale_format != "e4m3":
+            raise ValueError("official PoC_D KVC requires scale_format=e4m3")
+        if self.scale_group_size <= 0 or self.scale_group_size % 2:
+            raise ValueError("kvc.scale_group_size must be a positive even integer")
+        if not self.qat:
+            raise ValueError("PoC_D KVC requires qat=true (deterministic fake-quant)")
+
+
+@dataclass
 class PLEConfig:
     """PLE / Engram n-gram associative memory configuration."""
 
@@ -115,6 +151,7 @@ class FlashMiniConfig:
     moe: MoEConfig = field(default_factory=MoEConfig)
     gdn: GatedDeltaNetConfig = field(default_factory=GatedDeltaNetConfig)
     ple: PLEConfig = field(default_factory=PLEConfig)
+    kvc: KVConfig = field(default_factory=KVConfig)
     # Which layers are full attention (indices into layer list)
     attention_layers: list[int] | None = None
     architecture_version: int = 2
@@ -173,6 +210,7 @@ class FlashMiniConfig:
             if self.gdn.residual_in_mixer is None:
                 self.gdn.residual_in_mixer = True
             self.ple.architecture_version = 2
+        self.kvc.__post_init__()
         if self.attention_layers is None:
             if self.gdn_per_attention <= 0:
                 # Control variant: all layers are full attention (no GDN)
@@ -182,6 +220,9 @@ class FlashMiniConfig:
                 self.attention_layers = list(
                     range(self.gdn_per_attention, self.num_layers, self.gdn_per_attention + 1)
                 )
+        if self.kvc.enabled:
+            if len(self.attention_layers) < 2:
+                raise ValueError("KVC requires at least two attention layers (source + reuse)")
         self.ple.enabled = self.use_ple
         self.ple.d_model = self.d_model
         self.ple.vocab_size = self.vocab_size
@@ -194,6 +235,21 @@ class FlashMiniConfig:
 
     def is_attention_layer(self, idx: int) -> bool:
         return idx in self.attention_layers
+
+    def kvc_role(self, idx: int) -> str | None:
+        """Return 'source' or 'reuse' for a KVC pair member, else None.
+
+        The KVC pair is ``(attention_layers[0], attention_layers[1])``: the
+        first is the KVC source (produces the low-bit K/V bank), the second
+        the reuse layer (generates its own Q, attends against the bank).
+        """
+        if not self.kvc.enabled or self.attention_layers is None or len(self.attention_layers) < 2:
+            return None
+        if idx == self.attention_layers[0]:
+            return "source"
+        if idx == self.attention_layers[1]:
+            return "reuse"
+        return None
 
     def to_dict(self) -> dict:
         values = dataclasses.asdict(self)
@@ -219,6 +275,7 @@ class FlashMiniConfig:
                 "architecture_version",
             ):
                 values["ple"].pop(key, None)
+            values.pop("kvc", None)
         return values
 
     @classmethod
@@ -227,4 +284,5 @@ class FlashMiniConfig:
         d["moe"] = MoEConfig(**d.get("moe", {}))
         d["gdn"] = GatedDeltaNetConfig(**d.get("gdn", {}))
         d["ple"] = PLEConfig(**d.get("ple", {}))
+        d["kvc"] = KVConfig(**d.get("kvc", {}))
         return cls(**d)
