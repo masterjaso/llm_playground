@@ -67,7 +67,8 @@ def cmd_build(args) -> int:
         state["source_cursors"] = {}
     cache_dir = cache_mod.cache_root(args.cache_dir)
     cache_dir.mkdir(parents=True, exist_ok=True)
-    max_bytes = cache_mod.cache_max_bytes(args.cache_gb)
+    max_bytes = cache_mod.cache_max_bytes(
+        int(args.cache_gb * 1024 ** 3) if args.cache_gb else None)
     out_dir = Path(args.out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     exact = dedupe_mod.ExactDedupe()
@@ -100,7 +101,14 @@ def cmd_build(args) -> int:
                     opened, src,
                     limit=min(window, max_docs - total_docs, per_source),
                     start_offset=start_offset)
-            state["source_cursors"][sid] = cursor.offset
+            # Advance the persisted cursor to the NEW position after streaming
+            # (res.cursor.offset), not the pre-stream offset. Using cursor.offset
+            # here would re-read the same window every run and yield only
+            # duplicates.
+            if res.status == "OK":
+                state["source_cursors"][sid] = int(res.cursor.offset)
+            else:
+                state["source_cursors"][sid] = cursor.offset
             if res.status != "OK":
                 state.setdefault("errors", []).append(
                     {"source": sid, "status": res.status, "reason": res.reason})

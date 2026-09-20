@@ -106,7 +106,8 @@ def cmd_plan(args) -> int:
 def cmd_status(args) -> int:
     state = manifests.load_state(Path(args.state))
     root = cache_mod.cache_root(args.cache_dir)
-    st = cache_mod.stats(root, cache_mod.cache_max_bytes(args.cache_gb))
+    st = cache_mod.stats(root, cache_mod.cache_max_bytes(
+        int(args.cache_gb * 1024 ** 3) if args.cache_gb else None))
     from .status import render_dashboard
     print(render_dashboard(state, cache_used_bytes=st.used_bytes,
                            hf_revision=state.get("hf_revision", "")))
@@ -115,7 +116,8 @@ def cmd_status(args) -> int:
 
 def cmd_cache_status(args) -> int:
     root = cache_mod.cache_root(args.cache_dir)
-    st = cache_mod.stats(root, cache_mod.cache_max_bytes(args.cache_gb))
+    st = cache_mod.stats(root, cache_mod.cache_max_bytes(
+        int(args.cache_gb * 1024 ** 3) if args.cache_gb else None))
     print(f"root={st.root} used={st.used_bytes / 1024**3:.2f}GiB "
           f"max={st.max_bytes / 1024**3:.1f}GiB files={st.files} "
           f"disk_avail={st.avail_bytes / 1024**3:.1f}GiB")
@@ -124,7 +126,8 @@ def cmd_cache_status(args) -> int:
 
 def cmd_cache_prune(args) -> int:
     root = cache_mod.cache_root(args.cache_dir)
-    evicted = cache_mod.enforce_bound(root, cache_mod.cache_max_bytes(args.cache_gb))
+    evicted = cache_mod.enforce_bound(root, cache_mod.cache_max_bytes(
+        int(args.cache_gb * 1024 ** 3) if args.cache_gb else None))
     print(f"evicted {len(evicted)} files")
     for p in evicted[:20]:
         print(f"  {p}")
