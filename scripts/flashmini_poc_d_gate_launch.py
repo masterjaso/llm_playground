@@ -82,6 +82,15 @@ LR = 3e-4
 BATCH = 16
 MICROBATCH = 4
 AUX_COEF = 0.01
+# Frozen C screening schedule (docs/flashmini-resume.md) -- D matches C verbatim
+# plus the KVC microbatch pipeline; only the pipeline wiring differs.
+PLE_LR_MULTIPLIER = 5
+WARMUP_TOKENS = 524288
+MIN_LR_RATIO = 0.1
+TOTAL_TOKENS = 250_000_000
+EVAL_EVERY_TOKENS = 2_097_152
+EVAL_MAX_BATCHES = 128
+CHECKPOINT_EVERY_TOKENS = 4_194_304
 
 
 def _tiny_config() -> FlashMiniConfig:
@@ -720,24 +729,39 @@ def main() -> int:
         str(D_CONFIG_PATH),
         "--data-dir",
         str(DATA_DIR),
-        "--batch-size",
-        str(BATCH),
-        "--pipeline-microbatch-size",
-        str(MICROBATCH),
+        "--run-dir",
+        str(run_dir),
         "--model-parallel-gpus",
         "1,0",
         "--gpu-memory-gib",
         f"{MEMORY_GIB:.1f}",
+        "--tokens",
+        str(TOTAL_TOKENS),
+        "--batch-size",
+        str(BATCH),
+        "--grad-accum",
+        "1",
+        "--pipeline-microbatch-size",
+        str(MICROBATCH),
         "--seed",
         str(SEED),
         "--lr",
         str(LR),
-        "--grad-accum",
-        "1",
+        "--ple-lr-multiplier",
+        str(PLE_LR_MULTIPLIER),
+        "--warmup-tokens",
+        str(WARMUP_TOKENS),
+        "--cosine-decay",
+        "--min-lr-ratio",
+        str(MIN_LR_RATIO),
+        "--eval-every-tokens",
+        str(EVAL_EVERY_TOKENS),
+        "--eval-max-batches",
+        str(EVAL_MAX_BATCHES),
+        "--checkpoint-every-tokens",
+        str(CHECKPOINT_EVERY_TOKENS),
         "--log-every",
         "10",
-        "--run-dir",
-        str(run_dir),
     ]
     print("\nLaunching official PoC_D run on cuda:1,cuda:0 ...")
     print("  " + " ".join(cmd))
