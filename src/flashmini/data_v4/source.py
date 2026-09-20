@@ -22,13 +22,11 @@ class SourceResult:
     cursor: SourceCursor = field(default_factory=SourceCursor)
 
 
-def stream_source_window(source: dict, *, limit: int = 50,
-                         cursor: SourceCursor | None = None) -> SourceResult:
-    """Stream one bounded window. Never raises for gated/missing sources."""
+def open_source_stream(source: dict) -> SourceResult:
+    """Open a streaming iterator once per source (avoids repeated skip rescans)."""
     from datasets import load_dataset
     from datasets.exceptions import DatasetNotFoundError
-    cur = cursor or SourceCursor(
-        config=source.get("config"), split=source.get("split", "train"))
+    cur = SourceCursor(config=source.get("config"), split=source.get("split", "train"))
     try:
         ds = load_dataset(
             source["dataset_id"],
@@ -37,29 +35,55 @@ def stream_source_window(source: dict, *, limit: int = 50,
             revision=source.get("revision"),
             streaming=True,
         )
-    except Exception as exc:  # fail-local: record and continue other sources
-        msg = str(exc)
-        low = msg.lower()
-        if any(k in low for k in ("gated", "401", "403", "access denied",
-                                  "terms", "login", "private")):
-            return SourceResult(False, "SOURCE_BLOCKED",
-                                "gated_access_not_accepted", [], cur)
-        if "not found" in low or isinstance(exc, DatasetNotFoundError):
-            return SourceResult(False, "SOURCE_BLOCKED", "dataset_not_found", [], cur)
-        return SourceResult(False, "SOURCE_ERROR", f"{type(exc).__name__}: {msg[:200]}",
-                            [], cur)
+    except Exception as exc:
+        return _classify_open_error(exc, cur)
+    offset = int(source.get("_offset", 0) or 0)
+    iterator = iter(ds.skip(offset) if offset else iter(ds))
+    return SourceResult(True, "OK", "", [], cur), iterator  # type: ignore[return-value]
+
+
+def _classify_open_error(exc: Exception, cur: SourceCursor) -> SourceResult:
+    from datasets.exceptions import DatasetNotFoundError
+    msg = str(exc)
+    low = msg.lower()
+    if any(k in low for k in ("gated", "401", "403", "access denied",
+                              "terms", "login", "private")):
+        return SourceResult(False, "SOURCE_BLOCKED", "gated_access_not_accepted", [], cur)
+    if "not found" in low or isinstance(exc, DatasetNotFoundError):
+        return SourceResult(False, "SOURCE_BLOCKED", "dataset_not_found", [], cur)
+    return SourceResult(False, "SOURCE_ERROR", f"{type(exc).__name__}: {msg[:200]}", [], cur)
+
+
+def stream_records(iterator, source: dict, *, limit: int, start_offset: int = 0) -> SourceResult:
+    """Pull one bounded window from an already-open iterator."""
+    cur = SourceCursor(config=source.get("config"), split=source.get("split", "train"),
+                       offset=start_offset)
     records: list[dict] = []
     try:
-        it = iter(ds.skip(cur.offset) if cur.offset else iter(ds))
-        for i, row in enumerate(it):
+        for i, row in enumerate(iterator):
             if i >= limit:
                 break
-            records.append(_to_record(source, row, cur.offset + i))
+            records.append(_to_record(source, row, start_offset + i))
         cur.offset += len(records)
     except Exception as exc:
         return SourceResult(False, "SOURCE_ERROR",
                             f"{type(exc).__name__}: {str(exc)[:200]}", records, cur)
     return SourceResult(True, "OK", "", records, cur)
+
+
+def stream_source_window(source: dict, *, limit: int = 50,
+                         cursor: SourceCursor | None = None) -> SourceResult:
+    """Stream one bounded window. Never raises for gated/missing sources."""
+    cur = cursor or SourceCursor(
+        config=source.get("config"), split=source.get("split", "train"))
+    src = dict(source)
+    src["_offset"] = cur.offset
+    opened = open_source_stream(src)
+    if isinstance(opened, SourceResult):
+        return opened
+    _result, iterator = opened
+    return stream_records(iterator, source, limit=limit, start_offset=cur.offset)
+
 
 
 def _to_record(source: dict, row: dict, ordinal: int) -> dict:

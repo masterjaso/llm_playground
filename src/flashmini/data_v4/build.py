@@ -35,6 +35,21 @@ def _doc_from_record(rec: dict, src: dict, salt: str) -> dict | None:
     }
 
 
+def _open_or_reuse(streams: dict, sid: str, src: dict, cursor) -> tuple[object, object]:
+    """Open a source iterator once per process; reuse across windows."""
+    entry = streams.get(sid)
+    if entry is None or cursor.offset != entry[1]:
+        src_with_offset = dict(src)
+        src_with_offset["_offset"] = cursor.offset
+        opened = source_mod.open_source_stream(src_with_offset)
+        if isinstance(opened, source_mod.SourceResult):
+            return opened, cursor.offset
+        _result, iterator = opened
+        entry = (iterator, cursor.offset)
+        streams[sid] = entry
+    return entry[0], entry[1]
+
+
 def cmd_build(args) -> int:
     hf_store.load_token()  # set HF_TOKEN for datasets streaming rate limits
     recipe = recipes_mod.load_recipe(Path(args.recipe))
@@ -65,6 +80,7 @@ def cmd_build(args) -> int:
     window = getattr(args, "window", 500)
     shard_docs = getattr(args, "shard_docs", 2000)
     per_source = getattr(args, "per_source_docs", max_docs)
+    streams: dict = {}
     for domain, dom in recipe["domains"].items():
         for sid in dom["sources"]:
             if total_docs >= max_docs:
@@ -74,9 +90,14 @@ def cmd_build(args) -> int:
             cursor = source_mod.SourceCursor(
                 config=src.get("config"), split=src.get("split", "train"),
                 offset=int(state["source_cursors"].get(sid, 0)))
-            res = source_mod.stream_source_window(
-                src, limit=min(window, max_docs - total_docs, per_source),
-                cursor=cursor)
+            opened, start_offset = _open_or_reuse(streams, sid, src, cursor)
+            if isinstance(opened, source_mod.SourceResult):
+                res = opened
+            else:
+                res = source_mod.stream_records(
+                    opened, src,
+                    limit=min(window, max_docs - total_docs, per_source),
+                    start_offset=start_offset)
             state["source_cursors"][sid] = cursor.offset
             if res.status != "OK":
                 state.setdefault("errors", []).append(
