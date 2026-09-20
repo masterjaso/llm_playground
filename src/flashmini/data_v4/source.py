@@ -72,17 +72,49 @@ def stream_records(iterator, source: dict, *, limit: int, start_offset: int = 0)
 
 
 def stream_source_window(source: dict, *, limit: int = 50,
-                         cursor: SourceCursor | None = None) -> SourceResult:
-    """Stream one bounded window. Never raises for gated/missing sources."""
+                         cursor: SourceCursor | None = None,
+                         max_retries: int = 5) -> SourceResult:
+    """Stream one bounded window. Never raises for gated/missing sources.
+    Retries transient network errors with exponential backoff."""
     cur = cursor or SourceCursor(
         config=source.get("config"), split=source.get("split", "train"))
     src = dict(source)
     src["_offset"] = cur.offset
-    opened = open_source_stream(src)
-    if isinstance(opened, SourceResult):
-        return opened
-    _result, iterator = opened
-    return stream_records(iterator, source, limit=limit, start_offset=cur.offset)
+    for attempt in range(max_retries + 1):
+        opened = open_source_stream(src)
+        if isinstance(opened, SourceResult):
+            if attempt == max_retries or not _is_retryable(opened):
+                return opened
+            time.sleep(min(2 ** attempt, 30) + _jitter())
+            continue
+        _result, iterator = opened
+        res = stream_records(iterator, source, limit=limit, start_offset=cur.offset)
+        # On transient network errors during streaming, retry from scratch
+        if attempt < max_retries and _is_retryable(res):
+            time.sleep(min(2 ** attempt, 30) + _jitter())
+            continue
+        return res
+    return res
+
+
+def _is_retryable(result: SourceResult) -> bool:
+    """Only retry transient network/IO errors, not auth/blocked/missing."""
+    if result.status == "OK":
+        return False
+    msg = (result.reason or "").lower()
+    retryable_keywords = (
+        "bad file descriptor", "broken pipe", "connection reset",
+        "timeout", "temporary failure", "network", "http error",
+        "too many requests", "rate limit", "server error",
+        "remote end closed", "errno 9", "io error", "socket",
+    )
+    return any(k in msg for k in retryable_keywords)
+
+
+def _jitter() -> float:
+    """Small random jitter to avoid thundering herd."""
+    import random as _random
+    return _random.uniform(0, 0.5)
 
 
 
