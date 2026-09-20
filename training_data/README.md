@@ -67,3 +67,27 @@ Every source carries `redistribution_class`. Only `mirror_allowed` and
 `generated_owned` content bytes are published; everything else stores
 pinned recipe/provenance (fail-closed). Dataset cards retain source licenses;
 no relicensing under the code license. See `SOURCES.md`, `ARCHITECTURE.md`.
+
+## Current corpus-v1 status
+
+Frozen release available on HF:
+
+```bash
+flashmini-data verify --recipe training_data/recipes/flashmini_1b_full_v1.yaml
+```
+
+| Field | Value |
+|---|---|
+| HF repo | `mjaso/flashmini-data-v1` @ `f13e9cee67eb…` |
+| Shards | 84 published + verified |
+| Documents | 92,373 (train 91,907 / val 466) |
+| Estimated tokens | ~1.76 B |
+| Fingerprint | `af4439de1e1a6d25c97759cba67947397f39740cb7d99b61df22453c9bd74aa5` |
+| Train-smoke | passes (integrity valid, consumed across shards) |
+| Resume-check | identical=True |
+
+Known gap: 12 shards (~13,900 docs, finemath + stackv2_edu) were lost during
+an interrupted build and are documented in `manifests/README.md`. Their
+source pools remain pinned for a follow-up build. Scale-up beyond corpus-v1
+continues with `flashmini-data build` resuming from `build_state.json`
+cursors toward the 100B-token recipe target.
