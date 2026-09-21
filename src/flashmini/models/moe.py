@@ -94,14 +94,39 @@ class MoE(nn.Module):
         )
 
         out = torch.zeros_like(flat)
-        # Dispatch tokens to experts
-        for e in range(self.config.num_experts):
-            mask = indices == e  # (N, top_k)
-            if mask.any():
-                # tokens that routed to expert e (may appear multiple times)
-                token_ids, slot = mask.nonzero(as_tuple=True)
-                expert_out = self.experts[e](flat[token_ids])
-                out.index_add_(0, token_ids, expert_out * weights[token_ids, slot].unsqueeze(-1))
+        # Dispatch tokens to experts.
+        #
+        # `mask.any()` + `mask.nonzero()` forced two host round-trips per expert
+        # per layer (32 device synchronizations per MoE layer per microbatch),
+        # which made the training step CPU-bound rather than GPU-bound.  The
+        # stable-argsort form below needs exactly one small host transfer (the
+        # per-expert counts) per layer, because the per-expert slice bounds must
+        # exist as host integers to size the expert calls.
+        #
+        # The math is unchanged: a stable argsort of the flattened (token, slot)
+        # index visits pairs in the same (token, slot) lexicographic order as
+        # `mask.nonzero()`, so `index_add_` accumulates each expert's
+        # contributions in the identical order and the result is bit-identical.
+        num_experts = self.config.num_experts
+        top_k = self.config.top_k
+        flat_indices = indices.reshape(-1)
+        order = torch.argsort(flat_indices, stable=True)
+        sorted_indices = flat_indices[order]
+        boundaries = torch.searchsorted(
+            sorted_indices,
+            torch.arange(num_experts + 1, device=x.device, dtype=flat_indices.dtype),
+        )
+        counts = (boundaries[1:] - boundaries[:-1]).tolist()
+        start = 0
+        for e, count in enumerate(counts):
+            if count == 0:
+                continue
+            rows = order[start:start + count]
+            start += count
+            token_ids = torch.div(rows, top_k, rounding_mode="floor")
+            slot = rows - token_ids * top_k
+            expert_out = self.experts[e](flat[token_ids])
+            out.index_add_(0, token_ids, expert_out * weights[token_ids, slot].unsqueeze(-1))
 
         # Shared experts
         for se in self.shared_experts:
