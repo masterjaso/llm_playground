@@ -717,6 +717,18 @@ def train(
     step = 0
     tokens_seen = 0
     real_tokens_seen = 0
+    # Padding-excluded token counts accumulate on the training device and are
+    # folded into the host counter only where the value is read (logging,
+    # checkpointing, summary). Reading it every step would drain the launch queue.
+    real_tokens_pending: torch.Tensor | None = None
+
+    def fold_real_tokens() -> int:
+        nonlocal real_tokens_pending, real_tokens_seen
+        if real_tokens_pending is not None:
+            real_tokens_seen += int(real_tokens_pending.item())
+            real_tokens_pending = None
+        return real_tokens_seen
+
     previous_wall_clock = 0.0
     evaluations: list[dict[str, Any]] = []
     clipping_counts = {group: 0 for group in ("shared", "ple_dense", "ple_sparse")}
@@ -884,7 +896,7 @@ def train(
             keep_latest_only=True,
             extra={**_checkpoint_extra(
                 tokens_seen=tokens_seen,
-                real_tokens_seen=real_tokens_seen,
+                real_tokens_seen=fold_real_tokens(),
                 wall_clock_seconds=elapsed_seconds(),
                 sampling_rng=sampling_rng,
                 training_metadata=training_meta,
@@ -910,7 +922,13 @@ def train(
             if batch_tokens <= 0:
                 raise ValueError("dataset returned an empty input batch")
 
-            timing_this_step = bool(log_every) and step % log_every == 0 and torch.cuda.is_available()
+            # The record is logged as step + 1, so the execution metrics must be
+            # timed on the same step the log condition will select.
+            timing_this_step = (
+                bool(log_every)
+                and (step + 1) % log_every == 0
+                and torch.cuda.is_available()
+            )
             step_begin = torch.cuda.Event(enable_timing=True) if timing_this_step else None
             step_end = None
             if step_begin is not None:
@@ -972,7 +990,11 @@ def train(
                     clipping_counts[group] = count + int(metrics[key])
                     metrics[f"grad_clip_fraction_{group}"] = clipping_counts[group] / step
             tokens_seen += batch_tokens
-            real_tokens_seen += int((labels != -100).sum().item())
+            real_batch = labels != -100
+            step_real = real_batch.sum()
+            real_tokens_pending = (
+                step_real if real_tokens_pending is None else real_tokens_pending + step_real
+            )
             lr_groups = _learning_rates(optimizer)
             metrics["lr_groups"] = lr_groups
             metrics["learning_rates"] = lr_groups
@@ -998,6 +1020,7 @@ def train(
 
             if log_every and step % log_every == 0:
                 elapsed = elapsed_seconds()
+                fold_real_tokens()
                 tok_per_sec = tokens_seen / elapsed if elapsed > 0 else 0.0
                 real_tok_per_sec = real_tokens_seen / elapsed if elapsed > 0 else 0.0
                 metrics_log.log(
@@ -1036,7 +1059,7 @@ def train(
                     "event": "validation",
                     "step": step,
                     "tokens_seen": tokens_seen,
-                    "real_tokens_seen": real_tokens_seen,
+                    "real_tokens_seen": fold_real_tokens(),
                     "validation": validation,
                     "val_nll": validation["ple_on"]["nll"],
                     "val_perplexity": validation["ple_on"]["perplexity"],
@@ -1071,7 +1094,7 @@ def train(
         "clipping_counts": clipping_counts,
         "steps": step,
         "tokens_seen": tokens_seen,
-        "real_tokens_seen": real_tokens_seen,
+        "real_tokens_seen": fold_real_tokens(),
         "wall_clock_seconds": elapsed,
         "tok_per_sec": tokens_seen / elapsed if elapsed > 0 else 0.0,
         "real_tok_per_sec": real_tokens_seen / elapsed if elapsed > 0 else 0.0,

@@ -67,22 +67,26 @@ def _checkpoint_step(path: Path) -> int | None:
     return int(parts[1])
 
 
-def find_newest_valid_checkpoint(directory: Path) -> tuple[Path, int, int]:
+def find_newest_valid_checkpoint(directories: list[Path]) -> tuple[Path, int, int]:
     """Return ``(path, step, tokens_seen)`` for the newest loadable checkpoint.
 
+    Directories are searched newest-step-first across all of them, so a resumed
+    run that already wrote a checkpoint wins over the original run's older one.
     Partial writes (``*.tmp``) and checkpoints that fail to load are skipped, so
     a crash at a checkpoint boundary costs only the tokens since the previous
     complete checkpoint.
     """
-    if not directory.is_dir():
-        raise SystemExit(f"no checkpoint directory: {directory}")
-    candidates = sorted(
-        (path for path in directory.glob("step_*.pt") if _checkpoint_step(path) is not None),
-        key=lambda path: _checkpoint_step(path) or -1,
-        reverse=True,
-    )
+    candidates: list[Path] = []
+    for directory in directories:
+        if not directory.is_dir():
+            continue
+        candidates.extend(
+            path for path in directory.glob("step_*.pt") if _checkpoint_step(path) is not None
+        )
     if not candidates:
-        raise SystemExit(f"no step_*.pt checkpoints in {directory}")
+        searched = ", ".join(str(directory) for directory in directories)
+        raise SystemExit(f"no step_*.pt checkpoints in {searched}")
+    candidates.sort(key=lambda path: _checkpoint_step(path) or -1, reverse=True)
     failures: list[str] = []
     for path in candidates:
         try:
@@ -167,7 +171,9 @@ def main(argv=None) -> int:
     else:
         # Loading verifies the newest checkpoint; its CPU copy is released before
         # the training process allocates its own model and optimizer.
-        checkpoint, _, _ = find_newest_valid_checkpoint(SOURCE_RUN_DIR / "checkpoints")
+        checkpoint, _, _ = find_newest_valid_checkpoint(
+            [TARGET_RUN_DIR / "checkpoints", SOURCE_RUN_DIR / "checkpoints"]
+        )
     command = build_command(
         checkpoint, schedule=args.schedule, microbatch=microbatch, stage_split=stage_split
     )

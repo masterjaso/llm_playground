@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from collections.abc import Iterable
 from typing import Any
 
@@ -172,9 +173,11 @@ def _gradient_stats(values: Iterable[torch.Tensor], max_norm: float) -> tuple[fl
     squares = 0.0
     for norms in norms_by_device.values():
         aggregate = torch.stack(norms).square().sum()
-        if not torch.isfinite(aggregate).item():
-            raise FloatingPointError("Nonfinite gradient; optimizer step refused")
         squares += float(aggregate)
+    # One host read per device group, and the finiteness check rides on the same
+    # read: squares only becomes non-finite when a gradient norm was.
+    if not math.isfinite(squares):
+        raise FloatingPointError("Nonfinite gradient; optimizer step refused")
     norm = squares ** 0.5
     coefficient = min(1.0, max_norm / (norm + 1e-6))
     return norm, coefficient, coefficient < 1.0
