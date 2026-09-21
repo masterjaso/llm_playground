@@ -150,6 +150,17 @@ def cmd_build(args) -> int:
     except RuntimeError as exc:
         print(f"build: cache bound: {exc}")
         return 2
+    # Explicitly release streaming iterators: the HF streaming generator holds
+    # sockets that otherwise keep the process alive after cmd_build returns.
+    for entry in streams.values():
+        try:
+            iterator = entry[0]
+            closer = getattr(iterator, "close", None)
+            if closer is not None:
+                closer()
+        except Exception:
+            pass
+    streams.clear()
     print(f"build: docs_this_run={total_docs} shards={len(state.get('published_shards', []))}")
     return 0
 
