@@ -796,12 +796,17 @@ def train(
         current_policy = run_metadata.get("execution_policy") or {}
         saved_executor = {key: saved_policy.get(key) for key in _EXECUTOR_POLICY_FIELDS}
         current_executor = {key: current_policy.get(key) for key in _EXECUTOR_POLICY_FIELDS}
+        previous_transitions = list((extra.get("run_metadata") or {}).get("execution_transitions") or [])
+        if not previous_transitions:
+            ancestor = (extra.get("run_metadata") or {}).get("execution_transition")
+            if isinstance(ancestor, dict) and ancestor:
+                previous_transitions = [ancestor]
         if saved_executor != current_executor:
             # Record the authorized executor change instead of pretending the run
             # always used one engine. The architecture, logical batch and
             # optimizer are unchanged: only how the same logical update is
             # scheduled differs.
-            run_metadata["execution_transition"] = {
+            transition = {
                 "from": saved_policy.get("pipeline_schedule"),
                 "to": current_policy.get("pipeline_schedule"),
                 "from_microbatch_size": saved_policy.get("pipeline_microbatch_size"),
@@ -815,6 +820,13 @@ def train(
                 "parent_tokens_seen": int(extra.get("tokens_seen", 0)),
                 "parent_step": int(meta["step"]),
             }
+            run_metadata["execution_transition"] = transition
+            run_metadata["execution_transitions"] = previous_transitions + [transition]
+        elif previous_transitions and "execution_transitions" not in run_metadata:
+            # The executor did not change on this resume, but an ancestor did: keep
+            # the lineage in the checkpoint provenance instead of letting it die.
+            run_metadata["execution_transitions"] = previous_transitions
+            run_metadata["execution_transition"] = previous_transitions[-1]
         if saved_base_lrs is not None:
             base_lrs = _capture_base_lrs(optimizer, saved_base_lrs)
         else:
