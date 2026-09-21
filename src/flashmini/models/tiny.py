@@ -265,25 +265,142 @@ class FlashMiniModel(nn.Module):
                 if bias is not None:
                     nn.init.zeros_(bias)
 
-    def parallelize(self, devices: list[torch.device]) -> FlashMiniModel:
+    def parallelize(self, devices: list[torch.device], stage_split: int | None = None) -> FlashMiniModel:
         """Shard consecutive blocks; keep tied embedding/head on the first device.
 
         This is sequential model parallelism, not replicated data parallelism.
         Place before optimizer construction; CPU PLE rows remain on the host.
+
+        ``stage_split`` pins the pipeline boundary explicitly: blocks
+        ``[0, stage_split)`` go to ``devices[0]`` and ``[stage_split, num_layers)``
+        to ``devices[1]``.  The default keeps the historical even split.  Only
+        device placement changes; parameter identity, shape and names do not, so
+        existing checkpoints load unchanged.
         """
         if not devices or len(devices) > len(self.blocks):
             raise ValueError("Need between one and num_layers devices")
+        if stage_split is None:
+            placement = [
+                devices[min(i * len(devices) // len(self.blocks), len(devices) - 1)]
+                for i in range(len(self.blocks))
+            ]
+        else:
+            if len(devices) != 2:
+                raise ValueError("stage_split requires exactly two model-parallel devices")
+            if not 0 < stage_split < len(self.blocks):
+                raise ValueError(
+                    "stage_split must leave at least one block on each device"
+                )
+            placement = [devices[0]] * stage_split + [devices[1]] * (len(self.blocks) - stage_split)
         self.embed.to(devices[0])
         self.head.to(devices[0])
         self.norm_f.to(devices[0])
         if self.final_hyper_connection is not None:
             self.final_hyper_connection.to(devices[0])
         for i, block in enumerate(self.blocks):
-            device = devices[min(i * len(devices) // len(self.blocks), len(devices) - 1)]
-            block.to(device)
+            block.to(placement[i])
             if self.ple is not None and i == self.config.ple.injection_layer:
-                self.ple.to(device)
+                self.ple.to(placement[i])
+        self.block_devices = list(placement)
+        # First block index owned by a device other than the first block's.
+        self.stage_split = next(
+            (i for i, device in enumerate(placement) if device != placement[0]),
+            len(placement),
+        )
         return self
+
+    def _ple_injection(self, x, input_ids, ple_enabled, stats):
+        """Inject PLE at its configured layer and record its statistics."""
+        enabled = True if ple_enabled is None else ple_enabled
+        ple_out = self.ple.forward_with_ablation(input_ids.to(x.device), enabled, x)
+        stats["ple_active"] = float(enabled)
+        ple_scale = getattr(self.ple, "scale", None)
+        if ple_scale is None:
+            ple_scale = torch.ones(1, device=self.embed.weight.device, dtype=x.dtype)
+        else:
+            ple_scale = ple_scale.detach().tanh().to(self.embed.weight.device)
+        stats["ple_scale"] = ple_scale
+        stats["ple_norm_ratio"] = (ple_out.detach().float().square().mean().sqrt()
+                                   / x.detach().float().square().mean().sqrt().clamp_min(1e-8)).to(self.embed.weight.device)
+        return x + ple_out
+
+    def _run_blocks(self, x, start, end, *, input_ids=None, kvc_bank=None, ple_enabled=None,
+                    stats=None, stats_device=None):
+        """Run blocks ``[start, end)`` in order, carrying the KVC bank.
+
+        With ``stats_device=None`` every statistic stays on the device that
+        produced it, which is what the overlapped pipeline wants: moving each
+        one across the stage boundary is a synchronization cost with no benefit,
+        because aggregation happens on device tensors anyway.
+        """
+        stats = {} if stats is None else stats
+        for i in range(start, end):
+            block = self.blocks[i]
+            x = x.to(next(block.parameters()).device)
+            if self.ple is not None and i == self.config.ple.injection_layer:
+                x = self._ple_injection(x, input_ids, ple_enabled, stats)
+            x, block_stats = block(x, kvc_bank=kvc_bank)
+            new_bank = block_stats.get("kvc_bank")
+            if new_bank is not None:
+                kvc_bank = new_bank  # pass through to the reuse block
+            for k, v in block_stats.items():
+                if k == "kvc_bank":
+                    continue
+                if stats_device is not None and isinstance(v, torch.Tensor):
+                    v = v.to(stats_device)
+                stats.setdefault(k, []).append(v)
+            # Carrying the shared K/V bank to the next block's device preserves
+            # the autograd graph (the bank is an active compute node, not an
+            # inert constant). A stage boundary transfers it exactly once, in
+            # the pipeline executor, not here.
+            if kvc_bank is not None and i + 1 < end:
+                nxt = next(self.blocks[i + 1].parameters()).device
+                if kvc_bank[0].device != nxt:
+                    kvc_bank = (kvc_bank[0].to(nxt), kvc_bank[1].to(nxt))
+        return x, kvc_bank, stats
+
+    def pipeline_stage0(self, input_ids, *, stage_end=None, ple_enabled=None,
+                        stats_device=None) -> dict:
+        """First pipeline stage: embedding, PLE injection, blocks ``[0, stage_end)``.
+
+        Returns the hidden activation, the KVC bank when the boundary sits after
+        the source layer, and this stage's routing/PLE statistics.  Everything
+        needed by the next stage is present in the mapping; nothing is
+        transferred implicitly.
+        """
+        stage_end = len(self.blocks) if stage_end is None else stage_end
+        x = self.embed(input_ids)
+        if self.config.architecture_version >= 3:
+            x = x.repeat(1, 1, self.config.hc_count)
+        x, kvc_bank, stats = self._run_blocks(
+            x, 0, stage_end, input_ids=input_ids, ple_enabled=ple_enabled,
+            stats={}, stats_device=stats_device,
+        )
+        return {"hidden": x, "kvc_bank": kvc_bank, "stats": stats}
+
+    def pipeline_stage1(self, hidden, *, stage_start, stage_end=None, kvc_bank=None,
+                        input_ids=None, ple_enabled=None, stats=None,
+                        stats_device=None) -> dict:
+        """Middle pipeline stage: blocks ``[stage_start, stage_end)``."""
+        stage_end = len(self.blocks) if stage_end is None else stage_end
+        x, kvc_bank, stats = self._run_blocks(
+            hidden, stage_start, stage_end, input_ids=input_ids, kvc_bank=kvc_bank,
+            ple_enabled=ple_enabled, stats=stats, stats_device=stats_device,
+        )
+        return {"hidden": x, "kvc_bank": kvc_bank, "stats": stats}
+
+    def pipeline_output(self, hidden) -> dict:
+        """Output stage: final residual combination, normalization, tied head."""
+        x = hidden.to(self.embed.weight.device)
+        if self.final_hyper_connection is not None:
+            x = self.final_hyper_connection(x)
+        x = self.norm_f(x)
+        return {"logits": self.head(x)}
+
+    @staticmethod
+    def pipeline_loss(logits: torch.Tensor, labels: torch.Tensor) -> torch.Tensor:
+        """Cross-entropy over a flattened logit/label pair (mean over tokens)."""
+        return F.cross_entropy(logits.reshape(-1, logits.size(-1)), labels.reshape(-1))
 
     def forward(
         self,
@@ -295,50 +412,15 @@ class FlashMiniModel(nn.Module):
 
         Returns dict with 'logits' (or 'loss'), and 'stats' (routing/ple stats).
         """
-        x = self.embed(input_ids)
-        if self.config.architecture_version >= 3:
-            x = x.repeat(1, 1, self.config.hc_count)
-        stats: dict = {}
-        kvc_bank: tuple[torch.Tensor, torch.Tensor] | None = None
-        for i, block in enumerate(self.blocks):
-            x = x.to(next(block.parameters()).device)
-            if self.ple is not None and i == self.config.ple.injection_layer:
-                enabled = True if ple_enabled is None else ple_enabled
-                ple_out = self.ple.forward_with_ablation(input_ids.to(x.device), enabled, x)
-                stats["ple_active"] = float(enabled)
-                ple_scale = getattr(self.ple, "scale", None)
-                if ple_scale is None:
-                    ple_scale = torch.ones(1, device=self.embed.weight.device, dtype=x.dtype)
-                else:
-                    ple_scale = ple_scale.detach().tanh().to(self.embed.weight.device)
-                stats["ple_scale"] = ple_scale
-                stats["ple_norm_ratio"] = (ple_out.detach().float().square().mean().sqrt()
-                                           / x.detach().float().square().mean().sqrt().clamp_min(1e-8)).to(self.embed.weight.device)
-                x = x + ple_out
-            x, block_stats = block(x, kvc_bank=kvc_bank)
-            new_bank = block_stats.get("kvc_bank")
-            if new_bank is not None:
-                kvc_bank = new_bank  # pass through to the reuse block
-            for k, v in block_stats.items():
-                if k == "kvc_bank":
-                    continue
-                stats.setdefault(k, []).append(v.to(self.embed.weight.device) if isinstance(v, torch.Tensor) else v)
-            # Carrying the shared K/V bank across a model-parallel stage
-            # boundary moves it to the next block's device while preserving
-            # the autograd graph (the bank is an active compute node, not an
-            # inert constant).
-            if kvc_bank is not None and i + 1 < len(self.blocks):
-                nxt = next(self.blocks[i + 1].parameters()).device
-                if kvc_bank[0].device != nxt:
-                    kvc_bank = (kvc_bank[0].to(nxt), kvc_bank[1].to(nxt))
-
-        if self.final_hyper_connection is not None:
-            x = self.final_hyper_connection(x.to(self.embed.weight.device))
-        x = self.norm_f(x.to(self.embed.weight.device))
-        logits = self.head(x)
-
-        result: dict = {"logits": logits, "stats": stats}
+        stats_device = self.embed.weight.device
+        staged = self.pipeline_stage0(
+            input_ids, ple_enabled=ple_enabled, stats_device=stats_device
+        )
+        result: dict = {
+            "logits": self.pipeline_output(staged["hidden"])["logits"],
+            "stats": staged["stats"],
+        }
         if labels is not None:
-            loss = F.cross_entropy(logits.reshape(-1, logits.size(-1)), labels.reshape(-1))
-            result["loss"] = loss
+            result["loss"] = self.pipeline_loss(result["logits"], labels)
         return result
+

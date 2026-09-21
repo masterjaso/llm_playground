@@ -43,6 +43,7 @@ from flashmini.models import FlashMiniModel
 from flashmini.pipeline import (
     _StatsAccumulator,
     _logical_aux,
+    overlapped_pipeline_train_step,
     pipeline_train_step,
 )
 from flashmini.optim import build_optimizer
@@ -395,3 +396,122 @@ def test_batched_eval_equals_per_sequence(tmp_path):
     assert p["tokens"] == b4["tokens"] == b8["tokens"]
     assert abs(p["nll"] - b4["nll"]) < 1e-5
     assert abs(p["nll"] - b8["nll"]) < 1e-5
+
+
+# --- staged execution ---------------------------------------------------------
+
+
+def test_staged_stages_reproduce_forward_exactly(tmp_path):
+    """``pipeline_stage0`` + ``pipeline_stage1`` + ``pipeline_output`` run the same
+    modules in the same order as ``forward``, so the staged engine cannot change
+    the model's output."""
+    dataset = make_data(tmp_path)
+    i, l = _batch(dataset, 8, DEVICE)
+    cfg = _tiny_config(kvc=True)
+    m = _build(cfg)
+    m.eval()
+    split = 4
+    with torch.no_grad():
+        reference = m(i, labels=l)
+        staged = m.pipeline_stage0(i, stage_end=split)
+        assert staged["kvc_bank"] is not None, "the KVC source bank must leave stage 0"
+        stage_b = m.pipeline_stage1(
+            staged["hidden"], stage_start=split, kvc_bank=staged["kvc_bank"]
+        )
+        logits = m.pipeline_output(stage_b["hidden"])["logits"]
+        loss = m.pipeline_loss(logits, l)
+    assert torch.equal(logits, reference["logits"])
+    assert torch.equal(loss, reference["loss"])
+    # Both stages contribute routing statistics: blocks 0-3 and 4-9.
+    assert len(staged["stats"]["router_prob_sum"]) == 4
+    assert len(stage_b["stats"]["router_prob_sum"]) == 4
+
+
+def test_stage_split_preserves_parameter_names():
+    """Explicit stage placement is device placement only: checkpoint parameter
+    names, shapes and count are unchanged."""
+    cfg = _tiny_config(kvc=True)
+    model = FlashMiniModel(cfg)
+    names = list(model.state_dict().keys())
+    for invalid in (0, cfg.num_layers):
+        with pytest.raises(ValueError, match="stage_split"):
+            model.parallelize([DEVICE, DEVICE], stage_split=invalid)
+    with pytest.raises(ValueError, match="two model-parallel devices"):
+        model.parallelize([DEVICE], stage_split=2)
+    model.parallelize([DEVICE, torch.device("meta")], stage_split=4)
+    assert model.stage_split == 4
+    assert list(model.state_dict().keys()) == names
+    assert names == list(FlashMiniModel(cfg).state_dict().keys())
+
+
+def test_overlapped_engine_matches_serial_on_one_device(tmp_path):
+    """Without two distinct CUDA devices the overlapped engine falls back to the
+    serial engine, so the update is identical rather than quietly different."""
+    dataset = make_data(tmp_path)
+    i, l = _batch(dataset, 8, DEVICE)
+    cfg = _tiny_config(kvc=True)
+    mb = 4
+    chunks = [(i[k * mb:(k + 1) * mb], l[k * mb:(k + 1) * mb]) for k in range(8 // mb)]
+
+    m_serial = _build(cfg)
+    opt_serial = build_optimizer(m_serial, lr=0.001)
+    out_serial = pipeline_train_step(
+        m_serial, opt_serial, chunks, aux_loss_coef=0.01, use_amp=False
+    )
+
+    m_overlapped = _build(cfg)
+    opt_overlapped = build_optimizer(m_overlapped, lr=0.001)
+    out_overlapped = overlapped_pipeline_train_step(
+        m_overlapped, opt_overlapped, chunks, aux_loss_coef=0.01, use_amp=False
+    )
+
+    for key in ("loss", "total_loss", "grad_norm", "router_aux_loss"):
+        assert abs(float(out_serial[key]) - float(out_overlapped[key])) < 1e-9, key
+    for name, value in m_serial.state_dict().items():
+        assert torch.equal(value, m_overlapped.state_dict()[name]), name
+
+
+def test_execution_schedule_identifiers_are_distinct():
+    """The serial and overlapped engines carry different policy identifiers, the
+    historical "gpipe" label normalizes to the serial engine, and the transition
+    authorization covers the executor only."""
+    from flashmini.pipeline import (
+        LEGACY_SCHEDULE,
+        MONOLITHIC_SCHEDULE,
+        OVERLAPPED_SCHEDULE,
+        SERIAL_SCHEDULE,
+    )
+    from flashmini.training import _execution_policy_mismatch, _resolve_pipeline_schedule
+
+    assert len({MONOLITHIC_SCHEDULE, SERIAL_SCHEDULE, OVERLAPPED_SCHEDULE}) == 3
+    assert LEGACY_SCHEDULE not in (SERIAL_SCHEDULE, OVERLAPPED_SCHEDULE)
+    assert _resolve_pipeline_schedule(None, None) == MONOLITHIC_SCHEDULE
+    assert _resolve_pipeline_schedule(None, 4) == SERIAL_SCHEDULE
+    assert _resolve_pipeline_schedule(LEGACY_SCHEDULE, 4) == SERIAL_SCHEDULE
+    assert _resolve_pipeline_schedule(OVERLAPPED_SCHEDULE, 4) == OVERLAPPED_SCHEDULE
+    with pytest.raises(ValueError, match="pipeline_microbatch_size"):
+        _resolve_pipeline_schedule(OVERLAPPED_SCHEDULE, None)
+    with pytest.raises(ValueError, match="monolithic"):
+        _resolve_pipeline_schedule(MONOLITHIC_SCHEDULE, 4)
+    with pytest.raises(ValueError, match="unknown pipeline_schedule"):
+        _resolve_pipeline_schedule("no-such-engine", 4)
+
+    legacy = {"pipeline_schedule": LEGACY_SCHEDULE, "pipeline_microbatch_size": 4}
+    serial = {"pipeline_schedule": SERIAL_SCHEDULE, "pipeline_microbatch_size": 4}
+    overlap = {"pipeline_schedule": OVERLAPPED_SCHEDULE, "pipeline_microbatch_size": 4,
+               "pipeline_stage_split": 4}
+    # A pure label rename is not an executor change.
+    assert _execution_policy_mismatch(legacy, serial, allow_transition=False) is None
+    assert _execution_policy_mismatch(serial, serial, allow_transition=False) is None
+    # A real executor change needs the explicit authorization.
+    assert _execution_policy_mismatch(legacy, overlap, allow_transition=False) is not None
+    assert _execution_policy_mismatch(legacy, overlap, allow_transition=True) is None
+    # The authorization covers the executor only.
+    assert _execution_policy_mismatch(
+        legacy, dict(overlap, precision="no_autocast"), allow_transition=True
+    ) is not None
+    assert _execution_policy_mismatch(
+        legacy, dict(overlap, router_aux_loss_coef=0.5), allow_transition=True
+    ) is not None
+
+
