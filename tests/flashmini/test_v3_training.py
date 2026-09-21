@@ -313,3 +313,55 @@ def test_collision_audit_resets_context_after_eos(tmp_path, monkeypatch):
                 context = [31, 31]
     for head in report["heads"]:
         assert head["distinct_contexts"] == len(expected[head["ngram"]])
+
+
+def test_executor_transition_requires_authorization_and_is_recorded(tmp_path):
+    """A recorded executor change is refused without the explicit flag, allowed
+    with it, and written into the resumed run's checkpoint provenance."""
+    import torch
+
+    from flashmini.models import FlashMiniModel
+    from flashmini.optim import build_optimizer
+
+    data = make_data(tmp_path / "data")
+    cfg = tiny_config(True)
+    run = tmp_path / "run"
+
+    def fit(schedule, **kwargs):
+        microbatch = None if schedule == "monolithic" else 2
+        torch.manual_seed(17)
+        model = FlashMiniModel(copy.deepcopy(cfg))
+        optimizer = build_optimizer(model, 0.001, ple_lr_multiplier=5)
+        return train(model, optimizer, data, cfg, run, total_tokens=64, seq_len=8,
+            device=torch.device("cpu"), batch_size=2, seed=17, log_every=1,
+            ckpt_every_tokens=16, warmup_tokens=16, cosine_decay=True, min_lr_ratio=0.1,
+            use_amp=False, pipeline_schedule=schedule, pipeline_microbatch_size=microbatch,
+            run_metadata={"source_sha256": "test-source",
+                          "execution_fingerprint": _test_fingerprint()}, **kwargs)
+
+    paused = fit("serial_microbatch_v1", stop_after_tokens=32)
+    assert paused["status"] == "paused"
+    checkpoint = run / "checkpoints" / "step_2.pt"
+    assert checkpoint.is_file()
+
+    # Without the authorization the executor change is refused.
+    with pytest.raises(ValueError, match="execution_policy"):
+        fit("monolithic", resume_from=checkpoint)
+
+    # With it, the run continues and the transition is recorded.
+    resumed = fit(
+        "monolithic", resume_from=checkpoint,
+        allow_pipeline_policy_transition=True,
+    )
+    assert resumed["tokens_seen"] == 64
+    saved = torch.load(run / "checkpoints" / "step_4.pt", map_location="cpu", weights_only=False)
+    transition = saved["extra"]["training"]["run_metadata"]["execution_transition"]
+    assert transition["from"] == "serial_microbatch_v1"
+    assert transition["to"] == "monolithic"
+    assert transition["reason"] == "performance optimization"
+    assert transition["architecture_changed"] is False
+    assert transition["logical_batch_changed"] is False
+    assert transition["optimizer_changed"] is False
+    assert transition["parent_tokens_seen"] == 32
+    assert transition["parent_checkpoint"].endswith("step_2.pt")
+

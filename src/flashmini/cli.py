@@ -133,7 +133,9 @@ def cmd_train(args) -> int:
     budget = getattr(args, "gpu_memory_gib", None)
     _set_gpu_memory_budget(devices, budget)
     device = devices[0]
-    model = FlashMiniModel(config).parallelize(devices)
+    model = FlashMiniModel(config).parallelize(
+        devices, stage_split=getattr(args, "pipeline_stage_split", None)
+    )
     from .optim import build_optimizer
 
     optimizer = build_optimizer(
@@ -195,6 +197,9 @@ def cmd_train(args) -> int:
         allow_repeated_corpus=getattr(args, "allow_repeated_corpus", False),
         stop_after_tokens=getattr(args, "stop_after_tokens", None),
         pipeline_microbatch_size=getattr(args, "pipeline_microbatch_size", None),
+        pipeline_schedule=getattr(args, "pipeline_schedule", None),
+        pipeline_stage_split=getattr(args, "pipeline_stage_split", None),
+        allow_pipeline_policy_transition=getattr(args, "allow_pipeline_policy_transition", False),
     )
     print(json.dumps(summary, indent=2))
     return 0
@@ -289,8 +294,20 @@ def main(argv=None) -> int:
     p.add_argument("--gpu-memory-gib", type=float, help="Per-device target including existing use; allocator guard, not a system-wide hard cap")
     p.add_argument("--grad-accum", type=int, default=1)
     p.add_argument("--pipeline-microbatch-size", type=int, default=None,
-                   help="Microbatch size for GPipe pipeline execution; must divide --batch-size. "
+                   help="Microbatch size for staged pipeline execution; must divide --batch-size. "
                         "One optimizer update per logical batch (not gradient accumulation).")
+    p.add_argument("--pipeline-schedule", default=None,
+                   choices=["monolithic", "serial_microbatch_v1", "overlapped_2gpu_v1"],
+                   help="Execution engine. monolithic runs the whole logical batch in one pass; "
+                        "serial_microbatch_v1 runs each microbatch through the whole model; "
+                        "overlapped_2gpu_v1 overlaps the two stages on explicit CUDA streams.")
+    p.add_argument("--pipeline-stage-split", type=int, default=None,
+                   help="Blocks [0, split) on the first model-parallel GPU, the rest on the second")
+    p.add_argument("--allow-pipeline-policy-transition", action="store_true",
+                   help="Authorize resuming a run whose recorded execution engine differs from the "
+                        "selected one. Requires every other policy field (model config, config hash, "
+                        "dataset, seed, batch size, sequence length, optimizer, base LRs, LR schedule, "
+                        "token target, KVC, PLE, MoE) to still match exactly.")
     p.add_argument("--log-every", type=int, default=10)
     p.add_argument("--checkpoint-every-tokens", type=int, default=25_000_000)
     p.add_argument("--eval-every-tokens", type=int, default=0)

@@ -260,6 +260,92 @@ def _dataset_identity(dataset: Any) -> dict[str, Any] | None:
     return identity
 
 
+_EXECUTOR_POLICY_FIELDS = (
+    "pipeline_schedule",
+    "pipeline_microbatch_size",
+    "pipeline_stage_split",
+)
+
+
+def _execution_policy_mismatch(saved: Any, current: Any, *, allow_transition: bool) -> str | None:
+    """Describe why two execution policies differ, or ``None`` when equivalent.
+
+    Without ``allow_transition`` the policies must match exactly.  With it, only
+    the executor fields may differ; every other policy field (precision, router
+    auxiliary coefficient, clipping policy, optimizer recipe, shared parameter
+    dtypes, optimizer updates per logical batch) must still match exactly.  The
+    recorded transition is written into the checkpoint metadata by the caller, so
+    a changed executor is never silently accepted.
+    """
+    from .pipeline import LEGACY_SCHEDULE, SERIAL_SCHEDULE
+
+    if not isinstance(saved, dict) or not isinstance(current, dict):
+        return None if saved == current else "execution_policy is not a mapping on both sides"
+
+    def _executor(policy: dict[str, Any]) -> dict[str, Any]:
+        values = {key: policy.get(key) for key in _EXECUTOR_POLICY_FIELDS}
+        # "gpipe" was only ever a label for the serial engine; normalizing it
+        # keeps a pure rename from looking like an executor change.
+        if values.get("pipeline_schedule") == LEGACY_SCHEDULE:
+            values["pipeline_schedule"] = SERIAL_SCHEDULE
+        return values
+
+    saved_executor = _executor(saved)
+    current_executor = _executor(current)
+    saved_rest = {key: value for key, value in saved.items() if key not in _EXECUTOR_POLICY_FIELDS}
+    current_rest = {key: value for key, value in current.items() if key not in _EXECUTOR_POLICY_FIELDS}
+    if saved_rest != current_rest:
+        changed = sorted(
+            key for key in set(saved_rest) | set(current_rest)
+            if saved_rest.get(key) != current_rest.get(key)
+        )
+        return f"non-executor execution_policy fields changed: {', '.join(changed)}"
+    if saved_executor == current_executor:
+        return None
+    if not allow_transition:
+        return (
+            f"executor changed {saved_executor!r} -> {current_executor!r} without "
+            "--allow-pipeline-policy-transition"
+        )
+    return None
+
+
+def _resolve_pipeline_schedule(schedule: str | None, microbatch_size: int | None) -> str:
+    """Resolve the execution-policy identifier recorded for this run.
+
+    ``monolithic`` runs the whole logical batch through the sharded model with no
+    microbatch loop.  The two microbatch engines are recorded under separate
+    identifiers because they are different execution policies even though they
+    build the same logical-batch objective.
+    """
+    from .pipeline import (
+        LEGACY_SCHEDULE,
+        MONOLITHIC_SCHEDULE,
+        OVERLAPPED_SCHEDULE,
+        SERIAL_SCHEDULE,
+    )
+
+    if microbatch_size is None:
+        if schedule not in (None, MONOLITHIC_SCHEDULE):
+            raise ValueError(
+                f"pipeline_schedule={schedule!r} requires pipeline_microbatch_size"
+            )
+        return MONOLITHIC_SCHEDULE
+    if schedule is None:
+        # Historical default when only a microbatch size is supplied.
+        return SERIAL_SCHEDULE
+    if schedule == MONOLITHIC_SCHEDULE:
+        raise ValueError(
+            "monolithic schedule cannot be combined with pipeline_microbatch_size"
+        )
+    if schedule == LEGACY_SCHEDULE:
+        # "gpipe" was the old name of the serial engine; it never described overlap.
+        return SERIAL_SCHEDULE
+    if schedule in (SERIAL_SCHEDULE, OVERLAPPED_SCHEDULE):
+        return schedule
+    raise ValueError(f"unknown pipeline_schedule {schedule!r}")
+
+
 def _validate_resume_metadata(
     extra: dict[str, Any],
     *,
@@ -271,6 +357,7 @@ def _validate_resume_metadata(
     dataset_identity: dict[str, Any] | None,
     run_metadata: dict[str, Any],
     strict: bool = False,
+    allow_pipeline_policy_transition: bool = False,
 ) -> list[float] | None:
     metadata = extra.get("training")
     if strict:
@@ -331,7 +418,18 @@ def _validate_resume_metadata(
                 # Skip: current source SHA drifts with edits; integrity
                 # is guaranteed by config_sha256 and data_contract checks.
                 continue
-            if key in saved_run_metadata and saved_run_metadata[key] != run_metadata.get(key):
+            if key not in saved_run_metadata:
+                continue
+            if key == "execution_policy":
+                reason = _execution_policy_mismatch(
+                    saved_run_metadata.get(key),
+                    run_metadata.get(key),
+                    allow_transition=allow_pipeline_policy_transition,
+                )
+                if reason is not None:
+                    raise ValueError(f"resume run metadata mismatch for {key}: {reason}")
+                continue
+            if saved_run_metadata[key] != run_metadata.get(key):
                 raise ValueError(
                     f"resume run metadata mismatch for {key}: "
                     f"checkpoint={saved_run_metadata[key]!r}, current={run_metadata.get(key)!r}"
@@ -487,6 +585,9 @@ def train(
     allow_repeated_corpus: bool = False,
     stop_after_tokens: int | None = None,
     pipeline_microbatch_size: int | None = None,
+    pipeline_schedule: str | None = None,
+    pipeline_stage_split: int | None = None,
+    allow_pipeline_policy_transition: bool = False,
 ) -> dict:
     """Train for a cumulative padded-token budget and persist a summary.
 
@@ -514,6 +615,7 @@ def train(
                 "pipeline_microbatch_size must divide the logical batch size so that "
                 "each optimizer update consumes a whole logical batch"
             )
+    pipeline_schedule = _resolve_pipeline_schedule(pipeline_schedule, pipeline_microbatch_size)
     if log_every < 0:
         raise ValueError("log_every must be non-negative")
     if ckpt_every_tokens < 0:
@@ -582,9 +684,10 @@ def train(
             "pipeline_microbatch_size": int(pipeline_microbatch_size)
             if pipeline_microbatch_size is not None
             else None,
-            "pipeline_schedule": "gpipe"
-            if pipeline_microbatch_size is not None
-            else "monolithic",
+            "pipeline_schedule": pipeline_schedule,
+            "pipeline_stage_split": int(pipeline_stage_split)
+            if pipeline_schedule == "overlapped_2gpu_v1" and pipeline_stage_split is not None
+            else None,
             "optimizer_updates_per_logical_batch": 1,
         }
         run_metadata["tuning_validation_prefix_sequences"] = (
@@ -675,7 +778,31 @@ def train(
             schedule=schedule,
             dataset_identity=dataset_identity,
             run_metadata=run_metadata,
+            allow_pipeline_policy_transition=allow_pipeline_policy_transition,
         )
+        saved_policy = (extra.get("run_metadata") or {}).get("execution_policy") or {}
+        current_policy = run_metadata.get("execution_policy") or {}
+        saved_executor = {key: saved_policy.get(key) for key in _EXECUTOR_POLICY_FIELDS}
+        current_executor = {key: current_policy.get(key) for key in _EXECUTOR_POLICY_FIELDS}
+        if saved_executor != current_executor:
+            # Record the authorized executor change instead of pretending the run
+            # always used one engine. The architecture, logical batch and
+            # optimizer are unchanged: only how the same logical update is
+            # scheduled differs.
+            run_metadata["execution_transition"] = {
+                "from": saved_policy.get("pipeline_schedule"),
+                "to": current_policy.get("pipeline_schedule"),
+                "from_microbatch_size": saved_policy.get("pipeline_microbatch_size"),
+                "to_microbatch_size": current_policy.get("pipeline_microbatch_size"),
+                "to_stage_split": current_policy.get("pipeline_stage_split"),
+                "reason": "performance optimization",
+                "architecture_changed": False,
+                "logical_batch_changed": False,
+                "optimizer_changed": False,
+                "parent_checkpoint": str(resume_from),
+                "parent_tokens_seen": int(extra.get("tokens_seen", 0)),
+                "parent_step": int(meta["step"]),
+            }
         if saved_base_lrs is not None:
             base_lrs = _capture_base_lrs(optimizer, saved_base_lrs)
         else:
@@ -783,6 +910,11 @@ def train(
             if batch_tokens <= 0:
                 raise ValueError("dataset returned an empty input batch")
 
+            timing_this_step = bool(log_every) and step % log_every == 0 and torch.cuda.is_available()
+            step_begin = torch.cuda.Event(enable_timing=True) if timing_this_step else None
+            step_end = None
+            if step_begin is not None:
+                step_begin.record()
             _set_learning_rates(
                 optimizer,
                 base_lrs,
@@ -792,22 +924,7 @@ def train(
                 cosine_decay,
                 min_lr_ratio,
             )
-            if pipeline_microbatch_size is not None:
-                from .pipeline import pipeline_train_step
-                mb = batch_size // pipeline_microbatch_size
-                chunks: list[tuple[torch.Tensor, torch.Tensor]] = [
-                    (input_ids[i * pipeline_microbatch_size:(i + 1) * pipeline_microbatch_size],
-                     labels[i * pipeline_microbatch_size:(i + 1) * pipeline_microbatch_size])
-                    for i in range(mb)
-                ]
-                metrics = pipeline_train_step(
-                    model,
-                    optimizer,
-                    chunks,
-                    aux_loss_coef=aux_loss_coef,
-                    use_amp=use_amp,
-                )
-            else:
+            if pipeline_schedule == "monolithic":
                 metrics = train_step(
                     model,
                     optimizer,
@@ -816,6 +933,38 @@ def train(
                     aux_loss_coef=aux_loss_coef,
                     use_amp=use_amp,
                 )
+            else:
+                from .pipeline import (
+                    OVERLAPPED_SCHEDULE,
+                    overlapped_pipeline_train_step,
+                    pipeline_train_step,
+                )
+                mb = batch_size // pipeline_microbatch_size
+                chunks: list[tuple[torch.Tensor, torch.Tensor]] = [
+                    (input_ids[i * pipeline_microbatch_size:(i + 1) * pipeline_microbatch_size],
+                     labels[i * pipeline_microbatch_size:(i + 1) * pipeline_microbatch_size])
+                    for i in range(mb)
+                ]
+                if pipeline_schedule == OVERLAPPED_SCHEDULE:
+                    metrics = overlapped_pipeline_train_step(
+                        model,
+                        optimizer,
+                        chunks,
+                        aux_loss_coef=aux_loss_coef,
+                        use_amp=use_amp,
+                        timing=timing_this_step,
+                    )
+                else:
+                    metrics = pipeline_train_step(
+                        model,
+                        optimizer,
+                        chunks,
+                        aux_loss_coef=aux_loss_coef,
+                        use_amp=use_amp,
+                    )
+            if step_begin is not None:
+                step_end = torch.cuda.Event(enable_timing=True)
+                step_end.record()
             step += 1
             for group, count in clipping_counts.items():
                 key = f"grad_clipped_{group}"
@@ -828,6 +977,24 @@ def train(
             metrics["lr_groups"] = lr_groups
             metrics["learning_rates"] = lr_groups
             metrics["lr"] = next(iter(lr_groups.values())) if len(lr_groups) == 1 else lr_groups
+
+            if step_end is not None:
+                # Execution metrics are sampled on logging steps only: the CUDA
+                # event pair plus the stage timings the engine already recorded.
+                # They ride on the training record so metrics.jsonl keeps exactly
+                # one row per logged step.
+                torch.cuda.synchronize()
+                metrics["step_ms"] = step_begin.elapsed_time(step_end)
+                metrics["pipeline_schedule"] = pipeline_schedule
+                metrics["pipeline_stage_split"] = pipeline_stage_split
+                metrics["pipeline_microbatch_size"] = pipeline_microbatch_size
+                for key, value in (metrics.get("stage_ms") or {}).items():
+                    metrics[key] = value
+                if torch.cuda.is_available():
+                    metrics["gpu_peak_memory"] = {
+                        str(index): torch.cuda.max_memory_allocated(index) / 2**30
+                        for index in range(torch.cuda.device_count())
+                    }
 
             if log_every and step % log_every == 0:
                 elapsed = elapsed_seconds()
