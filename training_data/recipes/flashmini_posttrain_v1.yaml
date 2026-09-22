@@ -1,0 +1,13 @@
+name: flashmini_posttrain_v1
+target_tokens: 5000000000
+seed: 90001
+split_salt: flashmini-v4-posttrain-v1
+val_fraction: 0.01
+note: Post-training pool weights (not pretraining). Keep separate from base corpus.
+domains:
+  code: {weight: 0.20, sources: [stack_edu]}
+  reasoning: {weight: 0.15, sources: [openthoughts]}
+  instruction: {weight: 0.20, sources: [openthoughts]}
+  safety: {weight: 0.15, sources: [openthoughts]}
+  preference: {weight: 0.15, sources: [cosmopedia]}
+  general_web: {weight: 0.15, sources: [fineweb_edu]}

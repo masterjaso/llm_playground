@@ -1,0 +1,55 @@
+{
+  "schema_version": 1,
+  "status": "BLOCKED_UNMATERIALIZED",
+  "release_id": "flashmini-pretrain-production-v1",
+  "view_id": "flashmini-50b-8t",
+  "hf_repository": "mjaso/flashmini-pretrain-production-v1",
+  "hf_revision": null,
+  "canonical_corpus_fingerprint": null,
+  "training_view_fingerprint": null,
+  "recipe": {
+    "name": "flashmini_50b_full_v1",
+    "hash": "8484a539f11b7daa94c762ff742b2016363a52516e4cd92fbff604d8076aea44",
+    "train_tokens": 8000000000000,
+    "validation_tokens": 200000000,
+    "stage_tokens": {
+      "foundation": 6500000000000,
+      "quality": 1000000000000,
+      "long_coherent": 500000000000
+    },
+    "domain_tokens": {
+      "general_web": 2675000000000,
+      "books_reference": 900000000000,
+      "code": 2110000000000,
+      "math_stem": 1145000000000,
+      "synthetic_edu": 645000000000,
+      "multilingual": 195000000000,
+      "tech_docs": 130000000000,
+      "reasoning": 200000000000
+    },
+    "source_tokens": null,
+    "source_tokens_status": "computed only after source-capacity and exact materialization"
+  },
+  "tokenizer": {
+    "tokenizer_id": "gpt2",
+    "revision": "607a30d783dfa663caf39e06633721c8d4cfcd7e",
+    "fingerprint": "764b98926f1c957f507238f93974d75c084014a5c2510237634c519327f9cd66",
+    "token_format_version": "flashmini-token-format-v1",
+    "dtype": "uint16"
+  },
+  "source_lock_sha256": "adea723bdab8b64e25f0a3b90216a0860c1d3f1ea4eacbf602b6c92aaf8c2fa0",
+  "dedupe_version": "flashmini-v4-dedupe-v3",
+  "benchmark_exclusion_version": "flashmini-v4-benchmark-exclusion-v2",
+  "artifacts": [],
+  "storage_projection": {
+    "canonical_parquet_bytes_provisional": 12223084953433,
+    "tokenized_flat_bytes": 16000000000000,
+    "validation_tokenized_bytes": 400000000
+  },
+  "blockers": [
+    "exact 8T train and 200M validation views are not materialized",
+    "source capacity is not sufficiently measured and three Nemotron sources are gated",
+    "production shard checksums and immutable Hub revision do not exist yet",
+    "provisional storage estimates require measurement from production shards"
+  ]
+}

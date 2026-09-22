@@ -1,0 +1,4 @@
+sample_size_docs: 100000
+seed: 4242
+max_chars_per_doc: 20000
+strata: [general_web, code, math_stem, books_reference, synthetic_edu]

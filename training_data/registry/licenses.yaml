@@ -1,0 +1,7 @@
+# Redistribution policy reference (fail-closed; unclear terms => review_required).
+classes:
+  mirror_allowed: Source terms allow publishing our processed representation.
+  recipe_only: Store pinned provenance only; training reads upstream.
+  gated_recipe_only: As recipe_only; user must accept upstream terms first.
+  review_required: Terms unclear; no content redistribution until reviewed.
+  generated_owned: FlashMini-created material we may distribute.

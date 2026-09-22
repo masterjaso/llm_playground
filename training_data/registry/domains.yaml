@@ -1,0 +1,12 @@
+domains:
+  general_web: High-quality general/educational web
+  books_reference: Books, papers, reference, science
+  code: Source code with repository/path/license provenance
+  math_stem: Math, formal, logical, scientific reasoning
+  synthetic_edu: Synthetic educational/explanatory
+  tech_docs: Manuals, specifications, documentation
+  multilingual: Non-English coverage
+  reasoning: Post-training reasoning traces
+  instruction: Instruction following with verifiable constraints
+  safety: Operational safety contrast pairs
+  preference: Style/preference pairs

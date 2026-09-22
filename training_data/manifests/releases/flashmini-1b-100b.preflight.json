@@ -1,0 +1,54 @@
+{
+  "schema_version": 1,
+  "status": "BLOCKED_UNMATERIALIZED",
+  "release_id": "flashmini-pretrain-production-v1",
+  "view_id": "flashmini-1b-100b",
+  "hf_repository": "mjaso/flashmini-pretrain-production-v1",
+  "hf_revision": null,
+  "canonical_corpus_fingerprint": null,
+  "training_view_fingerprint": null,
+  "recipe": {
+    "name": "flashmini_1b_full_v1",
+    "hash": "b7c8dca34727484b30a1c36b81bf7e72b6863d86fcf10fac7ce5530babbea99a",
+    "train_tokens": 100000000000,
+    "validation_tokens": 100000000,
+    "stage_tokens": {
+      "foundation": 80000000000,
+      "quality": 15000000000,
+      "long_coherent": 5000000000
+    },
+    "domain_tokens": {
+      "general_web": 31650000000,
+      "books_reference": 11250000000,
+      "code": 25950000000,
+      "math_stem": 14950000000,
+      "synthetic_edu": 8400000000,
+      "tech_docs": 3200000000,
+      "multilingual": 1600000000,
+      "reasoning": 3000000000
+    },
+    "source_tokens": null,
+    "source_tokens_status": "computed only after exact materialization"
+  },
+  "tokenizer": {
+    "tokenizer_id": "gpt2",
+    "revision": "607a30d783dfa663caf39e06633721c8d4cfcd7e",
+    "fingerprint": "764b98926f1c957f507238f93974d75c084014a5c2510237634c519327f9cd66",
+    "token_format_version": "flashmini-token-format-v1",
+    "dtype": "uint16"
+  },
+  "source_lock_sha256": "adea723bdab8b64e25f0a3b90216a0860c1d3f1ea4eacbf602b6c92aaf8c2fa0",
+  "dedupe_version": "flashmini-v4-dedupe-v3",
+  "benchmark_exclusion_version": "flashmini-v4-benchmark-exclusion-v2",
+  "artifacts": [],
+  "storage_projection": {
+    "canonical_parquet_bytes_provisional": 152788561918,
+    "tokenized_flat_bytes": 200000000000,
+    "validation_tokenized_bytes": 200000000
+  },
+  "blockers": [
+    "exact 100B train and 100M validation views are not materialized",
+    "production shard checksums and immutable Hub revision do not exist yet",
+    "provisional storage estimates require measurement from production shards"
+  ]
+}

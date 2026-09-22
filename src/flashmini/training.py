@@ -233,7 +233,17 @@ def _training_metadata(
 
 
 def _dataset_identity(dataset: Any) -> dict[str, Any] | None:
-    """Read stable shard hashes when training is backed by MemmapDataset."""
+    """Read stable shard hashes for MemmapDataset (v3) or v4 protocol."""
+    # Prefer explicit v4/v3 dataset protocol over path sniffing.
+    for method in ("dataset_identity", "verify_integrity"):
+        fn = getattr(dataset, method, None)
+        if method == "dataset_identity" and callable(fn):
+            try:
+                identity = fn()
+            except Exception:
+                identity = None
+            if isinstance(identity, dict):
+                return identity
     data_dir = getattr(dataset, "data_dir", None)
     split = getattr(dataset, "split", None)
     if data_dir is None or split is None:
