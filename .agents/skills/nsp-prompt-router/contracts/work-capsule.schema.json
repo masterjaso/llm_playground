@@ -37,6 +37,17 @@
     "parentPackageId": { "type": ["string", "null"] },
     "parentEpicId": { "type": ["string", "null"] },
     "baseRef": { "type": "string" },
+    "baseIdentity": {
+      "description": "Identity resolved once during preparation. Runtime also requires baseRef to equal commit; retries never resolve the historical displayRef again.",
+      "type": "object",
+      "required": ["schemaVersion", "commit", "displayRef"],
+      "properties": {
+        "schemaVersion": { "const": 1 },
+        "commit": { "type": "string", "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$" },
+        "displayRef": { "type": "string", "pattern": "\\S" }
+      },
+      "additionalProperties": false
+    },
     "objective": { "type": "string" },
     "nonGoals": { "type": "array", "items": { "type": "string" } },
     "activeInvariants": { "type": "array", "items": { "type": "string" } },
@@ -45,6 +56,18 @@
     "doNotReadUnlessExpanded": { "type": "array", "items": { "type": "string" } },
     "allowedWriteScopes": { "type": "array", "items": { "type": "string" } },
     "acceptanceGates": { "type": "array", "items": { "type": "string" } },
+    "discoveryDependencies": {
+      "description": "Optional explicit fact bindings. Runtime also requires unique gates and exact acceptance-gate coverage; legacy capsules retain whole-ledger readiness checks.",
+      "type": "array", "minItems": 1, "maxItems": 256, "uniqueItems": true,
+      "items": {
+        "type": "object", "additionalProperties": false, "required": ["gate", "factIds"],
+        "properties": {
+          "gate": { "type": "string", "minLength": 1, "maxLength": 4000 },
+          "factIds": { "type": "array", "minItems": 1, "maxItems": 256, "uniqueItems": true,
+            "items": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$" } }
+        }
+      }
+    },
     "validationCommands": { "type": "array", "items": { "type": "string" } },
     "requiredCapabilities": {
       "type": "array",

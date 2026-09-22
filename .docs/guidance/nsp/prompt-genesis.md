@@ -8,11 +8,11 @@ source: human
 confidence: high
 reviewStatus: reviewed
 graphNode: document:.docs/guidance/nsp/prompt-genesis.md
-graphTags: docs
+graphTags: docs,nsp,prompt-genesis
 validation: context-header-audit,manifest-check,secret-scan
 owner: prompt-engineering
-lastReviewed: 2026-05-23
-replaces: 
+lastReviewed: 2026-06-27
+replaces: .docs/features/prompt-generation-workflow.md
 replacedBy: 
 -->
 

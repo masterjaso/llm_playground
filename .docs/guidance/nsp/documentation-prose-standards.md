@@ -8,12 +8,12 @@ source: human
 confidence: high
 reviewStatus: reviewed
 graphNode: document:.docs/guidance/nsp/documentation-prose-standards.md
-graphTags: docs
+graphTags: genesis,docs,prose
 validation: context-header-audit,manifest-check,secret-scan
 owner: guidance
-lastReviewed: 2026-05-23
-replaces: 
-replacedBy: 
+lastReviewed: 2026-07-16
+replaces:
+replacedBy:
 -->
 
 # Genesis documentation prose standards

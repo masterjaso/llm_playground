@@ -8,12 +8,12 @@ source: human
 confidence: high
 reviewStatus: reviewed
 graphNode: document:.docs/guidance/nsp/golden-path-testing.md
-graphTags: docs
-validation: context-header-audit,manifest-check,secret-scan
+graphTags: docs,testing
+validation: manifest-check,frontmatter-audit,secret-scan
 owner: qa-validation
-lastReviewed: 2026-05-23
-replaces: 
-replacedBy: 
+lastReviewed: 2026-06-27
+replaces:
+replacedBy:
 -->
 
 # Golden-path testing

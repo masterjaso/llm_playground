@@ -8,12 +8,12 @@ source: human
 confidence: high
 reviewStatus: reviewed
 graphNode: document:.docs/guidance/nsp/tool-output-economy.md
-graphTags: docs
+graphTags: context,docs,nsp,tool-output
 validation: context-header-audit,manifest-check,secret-scan
 owner: guidance
-lastReviewed: 2026-05-23
-replaces: 
-replacedBy: 
+lastReviewed: 2026-06-27
+replaces:
+replacedBy:
 -->
 
 # NSP Tool Output Economy Guidance

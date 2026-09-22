@@ -8,12 +8,12 @@ source: human
 confidence: high
 reviewStatus: reviewed
 graphNode: document:.docs/guidance/nsp/deep-modules-and-locality.md
-graphTags: docs
-validation: context-header-audit,manifest-check,secret-scan
+graphTags: docs,architecture
+validation: manifest-check,frontmatter-audit,secret-scan
 owner: platform-engineering
-lastReviewed: 2026-05-23
-replaces: 
-replacedBy: 
+lastReviewed: 2026-06-27
+replaces:
+replacedBy:
 -->
 
 # Deep modules and locality

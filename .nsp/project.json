@@ -7,5 +7,7 @@
   "governanceFile": "AGENTS.md",
   "compatibility": {
     "nsp": ">=2.0.0"
-  }
+  },
+  "appliedNspVersion": "3.1.4",
+  "appliedAt": "2026-09-22T16:01:32.051Z"
 }

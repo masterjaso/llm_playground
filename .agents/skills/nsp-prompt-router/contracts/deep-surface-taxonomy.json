@@ -41,6 +41,11 @@
       "id": "nsp-review-discernment",
       "intent": "Perform exhaustive evidence-backed change review",
       "brand": "discernment"
+    },
+    {
+      "id": "nsp-workstatus-herald",
+      "intent": "Report read-only work progress, remaining gates, blockers and authorized closure sequence",
+      "brand": "herald"
     }
   ],
   "skillClasses": {
@@ -51,6 +56,12 @@
     "discipline": "Shared execution discipline referenced by Build/Debug/Review rather than a public skill."
   },
   "skillMigration": [
+    {
+      "from": null,
+      "to": "nsp-workstatus-herald",
+      "class": "public",
+      "notes": "Read-only work reporting; no execution ownership or additional CLI module."
+    },
     {
       "from": "nsp-genesis-sweep",
       "to": "nsp-adopt-ezra",

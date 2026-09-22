@@ -8,10 +8,10 @@ source: human
 confidence: high
 reviewStatus: reviewed
 graphNode: document:.docs/guidance/nsp/validation-rules.md
-graphTags: docs
+graphTags: context,docs,nsp,validation
 validation: context-header-audit,manifest-check,secret-scan
 owner: guidance
-lastReviewed: 2026-05-23
+lastReviewed: 2026-06-27
 replaces: 
 replacedBy: 
 -->

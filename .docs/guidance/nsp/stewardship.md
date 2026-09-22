@@ -8,10 +8,10 @@ source: human
 confidence: high
 reviewStatus: reviewed
 graphNode: document:.docs/guidance/nsp/stewardship.md
-graphTags: docs
+graphTags: context,docs,nsp,stewardship
 validation: context-header-audit,manifest-check,secret-scan
 owner: guidance
-lastReviewed: 2026-05-23
+lastReviewed: 2026-06-27
 replaces: 
 replacedBy: 
 -->

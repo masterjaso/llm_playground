@@ -8,11 +8,11 @@ source: human
 confidence: high
 reviewStatus: reviewed
 graphNode: document:.docs/guidance/nsp/context-maintenance.md
-graphTags: context,docs
+graphTags: context,docs,nsp
 validation: context-header-audit,manifest-check,secret-scan
 owner: guidance
-lastReviewed: 2026-05-23
-replaces: 
+lastReviewed: 2026-06-27
+replaces: .docs/guidance/context-maintenance.md
 replacedBy: 
 -->
 

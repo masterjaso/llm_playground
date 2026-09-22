@@ -8,12 +8,12 @@ source: human
 confidence: high
 reviewStatus: reviewed
 graphNode: document:.docs/guidance/nsp/context-hygiene.md
-graphTags: context,docs
-validation: context-header-audit,manifest-check,secret-scan
+graphTags: docs,context-hygiene
+validation: manifest-check,frontmatter-audit,secret-scan
 owner: context-hygiene
-lastReviewed: 2026-05-23
-replaces: 
-replacedBy: 
+lastReviewed: 2026-06-27
+replaces:
+replacedBy:
 -->
 
 # Context hygiene

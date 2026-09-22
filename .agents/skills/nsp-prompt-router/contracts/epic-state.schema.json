@@ -4,7 +4,21 @@
   "title": "NSP Epic Ralph State (STATE.json)",
   "description": "Resumable epic state maintained by nsp-epic-execution under .nsp/artifacts/tmp/ralph/<epic-id>/STATE.json.",
   "type": "object",
-  "required": ["schemaVersion", "epicId", "currentPhase", "phaseStatuses", "lastUpdated"],
+  "oneOf": [
+    {
+      "required": ["schemaVersion", "kind", "epicId", "runId", "currentPhase", "workStateRef"],
+      "properties": {
+        "schemaVersion": { "const": 1 }, "kind": { "const": "managed-epic" },
+        "epicId": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$" },
+        "runId": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$" },
+        "currentPhase": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$" },
+        "workStateRef": { "type": "string", "pattern": "^\\.nsp/artifacts/runs/[A-Za-z0-9][A-Za-z0-9._-]{0,79}/work/capsules/[A-Za-z0-9][A-Za-z0-9._-]{0,79}/STATE\\.json$" }
+      },
+      "additionalProperties": false,
+      "description": "Pointer only. Runtime checks matching run/epic/phase and resolves immutable capsule registration; pointer fields do not establish acceptance."
+    },
+    { "required": ["schemaVersion", "epicId", "currentPhase", "phaseStatuses", "lastUpdated"], "not": { "required": ["kind"] } }
+  ],
   "properties": {
     "schemaVersion": { "type": "number" },
     "epicId": { "type": "string" },

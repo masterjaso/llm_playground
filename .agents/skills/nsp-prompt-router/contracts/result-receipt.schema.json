@@ -47,6 +47,17 @@
     "assurance": { "$ref": "assurance.schema.json#/$defs/result" },
     "status": { "type": "string", "enum": ["candidate", "validated", "failed", "blocked"] },
     "baseRef": { "type": "string" },
+    "baseIdentity": {
+      "description": "Prepared identity copied from the capsule. Runtime also requires baseRef to equal commit and exact identity equality with the capsule.",
+      "type": "object",
+      "required": ["schemaVersion", "commit", "displayRef"],
+      "properties": {
+        "schemaVersion": { "const": 1 },
+        "commit": { "type": "string", "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$" },
+        "displayRef": { "type": "string", "pattern": "\\S" }
+      },
+      "additionalProperties": false
+    },
     "headRef": { "type": "string" },
     "changedPaths": { "type": "array", "items": { "type": "string" } },
     "acceptanceResults": {
