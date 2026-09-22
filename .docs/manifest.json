@@ -332,10 +332,10 @@
     },
     {
       "path": "README.md",
-      "sha256": "95112d29ef5875b32bcc9c26ab6b77a18ebc787b66212ea75afe2fd9c44b2563",
-      "bytes": 1011,
-      "tokens_approx": 253,
-      "summary": "# dense2moe `dense2moe` is a Windows-first, resumable control plane for experiments that",
+      "sha256": "d257dec950f18e59bca81ddf285cfc8e10f94b375f87722e30012a897f2affe5",
+      "bytes": 1904,
+      "tokens_approx": 476,
+      "summary": "# flashmini `flashmini` is the primary package in this repository: the FlashMini v3 experimental LLM",
       "frontmatter_keys": [],
       "frontmatter_preview": {}
     },

@@ -1,6 +1,7 @@
-"""FlashMini — Qwen3.8-Flash-Next architecture PoC research track.
+"""FlashMini — MoE + GDN + PLE + KVC experimental LLM training track.
 
-Isolated experimental track inside llm_playground. Does not modify dense2moe.
+Primary package of llm_playground: the v3 PoC experiments (A/B/C/D) and the
+frozen FineWeb-EDU training stack live here.
 """
 
 __version__ = "0.1.0"
