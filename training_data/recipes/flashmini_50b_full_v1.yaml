@@ -2,14 +2,14 @@ name: flashmini_50b_full_v1
 target_tokens: 8000000000000
 seed: 50000
 split_salt: flashmini-v4-split-v1
-val_fraction: 0.002
+validation_tokens: 200000000
 stages: [flashmini_50b_foundation_v1, flashmini_50b_quality_v1, flashmini_50b_long_v1]
 domains:
-  general_web: {weight: 0.36, sources: [fineweb_edu, fineweb, nemotron_cc_v2]}
-  books_reference: {weight: 0.10, sources: [common_pile_books]}
-  code: {weight: 0.25, sources: [stackv2_edu, stack_edu, nemotron_code]}
-  math_stem: {weight: 0.14, sources: [finemath, open_web_math, nemotron_math]}
-  synthetic_edu: {weight: 0.08, sources: [cosmopedia]}
-  multilingual: {weight: 0.03, sources: [fineweb]}
-  tech_docs: {weight: 0.02, sources: [common_pile_books]}
-  reasoning: {weight: 0.02, sources: [openthoughts]}
+  general_web: {weight: 0.334375, sources: [fineweb, fineweb_edu, nemotron_cc_v2]}
+  books_reference: {weight: 0.1125, sources: [common_pile_books]}
+  code: {weight: 0.26375, sources: [nemotron_code, stack_edu, stackv2_edu]}
+  math_stem: {weight: 0.143125, sources: [finemath, nemotron_math, open_web_math]}
+  synthetic_edu: {weight: 0.080625, sources: [cosmopedia]}
+  multilingual: {weight: 0.024375, sources: [fineweb]}
+  tech_docs: {weight: 0.01625, sources: [common_pile_books]}
+  reasoning: {weight: 0.025, sources: [openthoughts]}

@@ -37,8 +37,8 @@ def content_hash(text: str) -> str:
 def document_id(source_id: str, source_revision: str, record_id: str,
                 normalized_content_hash: str) -> str:
     """Stable identity independent of ingestion order."""
-    payload = "\0".join([source_id.strip(), source_revision.strip(),
-                         record_id.strip(), normalized_content_hash.strip()])
+    payload = (f"{source_id.strip()}\0{source_revision.strip()}\0"
+               f"{record_id.strip()}\0{normalized_content_hash.strip()}")
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 

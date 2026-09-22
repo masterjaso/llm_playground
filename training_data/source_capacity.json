@@ -1,0 +1,45 @@
+{
+  "status": "not_sufficiently_measured_for_8t",
+  "method": "source-native metadata plus bounded streaming probes",
+  "open_probe_ok": [
+    "fineweb_edu",
+    "fineweb",
+    "common_pile_books",
+    "finemath",
+    "open_web_math",
+    "cosmopedia",
+    "openthoughts"
+  ],
+  "schema_blocked": {
+    "stack_edu": {
+      "status": "SOURCE_BLOCKED",
+      "reason": "text_field_missing:content",
+      "detail": "Pinned HuggingFaceTB/stack-edu Python config exposes metadata columns only; no content/text field was present."
+    }
+  },
+  "latest_schema_probe": ".nsp/artifacts/runs/flashmini-pretraining-data-streaming-20260922t001329z-c8b2a5d7/evidence/source-schema-probe.json",
+  "gated_probe_blocked": [
+    "nemotron_cc_v2",
+    "nemotron_code",
+    "nemotron_math"
+  ],
+  "local_exact_token_slice": {
+    "selected_documents": 397,
+    "publishable_exact_tokens": 149487,
+    "elapsed_seconds": 108.22,
+    "peak_rss_gib": 5.56,
+    "status": "path_only_not_capacity_proof",
+    "evidence": ".nsp/artifacts/runs/flashmini-pretraining-data-20260921t230015z-38e42f79/evidence/capacity-probe.json"
+  },
+  "source_streaming_auth": {
+    "hub_token_passed": true,
+    "managed_cache": true,
+    "evidence": ".nsp/artifacts/runs/flashmini-pretraining-data-20260921t230015z-38e42f79/evidence/source-auth-probe.json"
+  },
+  "capacity_contract": {
+    "1b": "must measure >= 100B acceptable unique train tokens plus 100M validation tokens by domain",
+    "50b": "must measure >= 8T acceptable unique train tokens plus 200M validation tokens by domain",
+    "repetition": "not allowed unless declared as an explicit exposure policy"
+  },
+  "next_measurement": "run distributed source-capacity jobs against pinned revisions before 50B rental"
+}

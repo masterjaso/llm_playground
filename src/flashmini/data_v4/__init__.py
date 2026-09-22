@@ -8,18 +8,23 @@ Hugging Face rather than monolithic local memmaps.
 from .canonical import canonicalize_text, content_hash, document_id
 from .packing import PACKING_VERSION, pack_document, tokenizer_identity
 from .sampler import HierarchicalSampler, RemoteShardDataset
-from .splits import VAL_FRACTION_DEFAULT, SPLIT_SALT_DEFAULT, assign_split
+from .scheduler import DeficitScheduler, DeficitTokenScheduler
+from .splits import SPLIT_SALT_DEFAULT, VAL_FRACTION_DEFAULT, assign_split
+from .tokenizer import TokenizerSpec
 
 __all__ = [
+    "PACKING_VERSION",
+    "SPLIT_SALT_DEFAULT",
+    "VAL_FRACTION_DEFAULT",
+    "DeficitScheduler",
+    "DeficitTokenScheduler",
+    "HierarchicalSampler",
+    "RemoteShardDataset",
+    "TokenizerSpec",
+    "assign_split",
     "canonicalize_text",
     "content_hash",
     "document_id",
-    "assign_split",
-    "SPLIT_SALT_DEFAULT",
-    "VAL_FRACTION_DEFAULT",
-    "RemoteShardDataset",
-    "HierarchicalSampler",
-    "PACKING_VERSION",
     "pack_document",
     "tokenizer_identity",
 ]

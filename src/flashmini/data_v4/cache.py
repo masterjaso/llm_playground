@@ -6,6 +6,7 @@ import hashlib
 import os
 import shutil
 import tempfile
+import time
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -17,6 +18,43 @@ class CacheStats:
     used_bytes: int
     files: int
     avail_bytes: int
+
+
+@dataclass
+class CacheTelemetry:
+    """Small in-process telemetry surface for training data observability."""
+
+    cache_hits: int = 0
+    cache_misses: int = 0
+    downloads: int = 0
+    downloaded_bytes: int = 0
+    download_seconds: float = 0.0
+    evictions: int = 0
+    data_wait_seconds: float = 0.0
+    prefetch_queue_depth: int = 0
+
+    def record_download(self, size: int, elapsed: float) -> None:
+        self.downloads += 1
+        self.downloaded_bytes += max(0, int(size))
+        self.download_seconds += max(0.0, float(elapsed))
+
+    @property
+    def download_mb_s(self) -> float:
+        return (self.downloaded_bytes / 1024**2 / self.download_seconds
+                if self.download_seconds > 0 else 0.0)
+
+    def as_dict(self) -> dict:
+        return {
+            "cache_hit_rate": self.cache_hits / max(1, self.cache_hits + self.cache_misses),
+            "cache_hits": self.cache_hits,
+            "cache_misses": self.cache_misses,
+            "downloads": self.downloads,
+            "downloaded_bytes": self.downloaded_bytes,
+            "download_mb_s": self.download_mb_s,
+            "data_wait_seconds": self.data_wait_seconds,
+            "prefetch_queue_depth": self.prefetch_queue_depth,
+            "evictions": self.evictions,
+        }
 
 
 def cache_root(explicit: str | None = None) -> Path:
@@ -56,7 +94,7 @@ def _dir_size(root: Path) -> tuple[int, int]:
     if not root.exists():
         return 0, 0
     for p in root.rglob("*"):
-        if p.is_file() and not p.suffix == ".tmp":
+        if p.is_file() and p.suffix != ".tmp":
             try:
                 total += p.stat().st_size
                 count += 1
@@ -90,6 +128,15 @@ def enforce_bound(root: Path, max_bytes: int, active: set[str] | None = None) ->
     if used > max_bytes:
         raise RuntimeError(f"cache bound exceeded and nothing further evictable ({used} bytes)")
     return evicted
+
+
+def mark_in_use(path: Path) -> None:
+    """Touch a managed cache file so LRU eviction keeps recently used data."""
+    try:
+        now = time.time()
+        os.utime(path, (now, now))
+    except OSError:
+        pass
 
 
 def atomic_write_bytes(path: Path, data: bytes,

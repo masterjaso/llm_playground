@@ -1,61 +1,33 @@
 # Manifests (v4)
 
-`build_state.json` (resumable, atomic) and `corpus_manifest.json` (frozen:
-shard hashes, recipe hash, `corpus_fingerprint_sha256`) live here. Small
-indexes only; never bulk data in Git. Both JSONs are gitignored (runtime
-state) — this README records the release facts.
+`build_state.json` (resumable, atomic) and `corpus_manifest.json` (frozen
+shard hashes, recipe hash, and corpus fingerprint) are runtime indexes. They
+are not bulk data and are gitignored.
 
-## Current release: corpus-v1
+## Current release: corpus-v1 (pilot, immutable)
 
-| Field | Value |
-|---|---|
-| Recipe | `flashmini_1b_full_v1` (hash `6a38be9e15cc…`) |
-| HF repo | `mjaso/flashmini-data-v1` @ `e83398462169…` |
-| Shards in manifest | 85 — all published + hash-verified on HF |
-| Documents | 96,757 (train 96,268 / val 489, 0.51%) |
-| Published bytes | ~2.83 GB |
-| Estimated tokens | ~1.86 B |
-| Fingerprint | `ae3a4dd74c761d4ce2c63811f40a9b3b0f78a99f0334cea033f17311eaf662fe` |
-| Verify | recipe_match=True, 85/85 shard hashes valid |
-| Train-smoke | 96,268 sequences, integrity valid (`exact_counts=True`, `missing=[]`), consumed 400 sequences across shard boundaries, 1 HF download |
-| Resume-check | identical=True (resume == uninterrupted continuation) |
+The live Hub tree at revision `e83398462169164d9e4127627ad4f72d95b05a41`
+contains 85 `shards/*.parquet` files and 15 `clean/*.parquet` files. The
+remote manifest has 95 rows (83 marked published), 91,173 published-manifest
+documents, 2,619,337,547 published bytes, and 1,714,354,474 estimated tokens.
+It does not carry exact production-tokenizer counts. Six remote shard
+metadata mismatches, one unpublished remote shard, and one unmanifested shard
+are retained as pilot audit findings. Do not use old hand-entered counts as
+production evidence.
 
-### What training consumes
+The pilot release is preserved. Production views must use a new versioned
+prefix or repository, an immutable Hub revision, exact tokenizer counts, and a
+separate frozen training-view manifest.
 
-`corpus_manifest.json` contains ONLY shards that exist on HF. The 6 held
-(recipe-only) shards are excluded from the manifest, so the sampler never
-attempts to download a missing shard — training cannot break mid-run on
-licensing-gated content.
+## Production scale-up
 
-### Known gaps
+Production builds use a new release identity, SQLite exact and near-dedupe
+indexes, the deficit-aware exact-token scheduler, explicit validation budgets,
+and a frozen tokenizer/token-store contract. `corpus-v1` state is never
+overwritten. See `training_data/PRODUCTION_READINESS.md` for the full gate
+contract and recovery rules.
 
-- 12 shards from the original build (000002, 000011, 000019, …, 000091) were
-  lost during interrupted builds and cannot be exactly re-derived.
-- 6 held shards (000085-held, 000087-held, 000090-held, 000092-held,
-  000094-held, 000096-held) are recipe-only (stackv2_edu / openthoughts)
-  content — correctly never uploaded; excluded from the training manifest.
-- 6 duplicate shard entries (000084, 000086, 000088, 000089, 000093,
-  000095) were deduplicated — only the newest entry (matching HF) is kept.
-
-None of these gaps affect the integrity, determinism, or trainability of
-the corpus. They reduce math_stem/code coverage slightly and are documented
-rather than silently missing.
-
-### Per-document split
-
-The exact train/val split is stored per document in each parquet file's
-`split` column (derived from `assign_split(did, salt="flashmini-v4-split-v1")`
-with `val_fraction=0.005`). Exact counts were read from every published
-shard on HF and recorded in `corpus_manifest.json.split_distribution` and
-`split_totals`. Validation membership is stable regardless of source
-iteration order.
-
-### Scale-up
-
-The build loop continues from `build_state.json` cursors toward the
-100B-token recipe target. Source cursors were jumped to fresh regions
-(+50K) to avoid duplicate-heavy overlap between fineweb_edu and fineweb.
-
-
-
-
+The `releases/*.preflight.json` files are immutable target descriptors for the
+blocked, not-yet-materialized views. They intentionally leave Hub revisions,
+corpus/view fingerprints, shard lists, and source exact totals empty until the
+remote build and verification gates succeed.

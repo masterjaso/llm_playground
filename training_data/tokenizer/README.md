@@ -1,6 +1,8 @@
 # Tokenizer samples (v4)
 
-Corpus is tokenizer-independent. This dir holds representative sampling
-configs for the future frozen production tokenizer shared by 1B/50B runs.
-Record `tokenizer_id@revision` on every training run; never silently bake
-the PoC GPT-2 tokenizer into the corpus.
+Canonical text remains tokenizer-independent, but production views use the
+frozen contract in `production.yaml`
+(`gpt2@607a30d783dfa663caf39e06633721c8d4cfcd7e`). The release records the
+tokenizer fingerprint, vocabulary size, EOS/PAD policy, token format, and
+smallest safe integer dtype. Never use a mutable `main` revision for
+exact-token accounting.

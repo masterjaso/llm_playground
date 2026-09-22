@@ -1,12 +1,30 @@
-# Benchmarks excluded/flagged from training (record exact revisions on use).
+# Benchmarks excluded/flagged from training.  Hashes are populated from the
+# frozen evaluation release before a production build; names alone never cause
+# broad phrase deletion.
 benchmarks:
+  - ARC
   - HumanEval
   - MBPP
   - GSM8K
+  - GPQA
   - MATH
   - MMLU
+  - HellaSwag
+  - WinoGrande
   - SWE-bench
   - IFEval
   - LongBench
   - HarmBench
-method: hash-match-flag-v1
+  - FlashMiniEval
+method: exact-and-minhash-lsh-v1
+# Populate this mapping with immutable benchmark exports before final release
+# freeze. Canonical ingestion may run with a partial mapping; names and
+# thresholds alone never remove ordinary prose.
+corpus_files: {}
+thresholds:
+  HumanEval: 0.92
+  MBPP: 0.92
+  GSM8K: 0.92
+  MATH: 0.92
+  GPQA: 0.92
+  FlashMiniEval: 0.95

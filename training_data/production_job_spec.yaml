@@ -1,0 +1,85 @@
+# Reproducible CPU/storage job shape for production materialization.
+# This specification is intentionally infrastructure-neutral; provider-specific
+# credentials and endpoints are supplied by the operator at launch.
+release:
+  canonical_release_id: flashmini-pretrain-production-v1
+  one_b_view_id: flashmini-1b-100b
+  fifty_b_view_id: flashmini-50b-8t
+  pilot_repo: mjaso/flashmini-data-v1
+  production_repo: mjaso/flashmini-data-v1
+  production_prefix: releases/pretrain-production-v1
+  pilot_mutation: forbidden
+  preserve_corpus_v1: true
+storage:
+  corpus_system_of_record: huggingface
+  local_mode: bounded_staging_only
+  evict_after_remote_verify: true
+  cache_gb: "20-40"
+  free_space_watermark_gib: 10
+  active_shard_staging: "one completed shard plus bounded upload queue"
+requirements:
+  cpu_nodes: ">= 1 for 1B; scale horizontally for 8T"
+  local_nvme_gib: ">=128 for 1B bounded staging; scale horizontally for 8T"
+  object_store: "Hugging Face release prefix for canonical artifacts"
+  tokenizer_spec: training_data/tokenizer/production.yaml
+  contamination_config: "training_data/eval/contamination_sources.yaml (partial exports allowed during canonical ingestion)"
+build:
+  completion_basis: exact_tokens
+  concurrent_source_streams: false
+  bounded_queues: true
+  async_upload: false
+  batch_upload: true
+  bounded_source_windows: true
+  source_workers: 1
+  upload_workers: 1
+  # Batch shard commits to stay below the Hub repository-commit rate limit;
+  # local state and per-file verification remain durable at every batch.
+  max_pending_shards: 16
+  free_space_watermark_gib: 10
+  resume: true
+  benchmark_exclusion_mode: partial_until_private_eval
+  private_eval_required_for_final_freeze: true
+commands:
+  audit: "flashmini-data hf-audit --repo mjaso/flashmini-data-v1 --revision <pinned-sha>"
+  source_lock_validate: "flashmini-data source-lock-validate"
+  smoke: "python scripts/flashmini_data_smoke.py --report <run-evidence>/smoke.json"
+  build_1b: >-
+    flashmini-data build --production --recipe
+    training_data/recipes/flashmini_1b_full_v1.yaml --source-lock
+    training_data/registry/source_snapshot.lock.json --tokenizer-spec
+    training_data/tokenizer/production.yaml --contamination-config
+    training_data/eval/contamination_sources.yaml --hf-repo
+    mjaso/flashmini-data-v1 --hf-prefix releases/pretrain-production-v1/1b/canonical
+    --upload-workers 1 --max-pending-shards 16 --window 4096 --shard-docs 256
+    --free-space-watermark-gib 10
+  materialize_1b: >-
+    flashmini-data materialize --manifest <1b-canonical-manifest> --output-dir
+    <nvme>/tokens/flashmini-1b-100b --tokenizer-spec
+    training_data/tokenizer/production.yaml --seq-len 2048
+  build_50b: >-
+    flashmini-data build --production --recipe
+    training_data/recipes/flashmini_50b_full_v1.yaml --source-lock
+    training_data/registry/source_snapshot.lock.json --tokenizer-spec
+    training_data/tokenizer/production.yaml --contamination-config
+    training_data/eval/contamination_sources.yaml --hf-repo
+    mjaso/flashmini-data-v1 --hf-prefix releases/pretrain-production-v1/50b/canonical
+    --upload-workers 1 --max-pending-shards 16 --window 4096 --shard-docs 256
+  materialize_50b: >-
+    flashmini-data materialize --manifest <50b-canonical-manifest> --output-dir
+    <nvme>/tokens/flashmini-50b-8t --tokenizer-spec
+    training_data/tokenizer/production.yaml
+gates:
+  one_b_train_tokens: 100000000000
+  one_b_validation_tokens: 100000000
+  fifty_b_train_tokens: 8000000000000
+  fifty_b_validation_tokens: 200000000
+  exact_counts_required: true
+  remote_artifact_verification_required: true
+  source_capacity_must_be_measured_for_50b: true
+status:
+  pipeline_implemented: true
+  pilot_corpus_preserved: true
+  one_b_100b_build_status: "running_streaming"
+  fifty_b_8t_pipeline_status: "pipeline_ready_source_capacity_pending"
+  fifty_b_8t_materialization_status: "not_started"
+  final_1b_release_status: "blocked_on_private_eval_decontamination_until_exports_arrive"

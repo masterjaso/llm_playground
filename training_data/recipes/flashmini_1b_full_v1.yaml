@@ -2,14 +2,14 @@ name: flashmini_1b_full_v1
 target_tokens: 100000000000
 seed: 17000
 split_salt: flashmini-v4-split-v1
-val_fraction: 0.005
+validation_tokens: 100000000
 stages: [flashmini_1b_foundation_v1, flashmini_1b_quality_v1, flashmini_1b_long_v1]
 domains:
-  general_web: {weight: 0.34, sources: [fineweb_edu, fineweb]}
-  books_reference: {weight: 0.10, sources: [common_pile_books]}
-  code: {weight: 0.26, sources: [stackv2_edu, stack_edu]}
-  math_stem: {weight: 0.15, sources: [finemath, open_web_math]}
-  synthetic_edu: {weight: 0.08, sources: [cosmopedia]}
-  tech_docs: {weight: 0.03, sources: [common_pile_books]}
-  multilingual: {weight: 0.02, sources: [fineweb]}
-  reasoning: {weight: 0.02, sources: [openthoughts]}
+  general_web: {weight: 0.3165, sources: [fineweb, fineweb_edu]}
+  books_reference: {weight: 0.1125, sources: [common_pile_books]}
+  code: {weight: 0.2595, sources: [stack_edu, stackv2_edu]}
+  math_stem: {weight: 0.1495, sources: [finemath, open_web_math]}
+  synthetic_edu: {weight: 0.084, sources: [cosmopedia]}
+  tech_docs: {weight: 0.032, sources: [common_pile_books]}
+  multilingual: {weight: 0.016, sources: [fineweb]}
+  reasoning: {weight: 0.03, sources: [openthoughts]}

@@ -13,13 +13,32 @@ def default_state(recipe_name: str = "", recipe_hash: str = "") -> dict:
         "recipe_name": recipe_name,
         "recipe_hash": recipe_hash,
         "source_cursors": {},
+        "source_filter": None,
+        "source_records_this_run": 0,
         "selected_documents": 0,
         "rejected_documents": {},
         "exact_duplicates": 0,
         "near_duplicates": 0,
         "published_shards": [],
         "published_bytes": 0,
+        "published_documents": 0,
+        "published_exact_tokens": 0,
+        "published_train_tokens": 0,
+        "published_validation_tokens": 0,
         "estimated_tokens_by_domain": {},
+        "exact_tokens_by_domain": {},
+        "exact_tokens_by_source": {},
+        "validation_tokens": 0,
+        "training_tokens": 0,
+        "near_dedupe_version": "",
+        "dedupe_db": "",
+        "near_dedupe_db": "",
+        "benchmark_exclusion_status": "unknown",
+        "benchmark_exclusion_report": {},
+        "storage_contract": {},
+        "telemetry": {},
+        "scheduler": {},
+        "source_cursor_version": 2,
         "hf_revision": "",
         "last_successful_operation": "",
         "errors": [],
@@ -30,7 +49,11 @@ def default_state(recipe_name: str = "", recipe_hash: str = "") -> dict:
 def load_state(path: Path) -> dict:
     if not path.exists():
         return default_state()
-    return json.loads(path.read_text())
+    state = json.loads(path.read_text())
+    # A legacy pilot state carried a potentially enormous ``seen_hashes``
+    # array.  The build migrates it into SQLite on first resume and removes the
+    # array before the next atomic checkpoint.
+    return state
 
 
 def save_state(path: Path, state: dict) -> None:

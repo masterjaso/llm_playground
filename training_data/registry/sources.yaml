@@ -3,6 +3,7 @@
 sources:
   fineweb_edu:
     dataset_id: HuggingFaceFW/fineweb-edu
+    revision: 87f09149ef4734204d70ed1d046ddc9ca3f2b8f9
     split: train
     text_field: text
     domain: general_web
@@ -12,6 +13,7 @@ sources:
     role: foundation general/educational web
   fineweb:
     dataset_id: HuggingFaceFW/fineweb
+    revision: 9bb295ddab0e05d785b879661af7260fed5140fc
     config: CC-MAIN-2024-51
     split: train
     text_field: text
@@ -22,6 +24,7 @@ sources:
     role: general web overflow
   nemotron_cc_v2:
     dataset_id: nvidia/Nemotron-CC-v2
+    revision: 2669787c66d18601c0e91167fd520be6c1245865
     split: train
     text_field: text
     domain: general_web
@@ -31,6 +34,7 @@ sources:
     role: general web (gated; recipe-only unless terms permit)
   common_pile_books:
     dataset_id: common-pile/pre_1929_books
+    revision: a158135b4765f01d321b5cbe1ff90ebbd354b00f
     split: train
     text_field: text
     domain: books_reference
@@ -40,6 +44,7 @@ sources:
     role: public-domain books (pre-1929)
   stackv2_edu:
     dataset_id: common-pile/stackv2_edu_filtered
+    revision: c354dbe88469a1153e97c6a63ac50591849654de
     split: train
     text_field: text
     domain: code
@@ -49,6 +54,7 @@ sources:
     role: openly licensed code
   stack_edu:
     dataset_id: HuggingFaceTB/stack-edu
+    revision: eeec5caac5cc3758a18f1d3ba4416837a9ba814c
     config: Python
     split: train
     text_field: content
@@ -59,6 +65,7 @@ sources:
     role: code/problem solving (per-language configs)
   nemotron_code:
     dataset_id: nvidia/Nemotron-Pretraining-Code-v1
+    revision: 01393d3bd890ddc5c15da8a2c9afb57391277659
     split: train
     text_field: text
     domain: code
@@ -68,6 +75,7 @@ sources:
     role: optional gated code (recipe-only)
   finemath:
     dataset_id: HuggingFaceTB/finemath
+    revision: e92b25a616738fe95dc186b64dfb19f9c8525594
     config: finemath-4plus
     split: train
     text_field: text
@@ -78,6 +86,7 @@ sources:
     role: math/formal reasoning
   open_web_math:
     dataset_id: open-web-math/open-web-math
+    revision: fde8ef8de2300f5e778f56261843dab89f230815
     split: train
     text_field: text
     domain: math_stem
@@ -87,6 +96,7 @@ sources:
     role: math/STEM prose
   nemotron_math:
     dataset_id: nvidia/Nemotron-CC-Math-v1
+    revision: 397a2502f2028c659ba411a6c4935b464a7f03aa
     split: train
     text_field: text
     domain: math_stem
@@ -96,6 +106,7 @@ sources:
     role: optional gated math (recipe-only)
   cosmopedia:
     dataset_id: HuggingFaceTB/cosmopedia-v2
+    revision: 3ba9d605774198c5868892d7a8deda78031a781f
     config: cosmopedia-v2
     split: train
     text_field: text
@@ -106,6 +117,7 @@ sources:
     role: synthetic educational
   openthoughts:
     dataset_id: open-thoughts/OpenThoughts3-1.2M
+    revision: 61bcf9d4eb38b30295efc2021227a63cc5bb34c8
     split: train
     text_field: conversations
     domain: reasoning

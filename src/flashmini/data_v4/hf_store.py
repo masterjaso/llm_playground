@@ -46,6 +46,8 @@ def whoami() -> dict:
 def repo_id_for(kind: str, hf_user: str) -> str:
     if kind == "data":
         return f"{hf_user}/flashmini-data-v1"
+    if kind == "production":
+        return f"{hf_user}/flashmini-pretrain-production-v1"
     if kind == "eval":
         return f"{hf_user}/flashmini-eval-v1"
     raise ValueError(f"unknown repo kind: {kind}")
@@ -86,6 +88,35 @@ def upload_file(repo_id: str, local_path: Path, path_in_repo: str,
     )
 
 
+def upload_files(repo_id: str, files: list[tuple[Path, str]], *,
+                 commit_message: str) -> str:
+    """Upload several files in one dataset commit and return its revision.
+
+    Hugging Face applies the repository commit rate limit to each
+    ``upload_file`` call.  Canonical production shards are therefore grouped
+    into one atomic commit.  The caller still performs per-file size and hash
+    verification before treating the batch as durable.
+    """
+    from huggingface_hub import CommitOperationAdd, HfApi
+
+    if not files:
+        raise ValueError("at least one file is required for a batch upload")
+    token = load_token()
+    api = HfApi(token=token)
+    operations = [
+        CommitOperationAdd(path_in_repo=remote, path_or_fileobj=str(local))
+        for local, remote in files
+    ]
+    commit = api.create_commit(
+        repo_id=repo_id,
+        repo_type="dataset",
+        operations=operations,
+        commit_message=commit_message,
+    )
+    revision = getattr(commit, "oid", "") or getattr(commit, "commit_id", "")
+    return str(revision or "")
+
+
 def download_file(repo_id: str, path_in_repo: str, dest: Path, *,
                   revision: str | None = None,
                   cache_dir: Path | None = None,
@@ -99,6 +130,7 @@ def download_file(repo_id: str, path_in_repo: str, dest: Path, *,
     """
     import shutil
     import tempfile
+
     from huggingface_hub import hf_hub_download
     dest = Path(dest)
     dest.parent.mkdir(parents=True, exist_ok=True)
@@ -139,7 +171,7 @@ def remote_file_info(repo_id: str, path_in_repo: str, *,
     try:
         info = api.get_paths_info(repo_id, path_in_repo, repo_type="dataset",
                                   revision=revision)
-    except Exception:
+    except Exception:  # noqa: BLE001 - metadata API absence is handled by caller
         return None
     if isinstance(info, list):
         info = info[0] if info else None
@@ -154,6 +186,6 @@ def remote_head_sha(repo_id: str) -> str:
         for branch in getattr(refs, "branches", []):
             if getattr(branch, "name", "") == "main":
                 return getattr(branch, "target_commit", "") or ""
-    except Exception:
+    except Exception:  # noqa: BLE001, S110 - head lookup is best effort
         pass
     return ""

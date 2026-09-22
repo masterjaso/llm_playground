@@ -1,0 +1,150 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-09-22T11:59:00Z",
+  "release_id": "flashmini-pretrain-production-v1",
+  "production_repository": "mjaso/flashmini-data-v1",
+  "production_prefix": "releases/pretrain-production-v1",
+  "pilot_corpus_preserved": true,
+  "pilot": {
+    "repository": "mjaso/flashmini-data-v1",
+    "revision": "e83398462169164d9e4127627ad4f72d95b05a41",
+    "immutable": true,
+    "audit_evidence": ".nsp/artifacts/runs/flashmini-pretraining-data-20260921t210507z-4ee60f38/evidence/hf-audit-live.json",
+    "integrity_ready": false,
+    "integrity_blockers": [
+      "11 manifest paths are missing remotely",
+      "one unmanifested remote shard is present",
+      "six remote shard size/hash mismatches",
+      "published rows have estimated rather than exact production-tokenizer counts"
+    ]
+  },
+  "verified_gates": {
+    "exact_recipe_aggregates": true,
+    "immutable_source_lock": true,
+    "frozen_production_tokenizer_spec": true,
+    "sqlite_exact_and_near_dedupe": true,
+    "benchmark_exclusion_implementation": true,
+    "deficit_token_scheduler": true,
+    "contiguous_token_store_and_packing": true,
+    "distributed_sampler_resume_and_cache_telemetry": true,
+    "bounded_stream_upload_verify_evict": true,
+    "durable_hf_build_progress": true,
+    "end_to_end_smoke": true,
+    "repository_tests": true
+  },
+  "source_capacity": {
+    "status": "not_sufficiently_measured_for_8t",
+    "open_sources_probe": "partial_ok_with_schema_block",
+    "schema_blocked_sources": {
+      "stack_edu": "text_field_missing:content; pinned dataset exposes metadata only"
+    },
+    "gated_sources": [
+      "nemotron_cc_v2",
+      "nemotron_code",
+      "nemotron_math"
+    ],
+    "evidence": "training_data/source_capacity.json",
+    "latest_schema_probe": ".nsp/artifacts/runs/flashmini-pretraining-data-streaming-20260922t001329z-c8b2a5d7/evidence/source-schema-probe.json",
+    "latest_continuation_evidence": ".nsp/artifacts/runs/flashmini-pretraining-data-streaming-continuation-20260922t005710z-0309721f/evidence/1b-stream-continuation-summary.json",
+    "local_slice": {
+      "selected_documents": 397,
+      "publishable_exact_tokens": 149487,
+      "elapsed_seconds": 108.22,
+      "peak_rss_gib": 5.56,
+      "result": "insufficient_for_production_materialization"
+    }
+  },
+  "benchmark_contamination": {
+    "implementation": "training_data/eval/contamination_sources.yaml",
+    "frozen_corpus_loaded": false,
+    "status": "partial_exclusion_allowed_during_canonical_ingestion",
+    "final_freeze_status": "blocked_until_immutable_evaluation_exports_are_pinned"
+  },
+  "1B_100B_BUILD_STATUS": {
+    "pipeline_ready": true,
+    "canonical_materialization": "running_streaming",
+    "exact_tokens_published": 1039496,
+    "training_view_tokens_published": 0,
+    "canonical_documents_published": 170,
+    "canonical_shards_published": 12,
+    "last_remote_revision": "31a09d868966466a90459678b5eba9532267d02c",
+    "last_remote_prefix": "releases/pretrain-production-v1/1b/canonical",
+    "last_run_evidence": ".nsp/artifacts/runs/flashmini-pretraining-data-streaming-continuation-20260922t005710z-0309721f/evidence/1b-stream-remote-verification.json",
+    "state_evidence": ".nsp/artifacts/runs/flashmini-pretraining-data-streaming-20260922t001329z-c8b2a5d7/state/1b-stream-fineweb-state.json",
+    "benchmark_exclusion_status": "partial_pending_exports",
+    "source_notes": [
+      "approved public-source continuation windows published and evicted after remote size/LFS verification; 170 documents and 1,039,496 exact train tokens are live",
+      "stack_edu is schema-blocked because its pinned Python config exposes metadata without the configured content field",
+      "stackv2_edu and openthoughts remain review_required and are held from public canonical publication",
+      "gated Nemotron sources remain untouched pending accepted terms or approved replacements"
+    ],
+    "final_decontamination": "blocked_pending_private_eval",
+    "training_release_ready": false
+  },
+  "50B_8T_PIPELINE_STATUS": {
+    "pipeline_ready": true,
+    "materialization": "running_streaming",
+    "exact_tokens_published": 921570886,
+    "canonical_documents_published": 482543,
+    "canonical_shards_published": 1893,
+    "pending_unverified_shards": 0,
+    "last_remote_revision": "7351bacc0cf74e56a442dc5ae353e98b5ff603df",
+    "last_progress_revision": "a16b28921d1c9d7f57d055799add0d6e9fd864ce",
+    "last_run_id": "flashmini-pretraining-data-50b-corpus-continuation-20260922t011528z-716a591b",
+    "state_evidence": ".nsp/artifacts/runs/flashmini-pretraining-data-50b-corpus-continuation-20260922t011528z-716a591b/state/50b-stream-state.json",
+    "remote_prefix": "releases/pretrain-production-v1/50b/canonical",
+    "batch_commit_policy": {
+      "max_pending_shards": 16,
+      "window_records": 4096,
+      "shard_documents": 256,
+      "retry_verified_at": "2026-09-22T01:55:00Z",
+      "retry_shards": [
+        "flashmini_50b_full_v1-shard-000050",
+        "flashmini_50b_full_v1-shard-000051",
+        "flashmini_50b_full_v1-shard-000052"
+      ]
+    },
+    "source_blockers": [
+      "gated Nemotron access or approved replacements",
+      "distributed source-capacity evidence",
+      "stack_edu pinned revision has no configured content field",
+      "review-required code/reasoning sources are not public-release eligible"
+    ]
+  },
+  "50B_8T_MATERIALIZATION_STATUS": {
+    "status": "running_streaming",
+    "exact_tokens_published": 921570886,
+    "canonical_documents_published": 482543,
+    "canonical_shards_published": 1893,
+    "pending_unverified_shards": 0,
+    "training_view_materialized": false,
+    "note": "streaming canonical shards are live; final 8T exact target, validation view, and freeze gates remain open"
+  },
+  "readiness": {
+    "FLASHMINI_1B_DATA_READY": false,
+    "FLASHMINI_50B_DATA_PIPELINE_READY": true,
+    "FLASHMINI_50B_DATA_MATERIALIZED_READY": false,
+    "reason": "The 50B stream is active with 921,570,886 exact train tokens in 1,893 verified canonical shards and no pending upload failures. The exact 8T domain targets, code-source replacement, full tokenized training view, source-capacity proof, and private benchmark exports remain outstanding."
+  },
+  "materialization": {
+    "one_b_train_tokens": 100000000000,
+    "one_b_validation_tokens": 100000000,
+    "fifty_b_train_tokens": 8000000000000,
+    "fifty_b_validation_tokens": 200000000,
+    "one_b_materialized": false,
+    "fifty_b_materialized": false,
+    "job_spec": "training_data/production_job_spec.yaml",
+    "storage_projection": "training_data/storage_projection.json",
+    "preflight_manifests": [
+      "training_data/manifests/releases/flashmini-1b-100b.preflight.json",
+      "training_data/manifests/releases/flashmini-50b-8t.preflight.json"
+    ]
+  },
+  "next_actions": [
+    "Continue the active resumable 50B stream-to-HF build across approved sources with 16-shard Hub commits and bounded windows; private eval exports are not required for canonical ingestion.",
+    "Resolve the pinned stack_edu metadata-only schema or approve a replacement code source before the code-domain deficit can close.",
+    "Supply immutable benchmark exports (including the private FlashMini evaluation release) before final freeze; mjaso/flashmini-eval-v1 is not present in the authenticated Hub account.",
+    "Obtain accepted terms or replace the three gated Nemotron inputs and rerun source-capacity measurement for 50B.",
+    "Verify every production shard remotely, freeze release manifests, and then run the 8T capacity/build path."
+  ]
+}

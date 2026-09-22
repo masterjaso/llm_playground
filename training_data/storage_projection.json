@@ -1,0 +1,32 @@
+{
+  "status": "provisional_until_production_shard_measurement",
+  "basis": {
+    "pilot_revision": "e83398462169164d9e4127627ad4f72d95b05a41",
+    "pilot_published_bytes": 2619337547,
+    "pilot_estimated_tokens": 1714354474,
+    "canonical_bytes_per_estimated_token": 1.528,
+    "token_dtype": "uint16",
+    "token_bytes_per_token": 2
+  },
+  "views": {
+    "flashmini-1b-100b": {
+      "train_tokens": 100000000000,
+      "canonical_parquet_bytes_provisional": 152788561918,
+      "tokenized_flat_bytes": 200000000000,
+      "validation_tokenized_bytes_at_100m": 200000000
+    },
+    "flashmini-50b-8t": {
+      "train_tokens": 8000000000000,
+      "canonical_parquet_bytes_provisional": 12223084953433,
+      "tokenized_flat_bytes": 16000000000000,
+      "validation_tokenized_bytes_at_200m": 400000000
+    }
+  },
+  "required_measurements_before_materialization": [
+    "canonical Parquet+ZSTD bytes/token by domain and source",
+    "tokenized index and boundary overhead",
+    "temporary dedupe/index working set",
+    "validation storage",
+    "remote object-store and local-NVMe cache capacity"
+  ]
+}

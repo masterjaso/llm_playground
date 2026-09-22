@@ -1,0 +1,9 @@
+# Frozen tokenizer contract shared by the 1B and 50B production views.
+# The revision is an immutable Hugging Face commit, not a mutable branch.
+tokenizer_id: gpt2
+revision: 607a30d783dfa663caf39e06633721c8d4cfcd7e
+vocab_size: 50257
+eos_token_id: 50256
+pad_policy: eos
+token_format_version: flashmini-token-format-v1
+fingerprint: 764b98926f1c957f507238f93974d75c084014a5c2510237634c519327f9cd66

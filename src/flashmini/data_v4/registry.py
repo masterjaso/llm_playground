@@ -21,21 +21,27 @@ def _is_hex40(value: str) -> bool:
     return len(value) == 40 and all(c in _HEX40 for c in value.lower())
 
 
-def load_registry(path: Path) -> dict:
+def load_registry(path: Path, *, lock_path: Path | None = None,
+                  require_immutable: bool = False) -> dict:
     raw = yaml.safe_load(Path(path).read_text())
     if not isinstance(raw, dict) or "sources" not in raw:
         raise ValueError("registry must contain a 'sources' mapping")
     sources = raw["sources"]
     if not isinstance(sources, dict):
-        raise ValueError("registry 'sources' must be a mapping")
+        raise TypeError("registry 'sources' must be a mapping")
     for sid, src in sources.items():
         _validate_source(sid, src)
+    if lock_path is not None:
+        lock = json.loads(Path(lock_path).read_text())
+        raw = merge_source_lock(raw, lock, require_immutable=require_immutable)
+    elif require_immutable:
+        raise ValueError("production registry requires source_snapshot.lock.json")
     return raw
 
 
 def _validate_source(sid: str, src: dict) -> None:
     if not isinstance(src, dict):
-        raise ValueError(f"source {sid}: must be a mapping")
+        raise TypeError(f"source {sid}: must be a mapping")
     for field in ("dataset_id", "domain", "redistribution_class"):
         if field not in src:
             raise ValueError(f"source {sid}: missing required field '{field}'")
@@ -45,6 +51,53 @@ def _validate_source(sid: str, src: dict) -> None:
     rev = src.get("revision")
     if src.get("decisive") and not (isinstance(rev, str) and _is_hex40(rev)):
         raise ValueError(f"source {sid}: decisive sources require immutable 40-hex revision")
+
+
+def merge_source_lock(registry: dict, lock: dict, *, require_immutable: bool = True) -> dict:
+    """Overlay immutable probe facts onto the human-edited source registry."""
+    if not isinstance(lock, dict):
+        raise TypeError("source lock must be a mapping")
+    merged = json.loads(json.dumps(registry))
+    for sid, source in merged.get("sources", {}).items():
+        entry = lock.get(sid)
+        if not isinstance(entry, dict):
+            if require_immutable:
+                raise ValueError(f"source lock missing entry for {sid}")
+            continue
+        if entry.get("dataset_id") and entry["dataset_id"] != source.get("dataset_id"):
+            raise ValueError(f"source lock dataset mismatch for {sid}")
+        revision = entry.get("revision") or source.get("revision")
+        if require_immutable and not (isinstance(revision, str) and _is_hex40(revision)):
+            raise ValueError(f"source lock for {sid} lacks immutable revision")
+        source.update({
+            "revision": revision,
+            "config": entry.get("config", source.get("config")),
+            "split": entry.get("split", source.get("split", "train")),
+            "license": entry.get("license", source.get("license", "")),
+            "gated": bool(entry.get("gated", source.get("gated", False))),
+            "lock_card_sha256": entry.get("card_sha256", ""),
+        })
+        source["immutable_lock"] = True
+    return merged
+
+
+def validate_source_lock(registry: dict, lock: dict) -> dict:
+    """Return a machine-readable lock health report without mutating input."""
+    report = {"valid": True, "missing": [], "mutable": [], "mismatched": []}
+    entries = lock if isinstance(lock, dict) else {}
+    for sid, source in registry.get("sources", {}).items():
+        entry = entries.get(sid)
+        if not isinstance(entry, dict):
+            report["missing"].append(sid)
+            continue
+        if entry.get("dataset_id") != source.get("dataset_id"):
+            report["mismatched"].append(sid)
+        if source.get("revision") and entry.get("revision") != source.get("revision"):
+            report["mismatched"].append(sid)
+        if not _is_hex40(str(entry.get("revision", ""))):
+            report["mutable"].append(sid)
+    report["valid"] = not any(report[key] for key in ("missing", "mutable", "mismatched"))
+    return report
 
 
 def registry_hash(registry: dict) -> str:

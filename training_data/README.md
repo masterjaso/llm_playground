@@ -24,6 +24,42 @@ flashmini-data train-smoke
 flashmini-data cache-status
 ```
 
+## Production stream operator loop
+
+The 1B production command writes only bounded staging and publishes verified
+progress under `releases/pretrain-production-v1/1b/canonical`:
+
+```bash
+flashmini-data build --production \
+  --recipe training_data/recipes/flashmini_1b_full_v1.yaml \
+  --source-lock training_data/registry/source_snapshot.lock.json \
+  --tokenizer-spec training_data/tokenizer/production.yaml \
+  --contamination-config training_data/eval/contamination_sources.yaml \
+  --hf-repo mjaso/flashmini-data-v1 \
+  --hf-prefix releases/pretrain-production-v1/1b/canonical \
+  --upload-workers 1 --max-pending-shards 16 --window 4096 --shard-docs 256 \
+  --free-space-watermark-gib 10
+flashmini-data resume --production --recipe training_data/recipes/flashmini_1b_full_v1.yaml \
+  --state <state.json> --out-dir <staging-dir> --cache-dir <managed-cache>
+flashmini-data progress --state <state.json> --cache-dir <managed-cache>
+flashmini-data cache-status --cache-dir <managed-cache>
+flashmini-data hf-audit --repo mjaso/flashmini-data-v1
+```
+
+When immutable benchmark/private-eval exports arrive, run `flashmini-data
+overlay` against the published canonical state. It downloads and filters one
+remote shard at a time, publishes a separate decontaminated view prefix, and
+never rewrites the canonical release.
+
+For a controlled operational slice, add `--max-records`, `--max-docs`, and an
+optional `--source-ids` allowlist. These limits pause after a bounded chunk;
+they never redefine the exact recipe target. A verified shard is evicted
+immediately, while cursors, SQLite dedupe state, and release progress remain.
+
+`--max-pending-shards` controls the number of shards in one atomic Hub commit.
+Production runs use 16 to avoid the repository commit rate limit; a partial
+batch remains local until every member is remotely verified.
+
 ## HF auth
 
 Set `HF_TOKEN` (preferred; `HUGGINGFACE_HUB_TOKEN` also honored, plus `.env`
@@ -70,24 +106,23 @@ no relicensing under the code license. See `SOURCES.md`, `ARCHITECTURE.md`.
 
 ## Current corpus-v1 status
 
-Frozen release available on HF:
+The pilot remains immutable.  Re-audit the live Hub tree before using it:
 
 ```bash
-flashmini-data verify --recipe training_data/recipes/flashmini_1b_full_v1.yaml
+flashmini-data hf-audit --repo mjaso/flashmini-data-v1 \
+  --revision e83398462169164d9e4127627ad4f72d95b05a41
 ```
 
-| Field | Value |
-|---|---|
-| HF repo | `mjaso/flashmini-data-v1` @ `f13e9cee67eb…` |
-| Shards | 84 published + verified |
-| Documents | 92,373 (train 91,907 / val 466) |
-| Estimated tokens | ~1.76 B |
-| Fingerprint | `af4439de1e1a6d25c97759cba67947397f39740cb7d99b61df22453c9bd74aa5` |
-| Train-smoke | passes (integrity valid, consumed across shards) |
-| Resume-check | identical=True |
+At that pinned revision the live inventory contains 85 `shards/*.parquet`
+files and 15 `clean/*.parquet` files.  The remote manifest contains 95 rows,
+83 marked published, 91,173 published-manifest documents, and
+1,714,354,474 estimated published tokens.  It has no exact production-tokenizer
+counts.  Six shard size/hash mismatches, one unpublished remote shard, and
+one unmanifested remote shard are recorded in the run audit.  These are pilot
+release findings; production code never mutates or silently reuses the pilot.
 
-Known gap: 12 shards (~13,900 docs, finemath + stackv2_edu) were lost during
-an interrupted build and are documented in `manifests/README.md`. Their
-source pools remain pinned for a follow-up build. Scale-up beyond corpus-v1
-continues with `flashmini-data build` resuming from `build_state.json`
-cursors toward the 100B-token recipe target.
+The production release must use a new versioned prefix or dataset repository,
+an immutable Hub revision, exact tokenizer counts, and a separate frozen
+training-view manifest.  Machine-readable readiness facts live in
+`production_release_status.json`; the blocked target descriptors are under
+`manifests/releases/`. See `PRODUCTION_READINESS.md` for the gate contract.
