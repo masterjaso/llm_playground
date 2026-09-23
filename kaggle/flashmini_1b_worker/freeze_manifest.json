@@ -66,12 +66,12 @@
   },
   "architecture_version": 3,
   "checkpoint_schema_version": 1,
-  "created_at_utc": "2026-09-23T18:59:07Z",
+  "created_at_utc": "2026-09-23T19:05:16Z",
   "data_view": {
     "blocked_sources": [],
     "bounded_host_cache": true,
     "exact_token_accounting": true,
-    "fingerprint": "6a84be65449cb9b10503b02f9d5f221aca500e64842e3efbd7552d6227ab3cb3",
+    "fingerprint": "927461f9c335e1b46f6300e5ee6d70960aaeaa1f4a31ce74ab78fc45a712de34",
     "full_corpus_materialization_required": false,
     "kind": "virtual_remote_shards",
     "packing_policy": "document_mix",
@@ -95,6 +95,7 @@
           ],
           "production_recipe": false,
           "reason": "metadata_only_no_content_field",
+          "redistribution_class": "review_required",
           "revision": "eeec5caac5cc3758a18f1d3ba4416837a9ba814c",
           "status": "REJECTED"
         }
@@ -169,13 +170,13 @@
         "source_change_requires_new_view_fingerprint": true
       },
       "source_lock": "training_data/registry/source_snapshot.lock.json",
-      "source_lock_sha256": "adea723bdab8b64e25f0a3b90216a0860c1d3f1ea4eacbf602b6c92aaf8c2fa0",
+      "source_lock_sha256": "eee182aa2fe3ced5f323ef0ddda079f3e0c55a5c27243471cd1e9ba84ca86d65",
       "view_id": "flashmini-1b-virtual-foundation-v1"
     },
     "source_audit_path": "training_data/manifests/releases/flashmini-1b-foundation-source-audit.json",
-    "source_audit_sha256": "10f77f4b3e6fafa75d30b72f980d207456d6bd929f846012e464b69cf80acb6c",
+    "source_audit_sha256": "94dc91e6a347c8c27900407a1ecb7ebeb8e4ad1c96d85daba8167548443cc3d3",
     "source_lock_path": "training_data/registry/source_snapshot.lock.json",
-    "source_lock_sha256": "adea723bdab8b64e25f0a3b90216a0860c1d3f1ea4eacbf602b6c92aaf8c2fa0",
+    "source_lock_sha256": "eee182aa2fe3ced5f323ef0ddda079f3e0c55a5c27243471cd1e9ba84ca86d65",
     "sources": {
       "common_pile_books": {
         "config": null,
@@ -300,7 +301,7 @@
     },
     "view_id": "flashmini-1b-virtual-foundation-v1"
   },
-  "git_commit": "13135b899e9e24b11f33b4f92386f0bc1f8b4aee",
+  "git_commit": "8e84aeed514bc2d348a377f4906fbf6167fd07af",
   "model_config_sha256": "911dc3d802bff39beb1539f8ae2acef718cc7df1de1ba348bbcc780fc837a05c",
   "optimizer_policy": {
     "betas": [
@@ -361,7 +362,7 @@
     "world_size": 8
   },
   "schema_version": 1,
-  "source_fingerprint": "383b4e507065d2d9f5efb09af3367b1e069571e565f34ff446546e3d2184394d",
+  "source_fingerprint": "1b0e0c339eea808ca3a6fe962d587c0105da89c5f854c6fadfb48deb62e8ba8b",
   "state": "INFRASTRUCTURE_READY",
   "tokenizer": {
     "eos_token_id": 50256,
