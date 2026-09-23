@@ -1,0 +1,708 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-09-23T16:20:41Z",
+  "links": [
+    {
+      "type": "feature_implemented_by_technical",
+      "source": "feature.flashmini-experiment-gates",
+      "target": "technical.flashmini-training-runtime",
+      "reviewStatus": "reviewed",
+      "status": "promoted",
+      "reviewedBy": "nsp-ccb-hygiene",
+      "reviewedAt": "2026-09-23T16:20:41Z",
+      "evidence": [
+        ".docs/features/flashmini-experiment-gates.md",
+        ".docs/technical/flashmini-training-runtime.md"
+      ],
+      "rationale": "The linked section and resolvable anchor were inspected against the documented runtime/data/validation contract and its targeted tests."
+    },
+    {
+      "type": "technical_implemented_by_code",
+      "source": "technical.flashmini-training-runtime",
+      "target": "repo://src/flashmini/config.py",
+      "reviewStatus": "reviewed",
+      "status": "promoted",
+      "reviewedBy": "nsp-ccb-hygiene",
+      "reviewedAt": "2026-09-23T16:20:41Z",
+      "evidence": [
+        ".docs/technical/flashmini-training-runtime.md",
+        "src/flashmini/config.py",
+        "tests/flashmini/test_v3_architecture.py"
+      ],
+      "rationale": "The linked section and resolvable anchor were inspected against the documented runtime/data/validation contract and its targeted tests."
+    },
+    {
+      "type": "technical_implemented_by_code",
+      "source": "technical.flashmini-training-runtime",
+      "target": "repo://src/flashmini/models/moe.py",
+      "reviewStatus": "reviewed",
+      "status": "promoted",
+      "reviewedBy": "nsp-ccb-hygiene",
+      "reviewedAt": "2026-09-23T16:20:41Z",
+      "evidence": [
+        ".docs/technical/flashmini-training-runtime.md",
+        "src/flashmini/models/moe.py",
+        "tests/flashmini/test_v3_architecture.py"
+      ],
+      "rationale": "The linked section and resolvable anchor were inspected against the documented runtime/data/validation contract and its targeted tests."
+    },
+    {
+      "type": "technical_implemented_by_code",
+      "source": "technical.flashmini-training-runtime",
+      "target": "repo://src/flashmini/models/gated_delta_net.py",
+      "reviewStatus": "reviewed",
+      "status": "promoted",
+      "reviewedBy": "nsp-ccb-hygiene",
+      "reviewedAt": "2026-09-23T16:20:41Z",
+      "evidence": [
+        ".docs/technical/flashmini-training-runtime.md",
+        "src/flashmini/models/gated_delta_net.py",
+        "tests/flashmini/test_v3_architecture.py"
+      ],
+      "rationale": "The linked section and resolvable anchor were inspected against the documented runtime/data/validation contract and its targeted tests."
+    },
+    {
+      "type": "technical_implemented_by_code",
+      "source": "technical.flashmini-training-runtime",
+      "target": "repo://src/flashmini/models/ple.py",
+      "reviewStatus": "reviewed",
+      "status": "promoted",
+      "reviewedBy": "nsp-ccb-hygiene",
+      "reviewedAt": "2026-09-23T16:20:41Z",
+      "evidence": [
+        ".docs/technical/flashmini-training-runtime.md",
+        "src/flashmini/models/ple.py",
+        "tests/flashmini/test_v3_architecture.py"
+      ],
+      "rationale": "The linked section and resolvable anchor were inspected against the documented runtime/data/validation contract and its targeted tests."
+    },
+    {
+      "type": "technical_implemented_by_code",
+      "source": "technical.flashmini-training-runtime",
+      "target": "repo://src/flashmini/models/hyperconnection.py",
+      "reviewStatus": "reviewed",
+      "status": "promoted",
+      "reviewedBy": "nsp-ccb-hygiene",
+      "reviewedAt": "2026-09-23T16:20:41Z",
+      "evidence": [
+        ".docs/technical/flashmini-training-runtime.md",
+        "src/flashmini/models/hyperconnection.py",
+        "tests/flashmini/test_v3_architecture.py"
+      ],
+      "rationale": "The linked section and resolvable anchor were inspected against the documented runtime/data/validation contract and its targeted tests."
+    },
+    {
+      "type": "technical_implemented_by_code",
+      "source": "technical.flashmini-training-runtime",
+      "target": "repo://src/flashmini/training.py",
+      "reviewStatus": "reviewed",
+      "status": "promoted",
+      "reviewedBy": "nsp-ccb-hygiene",
+      "reviewedAt": "2026-09-23T16:20:41Z",
+      "evidence": [
+        ".docs/technical/flashmini-training-runtime.md",
+        "src/flashmini/training.py",
+        "tests/flashmini/test_v3_architecture.py"
+      ],
+      "rationale": "The linked section and resolvable anchor were inspected against the documented runtime/data/validation contract and its targeted tests."
+    },
+    {
+      "type": "technical_implemented_by_code",
+      "source": "technical.flashmini-training-runtime",
+      "target": "repo://src/flashmini/pipeline.py",
+      "reviewStatus": "reviewed",
+      "status": "promoted",
+      "reviewedBy": "nsp-ccb-hygiene",
+      "reviewedAt": "2026-09-23T16:20:41Z",
+      "evidence": [
+        ".docs/technical/flashmini-training-runtime.md",
+        "src/flashmini/pipeline.py",
+        "tests/flashmini/test_v3_architecture.py"
+      ],
+      "rationale": "The linked section and resolvable anchor were inspected against the documented runtime/data/validation contract and its targeted tests."
+    },
+    {
+      "type": "technical_implemented_by_code",
+      "source": "technical.flashmini-training-runtime",
+      "target": "repo://src/flashmini/checkpoint.py",
+      "reviewStatus": "reviewed",
+      "status": "promoted",
+      "reviewedBy": "nsp-ccb-hygiene",
+      "reviewedAt": "2026-09-23T16:20:41Z",
+      "evidence": [
+        ".docs/technical/flashmini-training-runtime.md",
+        "src/flashmini/checkpoint.py",
+        "tests/flashmini/test_v3_architecture.py"
+      ],
+      "rationale": "The linked section and resolvable anchor were inspected against the documented runtime/data/validation contract and its targeted tests."
+    },
+    {
+      "type": "technical_implemented_by_code",
+      "source": "technical.flashmini-training-runtime",
+      "target": "repo://src/flashmini/comparison.py",
+      "reviewStatus": "reviewed",
+      "status": "promoted",
+      "reviewedBy": "nsp-ccb-hygiene",
+      "reviewedAt": "2026-09-23T16:20:41Z",
+      "evidence": [
+        ".docs/technical/flashmini-training-runtime.md",
+        "src/flashmini/comparison.py",
+        "tests/flashmini/test_v3_architecture.py"
+      ],
+      "rationale": "The linked section and resolvable anchor were inspected against the documented runtime/data/validation contract and its targeted tests."
+    },
+    {
+      "type": "technical_implemented_by_code",
+      "source": "technical.flashmini-training-runtime",
+      "target": "repo://src/flashmini/evaluation.py",
+      "reviewStatus": "reviewed",
+      "status": "promoted",
+      "reviewedBy": "nsp-ccb-hygiene",
+      "reviewedAt": "2026-09-23T16:20:41Z",
+      "evidence": [
+        ".docs/technical/flashmini-training-runtime.md",
+        "src/flashmini/evaluation.py",
+        "tests/flashmini/test_v3_architecture.py"
+      ],
+      "rationale": "The linked section and resolvable anchor were inspected against the documented runtime/data/validation contract and its targeted tests."
+    },
+    {
+      "type": "technical_implemented_by_code",
+      "source": "technical.flashmini-training-runtime",
+      "target": "repo://src/flashmini/cli.py",
+      "reviewStatus": "reviewed",
+      "status": "promoted",
+      "reviewedBy": "nsp-ccb-hygiene",
+      "reviewedAt": "2026-09-23T16:20:41Z",
+      "evidence": [
+        ".docs/technical/flashmini-training-runtime.md",
+        "src/flashmini/cli.py",
+        "tests/flashmini/test_v3_architecture.py"
+      ],
+      "rationale": "The linked section and resolvable anchor were inspected against the documented runtime/data/validation contract and its targeted tests."
+    },
+    {
+      "type": "technical_implemented_by_code",
+      "source": "technical.flashmini-training-runtime",
+      "target": "repo://configs/flashmini/poc_a_v3.yaml",
+      "reviewStatus": "reviewed",
+      "status": "promoted",
+      "reviewedBy": "nsp-ccb-hygiene",
+      "reviewedAt": "2026-09-23T16:20:41Z",
+      "evidence": [
+        ".docs/technical/flashmini-training-runtime.md",
+        "configs/flashmini/poc_a_v3.yaml",
+        "tests/flashmini/test_v3_architecture.py"
+      ],
+      "rationale": "The linked section and resolvable anchor were inspected against the documented runtime/data/validation contract and its targeted tests."
+    },
+    {
+      "type": "technical_implemented_by_code",
+      "source": "technical.flashmini-training-runtime",
+      "target": "repo://configs/flashmini/poc_b_v3.yaml",
+      "reviewStatus": "reviewed",
+      "status": "promoted",
+      "reviewedBy": "nsp-ccb-hygiene",
+      "reviewedAt": "2026-09-23T16:20:41Z",
+      "evidence": [
+        ".docs/technical/flashmini-training-runtime.md",
+        "configs/flashmini/poc_b_v3.yaml",
+        "tests/flashmini/test_v3_architecture.py"
+      ],
+      "rationale": "The linked section and resolvable anchor were inspected against the documented runtime/data/validation contract and its targeted tests."
+    },
+    {
+      "type": "technical_implemented_by_code",
+      "source": "technical.flashmini-training-runtime",
+      "target": "repo://configs/flashmini/poc_c_v3.yaml",
+      "reviewStatus": "reviewed",
+      "status": "promoted",
+      "reviewedBy": "nsp-ccb-hygiene",
+      "reviewedAt": "2026-09-23T16:20:41Z",
+      "evidence": [
+        ".docs/technical/flashmini-training-runtime.md",
+        "configs/flashmini/poc_c_v3.yaml",
+        "tests/flashmini/test_v3_architecture.py"
+      ],
+      "rationale": "The linked section and resolvable anchor were inspected against the documented runtime/data/validation contract and its targeted tests."
+    },
+    {
+      "type": "technical_implemented_by_code",
+      "source": "technical.flashmini-training-runtime",
+      "target": "repo://configs/flashmini/poc_d_v3.yaml",
+      "reviewStatus": "reviewed",
+      "status": "promoted",
+      "reviewedBy": "nsp-ccb-hygiene",
+      "reviewedAt": "2026-09-23T16:20:41Z",
+      "evidence": [
+        ".docs/technical/flashmini-training-runtime.md",
+        "configs/flashmini/poc_d_v3.yaml",
+        "tests/flashmini/test_v3_architecture.py"
+      ],
+      "rationale": "The linked section and resolvable anchor were inspected against the documented runtime/data/validation contract and its targeted tests."
+    },
+    {
+      "type": "feature_implemented_by_technical",
+      "source": "feature.flashmini-production-data",
+      "target": "technical.flashmini-data-pipeline",
+      "reviewStatus": "reviewed",
+      "status": "promoted",
+      "reviewedBy": "nsp-ccb-hygiene",
+      "reviewedAt": "2026-09-23T16:20:41Z",
+      "evidence": [
+        ".docs/features/flashmini-production-data.md",
+        ".docs/technical/flashmini-data-pipeline.md"
+      ],
+      "rationale": "The linked section and resolvable anchor were inspected against the documented runtime/data/validation contract and its targeted tests."
+    },
+    {
+      "type": "technical_implemented_by_code",
+      "source": "technical.flashmini-data-pipeline",
+      "target": "repo://src/flashmini/data_v4/registry.py",
+      "reviewStatus": "reviewed",
+      "status": "promoted",
+      "reviewedBy": "nsp-ccb-hygiene",
+      "reviewedAt": "2026-09-23T16:20:41Z",
+      "evidence": [
+        ".docs/technical/flashmini-data-pipeline.md",
+        "src/flashmini/data_v4/registry.py",
+        "tests/flashmini/test_data_v4_production.py"
+      ],
+      "rationale": "The linked section and resolvable anchor were inspected against the documented runtime/data/validation contract and its targeted tests."
+    },
+    {
+      "type": "technical_implemented_by_code",
+      "source": "technical.flashmini-data-pipeline",
+      "target": "repo://src/flashmini/data_v4/source.py",
+      "reviewStatus": "reviewed",
+      "status": "promoted",
+      "reviewedBy": "nsp-ccb-hygiene",
+      "reviewedAt": "2026-09-23T16:20:41Z",
+      "evidence": [
+        ".docs/technical/flashmini-data-pipeline.md",
+        "src/flashmini/data_v4/source.py",
+        "tests/flashmini/test_data_v4_production.py"
+      ],
+      "rationale": "The linked section and resolvable anchor were inspected against the documented runtime/data/validation contract and its targeted tests."
+    },
+    {
+      "type": "technical_implemented_by_code",
+      "source": "technical.flashmini-data-pipeline",
+      "target": "repo://src/flashmini/data_v4/recipes.py",
+      "reviewStatus": "reviewed",
+      "status": "promoted",
+      "reviewedBy": "nsp-ccb-hygiene",
+      "reviewedAt": "2026-09-23T16:20:41Z",
+      "evidence": [
+        ".docs/technical/flashmini-data-pipeline.md",
+        "src/flashmini/data_v4/recipes.py",
+        "tests/flashmini/test_data_v4_production.py"
+      ],
+      "rationale": "The linked section and resolvable anchor were inspected against the documented runtime/data/validation contract and its targeted tests."
+    },
+    {
+      "type": "technical_implemented_by_code",
+      "source": "technical.flashmini-data-pipeline",
+      "target": "repo://src/flashmini/data_v4/filters.py",
+      "reviewStatus": "reviewed",
+      "status": "promoted",
+      "reviewedBy": "nsp-ccb-hygiene",
+      "reviewedAt": "2026-09-23T16:20:41Z",
+      "evidence": [
+        ".docs/technical/flashmini-data-pipeline.md",
+        "src/flashmini/data_v4/filters.py",
+        "tests/flashmini/test_data_v4_production.py"
+      ],
+      "rationale": "The linked section and resolvable anchor were inspected against the documented runtime/data/validation contract and its targeted tests."
+    },
+    {
+      "type": "technical_implemented_by_code",
+      "source": "technical.flashmini-data-pipeline",
+      "target": "repo://src/flashmini/data_v4/dedupe.py",
+      "reviewStatus": "reviewed",
+      "status": "promoted",
+      "reviewedBy": "nsp-ccb-hygiene",
+      "reviewedAt": "2026-09-23T16:20:41Z",
+      "evidence": [
+        ".docs/technical/flashmini-data-pipeline.md",
+        "src/flashmini/data_v4/dedupe.py",
+        "tests/flashmini/test_data_v4_production.py"
+      ],
+      "rationale": "The linked section and resolvable anchor were inspected against the documented runtime/data/validation contract and its targeted tests."
+    },
+    {
+      "type": "technical_implemented_by_code",
+      "source": "technical.flashmini-data-pipeline",
+      "target": "repo://src/flashmini/data_v4/build.py",
+      "reviewStatus": "reviewed",
+      "status": "promoted",
+      "reviewedBy": "nsp-ccb-hygiene",
+      "reviewedAt": "2026-09-23T16:20:41Z",
+      "evidence": [
+        ".docs/technical/flashmini-data-pipeline.md",
+        "src/flashmini/data_v4/build.py",
+        "tests/flashmini/test_data_v4_production.py"
+      ],
+      "rationale": "The linked section and resolvable anchor were inspected against the documented runtime/data/validation contract and its targeted tests."
+    },
+    {
+      "type": "technical_implemented_by_code",
+      "source": "technical.flashmini-data-pipeline",
+      "target": "repo://src/flashmini/data_v4/manifests.py",
+      "reviewStatus": "reviewed",
+      "status": "promoted",
+      "reviewedBy": "nsp-ccb-hygiene",
+      "reviewedAt": "2026-09-23T16:20:41Z",
+      "evidence": [
+        ".docs/technical/flashmini-data-pipeline.md",
+        "src/flashmini/data_v4/manifests.py",
+        "tests/flashmini/test_data_v4_production.py"
+      ],
+      "rationale": "The linked section and resolvable anchor were inspected against the documented runtime/data/validation contract and its targeted tests."
+    },
+    {
+      "type": "technical_implemented_by_code",
+      "source": "technical.flashmini-data-pipeline",
+      "target": "repo://src/flashmini/data_v4/hf_store.py",
+      "reviewStatus": "reviewed",
+      "status": "promoted",
+      "reviewedBy": "nsp-ccb-hygiene",
+      "reviewedAt": "2026-09-23T16:20:41Z",
+      "evidence": [
+        ".docs/technical/flashmini-data-pipeline.md",
+        "src/flashmini/data_v4/hf_store.py",
+        "tests/flashmini/test_data_v4_production.py"
+      ],
+      "rationale": "The linked section and resolvable anchor were inspected against the documented runtime/data/validation contract and its targeted tests."
+    },
+    {
+      "type": "technical_implemented_by_code",
+      "source": "technical.flashmini-data-pipeline",
+      "target": "repo://src/flashmini/data_v4/cache.py",
+      "reviewStatus": "reviewed",
+      "status": "promoted",
+      "reviewedBy": "nsp-ccb-hygiene",
+      "reviewedAt": "2026-09-23T16:20:41Z",
+      "evidence": [
+        ".docs/technical/flashmini-data-pipeline.md",
+        "src/flashmini/data_v4/cache.py",
+        "tests/flashmini/test_data_v4_production.py"
+      ],
+      "rationale": "The linked section and resolvable anchor were inspected against the documented runtime/data/validation contract and its targeted tests."
+    },
+    {
+      "type": "technical_implemented_by_code",
+      "source": "technical.flashmini-data-pipeline",
+      "target": "repo://src/flashmini/data_v4/remote_dataset.py",
+      "reviewStatus": "reviewed",
+      "status": "promoted",
+      "reviewedBy": "nsp-ccb-hygiene",
+      "reviewedAt": "2026-09-23T16:20:41Z",
+      "evidence": [
+        ".docs/technical/flashmini-data-pipeline.md",
+        "src/flashmini/data_v4/remote_dataset.py",
+        "tests/flashmini/test_data_v4_production.py"
+      ],
+      "rationale": "The linked section and resolvable anchor were inspected against the documented runtime/data/validation contract and its targeted tests."
+    },
+    {
+      "type": "technical_implemented_by_code",
+      "source": "technical.flashmini-data-pipeline",
+      "target": "repo://src/flashmini/data_v4/materialize.py",
+      "reviewStatus": "reviewed",
+      "status": "promoted",
+      "reviewedBy": "nsp-ccb-hygiene",
+      "reviewedAt": "2026-09-23T16:20:41Z",
+      "evidence": [
+        ".docs/technical/flashmini-data-pipeline.md",
+        "src/flashmini/data_v4/materialize.py",
+        "tests/flashmini/test_data_v4_production.py"
+      ],
+      "rationale": "The linked section and resolvable anchor were inspected against the documented runtime/data/validation contract and its targeted tests."
+    },
+    {
+      "type": "technical_implemented_by_code",
+      "source": "technical.flashmini-data-pipeline",
+      "target": "repo://src/flashmini/data_v4/overlay.py",
+      "reviewStatus": "reviewed",
+      "status": "promoted",
+      "reviewedBy": "nsp-ccb-hygiene",
+      "reviewedAt": "2026-09-23T16:20:41Z",
+      "evidence": [
+        ".docs/technical/flashmini-data-pipeline.md",
+        "src/flashmini/data_v4/overlay.py",
+        "tests/flashmini/test_data_v4_production.py"
+      ],
+      "rationale": "The linked section and resolvable anchor were inspected against the documented runtime/data/validation contract and its targeted tests."
+    },
+    {
+      "type": "technical_implemented_by_code",
+      "source": "technical.flashmini-data-pipeline",
+      "target": "repo://src/flashmini/data_v4/tokenizer.py",
+      "reviewStatus": "reviewed",
+      "status": "promoted",
+      "reviewedBy": "nsp-ccb-hygiene",
+      "reviewedAt": "2026-09-23T16:20:41Z",
+      "evidence": [
+        ".docs/technical/flashmini-data-pipeline.md",
+        "src/flashmini/data_v4/tokenizer.py",
+        "tests/flashmini/test_data_v4_production.py"
+      ],
+      "rationale": "The linked section and resolvable anchor were inspected against the documented runtime/data/validation contract and its targeted tests."
+    },
+    {
+      "type": "technical_implemented_by_code",
+      "source": "technical.flashmini-data-pipeline",
+      "target": "repo://src/flashmini/data_v4/cli.py",
+      "reviewStatus": "reviewed",
+      "status": "promoted",
+      "reviewedBy": "nsp-ccb-hygiene",
+      "reviewedAt": "2026-09-23T16:20:41Z",
+      "evidence": [
+        ".docs/technical/flashmini-data-pipeline.md",
+        "src/flashmini/data_v4/cli.py",
+        "tests/flashmini/test_data_v4_production.py"
+      ],
+      "rationale": "The linked section and resolvable anchor were inspected against the documented runtime/data/validation contract and its targeted tests."
+    },
+    {
+      "type": "technical_implemented_by_code",
+      "source": "technical.flashmini-data-pipeline",
+      "target": "repo://training_data/registry/source_snapshot.lock.json",
+      "reviewStatus": "reviewed",
+      "status": "promoted",
+      "reviewedBy": "nsp-ccb-hygiene",
+      "reviewedAt": "2026-09-23T16:20:41Z",
+      "evidence": [
+        ".docs/technical/flashmini-data-pipeline.md",
+        "training_data/registry/source_snapshot.lock.json",
+        "tests/flashmini/test_data_v4_production.py"
+      ],
+      "rationale": "The linked section and resolvable anchor were inspected against the documented runtime/data/validation contract and its targeted tests."
+    },
+    {
+      "type": "technical_implemented_by_code",
+      "source": "technical.flashmini-data-pipeline",
+      "target": "repo://training_data/production_job_spec.yaml",
+      "reviewStatus": "reviewed",
+      "status": "promoted",
+      "reviewedBy": "nsp-ccb-hygiene",
+      "reviewedAt": "2026-09-23T16:20:41Z",
+      "evidence": [
+        ".docs/technical/flashmini-data-pipeline.md",
+        "training_data/production_job_spec.yaml",
+        "tests/flashmini/test_data_v4_production.py"
+      ],
+      "rationale": "The linked section and resolvable anchor were inspected against the documented runtime/data/validation contract and its targeted tests."
+    },
+    {
+      "type": "feature_implemented_by_technical",
+      "source": "feature.flashmini-validation-release",
+      "target": "technical.flashmini-validation-operations",
+      "reviewStatus": "reviewed",
+      "status": "promoted",
+      "reviewedBy": "nsp-ccb-hygiene",
+      "reviewedAt": "2026-09-23T16:20:41Z",
+      "evidence": [
+        ".docs/features/flashmini-validation-release.md",
+        ".docs/technical/flashmini-validation-operations.md"
+      ],
+      "rationale": "The linked section and resolvable anchor were inspected against the documented runtime/data/validation contract and its targeted tests."
+    },
+    {
+      "type": "technical_implemented_by_code",
+      "source": "technical.flashmini-validation-operations",
+      "target": "repo://src/flashmini/gate_policy.py",
+      "reviewStatus": "reviewed",
+      "status": "promoted",
+      "reviewedBy": "nsp-ccb-hygiene",
+      "reviewedAt": "2026-09-23T16:20:41Z",
+      "evidence": [
+        ".docs/technical/flashmini-validation-operations.md",
+        "src/flashmini/gate_policy.py",
+        "tests/flashmini/test_gate_policy.py"
+      ],
+      "rationale": "The linked section and resolvable anchor were inspected against the documented runtime/data/validation contract and its targeted tests."
+    },
+    {
+      "type": "technical_implemented_by_code",
+      "source": "technical.flashmini-validation-operations",
+      "target": "repo://src/flashmini/gates.py",
+      "reviewStatus": "reviewed",
+      "status": "promoted",
+      "reviewedBy": "nsp-ccb-hygiene",
+      "reviewedAt": "2026-09-23T16:20:41Z",
+      "evidence": [
+        ".docs/technical/flashmini-validation-operations.md",
+        "src/flashmini/gates.py",
+        "tests/flashmini/test_gate_policy.py"
+      ],
+      "rationale": "The linked section and resolvable anchor were inspected against the documented runtime/data/validation contract and its targeted tests."
+    },
+    {
+      "type": "technical_implemented_by_code",
+      "source": "technical.flashmini-validation-operations",
+      "target": "repo://src/flashmini/evaluation.py",
+      "reviewStatus": "reviewed",
+      "status": "promoted",
+      "reviewedBy": "nsp-ccb-hygiene",
+      "reviewedAt": "2026-09-23T16:20:41Z",
+      "evidence": [
+        ".docs/technical/flashmini-validation-operations.md",
+        "src/flashmini/evaluation.py",
+        "tests/flashmini/test_gate_policy.py"
+      ],
+      "rationale": "The linked section and resolvable anchor were inspected against the documented runtime/data/validation contract and its targeted tests."
+    },
+    {
+      "type": "technical_implemented_by_code",
+      "source": "technical.flashmini-validation-operations",
+      "target": "repo://src/flashmini/eval.py",
+      "reviewStatus": "reviewed",
+      "status": "promoted",
+      "reviewedBy": "nsp-ccb-hygiene",
+      "reviewedAt": "2026-09-23T16:20:41Z",
+      "evidence": [
+        ".docs/technical/flashmini-validation-operations.md",
+        "src/flashmini/eval.py",
+        "tests/flashmini/test_gate_policy.py"
+      ],
+      "rationale": "The linked section and resolvable anchor were inspected against the documented runtime/data/validation contract and its targeted tests."
+    },
+    {
+      "type": "technical_implemented_by_code",
+      "source": "technical.flashmini-validation-operations",
+      "target": "repo://src/flashmini/metrics_reconcile.py",
+      "reviewStatus": "reviewed",
+      "status": "promoted",
+      "reviewedBy": "nsp-ccb-hygiene",
+      "reviewedAt": "2026-09-23T16:20:41Z",
+      "evidence": [
+        ".docs/technical/flashmini-validation-operations.md",
+        "src/flashmini/metrics_reconcile.py",
+        "tests/flashmini/test_gate_policy.py"
+      ],
+      "rationale": "The linked section and resolvable anchor were inspected against the documented runtime/data/validation contract and its targeted tests."
+    },
+    {
+      "type": "technical_implemented_by_code",
+      "source": "technical.flashmini-validation-operations",
+      "target": "repo://scripts/flashmini_v3_validate.py",
+      "reviewStatus": "reviewed",
+      "status": "promoted",
+      "reviewedBy": "nsp-ccb-hygiene",
+      "reviewedAt": "2026-09-23T16:20:41Z",
+      "evidence": [
+        ".docs/technical/flashmini-validation-operations.md",
+        "scripts/flashmini_v3_validate.py",
+        "tests/flashmini/test_gate_policy.py"
+      ],
+      "rationale": "The linked section and resolvable anchor were inspected against the documented runtime/data/validation contract and its targeted tests."
+    },
+    {
+      "type": "technical_implemented_by_code",
+      "source": "technical.flashmini-validation-operations",
+      "target": "repo://scripts/flashmini_v3_upstream_check.py",
+      "reviewStatus": "reviewed",
+      "status": "promoted",
+      "reviewedBy": "nsp-ccb-hygiene",
+      "reviewedAt": "2026-09-23T16:20:41Z",
+      "evidence": [
+        ".docs/technical/flashmini-validation-operations.md",
+        "scripts/flashmini_v3_upstream_check.py",
+        "tests/flashmini/test_gate_policy.py"
+      ],
+      "rationale": "The linked section and resolvable anchor were inspected against the documented runtime/data/validation contract and its targeted tests."
+    },
+    {
+      "type": "technical_implemented_by_code",
+      "source": "technical.flashmini-validation-operations",
+      "target": "repo://scripts/flashmini_v3_simulate.py",
+      "reviewStatus": "reviewed",
+      "status": "promoted",
+      "reviewedBy": "nsp-ccb-hygiene",
+      "reviewedAt": "2026-09-23T16:20:41Z",
+      "evidence": [
+        ".docs/technical/flashmini-validation-operations.md",
+        "scripts/flashmini_v3_simulate.py",
+        "tests/flashmini/test_gate_policy.py"
+      ],
+      "rationale": "The linked section and resolvable anchor were inspected against the documented runtime/data/validation contract and its targeted tests."
+    },
+    {
+      "type": "technical_implemented_by_code",
+      "source": "technical.flashmini-validation-operations",
+      "target": "repo://scripts/flashmini_v3_execute.py",
+      "reviewStatus": "reviewed",
+      "status": "promoted",
+      "reviewedBy": "nsp-ccb-hygiene",
+      "reviewedAt": "2026-09-23T16:20:41Z",
+      "evidence": [
+        ".docs/technical/flashmini-validation-operations.md",
+        "scripts/flashmini_v3_execute.py",
+        "tests/flashmini/test_gate_policy.py"
+      ],
+      "rationale": "The linked section and resolvable anchor were inspected against the documented runtime/data/validation contract and its targeted tests."
+    },
+    {
+      "type": "technical_implemented_by_code",
+      "source": "technical.flashmini-validation-operations",
+      "target": "repo://configs/flashmini/v3_gate_policy.json",
+      "reviewStatus": "reviewed",
+      "status": "promoted",
+      "reviewedBy": "nsp-ccb-hygiene",
+      "reviewedAt": "2026-09-23T16:20:41Z",
+      "evidence": [
+        ".docs/technical/flashmini-validation-operations.md",
+        "configs/flashmini/v3_gate_policy.json",
+        "tests/flashmini/test_gate_policy.py"
+      ],
+      "rationale": "The linked section and resolvable anchor were inspected against the documented runtime/data/validation contract and its targeted tests."
+    },
+    {
+      "type": "technical_implemented_by_code",
+      "source": "technical.flashmini-validation-operations",
+      "target": "repo://docs/validation/flashmini-v3-runtime.json",
+      "reviewStatus": "reviewed",
+      "status": "promoted",
+      "reviewedBy": "nsp-ccb-hygiene",
+      "reviewedAt": "2026-09-23T16:20:41Z",
+      "evidence": [
+        ".docs/technical/flashmini-validation-operations.md",
+        "docs/validation/flashmini-v3-runtime.json",
+        "tests/flashmini/test_gate_policy.py"
+      ],
+      "rationale": "The linked section and resolvable anchor were inspected against the documented runtime/data/validation contract and its targeted tests."
+    },
+    {
+      "type": "technical_implemented_by_code",
+      "source": "technical.flashmini-validation-operations",
+      "target": "repo://docs/validation/flashmini-v3-data.json",
+      "reviewStatus": "reviewed",
+      "status": "promoted",
+      "reviewedBy": "nsp-ccb-hygiene",
+      "reviewedAt": "2026-09-23T16:20:41Z",
+      "evidence": [
+        ".docs/technical/flashmini-validation-operations.md",
+        "docs/validation/flashmini-v3-data.json",
+        "tests/flashmini/test_gate_policy.py"
+      ],
+      "rationale": "The linked section and resolvable anchor were inspected against the documented runtime/data/validation contract and its targeted tests."
+    },
+    {
+      "type": "technical_implemented_by_code",
+      "source": "technical.flashmini-validation-operations",
+      "target": "repo://training_data/production_release_status.json",
+      "reviewStatus": "reviewed",
+      "status": "promoted",
+      "reviewedBy": "nsp-ccb-hygiene",
+      "reviewedAt": "2026-09-23T16:20:41Z",
+      "evidence": [
+        ".docs/technical/flashmini-validation-operations.md",
+        "training_data/production_release_status.json",
+        "tests/flashmini/test_gate_policy.py"
+      ],
+      "rationale": "The linked section and resolvable anchor were inspected against the documented runtime/data/validation contract and its targeted tests."
+    }
+  ]
+}

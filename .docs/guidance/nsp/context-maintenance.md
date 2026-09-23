@@ -39,4 +39,4 @@ A typical changed-file list can be staged temporarily with:
 git diff --name-only main...HEAD > .nsp/artifacts/changed-files.txt
 ```
 
-NSP does not call a model for maintenance. The external agent/model that receives this guidance performs the reasoning externally.
+The deterministic `_nsp` CLI does not call a model for maintenance. The external agent/model that receives this guidance performs the reasoning externally.

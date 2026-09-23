@@ -1,21 +1,9 @@
-<!-- nsp:meta
-id: docs.technical.index
-kind: document
-scope: technical
-persona: platform-engineering
-status: active
-source: human
-confidence: high
-reviewStatus: reviewed
-graphNode: document:.docs/technical/index.md
-graphTags: docs
-validation: context-header-audit,manifest-check,secret-scan
-owner: technical
-lastReviewed: 2026-05-23
-replaces: 
-replacedBy: 
--->
-
 # Technical index
 
-Directory navigation for developer-facing technical docs. Run `_nsp ccb build` to refresh this index.
+Directory navigation for developer-facing technical docs. Index files are not concept docs.
+
+| Title | Description | Status | Audience | ID | Path |
+|-------|-------------|--------|----------|----|------|
+| FlashMini training runtime | Describe the FlashMini model, training, checkpoint, and matched-comparison runtime contracts. | active | developer | technical.flashmini-training-runtime | .docs/technical/flashmini-training-runtime.md |
+| FlashMini v4 data pipeline | Specify the resumable v4 source, deduplication, sharding, release, and token-store pipeline. | active | developer | technical.flashmini-data-pipeline | .docs/technical/flashmini-data-pipeline.md |
+| FlashMini validation and operations | Map FlashMini gate policy, evidence-producing checks, and release readiness decisions. | active | developer | technical.flashmini-validation-operations | .docs/technical/flashmini-validation-operations.md |

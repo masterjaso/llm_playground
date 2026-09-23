@@ -4,14 +4,17 @@
     "**/.git/**",
     "**/artifacts/**",
     "**/coverage/**",
-    "**/dist/**"
+    "**/dist/**",
+    "**/__pycache__/**",
+    "**/*.pyc",
+    "**/*.egg-info/**"
   ],
   "scopes": {
     "root": {
       "description": "Repository root entrypoints and package manifest",
-      "include": [
+        "include": [
         "README.md",
-        "package.json",
+        "pyproject.toml",
         "AGENTS.md"
       ],
       "exclude": []
@@ -53,31 +56,35 @@
       "exclude": []
     },
     "scripts": {
-      "description": "Governance scripts",
+      "description": "Operational and validation scripts",
+      "persona": "platform-engineering",
       "include": [
-        "scripts/**/*.ts"
+        "scripts/**/*.py"
       ],
       "exclude": []
     },
     "tooling": {
       "description": "Tooling and package metadata",
       "include": [
-        "package.json",
-        "tsconfig.json"
+        "pyproject.toml",
+        "uv.lock",
+        "configs/**/*.yaml",
+        "configs/**/*.json"
       ],
       "exclude": []
     },
     "security": {
       "description": "Security-sensitive docs and scripts",
+      "persona": "security-engineering",
       "include": [
         ".docs/guidance/nsp/stewardship.md",
-        "scripts/secret_*.ts",
-        "scripts/target_validate.ts"
+        "training_data/registry/licenses.yaml"
       ],
       "exclude": []
     },
     "source": {
       "description": "Likely product source roots",
+      "persona": "model-research",
       "include": [
         "src/**"
       ],
@@ -89,10 +96,20 @@
     },
     "tests": {
       "description": "Likely test roots",
+      "persona": "qa-validation",
       "include": [
         "tests/**"
       ],
       "exclude": []
+    },
+    "training-data": {
+      "description": "Source registry, recipes, schemas, tokenizer contracts, and release state",
+      "include": [
+        "training_data/**"
+      ],
+      "exclude": [
+        "training_data/manifests/shards/**"
+      ]
     },
     "docs": {
       "description": "Likely documentation roots",

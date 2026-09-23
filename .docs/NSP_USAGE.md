@@ -4,14 +4,14 @@ kind: runbook
 scope: guidance
 persona: context-hygiene
 status: active
-source: human
+source: model
 confidence: high
-reviewStatus: reviewed
+reviewStatus: unreviewed
 graphNode: document:.docs/NSP_USAGE.md
 graphTags: docs
 validation: context-header-audit,manifest-check,secret-scan
 owner: guidance
-lastReviewed: 2026-08-11
+lastReviewed: 2026-09-22
 replaces:
 replacedBy:
 -->
@@ -47,7 +47,7 @@ _nsp review-manifest --target . --base main
 _nsp evidence collect --target .
 ```
 
-Public skills (peer discovery): `nsp-adopt-ezra`, `nsp-insight-berean`, `nsp-plan-genesis`, `nsp-build-bezalel`, `nsp-debug-watchman`, `nsp-maintain-steward`, `nsp-clean-purify`, `nsp-review-discernment`, `nsp-workstatus-herald`. Internal/worker/lifecycle composables include `nsp-context-hygiene`, `nsp-code-hygiene`, and `nsp-ccb-hygiene`. Use `nsp-prompt-router` for preflight routing. The commands above are substrate, not CLI-side inference.
+Public skills (peer discovery): `nsp-adopt-ezra`, `nsp-insight-berean`, `nsp-plan-genesis`, `nsp-build-bezalel`, `nsp-debug-watchman`, `nsp-maintain-steward`, `nsp-clean-purify`, `nsp-review-discernment`, `nsp-workstatus-herald`, `nsp-acceptance-prover`. Internal/worker/lifecycle composables include `nsp-context-hygiene`, `nsp-code-hygiene`, and `nsp-ccb-hygiene`. Use `nsp-prompt-router` for preflight routing. The commands above are substrate, not CLI-side inference.
 
 **Skill surfaces:** full skill bodies live only under `.agents/skills/**`. Cline/Claude may also have thin discovery wrappers under `.cline/skills/**` or `.claude/skills/**` that point back to `.agents`. Codex, Cursor, Copilot, Continue, Roo, and generic agents use `.agents/skills/**` (and/or their command/rules adapters) — they do not get a separate full skill-tree copy.
 
@@ -97,7 +97,7 @@ _nsp artifacts --target . --json
 _nsp artifacts --clean --target . --dry-run --json
 ```
 
-Real cleanup requires an explicit target: `_nsp artifacts --clean --target .`. Active work, retained runs, pins, Atlas sessions and referenced evidence remain protected; `--force` overrides typed policy protections but never bypasses hard integrity or live-mutex safety. Preview completed-run retention with `_nsp run gc --target . --dry-run`; `--keep-runs` and `--keep-days` change retention without bypassing protection. Successful full cleanup leaves `.gitkeep`; `partial` reports remaining entries and exits nonzero.
+Real cleanup requires an explicit target: `_nsp artifacts --clean --target .`. Active work, retained runs, pins, Atlas sessions and referenced evidence are protected by default. Explicit `--force` can override typed lifecycle-policy protections, including selected active work or retained evidence; it never bypasses hard integrity or live-mutex safety. Do not use force as a routine way around a blocker. Preview completed-run retention with `_nsp run gc --target . --dry-run`; `--keep-runs` and `--keep-days` change retention without bypassing protection. Successful full cleanup leaves `.gitkeep`; `partial` reports remaining entries and exits nonzero.
 
 The target repository owns `AGENTS.md`, durable `.docs/**` context and policy, `.agents/skills/**` (installed skill surface), `.nsp/skills/**` (deprecated compatibility index only), and the `.nsp/artifacts/` runtime workspace. NSP owns executable tooling. Do not copy NSP scripts here, do not add NSP to `package.json`, and do not create broad repository dumps.
 

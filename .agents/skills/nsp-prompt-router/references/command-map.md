@@ -1,9 +1,11 @@
 # NSP Command Map
 
-NSP commands support agent-first software development through two product features:
+NSP serves three North Stars: Context Management, Knowledge Discovery, and Agent-First Software Engineering. Token efficiency supports each goal.
 
 - Context Management: status, context selection, hygiene, review, repair, validate, evidence, prepare-pr for bounded work, token efficiency, context hygiene, and code hygiene governance.
 - Knowledge Discovery: map, code-map, impact, ask, explain, local viewer/report, relationship visualization, and lower-level graph/code-graph diagnostics when needed.
+
+- Agent-First Software Engineering: accepted scope, PIV, controlled work, independent qualification, review, and resumable evidence.
 
 Deterministic CLI utilities remain directly usable for setup, maps, validation, graph layers, reports, and bounded evidence. Inference-bearing workflows are skill-owned and use CLI output as substrate.
 

@@ -46,6 +46,11 @@
       "id": "nsp-workstatus-herald",
       "intent": "Report read-only work progress, remaining gates, blockers and authorized closure sequence",
       "brand": "herald"
+    },
+    {
+      "id": "nsp-acceptance-prover",
+      "intent": "Verify completed implementation slices against documented acceptance criteria with deterministic evidence before handoff or PR submission",
+      "brand": "prover"
     }
   ],
   "skillClasses": {
@@ -61,6 +66,12 @@
       "to": "nsp-workstatus-herald",
       "class": "public",
       "notes": "Read-only work reporting; no execution ownership or additional CLI module."
+    },
+    {
+      "from": null,
+      "to": "nsp-acceptance-prover",
+      "class": "public",
+      "notes": "Acceptance verification gate for completed slices."
     },
     {
       "from": "nsp-genesis-sweep",
@@ -163,6 +174,32 @@
       "to": "nsp-clean-purify",
       "class": "public",
       "notes": "Public artifact cleanup skill over the guarded project cleanup substrate."
+    }
+  ],
+  "routingRelationships": [
+    {
+      "from": "nsp-prompt-router",
+      "to": "nsp-acceptance-prover",
+      "relationship": "qualification",
+      "condition": "Acceptance / UAT / completed-work qualification"
+    },
+    {
+      "from": "nsp-build-bezalel",
+      "to": "nsp-acceptance-prover",
+      "relationship": "qualification",
+      "condition": "completed controlled work requires independent acceptance proof"
+    },
+    {
+      "from": "nsp-acceptance-prover",
+      "to": "nsp-build-bezalel",
+      "relationship": "repair-routing",
+      "condition": "incomplete implementation failures route through controlled acceptance-repair"
+    },
+    {
+      "from": "nsp-acceptance-prover",
+      "to": "nsp-debug-watchman",
+      "relationship": "repair-routing",
+      "condition": "behavioral defects and regressions route through controlled acceptance-repair"
     }
   ],
   "cliModules": [
