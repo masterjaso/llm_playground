@@ -73,7 +73,6 @@ def prepare() -> int:
     from flashmini.production import (
         DEFAULT_CONFIG,
         DEFAULT_SOURCE_AUDIT,
-        _git_commit,
         freeze_manifest,
         sha256_file,
         source_fingerprint,
@@ -88,8 +87,6 @@ def prepare() -> int:
         stale_reasons = []
         if manifest.get("source_fingerprint") != source_fingerprint():
             stale_reasons.append("source fingerprint changed")
-        if manifest.get("git_commit") != _git_commit():
-            stale_reasons.append("git commit changed")
         current_audit_sha = sha256_file(DEFAULT_SOURCE_AUDIT) if DEFAULT_SOURCE_AUDIT.is_file() else None
         if manifest.get("data_view", {}).get("source_audit_sha256") != current_audit_sha:
             stale_reasons.append("source audit changed")
