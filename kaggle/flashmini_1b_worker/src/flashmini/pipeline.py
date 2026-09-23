@@ -569,8 +569,3 @@ def overlapped_pipeline_train_step(
         torch.cuda.synchronize(stage_b_device)
         metrics["stage_ms"] = _sum_stage_ms(timings)
     return metrics
-
-
-
-
-

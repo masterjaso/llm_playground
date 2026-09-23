@@ -423,4 +423,3 @@ class FlashMiniModel(nn.Module):
         if labels is not None:
             result["loss"] = self.pipeline_loss(result["logits"], labels)
         return result
-
