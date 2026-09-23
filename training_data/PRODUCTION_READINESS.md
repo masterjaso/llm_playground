@@ -76,9 +76,10 @@ current bounded continuation has published 1,039,496 exact train tokens across
 prefix is `releases/pretrain-production-v1/1b/canonical`, with progress at
 Hub revision `31a09d868966466a90459678b5eba9532267d02c`. Approved windows
 cover FineWeb-Edu, FineWeb, public-domain books, FineMath, Open-Web-Math, and
-Cosmopedia. The pinned `stack_edu` code source is schema-blocked because its
-dataset exposes no configured `content` field; review-required and gated
-sources remain held.
+Cosmopedia. The pinned `stack_edu` code source is retired because its Python
+configuration exposes metadata without a configured `content` field. The
+production 1B view uses the pinned, content-bearing `stackv2_edu` revision
+upstream-only; review-required and gated sources remain held from mirroring.
 `FLASHMINI_50B_DATA_PIPELINE_READY` is a code-and-small-scale proof state;
 `FLASHMINI_50B_DATA_MATERIALIZED_READY` requires the actual 8T artifacts. The
 50B canonical stream is paused at the user's request at

@@ -74,8 +74,8 @@
     "benchmark_exclusion_status": "partial_pending_exports",
     "source_notes": [
       "approved public-source continuation windows published and evicted after remote size/LFS verification; 170 documents and 1,039,496 exact train tokens are live",
-      "stack_edu is schema-blocked because its pinned Python config exposes metadata without the configured content field",
-      "stackv2_edu and openthoughts remain review_required and are held from public canonical publication",
+      "stack_edu is retired from the production virtual recipe because its pinned Python config exposes metadata without the configured content field",
+      "stackv2_edu remains review_required and is held from public canonical publication, but the 1B virtual worker streams its immutable text upstream-only",
       "gated Nemotron sources remain untouched pending accepted terms or approved replacements"
     ],
     "final_decontamination": "blocked_pending_private_eval",

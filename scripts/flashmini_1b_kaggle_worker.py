@@ -201,17 +201,21 @@ def _run_official(manifest: dict, run_dir: Path, status, topology: dict) -> dict
     from flashmini.production_checkpoint import (
         DurableCheckpointManager,
         FilesystemRemoteBackend,
+        KaggleDatasetRemoteBackend,
         verify_checkpoint,
     )
     from flashmini.production_metrics import MetricsLedger, reconcile_metrics_history
     from flashmini.tpu_backend import SessionBudget, TPUBackend, TPUBackendConfig
     from flashmini.xla_training import XLATrainingConfig, train_xla
 
-    remote_root = os.environ.get("FLASHMINI_REMOTE_CHECKPOINT_DIR", "")
-    if not remote_root:
+    remote_root = os.environ.get("FLASHMINI_REMOTE_CHECKPOINT_DIR", "").strip()
+    remote_dataset = os.environ.get("FLASHMINI_REMOTE_CHECKPOINT_DATASET", "").strip()
+    if not remote_root and not remote_dataset:
         raise RuntimeError(
-            "FLASHMINI_REMOTE_CHECKPOINT_DIR is required; local Kaggle scratch "
-            "cannot be the only durable recovery copy"
+            "a durable checkpoint backend is required: set "
+            "FLASHMINI_REMOTE_CHECKPOINT_DATASET or "
+            "FLASHMINI_REMOTE_CHECKPOINT_DIR; local Kaggle scratch cannot be "
+            "the only durable recovery copy"
         )
     config = FlashMiniConfig.from_dict(manifest["architecture"])
     identity = {
@@ -230,7 +234,17 @@ def _run_official(manifest: dict, run_dir: Path, status, topology: dict) -> dict
         "torch_xla_version": topology.get("torch_xla_version"),
     }
     local_root = run_dir / "checkpoints"
-    remote_root_path = Path(remote_root)
+    if remote_dataset:
+        remote = KaggleDatasetRemoteBackend(
+            remote_dataset,
+            run_dir / "remote_checkpoint_cache",
+            artifact_root=run_dir,
+        )
+        remote_root_path = remote.root
+    else:
+        remote_root_path = Path(remote_root)
+        remote = FilesystemRemoteBackend(remote_root_path)
+    latest = remote.latest_path()
     # Restore cumulative metrics before reconciling a downloaded checkpoint;
     # checkpoint retention is bounded, but metrics history is not.
     for relative in (Path("metrics.jsonl"), Path("metrics/checkpoints.jsonl"), Path("metrics/metrics_checkpoint.json")):
@@ -239,7 +253,6 @@ def _run_official(manifest: dict, run_dir: Path, status, topology: dict) -> dict
         if durable.is_file() and not local.is_file():
             local.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(durable, local)
-    remote = FilesystemRemoteBackend(remote_root_path)
     manager = DurableCheckpointManager(local_root, remote)
     backend = TPUBackend(
         TPUBackendConfig(
@@ -266,7 +279,6 @@ def _run_official(manifest: dict, run_dir: Path, status, topology: dict) -> dict
     scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_scale)
     stream = _build_virtual_stream(manifest, run_dir)
     initial_step, initial_tokens = 0, 0
-    latest = remote.latest_path()
     if latest is not None:
         checkpoint_manifest = verify_checkpoint(latest, expected_identity=identity)
         payload = torch.load(Path(latest) / "state.pt", map_location="cpu", weights_only=False)
@@ -283,6 +295,10 @@ def _run_official(manifest: dict, run_dir: Path, status, topology: dict) -> dict
     ledger = MetricsLedger(run_dir)
 
     def sync_metrics() -> None:
+        sync_remote_artifacts = getattr(remote, "sync_artifacts", None)
+        if callable(sync_remote_artifacts):
+            sync_remote_artifacts()
+            return
         for relative in (Path("metrics.jsonl"), Path("metrics/checkpoints.jsonl"), Path("metrics/metrics_checkpoint.json")):
             source = run_dir / relative
             if not source.is_file():

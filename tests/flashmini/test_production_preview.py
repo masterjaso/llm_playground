@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 import json
+import shutil
+import sys
 import time
+import types
 from pathlib import Path
 
 import torch
@@ -25,6 +28,7 @@ from flashmini.production import (
 from flashmini.production_checkpoint import (
     DurableCheckpointManager,
     FilesystemRemoteBackend,
+    KaggleDatasetRemoteBackend,
     save_full_checkpoint,
     verify_checkpoint,
 )
@@ -179,6 +183,50 @@ def test_remote_failure_keeps_previous_verified_checkpoint(tmp_path):
         raise AssertionError("injected remote failure unexpectedly succeeded")
     assert verify_checkpoint(tmp_path / "remote/checkpoint_step_1")["step"] == 1
     assert (tmp_path / "local/checkpoint_step_1").is_dir()
+
+
+def test_kaggle_dataset_backend_round_trips_verified_checkpoint(tmp_path, monkeypatch):
+    config = FlashMiniConfig(vocab_size=17, d_model=8, num_layers=1, num_heads=1,
+                             head_dim=8, max_seq_len=4)
+    model = FlashMiniModel(config)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=1e-3)
+    identity = {"model_config_sha256": __import__("flashmini.production", fromlist=["model_config_sha256"]).model_config_sha256(config)}
+    provider = tmp_path / "provider"
+
+    def dataset_upload(handle, local_dir, version_notes=""):
+        assert handle == "owner/checkpoints"
+        assert "checkpoint" in version_notes
+        if provider.exists():
+            shutil.rmtree(provider)
+        shutil.copytree(local_dir, provider)
+
+    def dataset_download(handle, *, output_dir, force_download=False):
+        assert handle == "owner/checkpoints"
+        assert force_download is True
+        shutil.copytree(provider, output_dir, dirs_exist_ok=True)
+        return output_dir
+
+    monkeypatch.setitem(sys.modules, "kagglehub", types.SimpleNamespace(
+        dataset_upload=dataset_upload, dataset_download=dataset_download,
+    ))
+    provider.mkdir()
+    (provider / "LATEST.json").write_text(json.dumps({"checkpoint": None}))
+    fresh = KaggleDatasetRemoteBackend("owner/checkpoints", tmp_path / "cache")
+    assert fresh.latest_path() is None
+
+    manager = DurableCheckpointManager(
+        tmp_path / "local",
+        KaggleDatasetRemoteBackend("owner/checkpoints", tmp_path / "cache2"),
+    )
+    result = manager.save_and_sync(
+        step=1, model=model, optimizer=optimizer, exact_tokens=8,
+        config=config, identity=identity, data_cursor={"offset": 1},
+    )
+    assert result["remote"]["checkpoint_sha256"]
+    restored_backend = KaggleDatasetRemoteBackend("owner/checkpoints", tmp_path / "cache3")
+    restored = restored_backend.latest_path()
+    assert restored is not None
+    assert verify_checkpoint(restored)["step"] == 1
 
 
 def test_session_budget_reserves_checkpoint_window():

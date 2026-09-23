@@ -3,8 +3,15 @@
   "view_id": "flashmini-1b-virtual-foundation-v1",
   "source_lock": "training_data/registry/source_snapshot.lock.json",
   "source_lock_sha256": "adea723bdab8b64e25f0a3b90216a0860c1d3f1ea4eacbf602b6c92aaf8c2fa0",
+  "selection": {
+    "code_source": "stackv2_edu",
+    "replaced_source": "stack_edu",
+    "rationale": "The pinned stack_edu Python configuration exposes metadata without a content field. The pinned stackv2_edu revision exposes non-empty text and preserves the declared code-domain target.",
+    "code_domain_weights_preserved": true,
+    "source_change_requires_new_view_fingerprint": true
+  },
   "probe": {
-    "method": "flashmini-data source-probe --limit 1",
+    "method": "flashmini-data source-probe --sources fineweb_edu common_pile_books finemath open_web_math cosmopedia fineweb stackv2_edu --limit 1; bounded stackv2_edu content/token probe --limit 256",
     "exact_token_materialization": false,
     "bounded_streaming": true,
     "results": {
@@ -14,17 +21,58 @@
       "open_web_math": {"status": "OK", "records": 1},
       "cosmopedia": {"status": "OK", "records": 1},
       "fineweb": {"status": "OK", "records": 1},
-      "stackv2_edu": {"status": "OK", "records": 1},
-      "stack_edu": {
-        "status": "SOURCE_BLOCKED",
-        "reason": "text_field_missing:content",
-        "records": 0
+      "stackv2_edu": {
+        "status": "OK",
+        "records": 256,
+        "nonempty_text_records": 256,
+        "sample_exact_tokens": 420269,
+        "sample_text_chars": 1173826,
+        "cursor_offset": 256,
+        "schema": [
+          "added",
+          "created",
+          "id",
+          "int_score",
+          "metadata",
+          "score",
+          "source",
+          "text"
+        ],
+        "dataset_id": "common-pile/stackv2_edu_filtered",
+        "revision": "c354dbe88469a1153e97c6a63ac50591849654de",
+        "upstream_file_count": 97,
+        "upstream_total_file_bytes": 83037679175
       }
     }
   },
+  "excluded_sources": {
+    "stack_edu": {
+      "status": "REJECTED",
+      "reason": "metadata_only_no_content_field",
+      "dataset_id": "HuggingFaceTB/stack-edu",
+      "config": "Python",
+      "revision": "eeec5caac5cc3758a18f1d3ba4416837a9ba814c",
+      "observed_schema": [
+        "blob_id",
+        "language",
+        "repo_name",
+        "path",
+        "src_encoding",
+        "length_bytes",
+        "score",
+        "int_score",
+        "detected_licenses",
+        "license_type"
+      ],
+      "production_recipe": false
+    }
+  },
   "policy": {
-    "stack_edu": "fail_closed_until_schema_or_replacement_is_pinned",
+    "stackv2_edu": "upstream_only_pinned_review_required",
+    "content_mirroring_allowed": false,
     "no_unpinned_substitution": true,
-    "official_training_allowed": false
+    "official_training_allowed": true,
+    "capacity_claim": "bounded_window_only",
+    "code_domain_target": "foundation_24_percent"
   }
 }

@@ -66,28 +66,51 @@
   },
   "architecture_version": 3,
   "checkpoint_schema_version": 1,
-  "created_at_utc": "2026-09-23T17:28:06Z",
+  "created_at_utc": "2026-09-23T18:53:10Z",
   "data_view": {
-    "blocked_sources": [
-      "stack_edu"
-    ],
+    "blocked_sources": [],
     "bounded_host_cache": true,
     "exact_token_accounting": true,
-    "fingerprint": "36486df59db7b69db8edc2b572073d73818f82fb72c417bf4bf64bcd8b155953",
+    "fingerprint": "6a84be65449cb9b10503b02f9d5f221aca500e64842e3efbd7552d6227ab3cb3",
     "full_corpus_materialization_required": false,
     "kind": "virtual_remote_shards",
     "packing_policy": "document_mix",
     "sequence_length": 2048,
     "source_audit": {
+      "excluded_sources": {
+        "stack_edu": {
+          "config": "Python",
+          "dataset_id": "HuggingFaceTB/stack-edu",
+          "observed_schema": [
+            "blob_id",
+            "language",
+            "repo_name",
+            "path",
+            "src_encoding",
+            "length_bytes",
+            "score",
+            "int_score",
+            "detected_licenses",
+            "license_type"
+          ],
+          "production_recipe": false,
+          "reason": "metadata_only_no_content_field",
+          "revision": "eeec5caac5cc3758a18f1d3ba4416837a9ba814c",
+          "status": "REJECTED"
+        }
+      },
       "policy": {
+        "capacity_claim": "bounded_window_only",
+        "code_domain_target": "foundation_24_percent",
+        "content_mirroring_allowed": false,
         "no_unpinned_substitution": true,
-        "official_training_allowed": false,
-        "stack_edu": "fail_closed_until_schema_or_replacement_is_pinned"
+        "official_training_allowed": true,
+        "stackv2_edu": "upstream_only_pinned_review_required"
       },
       "probe": {
         "bounded_streaming": true,
         "exact_token_materialization": false,
-        "method": "flashmini-data source-probe --limit 1",
+        "method": "flashmini-data source-probe --sources fineweb_edu common_pile_books finemath open_web_math cosmopedia fineweb stackv2_edu --limit 1; bounded stackv2_edu content/token probe --limit 256",
         "results": {
           "common_pile_books": {
             "records": 1,
@@ -113,24 +136,44 @@
             "records": 1,
             "status": "OK"
           },
-          "stack_edu": {
-            "reason": "text_field_missing:content",
-            "records": 0,
-            "status": "SOURCE_BLOCKED"
-          },
           "stackv2_edu": {
-            "records": 1,
-            "status": "OK"
+            "cursor_offset": 256,
+            "dataset_id": "common-pile/stackv2_edu_filtered",
+            "nonempty_text_records": 256,
+            "records": 256,
+            "revision": "c354dbe88469a1153e97c6a63ac50591849654de",
+            "sample_exact_tokens": 420269,
+            "sample_text_chars": 1173826,
+            "schema": [
+              "added",
+              "created",
+              "id",
+              "int_score",
+              "metadata",
+              "score",
+              "source",
+              "text"
+            ],
+            "status": "OK",
+            "upstream_file_count": 97,
+            "upstream_total_file_bytes": 83037679175
           }
         }
       },
       "schema_version": 1,
+      "selection": {
+        "code_domain_weights_preserved": true,
+        "code_source": "stackv2_edu",
+        "rationale": "The pinned stack_edu Python configuration exposes metadata without a content field. The pinned stackv2_edu revision exposes non-empty text and preserves the declared code-domain target.",
+        "replaced_source": "stack_edu",
+        "source_change_requires_new_view_fingerprint": true
+      },
       "source_lock": "training_data/registry/source_snapshot.lock.json",
       "source_lock_sha256": "adea723bdab8b64e25f0a3b90216a0860c1d3f1ea4eacbf602b6c92aaf8c2fa0",
       "view_id": "flashmini-1b-virtual-foundation-v1"
     },
     "source_audit_path": "training_data/manifests/releases/flashmini-1b-foundation-source-audit.json",
-    "source_audit_sha256": "a0c3422cd76253ca6875c714c5db5d9c0090a0ad856efdfdd2e89ad1321e70d5",
+    "source_audit_sha256": "10f77f4b3e6fafa75d30b72f980d207456d6bd929f846012e464b69cf80acb6c",
     "source_lock_path": "training_data/registry/source_snapshot.lock.json",
     "source_lock_sha256": "adea723bdab8b64e25f0a3b90216a0860c1d3f1ea4eacbf602b6c92aaf8c2fa0",
     "sources": {
@@ -239,21 +282,6 @@
         "split": "train",
         "text_field": "conversations"
       },
-      "stack_edu": {
-        "config": "Python",
-        "dataset_id": "HuggingFaceTB/stack-edu",
-        "domain": "code",
-        "gated": false,
-        "immutable_lock": true,
-        "language": "code",
-        "license": "mixed-permissive",
-        "lock_card_sha256": "fa264b336a946b87e05e540d449a51968149fbe1ab9b34af340f2d20fc290cd4",
-        "redistribution_class": "mirror_allowed",
-        "revision": "eeec5caac5cc3758a18f1d3ba4416837a9ba814c",
-        "role": "code/problem solving (per-language configs)",
-        "split": "train",
-        "text_field": "content"
-      },
       "stackv2_edu": {
         "config": null,
         "dataset_id": "common-pile/stackv2_edu_filtered",
@@ -272,7 +300,7 @@
     },
     "view_id": "flashmini-1b-virtual-foundation-v1"
   },
-  "git_commit": "97d277ae5478d4807cc527730ae3340101853407",
+  "git_commit": "7293c3e89c301006ef5bb3fd7ffeb25338bafdcc",
   "model_config_sha256": "911dc3d802bff39beb1539f8ae2acef718cc7df1de1ba348bbcc780fc837a05c",
   "optimizer_policy": {
     "betas": [
@@ -333,8 +361,8 @@
     "world_size": 8
   },
   "schema_version": 1,
-  "source_fingerprint": "e0a849f18073ffdef40cffc4ed4a0cca9884449ccc5d8f731befca9b16be1985",
-  "state": "BLOCKED_SOURCE_SCHEMA_stack_edu",
+  "source_fingerprint": "28b3dea19d788b984d467a5e5af6414a06b85b416e98ed5c944149f969ec4d5a",
+  "state": "INFRASTRUCTURE_READY",
   "tokenizer": {
     "eos_token_id": 50256,
     "fingerprint": "764b98926f1c957f507238f93974d75c084014a5c2510237634c519327f9cd66",
@@ -347,7 +375,7 @@
     "vocab_size": 50257
   },
   "training_recipe": {
-    "foundation_prefix_hash": "77fc0185b3f3bc55a70683ca88d52132feddb327ce58958c2595367ef93d6e99",
+    "foundation_prefix_hash": "af68d68f73cce10f49bd38ae475138a0946bc482ee3c065ddba33734bb003737",
     "foundation_prefix_recipe": "flashmini_1b_foundation_v1",
     "foundation_recipe": {
       "domains": {
@@ -359,8 +387,7 @@
         },
         "code": {
           "sources": [
-            "stackv2_edu",
-            "stack_edu"
+            "stackv2_edu"
           ],
           "weight": 0.24
         },
@@ -402,7 +429,7 @@
       "target_tokens": 80000000000,
       "val_fraction": 0.005
     },
-    "hash": "b7c8dca34727484b30a1c36b81bf7e72b6863d86fcf10fac7ce5530babbea99a",
+    "hash": "140d79c09bf9c1af08b86c99116cf9e2fec66e01a5fe59f4aaf1022f93601291",
     "name": "flashmini_1b_full_v1",
     "preview_domain_targets": {
       "books_reference": 1000000000,

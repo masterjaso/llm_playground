@@ -215,6 +215,202 @@ class FilesystemRemoteBackend:
         return self.root / value if value else None
 
 
+class KaggleDatasetRemoteBackend:
+    """Durable checkpoint backend backed by versioned Kaggle Dataset uploads.
+
+    Kaggle notebook scratch storage is not a recovery surface: a quota stop or
+    VM replacement can remove it.  This backend uploads a verified checkpoint
+    directory as a new private dataset version and keeps ``LATEST.json`` in
+    that version as the recovery pointer.  ``kagglehub`` is imported lazily so
+    workstation tests and the controller do not require the Kaggle runtime
+    package.
+
+    The backend deliberately keeps the local downloaded view in a bounded
+    cache.  A new remote version is downloaded only once per process (on the
+    first ``latest_path`` call), while every publish is verified locally before
+    the upload is considered successful.
+    """
+
+    def __init__(
+        self,
+        handle: str,
+        cache_dir: Path | str,
+        *,
+        artifact_root: Path | str | None = None,
+    ) -> None:
+        handle = str(handle).strip()
+        if not handle or handle.count("/") != 1:
+            raise ValueError("Kaggle checkpoint dataset handle must be '<owner>/<dataset>'")
+        self.handle = handle
+        self.cache_dir = Path(cache_dir)
+        self.cache_dir.mkdir(parents=True, exist_ok=True)
+        self.artifact_root = Path(artifact_root) if artifact_root is not None else None
+        self.latest = self.cache_dir / "LATEST.json"
+        self._loaded = False
+        self._latest_path: Path | None = None
+
+    @property
+    def root(self) -> Path:
+        """Local materialized view used by the worker for metrics and resume."""
+        return self.cache_dir
+
+    def _kagglehub(self):
+        try:
+            import kagglehub
+        except ImportError as exc:  # pragma: no cover - exercised in Kaggle
+            raise RuntimeError(
+                "kagglehub is required for the Kaggle Dataset checkpoint backend; "
+                "use a Kaggle notebook runtime or install kagglehub"
+            ) from exc
+        return kagglehub
+
+    def _copy_artifacts(self, destination: Path) -> None:
+        if self.artifact_root is None:
+            return
+        for relative in (
+            Path("metrics.jsonl"),
+            Path("metrics/checkpoints.jsonl"),
+            Path("metrics/metrics_checkpoint.json"),
+        ):
+            source = self.artifact_root / relative
+            if source.is_file():
+                _copy_verified(source, destination / relative)
+
+    def _stage(self, checkpoint: Path, manifest: dict[str, Any]) -> Path:
+        stage = Path(tempfile.mkdtemp(prefix="flashmini-kaggle-upload-"))
+        try:
+            name = f"checkpoint_step_{int(manifest['step'])}"
+            target = stage / name
+            target.mkdir(parents=True, exist_ok=True)
+            for source in checkpoint.iterdir():
+                if source.is_file():
+                    _copy_verified(source, target / source.name)
+            atomic_write_json(stage / "LATEST.json", {
+                "checkpoint": name,
+                "checkpoint_sha256": manifest["checkpoint_sha256"],
+            })
+            self._copy_artifacts(stage)
+            return stage
+        except Exception:
+            shutil.rmtree(stage, ignore_errors=True)
+            raise
+
+    def _upload(self, stage: Path, *, step: int) -> None:
+        self._kagglehub().dataset_upload(
+            self.handle,
+            str(stage),
+            version_notes=f"FlashMini-1B durable checkpoint step {int(step)}",
+        )
+
+    def publish(self, local_checkpoint: Path, manifest: dict[str, Any]) -> dict[str, Any]:
+        stage = self._stage(Path(local_checkpoint), manifest)
+        try:
+            self._upload(stage, step=int(manifest["step"]))
+            # The upload succeeded; make the same verified files available to
+            # the worker for metrics sync and the next resume in this process.
+            self._replace_cache(stage)
+            target = self.cache_dir / f"checkpoint_step_{int(manifest['step'])}"
+            self._latest_path = target
+            self._loaded = True
+            return {"path": str(target), "checkpoint_sha256": manifest["checkpoint_sha256"]}
+        finally:
+            shutil.rmtree(stage, ignore_errors=True)
+
+    def _replace_cache(self, source_root: Path) -> None:
+        self.cache_dir.mkdir(parents=True, exist_ok=True)
+        for source in source_root.iterdir():
+            destination = self.cache_dir / source.name
+            if source.is_dir():
+                temporary = Path(tempfile.mkdtemp(prefix=f".{source.name}.", dir=self.cache_dir))
+                try:
+                    shutil.copytree(source, temporary / source.name)
+                    if destination.exists():
+                        shutil.rmtree(destination)
+                    os.replace(temporary / source.name, destination)
+                finally:
+                    shutil.rmtree(temporary, ignore_errors=True)
+            else:
+                _copy_verified(source, destination)
+
+    def verify(self, remote_checkpoint: Path, manifest: dict[str, Any]) -> None:
+        checked = verify_checkpoint(remote_checkpoint)
+        if checked.get("checkpoint_sha256") != manifest.get("checkpoint_sha256"):
+            raise ValueError("remote Kaggle checkpoint manifest identity mismatch")
+
+    def _load_remote(self) -> Path | None:
+        download_root = self.cache_dir / ".download"
+        if download_root.exists():
+            shutil.rmtree(download_root)
+        download_root.mkdir(parents=True, exist_ok=True)
+        resolved = self._kagglehub().dataset_download(
+            self.handle,
+            output_dir=str(download_root),
+            force_download=True,
+        )
+        downloaded = Path(resolved)
+        pointer = downloaded / "LATEST.json"
+        if not pointer.is_file():
+            raise RuntimeError(
+                f"Kaggle checkpoint dataset {self.handle} has no LATEST.json pointer"
+            )
+        value = json.loads(pointer.read_text())
+        name = value.get("checkpoint")
+        # Keep only the current downloaded version in the worker's bounded
+        # local cache.  The temporary download directory is removed after the
+        # files have been copied.
+        for child in list(self.cache_dir.iterdir()):
+            if child.name != ".download":
+                if child.is_dir():
+                    shutil.rmtree(child)
+                else:
+                    child.unlink()
+        if name is None:
+            # A newly created private dataset can carry an explicit empty
+            # pointer.  This distinguishes a clean run from a corrupted
+            # version while allowing the first checkpoint upload to create
+            # the durable recovery point.
+            self._replace_cache(downloaded)
+            shutil.rmtree(download_root, ignore_errors=True)
+            self._latest_path = None
+            self._loaded = True
+            return None
+        if not isinstance(name, str) or not name.startswith("checkpoint_step_"):
+            raise RuntimeError("Kaggle checkpoint LATEST.json has an invalid checkpoint name")
+        checkpoint = downloaded / name
+        self.verify(checkpoint, {"checkpoint_sha256": value.get("checkpoint_sha256")})
+        self._replace_cache(downloaded)
+        shutil.rmtree(download_root, ignore_errors=True)
+        self._latest_path = self.cache_dir / name
+        self._loaded = True
+        return self._latest_path
+
+    def latest_path(self) -> Path | None:
+        if self._loaded:
+            return self._latest_path
+        return self._load_remote()
+
+    def sync_artifacts(self) -> None:
+        """Publish current append-only metrics with the latest checkpoint."""
+        if self.artifact_root is None or self._latest_path is None:
+            return
+        manifest = json.loads((self._latest_path / "manifest.json").read_text())
+        stage = self._stage(self._latest_path, manifest)
+        try:
+            self._upload(stage, step=int(manifest["step"]))
+            self._replace_cache(stage)
+        finally:
+            shutil.rmtree(stage, ignore_errors=True)
+
+    def retire(self, previous: Path | None, *, keep: Path) -> None:
+        # Kaggle Dataset versions are immutable and intentionally retained as
+        # an audit trail.  Only stale local cache directories are removed.
+        if previous and previous.exists() and previous.resolve() != keep.resolve():
+            try:
+                shutil.rmtree(previous)
+            except OSError:
+                pass
+
+
 class DurableCheckpointManager:
     """Local candidate -> remote verify -> pointer -> bounded retention."""
 
@@ -251,6 +447,7 @@ class DurableCheckpointManager:
 
 
 __all__ = [
-    "DurableCheckpointManager", "FilesystemRemoteBackend", "RemoteCheckpointBackend",
+    "DurableCheckpointManager", "FilesystemRemoteBackend", "KaggleDatasetRemoteBackend",
+    "RemoteCheckpointBackend",
     "checkpoint_identity", "save_full_checkpoint", "sha256_file", "verify_checkpoint",
 ]

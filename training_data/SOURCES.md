@@ -14,8 +14,8 @@ sources stay recipe-only unless terms explicitly permit redistribution.
 | `cosmopedia` | HuggingFaceTB/cosmopedia-v2 | `3ba9d6057741` | synthetic_edu | streams | mirror_allowed | minority |
 | `finemath` | HuggingFaceTB/finemath | `e92b25a61673` | math_stem | streams | mirror_allowed | in lost 12-shard gap |
 | `open_web_math` | open-web-math/open-web-math | `fde8ef8de230` | math_stem | streams | mirror_allowed | in lost 12-shard gap |
-| `stackv2_edu` | common-pile/stackv2_edu_filtered | `c354dbe88469` | code | streams | review_required | in lost 12-shard gap; recipe-only content |
-| `stack_edu` | HuggingFaceTB/stack-edu | `eeec5caac5cc` | code | streams (config Python) | mirror_allowed | probe only; rows lack content column in first rows |
+| `stackv2_edu` | common-pile/stackv2_edu_filtered | `c354dbe88469` | code | upstream streams | review_required | production code source; content-bearing text field; no content mirroring |
+| `stack_edu` | HuggingFaceTB/stack-edu | `eeec5caac5cc` | code | blocked | mirror_allowed | retired from production recipe; pinned Python config is metadata-only and lacks content |
 | `openthoughts` | open-thoughts/OpenThoughts3-1.2M | `61bcf9d4eb38` | reasoning | streams (conversations adapter) | review_required | in lost 12-shard gap; recipe-only content |
 | `nemotron_cc_v2` | nvidia/Nemotron-CC-v2 | `2669787c66d1` | general_web | `SOURCE_BLOCKED` | gated_recipe_only | terms not accepted |
 | `nemotron_code` | nvidia/Nemotron-Pretraining-Code-v1 | `01393d3bd890` | code | `SOURCE_BLOCKED` | gated_recipe_only | terms not accepted |
@@ -44,4 +44,3 @@ instruction-following (verifiable constraints), tool use, operational safety
 (read-only < reversible < recoverable < irreversible/external/credential),
 concise neutral style (minimum words to fully satisfy; no canned
 friendliness), general assistant, preference pairs.
-

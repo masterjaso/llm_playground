@@ -23,6 +23,7 @@ RUN_DIR = Path(os.environ.get("FLASHMINI_1B_RUN_DIR", str(REPO_ROOT / "runs/flas
 WORKER_DIR = REPO_ROOT / "kaggle" / "flashmini_1b_worker"
 KERNEL_ID = os.environ.get("FLASHMINI_1B_KERNEL_ID", "masterjaso/flashmini-1b-tpu-v5e-8-production-worker")
 KAGGLE_CLI = os.environ.get("KAGGLE_CLI", shutil.which("kaggle") or "kaggle")
+DEFAULT_CHECKPOINT_DATASET = f"{KERNEL_ID.split('/', 1)[0]}/flashmini-1b-checkpoints"
 
 
 def utc_now() -> str:
@@ -69,17 +70,47 @@ def load_state() -> dict[str, Any]:
 
 
 def prepare() -> int:
-    from flashmini.production import DEFAULT_CONFIG, freeze_manifest, validate_freeze_manifest
+    from flashmini.production import (
+        DEFAULT_CONFIG,
+        DEFAULT_SOURCE_AUDIT,
+        _git_commit,
+        freeze_manifest,
+        sha256_file,
+        source_fingerprint,
+        validate_freeze_manifest,
+    )
     RUN_DIR.mkdir(parents=True, exist_ok=True)
     previous_state = json.loads(state_path().read_text()) if state_path().is_file() else {}
     manifest_path = RUN_DIR / "freeze_manifest.json"
+    action = "created"
     if manifest_path.is_file():
         manifest = json.loads(manifest_path.read_text())
-        validate_freeze_manifest(manifest)
-        action = "validated"
+        stale_reasons = []
+        if manifest.get("source_fingerprint") != source_fingerprint():
+            stale_reasons.append("source fingerprint changed")
+        if manifest.get("git_commit") != _git_commit():
+            stale_reasons.append("git commit changed")
+        current_audit_sha = sha256_file(DEFAULT_SOURCE_AUDIT) if DEFAULT_SOURCE_AUDIT.is_file() else None
+        if manifest.get("data_view", {}).get("source_audit_sha256") != current_audit_sha:
+            stale_reasons.append("source audit changed")
+        if stale_reasons:
+            progressed = any([
+                int(previous_state.get("tokens_seen", 0) or 0) > 0,
+                int(previous_state.get("step", 0) or 0) > 0,
+                bool(previous_state.get("latest_checkpoint")),
+            ])
+            if progressed:
+                raise SystemExit(
+                    "freeze contract changed after progress/checkpoint; refusing to "
+                    "replace the resume identity (start a new run_id)"
+                )
+            manifest = freeze_manifest(manifest_path)
+            action = "recreated (" + ", ".join(stale_reasons) + ")"
+        else:
+            validate_freeze_manifest(manifest)
+            action = "validated"
     else:
         manifest = freeze_manifest(manifest_path)
-        action = "created"
     (RUN_DIR / "status").mkdir(parents=True, exist_ok=True)
     state = {
         "schema_version": 1, "run_id": manifest["run_id"],
@@ -89,12 +120,22 @@ def prepare() -> int:
         "tokens_seen": 0, "step": 0, "latest_checkpoint": None,
         "latest_checkpoint_sha256": None, "freeze_manifest": str(manifest_path),
         "prepared_at_utc": utc_now(), "config_path": str(DEFAULT_CONFIG),
+        "source_fingerprint": manifest.get("source_fingerprint"),
+        "data_view_fingerprint": manifest.get("data_view", {}).get("fingerprint"),
+        "checkpoint_dataset": load_env().get(
+            "FLASHMINI_REMOTE_CHECKPOINT_DATASET", DEFAULT_CHECKPOINT_DATASET
+        ),
         "controller": "workstation_only",
     }
     # Re-preparing a run must not erase a queued/quota-paused or already
     # resumed state observed by the controller.  A changed run identity starts
     # from the clean defaults above.
-    if previous_state.get("run_id") == manifest["run_id"]:
+    identity_unchanged = (
+        previous_state.get("run_id") == manifest["run_id"]
+        and previous_state.get("source_fingerprint") == manifest.get("source_fingerprint")
+        and previous_state.get("data_view_fingerprint") == manifest.get("data_view", {}).get("fingerprint")
+    )
+    if identity_unchanged:
         for key in (
             "status", "session_id", "parent_session_id", "tokens_seen", "step",
             "latest_checkpoint", "latest_checkpoint_sha256", "external_blocker",
@@ -145,6 +186,7 @@ def _ensure_worker_surface(*, smoke: bool = False) -> None:
     smoke_flag = " --smoke" if smoke else ""
     notebook["cells"][0]["source"] = [
         "import os, sys\n",
+        f"os.environ.setdefault('FLASHMINI_REMOTE_CHECKPOINT_DATASET', {json.dumps(load_env().get('FLASHMINI_REMOTE_CHECKPOINT_DATASET', DEFAULT_CHECKPOINT_DATASET))})\n",
         "sys.path.insert(0, '/kaggle/working/src')\n",
         f"%run flashmini_1b_kaggle_worker.py --run-dir /kaggle/working/flashmini_run --freeze-manifest /kaggle/working/freeze_manifest.json{smoke_flag}\n",
     ]
@@ -275,16 +317,47 @@ def show_metrics(tail: int = 25) -> int:
     return 0
 
 
+def _download_kaggle_checkpoint_dataset() -> tuple[Path, dict[str, Any]]:
+    """Download and return the latest private checkpoint dataset snapshot."""
+    handle = load_env().get("FLASHMINI_REMOTE_CHECKPOINT_DATASET", DEFAULT_CHECKPOINT_DATASET)
+    destination = RUN_DIR / "checkpoint_downloads" / datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    destination.mkdir(parents=True, exist_ok=False)
+    downloaded = run_kaggle(
+        ["datasets", "download", handle, "-p", str(destination), "--unzip", "--force"],
+        timeout=3600,
+    )
+    if downloaded.returncode:
+        raise SystemExit(downloaded.stderr[-2000:] or f"could not download checkpoint dataset {handle}")
+    pointer_path = destination / "LATEST.json"
+    if not pointer_path.is_file():
+        raise SystemExit(f"checkpoint dataset {handle} has no LATEST.json pointer")
+    pointer = json.loads(pointer_path.read_text())
+    name = pointer.get("checkpoint")
+    if name is None:
+        raise SystemExit("checkpoint dataset is initialized but has no durable checkpoint yet")
+    checkpoint = destination / str(name)
+    if not checkpoint.is_dir():
+        raise SystemExit(f"checkpoint dataset pointer references missing directory: {name}")
+    return checkpoint, pointer
+
+
 def verify_latest() -> int:
     from flashmini.production_checkpoint import verify_checkpoint
     state = load_state()
     latest = state.get("latest_checkpoint")
-    remote_root = load_env().get("FLASHMINI_REMOTE_CHECKPOINT_DIR", "")
+    env = load_env()
+    remote_root = env.get("FLASHMINI_REMOTE_CHECKPOINT_DIR", "")
     if remote_root:
         from flashmini.production_checkpoint import FilesystemRemoteBackend
         remote_latest = FilesystemRemoteBackend(remote_root).latest_path()
         if remote_latest is not None:
             latest = str(remote_latest)
+    elif env.get("FLASHMINI_REMOTE_CHECKPOINT_DATASET") or DEFAULT_CHECKPOINT_DATASET:
+        latest_path, pointer = _download_kaggle_checkpoint_dataset()
+        manifest = verify_checkpoint(latest_path)
+        if pointer.get("checkpoint_sha256") != manifest.get("checkpoint_sha256"):
+            raise SystemExit("checkpoint dataset pointer checksum does not match its manifest")
+        latest = str(latest_path)
     if not latest:
         candidate = sorted(RUN_DIR.glob("checkpoints/checkpoint_step_*"))
         latest = str(candidate[-1]) if candidate else None
@@ -298,7 +371,8 @@ def verify_latest() -> int:
 
 def download_latest() -> int:
     state = load_state()
-    remote_root = load_env().get("FLASHMINI_REMOTE_CHECKPOINT_DIR", "")
+    env = load_env()
+    remote_root = env.get("FLASHMINI_REMOTE_CHECKPOINT_DIR", "")
     if remote_root:
         from flashmini.production_checkpoint import FilesystemRemoteBackend, verify_checkpoint
         remote_latest = FilesystemRemoteBackend(remote_root).latest_path()
@@ -318,8 +392,25 @@ def download_latest() -> int:
         persist_state(state)
         print(f"downloaded and verified {destination}")
         return 0
-    print("FLASHMINI_REMOTE_CHECKPOINT_DIR is not configured; no durable backend is mounted.")
-    print("Run the next Kaggle quota window, then inspect `status --json`.")
+    if env.get("FLASHMINI_REMOTE_CHECKPOINT_DATASET") or DEFAULT_CHECKPOINT_DATASET:
+        checkpoint, pointer = _download_kaggle_checkpoint_dataset()
+        from flashmini.production_checkpoint import verify_checkpoint
+        manifest = verify_checkpoint(checkpoint)
+        if pointer.get("checkpoint_sha256") != manifest.get("checkpoint_sha256"):
+            raise SystemExit("checkpoint dataset pointer checksum does not match its manifest")
+        destination = RUN_DIR / "checkpoints" / checkpoint.name
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        temporary = destination.with_name(destination.name + ".download")
+        if temporary.exists():
+            raise SystemExit(f"refusing to overwrite an in-progress download: {temporary}")
+        shutil.copytree(checkpoint, temporary)
+        os.replace(temporary, destination)
+        state.update({"latest_checkpoint": str(destination),
+                      "latest_checkpoint_sha256": manifest.get("checkpoint_sha256")})
+        persist_state(state)
+        print(f"downloaded and verified {destination}")
+        return 0
+    print("no durable checkpoint backend is configured")
     return 2
 
 

@@ -4,7 +4,7 @@ seed: 17002
 split_salt: flashmini-v4-split-v1
 val_fraction: 0.005
 domains:
-  code: {weight: 0.30, sources: [stackv2_edu, stack_edu]}
+  code: {weight: 0.30, sources: [stackv2_edu]}
   math_stem: {weight: 0.25, sources: [finemath, open_web_math]}
   books_reference: {weight: 0.15, sources: [common_pile_books]}
   general_web: {weight: 0.05, sources: [fineweb_edu]}

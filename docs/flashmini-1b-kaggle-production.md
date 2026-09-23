@@ -82,7 +82,11 @@ two-update reduced model smoke, and emits `FLASHMINI_STATUS` heartbeats. An
 official worker reconstructs the pinned virtual HF stream, restores the
 newest verified full checkpoint, and trains through the tested XLA loop only
 when the source audit is runnable, FSDP is available, and
-`FLASHMINI_REMOTE_CHECKPOINT_DIR` names a genuinely durable mounted backend.
+either `FLASHMINI_REMOTE_CHECKPOINT_DATASET` names the private versioned
+Kaggle checkpoint dataset or `FLASHMINI_REMOTE_CHECKPOINT_DIR` names a
+genuinely durable mounted backend. The default worker bundle uses
+`masterjaso/flashmini-1b-checkpoints`; the dataset is initialized with an
+empty `LATEST.json` pointer before the first checkpoint.
 
 ## Durability and observability
 
@@ -90,8 +94,10 @@ when the source audit is runnable, FSDP is available, and
 optimizer, scheduler, RNG, cursor, identities, lineage), reads it back,
 checksums it, and only then promotes it. A provider-neutral filesystem backend
 implements remote publish/verify/pointer/retention semantics for tests and
-mounted durable storage; a Kaggle adapter can supply the same protocol. The
-official worker refuses to use Kaggle scratch as the only recovery copy.
+mounted durable storage. `KaggleDatasetRemoteBackend` uploads each verified
+checkpoint and append-only metric snapshot as a new private Kaggle Dataset
+version, and downloads/verifies the latest version on resume. The official
+worker refuses to use Kaggle scratch as the only recovery copy.
 `MetricsLedger` keeps `metrics.jsonl` and cumulative 25M milestone rows
 append-only. `StatusLogger` atomically maintains `status/heartbeat.json`,
 `status/progress.json`, and `run_status.json`. `Watchdog` distinguishes XLA
@@ -108,14 +114,17 @@ ruff check <changed files>        All checks passed
 worker --smoke --allow-local-cpu  SMOKE_READY
 ```
 
-The Kaggle API accepted the smoke submission, but the kernel remained queued
-when this handoff was prepared. No 8-device topology, XLA version, throughput,
-checkpoint upload, 25M gate, or 100M gate is claimed until that queued worker
-executes and writes its result manifest. The source audit also records
-`stack_edu` as `SOURCE_BLOCKED(text_field_missing:content)` at its pinned
-revision. The audit uses bounded `limit=1` streaming probes and therefore does
-not claim full upstream capacity or corpus materialization. The freeze therefore
-carries `BLOCKED_SOURCE_SCHEMA_stack_edu`; the
-worker must not start official training until that schema is repaired or an
-explicitly reviewed replacement is pinned. The current external state is
-therefore `BLOCKED_KAGGLE_WORKER_QUEUED`, not a training success.
+The source audit retires the pinned `stack_edu` Python configuration because it
+exposes metadata without a content field. The production recipes now use the
+already pinned, content-bearing `stackv2_edu` source for the same code-domain
+weights. It remains upstream-only (`review_required`), so content is streamed
+from the immutable revision and is never mirrored into our corpus. The audit
+records a bounded 256-record, non-empty-text/token probe and does not claim
+full upstream capacity or corpus materialization.
+
+The Kaggle API accepted the smoke submission, but no 8-device topology, XLA
+version, throughput, checkpoint upload, 25M gate, or 100M gate is claimed until
+the worker executes and writes its result manifest. The private checkpoint
+dataset's empty pointer and live upload/download round-trip are verified; a
+real TPU checkpoint still requires the worker to execute. The current external
+state is `BLOCKED_KAGGLE_WORKER_QUEUED`, not a training success.

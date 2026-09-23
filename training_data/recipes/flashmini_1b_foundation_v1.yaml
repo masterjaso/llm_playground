@@ -6,7 +6,7 @@ val_fraction: 0.005
 domains:
   general_web: {weight: 0.38, sources: [fineweb_edu]}
   books_reference: {weight: 0.10, sources: [common_pile_books]}
-  code: {weight: 0.24, sources: [stackv2_edu, stack_edu]}
+  code: {weight: 0.24, sources: [stackv2_edu]}
   math_stem: {weight: 0.14, sources: [finemath, open_web_math]}
   synthetic_edu: {weight: 0.08, sources: [cosmopedia]}
   tech_docs: {weight: 0.04, sources: [common_pile_books]}

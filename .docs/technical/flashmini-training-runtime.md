@@ -72,7 +72,8 @@ must not be treated as evidence that the TPU, quota, source authorization, or
 - `src/flashmini/production_checkpoint.py` and
   `src/flashmini/production_metrics.py` own full-state durable checkpoint
   promotion/readback and append-only cumulative metrics. The official worker
-  refuses to run without a runnable source freeze, XLA FSDP, and a durable
+  refuses to run without a runnable source freeze, XLA FSDP, and either the
+  private versioned `FLASHMINI_REMOTE_CHECKPOINT_DATASET` backend or a durable
   `FLASHMINI_REMOTE_CHECKPOINT_DIR`.
 - `scripts/flashmini_1b_kaggle_controller.py` is workstation-only; it prepares,
   submits, and observes the Kaggle worker but never trains locally. The
@@ -136,9 +137,9 @@ must not be treated as evidence that the TPU, quota, source authorization, or
 - Sparse PLE optimizer state is CPU-resident and can dominate memory.
 - Pipeline transitions require explicit authorization and are not equivalent to
   proving the two execution schedules have identical performance.
-- The production preview remains fail-closed while the pinned `stack_edu`
-  source lacks the declared `content` field; no unpinned substitution is
-  allowed.
+- The production preview retires the metadata-only pinned `stack_edu` source
+  and uses the immutable, content-bearing `stackv2_edu` revision upstream-only;
+  no unpinned substitution or content mirroring is allowed.
 - Kaggle queue state, TPU topology, sustained throughput, and durable remote
   checkpoint behavior require live worker evidence and are not established by
   local CPU tests.
