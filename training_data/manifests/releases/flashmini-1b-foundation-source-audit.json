@@ -2,7 +2,7 @@
   "schema_version": 1,
   "view_id": "flashmini-1b-virtual-foundation-v1",
   "source_lock": "training_data/registry/source_snapshot.lock.json",
-  "source_lock_sha256": "adea723bdab8b64e25f0a3b90216a0860c1d3f1ea4eacbf602b6c92aaf8c2fa0",
+  "source_lock_sha256": "eee182aa2fe3ced5f323ef0ddda079f3e0c55a5c27243471cd1e9ba84ca86d65",
   "selection": {
     "code_source": "stackv2_edu",
     "replaced_source": "stack_edu",
@@ -52,6 +52,7 @@
       "dataset_id": "HuggingFaceTB/stack-edu",
       "config": "Python",
       "revision": "eeec5caac5cc3758a18f1d3ba4416837a9ba814c",
+      "redistribution_class": "review_required",
       "observed_schema": [
         "blob_id",
         "language",

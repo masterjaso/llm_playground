@@ -105,7 +105,7 @@
     "dataset_id": "HuggingFaceTB/stack-edu",
     "gated": false,
     "license": "mixed-permissive",
-    "redistribution_class": "mirror_allowed",
+    "redistribution_class": "review_required",
     "revision": "eeec5caac5cc3758a18f1d3ba4416837a9ba814c",
     "split": "train"
   },

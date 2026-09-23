@@ -61,7 +61,7 @@ sources:
     domain: code
     language: code
     license: mixed-permissive
-    redistribution_class: mirror_allowed
+    redistribution_class: review_required
     role: code/problem solving (per-language configs)
   nemotron_code:
     dataset_id: nvidia/Nemotron-Pretraining-Code-v1
