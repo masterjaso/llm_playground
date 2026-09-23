@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "view_id": "flashmini-1b-virtual-foundation-v1",
+  "source_lock": "training_data/registry/source_snapshot.lock.json",
+  "source_lock_sha256": "adea723bdab8b64e25f0a3b90216a0860c1d3f1ea4eacbf602b6c92aaf8c2fa0",
+  "probe": {
+    "method": "flashmini-data source-probe --limit 1",
+    "exact_token_materialization": false,
+    "bounded_streaming": true,
+    "results": {
+      "fineweb_edu": {"status": "OK", "records": 1},
+      "common_pile_books": {"status": "OK", "records": 1},
+      "finemath": {"status": "OK", "records": 1},
+      "open_web_math": {"status": "OK", "records": 1},
+      "cosmopedia": {"status": "OK", "records": 1},
+      "fineweb": {"status": "OK", "records": 1},
+      "stackv2_edu": {"status": "OK", "records": 1},
+      "stack_edu": {
+        "status": "SOURCE_BLOCKED",
+        "reason": "text_field_missing:content",
+        "records": 0
+      }
+    }
+  },
+  "policy": {
+    "stack_edu": "fail_closed_until_schema_or_replacement_is_pinned",
+    "no_unpinned_substitution": true,
+    "official_training_allowed": false
+  }
+}

@@ -1,0 +1,456 @@
+{
+  "architecture": {
+    "architecture_version": 3,
+    "attention_layers": [
+      3,
+      7,
+      11,
+      15,
+      19
+    ],
+    "d_model": 768,
+    "dropout": 0.0,
+    "experiment_mode": "decisive",
+    "gdn": {
+      "chunk_size": 64,
+      "d_state": 128,
+      "residual_in_mixer": false,
+      "short_conv_kernel": 4,
+      "use_short_conv": true
+    },
+    "gdn_per_attention": 3,
+    "hc_count": 4,
+    "hc_lowrank": 96,
+    "head_dim": 128,
+    "kvc": {
+      "enabled": true,
+      "kv_bits": 4,
+      "qat": true,
+      "quant_format": "e2m1",
+      "scale_format": "e4m3",
+      "scale_group_size": 16,
+      "share_group_size": 2
+    },
+    "max_seq_len": 2048,
+    "moe": {
+      "aux_loss_coef": 0.01,
+      "capacity_factor": 1.0,
+      "expert_intermediate": 1536,
+      "num_experts": 16,
+      "shared_experts": 1,
+      "top_k": 2
+    },
+    "num_heads": 6,
+    "num_layers": 20,
+    "ple": {
+      "architecture_version": 3,
+      "conv_dilation": 3,
+      "conv_kernel_size": 4,
+      "d_model": 768,
+      "embed_dim": 2048,
+      "enabled": true,
+      "eos_id": 50256,
+      "hash_seed": 1234,
+      "heads_per_ngram": 8,
+      "injection_layer": 1,
+      "ngram": 3,
+      "ngram_vocab_size_base": 50257,
+      "offload": "gpu",
+      "sparse": false,
+      "vocab_size": 50257
+    },
+    "rope_theta": 10000.0,
+    "use_hyperconnection": true,
+    "use_ple": true,
+    "vocab_size": 50257
+  },
+  "architecture_version": 3,
+  "checkpoint_schema_version": 1,
+  "created_at_utc": "2026-09-23T17:28:06Z",
+  "data_view": {
+    "blocked_sources": [
+      "stack_edu"
+    ],
+    "bounded_host_cache": true,
+    "exact_token_accounting": true,
+    "fingerprint": "36486df59db7b69db8edc2b572073d73818f82fb72c417bf4bf64bcd8b155953",
+    "full_corpus_materialization_required": false,
+    "kind": "virtual_remote_shards",
+    "packing_policy": "document_mix",
+    "sequence_length": 2048,
+    "source_audit": {
+      "policy": {
+        "no_unpinned_substitution": true,
+        "official_training_allowed": false,
+        "stack_edu": "fail_closed_until_schema_or_replacement_is_pinned"
+      },
+      "probe": {
+        "bounded_streaming": true,
+        "exact_token_materialization": false,
+        "method": "flashmini-data source-probe --limit 1",
+        "results": {
+          "common_pile_books": {
+            "records": 1,
+            "status": "OK"
+          },
+          "cosmopedia": {
+            "records": 1,
+            "status": "OK"
+          },
+          "finemath": {
+            "records": 1,
+            "status": "OK"
+          },
+          "fineweb": {
+            "records": 1,
+            "status": "OK"
+          },
+          "fineweb_edu": {
+            "records": 1,
+            "status": "OK"
+          },
+          "open_web_math": {
+            "records": 1,
+            "status": "OK"
+          },
+          "stack_edu": {
+            "reason": "text_field_missing:content",
+            "records": 0,
+            "status": "SOURCE_BLOCKED"
+          },
+          "stackv2_edu": {
+            "records": 1,
+            "status": "OK"
+          }
+        }
+      },
+      "schema_version": 1,
+      "source_lock": "training_data/registry/source_snapshot.lock.json",
+      "source_lock_sha256": "adea723bdab8b64e25f0a3b90216a0860c1d3f1ea4eacbf602b6c92aaf8c2fa0",
+      "view_id": "flashmini-1b-virtual-foundation-v1"
+    },
+    "source_audit_path": "training_data/manifests/releases/flashmini-1b-foundation-source-audit.json",
+    "source_audit_sha256": "a0c3422cd76253ca6875c714c5db5d9c0090a0ad856efdfdd2e89ad1321e70d5",
+    "source_lock_path": "training_data/registry/source_snapshot.lock.json",
+    "source_lock_sha256": "adea723bdab8b64e25f0a3b90216a0860c1d3f1ea4eacbf602b6c92aaf8c2fa0",
+    "sources": {
+      "common_pile_books": {
+        "config": null,
+        "dataset_id": "common-pile/pre_1929_books",
+        "domain": "books_reference",
+        "gated": false,
+        "immutable_lock": true,
+        "language": "en",
+        "license": "public-domain",
+        "lock_card_sha256": "bdddeb53c66827257adae804a37ca31ce856d23971dfa290a3ac2027b28eb1af",
+        "redistribution_class": "mirror_allowed",
+        "revision": "a158135b4765f01d321b5cbe1ff90ebbd354b00f",
+        "role": "public-domain books (pre-1929)",
+        "split": "train",
+        "text_field": "text"
+      },
+      "cosmopedia": {
+        "config": "cosmopedia-v2",
+        "dataset_id": "HuggingFaceTB/cosmopedia-v2",
+        "domain": "synthetic_edu",
+        "gated": false,
+        "immutable_lock": true,
+        "language": "en",
+        "license": "ODC-By-1.0",
+        "lock_card_sha256": "e09544d7132303ae6bbc6e156e984db0305d81561615476be49eabd4be4b8bed",
+        "redistribution_class": "mirror_allowed",
+        "revision": "3ba9d605774198c5868892d7a8deda78031a781f",
+        "role": "synthetic educational",
+        "split": "train",
+        "text_field": "text"
+      },
+      "finemath": {
+        "config": "finemath-4plus",
+        "dataset_id": "HuggingFaceTB/finemath",
+        "domain": "math_stem",
+        "gated": false,
+        "immutable_lock": true,
+        "language": "en",
+        "license": "mixed-open",
+        "lock_card_sha256": "77b9162c99fc6b5944da8793f18fb99c3b520ab7cdce0cc67ec8a1e47871da61",
+        "redistribution_class": "mirror_allowed",
+        "revision": "e92b25a616738fe95dc186b64dfb19f9c8525594",
+        "role": "math/formal reasoning",
+        "split": "train",
+        "text_field": "text"
+      },
+      "fineweb": {
+        "config": "CC-MAIN-2024-51",
+        "dataset_id": "HuggingFaceFW/fineweb",
+        "domain": "general_web",
+        "gated": false,
+        "immutable_lock": true,
+        "language": "en",
+        "license": "ODC-By-1.0",
+        "lock_card_sha256": "2fb3e49e8aa62a7429b07b557cc49d578292174843fb6aa561b5fbe6afbff01c",
+        "redistribution_class": "mirror_allowed",
+        "revision": "9bb295ddab0e05d785b879661af7260fed5140fc",
+        "role": "general web overflow",
+        "split": "train",
+        "text_field": "text"
+      },
+      "fineweb_edu": {
+        "config": null,
+        "dataset_id": "HuggingFaceFW/fineweb-edu",
+        "domain": "general_web",
+        "gated": false,
+        "immutable_lock": true,
+        "language": "en",
+        "license": "ODC-By-1.0",
+        "lock_card_sha256": "a0cc8998a20499432b28b6575f3046b714938eb8e11b8d59a1d25ddf3716061e",
+        "redistribution_class": "mirror_allowed",
+        "revision": "87f09149ef4734204d70ed1d046ddc9ca3f2b8f9",
+        "role": "foundation general/educational web",
+        "split": "train",
+        "text_field": "text"
+      },
+      "open_web_math": {
+        "config": null,
+        "dataset_id": "open-web-math/open-web-math",
+        "domain": "math_stem",
+        "gated": false,
+        "immutable_lock": true,
+        "language": "en",
+        "license": "CC-BY",
+        "lock_card_sha256": "c4497f073cd93dfe104d8960f152fcbcbecd97ca1a7245a4cf66b8b8c79936ec",
+        "redistribution_class": "mirror_allowed",
+        "revision": "fde8ef8de2300f5e778f56261843dab89f230815",
+        "role": "math/STEM prose",
+        "split": "train",
+        "text_field": "text"
+      },
+      "openthoughts": {
+        "config": null,
+        "dataset_id": "open-thoughts/OpenThoughts3-1.2M",
+        "domain": "reasoning",
+        "gated": false,
+        "immutable_lock": true,
+        "language": "en",
+        "license": "Apache-2.0",
+        "lock_card_sha256": "8bc5c1c91e5fce307d33b049701606f2a3fb73521c4bae89e16cdacf1aa9b2e1",
+        "redistribution_class": "review_required",
+        "revision": "61bcf9d4eb38b30295efc2021227a63cc5bb34c8",
+        "role": "reasoning traces (reasoning vs final kept separate downstream)",
+        "split": "train",
+        "text_field": "conversations"
+      },
+      "stack_edu": {
+        "config": "Python",
+        "dataset_id": "HuggingFaceTB/stack-edu",
+        "domain": "code",
+        "gated": false,
+        "immutable_lock": true,
+        "language": "code",
+        "license": "mixed-permissive",
+        "lock_card_sha256": "fa264b336a946b87e05e540d449a51968149fbe1ab9b34af340f2d20fc290cd4",
+        "redistribution_class": "mirror_allowed",
+        "revision": "eeec5caac5cc3758a18f1d3ba4416837a9ba814c",
+        "role": "code/problem solving (per-language configs)",
+        "split": "train",
+        "text_field": "content"
+      },
+      "stackv2_edu": {
+        "config": null,
+        "dataset_id": "common-pile/stackv2_edu_filtered",
+        "domain": "code",
+        "gated": false,
+        "immutable_lock": true,
+        "language": "code",
+        "license": "mixed-permissive",
+        "lock_card_sha256": "49a352a903a57d7b4b33b120515df8c2dbd4b55828752e33b58cd628a913e7cd",
+        "redistribution_class": "review_required",
+        "revision": "c354dbe88469a1153e97c6a63ac50591849654de",
+        "role": "openly licensed code",
+        "split": "train",
+        "text_field": "text"
+      }
+    },
+    "view_id": "flashmini-1b-virtual-foundation-v1"
+  },
+  "git_commit": "97d277ae5478d4807cc527730ae3340101853407",
+  "model_config_sha256": "911dc3d802bff39beb1539f8ae2acef718cc7df1de1ba348bbcc780fc837a05c",
+  "optimizer_policy": {
+    "betas": [
+      0.9,
+      0.95
+    ],
+    "bf16": true,
+    "eps": 1e-08,
+    "family": "AdamW",
+    "updates_per_logical_batch": 1,
+    "weight_decay": 0.1
+  },
+  "parameter_report": {
+    "active_moe_expert_parameters_per_token": 141803520,
+    "active_parameters_per_token": 238181504,
+    "attention_parameters": 11796480,
+    "categories": {
+      "attention": 11796480,
+      "dense_shared": 24800256,
+      "embedding": 38597376,
+      "gdn": 13296000,
+      "moe": 802406400,
+      "ple": 110962944
+    },
+    "categories_sum": 1001859456,
+    "core_parameters": 852299136,
+    "dense_shared_parameters": 24800256,
+    "embedding_head_parameters": 38597376,
+    "embedding_parameters": 38597376,
+    "gdn_parameters": 13296000,
+    "kvc_parameter_contribution": 0,
+    "kvc_semantics": "qat_e2m1_values_e4m3_group_scales_16_cross_layer_share_2",
+    "moe_expert_parameters": 802406400,
+    "num_experts": 16,
+    "ple_parameters": 110962944,
+    "shared_experts": 1,
+    "sparse_expert_parameters": 802406400,
+    "top_k": 2,
+    "total_learned_parameters": 1001859456
+  },
+  "provenance": {
+    "platform": "Linux-6.18.33.2-microsoft-standard-WSL2-x86_64-with-glibc2.43",
+    "python_version": "3.13.14"
+  },
+  "run_id": "flashmini-1b-foundation-v1",
+  "runtime_policy": {
+    "backend": "pytorch_xla",
+    "checkpoint_every_tokens": 25000000,
+    "checkpoint_upload_reserve_seconds": 3600,
+    "kaggle_hard_session_seconds": 21600,
+    "kaggle_soft_stop_seconds": 18000,
+    "kvc_enabled": true,
+    "metrics_append_only": true,
+    "ple_placement": "tpu_resident",
+    "retain_full_checkpoints": 1,
+    "static_shapes": true,
+    "topology": "TPU-v5e-8",
+    "world_size": 8
+  },
+  "schema_version": 1,
+  "source_fingerprint": "e0a849f18073ffdef40cffc4ed4a0cca9884449ccc5d8f731befca9b16be1985",
+  "state": "BLOCKED_SOURCE_SCHEMA_stack_edu",
+  "tokenizer": {
+    "eos_token_id": 50256,
+    "fingerprint": "764b98926f1c957f507238f93974d75c084014a5c2510237634c519327f9cd66",
+    "pad_policy": "eos",
+    "revision": "607a30d783dfa663caf39e06633721c8d4cfcd7e",
+    "spec_sha256": "f666c41f9dd2fa0107be74deb1be995ce21054b6d0a98128b3a085f16dbd82ab",
+    "token_dtype": "uint16",
+    "token_format_version": "flashmini-token-format-v1",
+    "tokenizer_id": "gpt2",
+    "vocab_size": 50257
+  },
+  "training_recipe": {
+    "foundation_prefix_hash": "77fc0185b3f3bc55a70683ca88d52132feddb327ce58958c2595367ef93d6e99",
+    "foundation_prefix_recipe": "flashmini_1b_foundation_v1",
+    "foundation_recipe": {
+      "domains": {
+        "books_reference": {
+          "sources": [
+            "common_pile_books"
+          ],
+          "weight": 0.1
+        },
+        "code": {
+          "sources": [
+            "stackv2_edu",
+            "stack_edu"
+          ],
+          "weight": 0.24
+        },
+        "general_web": {
+          "sources": [
+            "fineweb_edu"
+          ],
+          "weight": 0.38
+        },
+        "math_stem": {
+          "sources": [
+            "finemath",
+            "open_web_math"
+          ],
+          "weight": 0.14
+        },
+        "multilingual": {
+          "sources": [
+            "fineweb"
+          ],
+          "weight": 0.02
+        },
+        "synthetic_edu": {
+          "sources": [
+            "cosmopedia"
+          ],
+          "weight": 0.08
+        },
+        "tech_docs": {
+          "sources": [
+            "common_pile_books"
+          ],
+          "weight": 0.04
+        }
+      },
+      "name": "flashmini_1b_foundation_v1",
+      "seed": 17001,
+      "split_salt": "flashmini-v4-split-v1",
+      "target_tokens": 80000000000,
+      "val_fraction": 0.005
+    },
+    "hash": "b7c8dca34727484b30a1c36b81bf7e72b6863d86fcf10fac7ce5530babbea99a",
+    "name": "flashmini_1b_full_v1",
+    "preview_domain_targets": {
+      "books_reference": 1000000000,
+      "code": 2400000000,
+      "general_web": 3800000000,
+      "math_stem": 1400000000,
+      "multilingual": 200000000,
+      "synthetic_edu": 800000000,
+      "tech_docs": 400000000
+    },
+    "preview_pause_tokens": 10000000000,
+    "target_tokens": 100000000000
+  },
+  "trajectory": {
+    "checkpoint_interval_tokens": 25000000,
+    "preview_pause_tokens": 10000000000,
+    "schedule": {
+      "decay_horizon_tokens": 100000000000,
+      "kind": "warmup_then_cosine_full_horizon",
+      "pause_is_not_schedule_end": true
+    },
+    "stages": [
+      {
+        "name": "foundation",
+        "recipe": "flashmini_1b_foundation_v1",
+        "tokens": 80000000000
+      },
+      {
+        "name": "quality",
+        "recipe": "flashmini_1b_quality_v1",
+        "tokens": 15000000000
+      },
+      {
+        "name": "long_coherent",
+        "recipe": "flashmini_1b_long_v1",
+        "tokens": 5000000000
+      }
+    ],
+    "total_training_tokens": 100000000000,
+    "validation": {
+      "deterministic_held_out": true,
+      "lightweight_every_tokens": 250000000,
+      "major_tokens": [
+        1000000000,
+        2000000000,
+        5000000000,
+        10000000000
+      ]
+    }
+  }
+}

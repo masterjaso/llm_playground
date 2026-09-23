@@ -1,0 +1,58 @@
+# Frozen FlashMini-1B production preview configuration.
+#
+# This is the accepted PoC-D architecture (GDN + MoE + PLE + KVC + gated
+# HyperConnections) scaled by depth.  The model is deliberately just over one
+# billion learned parameters; sparse expert capacity is reported separately by
+# the freeze manifest.
+architecture_version: 3
+experiment_mode: decisive
+vocab_size: 50257
+d_model: 768
+num_layers: 20
+num_heads: 6
+head_dim: 128
+gdn_per_attention: 3
+max_seq_len: 2048
+dropout: 0.0
+use_hyperconnection: true
+hc_count: 4
+hc_lowrank: 96
+use_ple: true
+moe:
+  num_experts: 16
+  top_k: 2
+  shared_experts: 1
+  expert_intermediate: 1536
+  aux_loss_coef: 0.01
+  capacity_factor: 1.0
+gdn:
+  d_state: 128
+  chunk_size: 64
+  use_short_conv: true
+  short_conv_kernel: 4
+  residual_in_mixer: false
+ple:
+  ngram: 3
+  ngram_vocab_size_base: 50257
+  heads_per_ngram: 8
+  embed_dim: 2048
+  hash_seed: 1234
+  conv_kernel_size: 4
+  conv_dilation: 3
+  injection_layer: 1
+  eos_id: 50256
+  # TPU-resident PLE uses dense shard-local updates. Sparse CPU table updates
+  # remain available to the CUDA PoC, but sparse gradients are not a supported
+  # PyTorch/XLA optimizer surface.
+  sparse: false
+  # TPU production keeps the table on the accelerator.  The CUDA PoC's CPU
+  # row offload is not part of the TPU execution policy.
+  offload: gpu
+kvc:
+  enabled: true
+  share_group_size: 2
+  kv_bits: 4
+  quant_format: e2m1
+  scale_format: e4m3
+  scale_group_size: 16
+  qat: true

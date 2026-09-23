@@ -1,0 +1,191 @@
+"""Hugging Face storage wrapper (v4). Token is never logged or persisted."""
+
+from __future__ import annotations
+
+import os
+from pathlib import Path
+
+
+def load_token() -> str | None:
+    """Prefer HF_TOKEN; fall back to .env aliases. Never prints or persists."""
+    tok = (os.environ.get("HF_TOKEN") or os.environ.get("HUGGINGFACE_HUB_TOKEN")
+           or os.environ.get("HUGGING_FACE_API_KEY"))
+    if tok:
+        os.environ["HF_TOKEN"] = tok
+        return tok
+    for candidate in (Path(".env"),
+                      Path(__file__).resolve().parents[3] / ".env"):
+        try:
+            if candidate.is_file():
+                for line in candidate.read_text().splitlines():
+                    line = line.strip()
+                    for key in ("HF_TOKEN", "HUGGING_FACE_API_KEY",
+                                "HUGGINGFACE_HUB_TOKEN"):
+                        if line.startswith(f"{key}="):
+                            value = line.split("=", 1)[1].strip().strip("\"'")
+                            if value:
+                                os.environ["HF_TOKEN"] = value
+                                return value
+        except OSError:
+            continue
+    return None
+
+
+def whoami() -> dict:
+    from huggingface_hub import HfApi
+    token = load_token()
+    if not token:
+        raise RuntimeError("HF_TOKEN is not set (and not found in .env)")
+    api = HfApi(token=token)
+    info = api.whoami()
+    if isinstance(info, dict):
+        return info
+    return {"name": getattr(info, "name", str(info))}
+
+
+def repo_id_for(kind: str, hf_user: str) -> str:
+    if kind == "data":
+        return f"{hf_user}/flashmini-data-v1"
+    if kind == "production":
+        return f"{hf_user}/flashmini-pretrain-production-v1"
+    if kind == "eval":
+        return f"{hf_user}/flashmini-eval-v1"
+    raise ValueError(f"unknown repo kind: {kind}")
+
+
+def ensure_repo(repo_id: str, *, private: bool = False) -> str:
+    """Create-or-reuse after verifying ownership. Returns repo_id."""
+    from huggingface_hub import HfApi
+    from huggingface_hub.utils import HfHubHTTPError
+    token = load_token()
+    if not token:
+        raise RuntimeError("HF_TOKEN is not set (and not found in .env)")
+    api = HfApi(token=token)
+    me = whoami()
+    owner = repo_id.split("/")[0]
+    if owner != me.get("name"):
+        raise ValueError(f"refusing to write to repo owned by {owner!r}")
+    try:
+        api.create_repo(repo_id, repo_type="dataset", private=private, exist_ok=True)
+    except HfHubHTTPError as exc:
+        # 409/existing is fine; anything else re-raises.
+        if "409" not in str(exc) and "already exists" not in str(exc).lower():
+            raise
+    return repo_id
+
+
+def upload_file(repo_id: str, local_path: Path, path_in_repo: str,
+                *, commit_message: str) -> str:
+    from huggingface_hub import HfApi
+    token = load_token()
+    api = HfApi(token=token)
+    return api.upload_file(
+        path_or_fileobj=str(local_path),
+        path_in_repo=path_in_repo,
+        repo_id=repo_id,
+        repo_type="dataset",
+        commit_message=commit_message,
+    )
+
+
+def upload_files(repo_id: str, files: list[tuple[Path, str]], *,
+                 commit_message: str) -> str:
+    """Upload several files in one dataset commit and return its revision.
+
+    Hugging Face applies the repository commit rate limit to each
+    ``upload_file`` call.  Canonical production shards are therefore grouped
+    into one atomic commit.  The caller still performs per-file size and hash
+    verification before treating the batch as durable.
+    """
+    from huggingface_hub import CommitOperationAdd, HfApi
+
+    if not files:
+        raise ValueError("at least one file is required for a batch upload")
+    token = load_token()
+    api = HfApi(token=token)
+    operations = [
+        CommitOperationAdd(path_in_repo=remote, path_or_fileobj=str(local))
+        for local, remote in files
+    ]
+    commit = api.create_commit(
+        repo_id=repo_id,
+        repo_type="dataset",
+        operations=operations,
+        commit_message=commit_message,
+    )
+    revision = getattr(commit, "oid", "") or getattr(commit, "commit_id", "")
+    return str(revision or "")
+
+
+def download_file(repo_id: str, path_in_repo: str, dest: Path, *,
+                  revision: str | None = None,
+                  cache_dir: Path | None = None,
+                  min_avail_bytes: int | None = None) -> Path:
+    """Download one file into an explicitly controlled cache and place it at dest.
+
+    The Hugging Face blob cache is confined to ``cache_dir`` (never the user's
+    default ``~/.cache/huggingface``), the destination is written atomically so
+    a killed process can never leave a truncated file that looks valid, and the
+    caller verifies the sha256 before use.
+    """
+    import shutil
+    import tempfile
+
+    from huggingface_hub import hf_hub_download
+    dest = Path(dest)
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    if min_avail_bytes is not None:
+        from . import cache as cache_mod
+        cache_mod.check_watermark(dest.parent, min_avail_bytes)
+    # hf_hub_download returns a path inside the controlled cache_dir. That
+    # path is normally a real file, but it can be a symlink into the blob
+    # store. We resolve it explicitly before copying so a concurrent
+    # eviction of the cache never leaves us copying from a half-written or
+    # removed symlink target (which produced checksum mismatches).
+    cached = hf_hub_download(
+        repo_id=repo_id, filename=path_in_repo, repo_type="dataset",
+        revision=revision, token=load_token(),
+        cache_dir=str(cache_dir) if cache_dir else None)
+    cached = Path(cached).resolve()
+    if not cached.is_file():
+        raise FileNotFoundError(f"HF cache resolved target missing: {cached}")
+    fd, tmp = tempfile.mkstemp(prefix=dest.name + ".", suffix=".tmp",
+                               dir=str(dest.parent))
+    os.close(fd)
+    try:
+        shutil.copyfile(cached, tmp)
+        os.replace(tmp, dest)
+    finally:
+        try:
+            Path(tmp).unlink(missing_ok=True)
+        except OSError:
+            pass
+    return dest
+
+
+def remote_file_info(repo_id: str, path_in_repo: str, *,
+                     revision: str | None = None):
+    """Return Hub metadata for one remote file (size/sha), or None."""
+    from huggingface_hub import HfApi
+    api = HfApi(token=load_token())
+    try:
+        info = api.get_paths_info(repo_id, path_in_repo, repo_type="dataset",
+                                  revision=revision)
+    except Exception:  # noqa: BLE001 - metadata API absence is handled by caller
+        return None
+    if isinstance(info, list):
+        info = info[0] if info else None
+    return info
+
+
+def remote_head_sha(repo_id: str) -> str:
+    from huggingface_hub import HfApi
+    api = HfApi(token=load_token())
+    try:
+        refs = api.list_repo_refs(repo_id, repo_type="dataset")
+        for branch in getattr(refs, "branches", []):
+            if getattr(branch, "name", "") == "main":
+                return getattr(branch, "target_commit", "") or ""
+    except Exception:  # noqa: BLE001, S110 - head lookup is best effort
+        pass
+    return ""

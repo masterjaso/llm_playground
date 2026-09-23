@@ -1,0 +1,14 @@
+{
+  "id": "masterjaso/flashmini-1b-tpu-v5e-8-production-worker",
+  "title": "FlashMini-1B TPU v5e-8 production worker",
+  "code_file": "flashmini_1b_kaggle_worker.ipynb",
+  "language": "python",
+  "kernel_type": "notebook",
+  "is_private": true,
+  "enable_gpu": false,
+  "enable_tpu": true,
+  "accelerator_type": "TPU VM v5e-8",
+  "dataset_sources": [],
+  "competition_sources": [],
+  "enable_internet": true
+}
