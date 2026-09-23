@@ -66,7 +66,7 @@
   },
   "architecture_version": 3,
   "checkpoint_schema_version": 1,
-  "created_at_utc": "2026-09-23T19:05:16Z",
+  "created_at_utc": "2026-09-23T19:08:52Z",
   "data_view": {
     "blocked_sources": [],
     "bounded_host_cache": true,
@@ -301,7 +301,7 @@
     },
     "view_id": "flashmini-1b-virtual-foundation-v1"
   },
-  "git_commit": "8e84aeed514bc2d348a377f4906fbf6167fd07af",
+  "git_commit": "2fc1c2b70d691ecbac087aabaf2b510c80046f56",
   "model_config_sha256": "911dc3d802bff39beb1539f8ae2acef718cc7df1de1ba348bbcc780fc837a05c",
   "optimizer_policy": {
     "betas": [
@@ -362,7 +362,7 @@
     "world_size": 8
   },
   "schema_version": 1,
-  "source_fingerprint": "1b0e0c339eea808ca3a6fe962d587c0105da89c5f854c6fadfb48deb62e8ba8b",
+  "source_fingerprint": "05c275ccda17d97794ea93c980da0089e954065000ead2a95b68dea6cb413c38",
   "state": "INFRASTRUCTURE_READY",
   "tokenizer": {
     "eos_token_id": 50256,

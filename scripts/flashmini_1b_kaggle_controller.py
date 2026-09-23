@@ -183,12 +183,17 @@ def _ensure_worker_surface(*, smoke: bool = False) -> None:
     if freeze.is_file():
         shutil.copyfile(freeze, WORKER_DIR / "freeze_manifest.json")
     notebook = json.loads((WORKER_DIR / "flashmini_1b_kaggle_worker.ipynb").read_text())
-    smoke_flag = " --smoke" if smoke else ""
+    smoke_arg = ", '--smoke'" if smoke else ""
     notebook["cells"][0]["source"] = [
-        "import os, sys\n",
+        "import os, runpy, sys\n",
+        "from pathlib import Path\n",
         f"os.environ.setdefault('FLASHMINI_REMOTE_CHECKPOINT_DATASET', {json.dumps(load_env().get('FLASHMINI_REMOTE_CHECKPOINT_DATASET', DEFAULT_CHECKPOINT_DATASET))})\n",
-        "sys.path.insert(0, '/kaggle/working/src')\n",
-        f"%run flashmini_1b_kaggle_worker.py --run-dir /kaggle/working/flashmini_run --freeze-manifest /kaggle/working/freeze_manifest.json{smoke_flag}\n",
+        "bundle_roots = [Path.cwd(), Path('/kaggle/working')] + list(Path('/kaggle/input').glob('*'))\n",
+        "bundle = next((root for root in bundle_roots if (root / 'flashmini_1b_kaggle_worker.py').is_file()), None)\n",
+        "if bundle is None:\n    raise RuntimeError('FlashMini worker bundle is not mounted under /kaggle/input or /kaggle/working')\n",
+        "sys.path.insert(0, str(bundle / 'src'))\n",
+        "sys.argv = ['flashmini_1b_kaggle_worker.py', '--run-dir', '/kaggle/working/flashmini_run', '--freeze-manifest', str(bundle / 'freeze_manifest.json')" + smoke_arg + "]\n",
+        "runpy.run_path(str(bundle / 'flashmini_1b_kaggle_worker.py'), run_name='__main__')\n",
     ]
     (WORKER_DIR / "flashmini_1b_kaggle_worker.ipynb").write_text(json.dumps(notebook, indent=2))
 

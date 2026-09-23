@@ -20,8 +20,13 @@ from pathlib import Path
 
 
 def _find_repo() -> Path:
-    candidates = [os.environ.get("FLASHMINI_SOURCE_DIR", ""), "/kaggle/input/flashmini-source",
-                  str(Path(__file__).resolve().parents[1])]
+    script_parent = Path(__file__).resolve().parent
+    candidates = [
+        os.environ.get("FLASHMINI_SOURCE_DIR", ""),
+        "/kaggle/input/flashmini-source",
+        str(script_parent),
+        str(script_parent.parent),
+    ]
     for candidate in candidates:
         if candidate and (Path(candidate) / "src/flashmini").is_dir():
             return Path(candidate)
