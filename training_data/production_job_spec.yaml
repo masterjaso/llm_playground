@@ -79,7 +79,7 @@ gates:
 status:
   pipeline_implemented: true
   pilot_corpus_preserved: true
-  one_b_100b_build_status: "running_streaming"
+  one_b_100b_build_status: "paused_user_requested"
   fifty_b_8t_pipeline_status: "pipeline_ready_source_capacity_pending"
-  fifty_b_8t_materialization_status: "not_started"
+  fifty_b_8t_materialization_status: "paused_user_requested"
   final_1b_release_status: "blocked_on_private_eval_decontamination_until_exports_arrive"

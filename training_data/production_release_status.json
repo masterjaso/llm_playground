@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-09-22T11:59:00Z",
+  "generated_at": "2026-09-23T14:13:25Z",
   "release_id": "flashmini-pretrain-production-v1",
   "production_repository": "mjaso/flashmini-data-v1",
   "production_prefix": "releases/pretrain-production-v1",
@@ -62,7 +62,7 @@
   },
   "1B_100B_BUILD_STATUS": {
     "pipeline_ready": true,
-    "canonical_materialization": "running_streaming",
+    "canonical_materialization": "paused_user_requested",
     "exact_tokens_published": 1039496,
     "training_view_tokens_published": 0,
     "canonical_documents_published": 170,
@@ -83,25 +83,44 @@
   },
   "50B_8T_PIPELINE_STATUS": {
     "pipeline_ready": true,
-    "materialization": "running_streaming",
-    "exact_tokens_published": 921570886,
-    "canonical_documents_published": 482543,
-    "canonical_shards_published": 1893,
+    "materialization": "paused_user_requested",
+    "exact_tokens_published": 1390902314,
+    "canonical_documents_published": 958979,
+    "canonical_shards_published": 3941,
     "pending_unverified_shards": 0,
-    "last_remote_revision": "7351bacc0cf74e56a442dc5ae353e98b5ff603df",
-    "last_progress_revision": "a16b28921d1c9d7f57d055799add0d6e9fd864ce",
+    "last_remote_revision": "911f4d83e1a9811d779bf8d953337e4f207f895f",
+    "last_progress_revision": "8333dce8cdaccaf9707f9eb8cdff4b637052df6f",
     "last_run_id": "flashmini-pretraining-data-50b-corpus-continuation-20260922t011528z-716a591b",
     "state_evidence": ".nsp/artifacts/runs/flashmini-pretraining-data-50b-corpus-continuation-20260922t011528z-716a591b/state/50b-stream-state.json",
     "remote_prefix": "releases/pretrain-production-v1/50b/canonical",
+    "local_staged_unpublished_shards": 4,
     "batch_commit_policy": {
       "max_pending_shards": 16,
       "window_records": 4096,
       "shard_documents": 256,
-      "retry_verified_at": "2026-09-22T01:55:00Z",
+      "retry_verified_at": "2026-09-23T12:47:05Z",
       "retry_shards": [
         "flashmini_50b_full_v1-shard-000050",
         "flashmini_50b_full_v1-shard-000051",
         "flashmini_50b_full_v1-shard-000052"
+      ],
+      "latest_dns_retry_shards": [
+        "flashmini_50b_full_v1-shard-003893",
+        "flashmini_50b_full_v1-shard-003894",
+        "flashmini_50b_full_v1-shard-003895",
+        "flashmini_50b_full_v1-shard-003896",
+        "flashmini_50b_full_v1-shard-003897",
+        "flashmini_50b_full_v1-shard-003898",
+        "flashmini_50b_full_v1-shard-003899",
+        "flashmini_50b_full_v1-shard-003900",
+        "flashmini_50b_full_v1-shard-003901",
+        "flashmini_50b_full_v1-shard-003902",
+        "flashmini_50b_full_v1-shard-003903",
+        "flashmini_50b_full_v1-shard-003904",
+        "flashmini_50b_full_v1-shard-003905",
+        "flashmini_50b_full_v1-shard-003906",
+        "flashmini_50b_full_v1-shard-003907",
+        "flashmini_50b_full_v1-shard-003908"
       ]
     },
     "source_blockers": [
@@ -112,19 +131,20 @@
     ]
   },
   "50B_8T_MATERIALIZATION_STATUS": {
-    "status": "running_streaming",
-    "exact_tokens_published": 921570886,
-    "canonical_documents_published": 482543,
-    "canonical_shards_published": 1893,
+    "status": "paused_user_requested",
+    "exact_tokens_published": 1390902314,
+    "canonical_documents_published": 958979,
+    "canonical_shards_published": 3941,
     "pending_unverified_shards": 0,
     "training_view_materialized": false,
-    "note": "streaming canonical shards are live; final 8T exact target, validation view, and freeze gates remain open"
+    "local_staged_unpublished_shards": 4,
+    "note": "user-requested stop; verified remote shards and durable cursors are preserved, four local staged shards remain unverified; final 8T exact target, validation view, and freeze gates remain open"
   },
   "readiness": {
     "FLASHMINI_1B_DATA_READY": false,
     "FLASHMINI_50B_DATA_PIPELINE_READY": true,
     "FLASHMINI_50B_DATA_MATERIALIZED_READY": false,
-    "reason": "The 50B stream is active with 921,570,886 exact train tokens in 1,893 verified canonical shards and no pending upload failures. The exact 8T domain targets, code-source replacement, full tokenized training view, source-capacity proof, and private benchmark exports remain outstanding."
+    "reason": "The user-requested stop paused the 50B stream at 1,390,902,314 exact train tokens in 3,941 verified canonical shards; four local staged shards are preserved but not remotely verified. The exact 8T domain targets, code-source replacement, full tokenized training view, source-capacity proof, and private benchmark exports remain outstanding."
   },
   "materialization": {
     "one_b_train_tokens": 100000000000,
@@ -141,7 +161,7 @@
     ]
   },
   "next_actions": [
-    "Continue the active resumable 50B stream-to-HF build across approved sources with 16-shard Hub commits and bounded windows; private eval exports are not required for canonical ingestion.",
+    "Resume the paused 50B stream only if explicitly requested; durable state and four local staged shards are preserved.",
     "Resolve the pinned stack_edu metadata-only schema or approve a replacement code source before the code-domain deficit can close.",
     "Supply immutable benchmark exports (including the private FlashMini evaluation release) before final freeze; mjaso/flashmini-eval-v1 is not present in the authenticated Hub account.",
     "Obtain accepted terms or replace the three gated Nemotron inputs and rerun source-capacity measurement for 50B.",

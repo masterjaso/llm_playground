@@ -81,11 +81,12 @@ dataset exposes no configured `content` field; review-required and gated
 sources remain held.
 `FLASHMINI_50B_DATA_PIPELINE_READY` is a code-and-small-scale proof state;
 `FLASHMINI_50B_DATA_MATERIALIZED_READY` requires the actual 8T artifacts. The
-50B canonical stream is active at
+50B canonical stream is paused at the user's request at
 `releases/pretrain-production-v1/50b/canonical`; its latest durable checkpoint
-is 1,893 verified shards, 482,543 documents, and 921,570,886 exact train tokens.
-The three shards that previously hit the Hub HTTP 429 commit limit were retried
-and verified together in one atomic batch; no pending upload artifacts remain.
+is 3,941 verified shards, 958,979 documents, and 1,390,902,314 exact train tokens.
+The sixteen shards that hit a transient DNS failure were preserved locally,
+retried, and verified together in one atomic batch. Four later local staging
+shards remain preserved but unverified for a future resumable continuation.
 Production now uses 16-shard Hub commits and bounded 4,096-record windows.
 This is durable progress, not completion: code/reasoning inputs remain held or
 schema-blocked, Nemotron inputs are gated, and the final tokenized 8T view is
