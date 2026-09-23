@@ -66,7 +66,7 @@
   },
   "architecture_version": 3,
   "checkpoint_schema_version": 1,
-  "created_at_utc": "2026-09-23T19:08:52Z",
+  "created_at_utc": "2026-09-23T19:17:55Z",
   "data_view": {
     "blocked_sources": [],
     "bounded_host_cache": true,
@@ -301,7 +301,7 @@
     },
     "view_id": "flashmini-1b-virtual-foundation-v1"
   },
-  "git_commit": "2fc1c2b70d691ecbac087aabaf2b510c80046f56",
+  "git_commit": "08aa245de4bd14078f7a5c8e1d835c278c0b4f54",
   "model_config_sha256": "911dc3d802bff39beb1539f8ae2acef718cc7df1de1ba348bbcc780fc837a05c",
   "optimizer_policy": {
     "betas": [
