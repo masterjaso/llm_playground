@@ -83,6 +83,8 @@ gdn:
   value_heads: 32
   value_head_dim: 128
   short_conv_kernel: 4
+  short_conv_activation: silu
+  short_conv_residual: false
   residual_owner: hyperconnection
   recurrent_arithmetic: float32_stable_state_and_triangular_solve
   projection_layout: qkvz_8192_plus_ba_64_plus_depthwise_conv_plus_gated_norm_plus_out
