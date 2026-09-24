@@ -1,0 +1,1 @@
+python -m flashmini.base_init_bundle materialize --bundle . --output checkpoint

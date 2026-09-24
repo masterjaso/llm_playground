@@ -1,0 +1,1 @@
+pytest -q tests/flashmini/test_flashmini_50b_base_init.py

@@ -1,0 +1,10 @@
+{
+  "contract": {
+    "family": "custom_byte_level_bpe",
+    "freeze_before_optimizer_step": true,
+    "identity_status": "pending_donor_tokenizer_artifact",
+    "special_token_ids": {},
+    "vocab_size": 131072
+  },
+  "status": "pending"
+}

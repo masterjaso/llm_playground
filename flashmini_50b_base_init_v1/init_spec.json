@@ -1,0 +1,76 @@
+{
+  "architecture_sha256": "d5b34f116c7557245605678a24495e3f83a8c047448fdb9b8faef456a0a5c7dd",
+  "architecture_version": 4,
+  "checkpoint_id": "FlashMini-50B-Base-Init-v1",
+  "config_sha256": "22096230c998b53dca038ac0f680b792004aad146a3341df5ab482b8ab66b5cd",
+  "deterministic_algorithm": {
+    "chunk_elements": 1048576,
+    "generator": "torch.Generator(device=cpu).manual_seed(seed)",
+    "hash": "sha256",
+    "input": "flashmini-init-v1\u0000<global_seed_decimal>\u0000<tensor_name>\u0000<chunk_index_decimal>",
+    "seed_bytes": "first_16_bytes_little_endian_mod_2^63_minus_1",
+    "version": "flashmini-sha256-name-seed-v1"
+  },
+  "dtype": "bfloat16",
+  "global_initialization_seed": 500277,
+  "materialization": "python -m flashmini.base_init_bundle materialize --bundle . --output <checkpoint-dir>",
+  "model_id": "FlashMini-50B-Base",
+  "optimizer_contract": {
+    "adamw": {
+      "parameters": "embeddings, lm_head, routers, shared gates, HC controls, attention/GDN controls, norms, scalars, biases"
+    },
+    "batch_size_warmup": false,
+    "muon": {
+      "epsilon": 1e-14,
+      "iterations": 8,
+      "logical_operator_rule": "never orthogonalize a physical fusion across gate/up/down or attention Q/K/V operators",
+      "momentum": 0.95,
+      "nesterov": true,
+      "update_scale": "0.2 * sqrt(max(A, B))"
+    },
+    "ple": {
+      "optimizer": "Adam",
+      "storage": "host/distributed off-accelerator",
+      "weight_decay": 0
+    }
+  },
+  "ordinary_initializer": "normal_mean_0_std_0.02_fp32_then_cast",
+  "parameter_counts": {
+    "base": 50276673408,
+    "base_active_per_token": 4894079872,
+    "mtp": 685511168,
+    "total": 50962184576
+  },
+  "schema_version": 1,
+  "shard_mapping": "model.safetensors.index.json",
+  "source_git_sha": "e507c1783f25769ebe047f5b664a7e53ef63f960",
+  "special_initializers": {
+    "gdn": {
+      "A_log": "log_uniform_fp32_0.01_to_16_shape_32",
+      "dt_bias": "ones_32"
+    },
+    "hc": {
+      "norm_offset": "zeros",
+      "projections": "normal_0.02"
+    },
+    "moe": {
+      "experts": "normal_0.02",
+      "router": "normal_0.02",
+      "shared_gate": "normal_0.02"
+    },
+    "mtp": "mirror_corresponding_backbone_rules_plus_fusion_rules",
+    "ple": {
+      "convolution": "exact_zero",
+      "dense_projections": "normal_0.02",
+      "table": "normal_0.02"
+    }
+  },
+  "tensor_manifest": "tensor_manifest.json",
+  "tokenizer": {
+    "family": "custom_byte_level_bpe",
+    "freeze_before_optimizer_step": true,
+    "identity_status": "pending_donor_tokenizer_artifact",
+    "special_token_ids": {},
+    "vocab_size": 131072
+  }
+}

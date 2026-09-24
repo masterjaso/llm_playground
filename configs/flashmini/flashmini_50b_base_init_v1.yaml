@@ -1,0 +1,216 @@
+schema_version: 1
+model_id: FlashMini-50B-Base
+checkpoint_id: FlashMini-50B-Base-Init-v1
+architecture_version: 4
+
+tokenizer:
+  family: custom_byte_level_bpe
+  vocab_size: 131072
+  special_token_ids: {}
+  identity_status: pending_donor_tokenizer_artifact
+  freeze_before_optimizer_step: true
+
+architecture:
+  d_model: 2048
+  decoder_layers: 48
+  tie_word_embeddings: false
+  input_embedding_shape: [131072, 2048]
+  lm_head_shape: [2048, 131072]
+  native_context: 262144
+  final_mixer: read_only_hc_8192_to_2048
+  parameter_target:
+    base_approximate: 50277000000
+    tolerance_fraction: 0.005
+    resize_prohibited: true
+
+mixer:
+  gated_delta_net_layers: 38
+  full_attention_layers: 10
+  attention_layers_one_based: [4, 8, 12, 16, 20, 24, 29, 34, 39, 44]
+  attention_layers_zero_based: [3, 7, 11, 15, 19, 23, 28, 33, 38, 43]
+  tail_rule: layers_45_through_48_are_gated_delta_net
+
+attention:
+  query_heads: 16
+  kv_heads: 2
+  head_dim: 256
+  query_width: 4096
+  kv_projection_width: 512
+  partial_rotary_fraction: 0.25
+  rotary_dimensions: 64
+  output_gated: true
+  rope_theta: 10000000
+  bias: false
+  norm_offsets: zero_identity_semantics
+
+kvc:
+  enabled: true
+  share_group_size: 2
+  pairs_one_based: [[4, 8], [12, 16], [20, 24], [29, 34], [39, 44]]
+  pairs_zero_based: [[3, 7], [11, 15], [19, 23], [28, 33], [38, 43]]
+  kv_bits: 4
+  kv_format: e2m1
+  scale_format: e4m3
+  scale_group_size: 16
+  qat: true
+  training_representation: fake_quantize_dequantize_straight_through
+  inference_representation: packed_fp4_e4m3_scales_fused_or_on_demand_dequantize
+
+gdn:
+  key_query_heads: 16
+  key_head_dim: 128
+  value_heads: 32
+  value_head_dim: 128
+  short_conv_kernel: 4
+  residual_owner: hyperconnection
+  recurrent_arithmetic: float32_stable_state_and_triangular_solve
+  projection_layout: qkvz_8192_plus_ba_64_plus_depthwise_conv_plus_gated_norm_plus_out
+  special_state_shapes:
+    dt_bias: [32]
+    A_log: [32]
+    gated_norm_offset: [128]
+
+moe:
+  routed_experts: 80
+  shared_experts: 1
+  top_k: 6
+  expert_intermediate: 1280
+  activation: swiglu
+  router: learned_linear_2048_to_80_bias_false
+  routing: softmax_all_experts_then_top6_then_renormalize_selected
+  shared_expert_gate: learned_sigmoid_2048_to_1_bias_false
+  load_balance_scope: global_or_logical_batch_not_microbatch_local
+  physical_fusion: runtime_only_logical_gate_up_down_tensors_preserved
+
+hyperconnections:
+  streams: 4
+  persistent_residual_width: 8192
+  lowrank: 256
+  per_decoder_boundary: [mixer, moe]
+  final: read_only_8192_to_2048
+  norm_offsets: zero
+
+ple:
+  injections: 1
+  injection_layer_zero_based: 1
+  ngram_orders: [2, 3]
+  heads_per_order: 8
+  total_heads: 16
+  aggregate_width: 2048
+  head_dim: 128
+  ngram_vocab_size_base: 8388608
+  table_capacity_policy: sixteen_distinct_primes_at_or_above_base_in_ascending_head_order
+  hash_head_rows: [8388617, 8388619, 8388623, 8388637, 8388673, 8388683, 8388691, 8388697, 8388733, 8388739, 8388761, 8388763, 8388791, 8388811, 8388833, 8388841]
+  table_tensor_layout: one_independently_addressable_bf16_tensor_per_hash_head
+  dense_machinery: key_2048_to_8192_value_2048_to_2048_three_grouped_norms_depthwise_conv_8192x4
+  convolution:
+    kind: causal_depthwise
+    kernel: 4
+    dilation: 1
+    init: exact_zero
+  reset_isolation: eos_segment_local_history_and_convolution
+  training_storage: bf16_master_host_or_distributed_off_accelerator
+  inference_storage: fp8_e4m3_host_ram_mmap_async_row_prefetch_optional_hot_rows_4bit_optional
+
+mtp:
+  hidden_layers: 1
+  layer_type: full_attention
+  d_model: 2048
+  embedding: shared_main_model
+  lm_head: shared_main_model
+  moe:
+    routed_experts: 80
+    shared_experts: 1
+    top_k: 6
+    expert_intermediate: 1280
+    activation: swiglu
+    router: learned_linear_2048_to_80_bias_false
+    routing: softmax_all_experts_then_top6_then_renormalize_selected
+    shared_expert_gate: learned_sigmoid_2048_to_1_bias_false
+    load_balance_scope: global_or_logical_batch_not_microbatch_local
+    physical_fusion: runtime_only_logical_gate_up_down_tensors_preserved
+  hyperconnections:
+    streams: 4
+    lowrank: 256
+  kv: own_full_attention_kv_no_pairwise_kvc
+  prediction_window:
+    maximum: 4
+    runtime_range: [0, 1, 2, 3, 4]
+    recursive_steps: 3
+  teacher_forcing: ground_truth_shifted_embeddings_with_recursive_hidden_propagation_no_sampling
+  fusion: grouped_hc_rms_8192_embedding_rms_2048_fc_hidden_2048_to_2048_shared_per_stream_fc_embedding_2048_to_2048_add_each_stream_final_read_only_hc
+  main_loss_weight: 1.0
+  auxiliary_loss: equal_mean_t_plus_2_t_plus_3_t_plus_4
+  coefficient_schedule:
+    first_70_percent: 0.30
+    final_30_percent: 0.10
+  inference_precision:
+    routed_experts: fp8
+    attention_qkvo: bf16
+    router: bf16
+    shared_expert_and_gate: bf16
+    hc: bf16
+    fusion: bf16
+    norms: bf16
+
+initialization:
+  global_seed: 500277
+  ordinary_matrices: normal_mean_0_std_0.02_fp32_then_cast
+  biases: zero
+  norms: identity_semantics_offset_zero
+  identity_algorithm:
+    version: flashmini-sha256-name-seed-v1
+    hash: sha256
+    input: "flashmini-init-v1\0<global_seed_decimal>\0<tensor_name>\0<chunk_index_decimal>"
+    seed_bytes: first_16_bytes_little_endian_mod_2^63_minus_1
+    generator: torch.Generator(device=cpu).manual_seed(seed)
+    chunk_elements: 1048576
+  dtype: bfloat16
+  gdn:
+    dt_bias: ones_32
+    A_log: log_uniform_fp32_0.01_to_16_shape_32
+  hc:
+    norm_offset: zeros
+    projections: normal_0.02
+  moe:
+    experts: normal_0.02
+    router: normal_0.02
+    shared_gate: normal_0.02
+  ple:
+    table: normal_0.02
+    dense_projections: normal_0.02
+    convolution: exact_zero
+  mtp: mirror_corresponding_backbone_rules_plus_fusion_rules
+  chunk_elements: 1048576
+
+optimizer:
+  state_in_checkpoint: false
+  muon:
+    parameters: genuine_2d_learned_linear_transformations_by_logical_operator
+    momentum: 0.95
+    nesterov: true
+    newton_schulz_or_polar_express_iterations: 8
+    epsilon: 1.0e-14
+    update_scale: 0.2*sqrt(max(A,B))
+  adamw:
+    parameters: embeddings_lm_head_routers_gates_hc_controls_norms_biases_scalars_equivalent_mtp_controls
+  ple_table:
+    optimizer: Adam
+    weight_decay: 0
+  logical_operator_rule: physical_fusion_allowed_but_no_cross_operator_orthogonalization
+  batch_size_warmup: false
+
+storage:
+  format: safetensors
+  index: model.safetensors.index.json
+  target_shard_bytes: 4294967296
+  ple_layout: one_hash_head_per_tensor_and_never_monolithic
+  expert_layout: logical_expert_tensors_groupable_by_layer_or_expert_group
+  materialization: meta_manifest_then_name_seeded_chunk_fill_immediate_shard_write_release
+  precision_policy: never_change_precision_or_geometry_for_local_capacity
+
+architecture_contract:
+  status: frozen
+  source: FlashMini-50B Base Init hardened execution contract
+  changes_require: new_model_and_init_version
+  training_started: false
