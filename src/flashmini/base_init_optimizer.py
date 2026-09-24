@@ -9,8 +9,9 @@ a slice set that does not partition the rows exactly, or a Muon slice that is
 not a genuine 2-D transformation raises.
 
 Families: ``Muon`` (genuine learned 2-D transformations), ``AdamW`` (embeddings,
-LM head, routers, shared gates, HC controls, GDN beta/decay controls, norms,
-scalars, short convolutions), ``PLE_Adam`` (hash-head tables, weight decay 0).
+LM head, routers, attention/GDN output gates, shared gates, HC controls,
+GDN beta/decay controls, norms, scalars, short convolutions), ``PLE_Adam``
+(hash-head tables, weight decay 0).
 AdamW weight-decay *classes* are classified here; their values are donor
 training parameters.
 """
@@ -201,7 +202,7 @@ def optimizer_contract() -> dict[str, Any]:
             "logical_operator_rule": "physical_fusion_allowed_but_no_cross_operator_orthogonalization",
         },
         "adamw": {
-            "parameters": "embeddings, lm_head, routers, shared gates, HC controls, GDN beta/decay controls, norms, scalars, short convolutions",
+            "parameters": "embeddings, lm_head, routers, attention/GDN output gates, shared gates, HC controls, GDN beta/decay controls, norms, scalars, short convolutions",
             "weight_decay_classes": ["embedding", "control_matrix", "no_decay"],
         },
         "ple": {"optimizer": "Adam", "weight_decay": 0, "update": "row-sparse, per-row step count",
