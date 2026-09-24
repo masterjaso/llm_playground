@@ -243,12 +243,17 @@ class FlashMini50BConfig:
         gdn = self._raw["gdn"]
         _require_exact_keys(gdn, {
             "key_query_heads", "key_head_dim", "value_heads", "value_head_dim",
-            "short_conv_kernel", "residual_owner", "recurrent_arithmetic", "projection_layout",
-            "special_state_shapes"
+            "short_conv_kernel", "short_conv_activation", "short_conv_residual",
+            "residual_owner", "recurrent_arithmetic", "projection_layout", "special_state_shapes"
         }, "gdn")
         if (gdn["key_query_heads"], gdn["key_head_dim"], gdn["value_heads"], gdn["value_head_dim"]) != (16, 128, 32, 128):
             raise ValueError("v4 GDN head geometry mismatch")
-        if gdn["short_conv_kernel"] != 4 or gdn["residual_owner"] != "hyperconnection":
+        if (
+            gdn["short_conv_kernel"] != 4
+            or gdn["short_conv_activation"] != "silu"
+            or gdn["short_conv_residual"] is not False
+            or gdn["residual_owner"] != "hyperconnection"
+        ):
             raise ValueError("v4 GDN convolution/residual contract mismatch")
         if gdn["recurrent_arithmetic"] != "float32_stable_state_and_triangular_solve":
             raise ValueError("v4 GDN arithmetic precision mismatch")
