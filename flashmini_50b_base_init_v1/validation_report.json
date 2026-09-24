@@ -1,5 +1,97 @@
 {
-  "shards": "planned_not_materialized",
-  "structural": "pending test run",
-  "surrogate": "pending test run"
+  "schema_version": 1,
+  "verdict": "FLASHMINI-50B V4 TRAINING READY",
+  "source_commit_sha": "6b07972b2d0f0d82cd1e256b2ed076ba9b02caf2",
+  "branch": "main",
+  "config_sha256": "05667f1e3ab4e5378bb655dca399244bd5f2907c70aa98bda6cf23eb83e29dcb",
+  "architecture_sha256": "cb62c5d3f6234585bf689a4c28207c793654f9fb56c8b179026e6297289bd1f9",
+  "tokenizer_fingerprint": "ad7e623aca9d08891d9db1d270c7d6a8c612780890e01511255e0bbeb597e56e",
+  "parameter_counts": {
+    "base": 50276673408,
+    "mtp": 685511168,
+    "total": 50962184576,
+    "base_active_per_token": 4894079872,
+    "delta_from_frozen_target": "none; 50,276,673,408 / 685,511,168 / 50,962,184,576 unchanged"
+  },
+  "tests": {
+    "command": "TMPDIR=$PWD/.nsp/artifacts/tmp/pytest .venv/bin/python -m pytest tests/flashmini -q --tb=no",
+    "collected": 344,
+    "passed": 340,
+    "failed": 0,
+    "skipped": 4,
+    "evidence": "full flashmini suite exit 0 after the implementation commit contents were exercised; four skips are existing optional/hardware skips, not v4 disablements"
+  },
+  "surrogate_training": {
+    "command": "TMPDIR=$PWD/.nsp/artifacts/tmp/pytest .venv/bin/python -m pytest tests/flashmini/test_v4_training.py -q",
+    "result": "10 passed",
+    "loss": "finite on every step; main and MTP losses declined on the synthetic packed stream",
+    "parameter_classes": "every dense parameter and all 16 PLE tables updated",
+    "router": "normalized expert entropy stayed above 0.6; max/mean load below 2.5"
+  },
+  "checkpoint_resume": {
+    "command": "tests/flashmini/test_v4_training.py::test_checkpoint_resume_is_bit_identical_to_continuous_training",
+    "modes": ["exact_prepass", "ga_buffer"],
+    "result": "continuous N steps vs train-K / reload / train-(N-K) produced bit-identical parameters, PLE tables, and optimizer state"
+  },
+  "materialization": {
+    "planned_shard_count": 32,
+    "planned_bytes": 101924369152,
+    "full_materialization_status": "not_performed_locally; donor must materialize all 32 shards (~101.9 GiB BF16) and then python -m flashmini.base_init_bundle record-hashes",
+    "representative_status": "three planned shards materialized and verified",
+    "representative_shards": [
+      {
+        "shard": "model-00001.safetensors",
+        "index": 0,
+        "kind": "dense_or_expert_plus_special_init",
+        "sha256": "26eaf4a7e58978dfaf82f65850b6d3c9d6a4bbd4d790bced2737cebe9b606407",
+        "bytes": 4291325976,
+        "verified_tensors": ["blocks.0.mixer.A_log", "blocks.1.moe.experts.50.down_proj.weight", "blocks.11.moe.experts.17.gate_proj.weight"]
+      },
+      {
+        "shard": "model-00016.safetensors",
+        "index": 15,
+        "kind": "ple_hash_head",
+        "sha256": "c4d5ea062fe32c40c370ac233b454358c01374275122ad44211d88835b25a7a3",
+        "bytes": 2147486256,
+        "verified_tensors": ["ple.tables.0.weight[:16]"]
+      },
+      {
+        "shard": "model-00032.safetensors",
+        "index": 31,
+        "kind": "dense_or_expert_containing_mtp",
+        "sha256": "bf1974ab787bfd7cb8ca8a3e225225e8e9c2f9d53c77c6025fb7a3557751e235",
+        "bytes": 3190894984,
+        "verified_tensors": ["blocks.9.moe.experts.42.gate_proj.weight", "mtp.block.moe.experts.25.gate_proj.weight", "ple.value_proj.weight"],
+        "re_materialized_sha256": "bf1974ab787bfd7cb8ca8a3e225225e8e9c2f9d53c77c6025fb7a3557751e235"
+      }
+    ]
+  },
+  "environment": {
+    "python": "3.13.14",
+    "torch": "2.13.0+cu130",
+    "safetensors": "0.8.0",
+    "PyYAML": "6.0.3",
+    "tokenizers": "0.22.2",
+    "numpy": "2.5.2",
+    "cuda_visible_on_this_host": false,
+    "initialization_device": "cpu",
+    "muon": "in-repo flashmini.v4_optim; no external package"
+  },
+  "known_limitations": [
+    "Full 32-shard (~101.9 GiB) materialization was not run on this host; shard_hashes.json is therefore absent until the donor records it.",
+    "Full donor preflight PASS requires CUDA, a production train.yaml with every mandatory field set, complete shards, and recorded shard hashes.",
+    "Tokenizer training used every verified corpus-v1 train shard present on the build host; rejected/missing release shards are listed in tokenizer_manifest.json and did not contribute tokens.",
+    "test_fingerprint.py GPU-name mutation now also covers an empty device list so the v3 environment fingerprint test is valid on CPU-only hosts."
+  ],
+  "remaining_donor_runtime_decisions": [
+    "nodes, gpus_per_node, micro-batch, gradient accumulation, sequence-length curriculum, planned_total_tokens",
+    "learning rates and schedule kind/warmup/min_lr_ratio",
+    "teacher/synthetic mixture fractions (must sum to 1)",
+    "router_aux_coefficient (no default; record the chosen value)",
+    "router_balance_mode: exact_prepass (recommended) or ga_buffer",
+    "checkpoint interval and keep_last",
+    "watchdog timeout"
+  ],
+  "training_started": false,
+  "provenance_rule": "source_commit names the implementation commit (this report's source_commit_sha). The generated bundle directory is committed afterwards and is excluded from source_tree_sha256. HEAD may differ from source_commit only inside flashmini_50b_base_init_v1/."
 }

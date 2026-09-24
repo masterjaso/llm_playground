@@ -2,8 +2,8 @@
   "active_definition": "one input embedding row; full untied LM head; all attention/GDN/HC/router/shared/dense PLE tensors; top-6 routed experts; one PLE row per hash head",
   "active_parameters_per_token_breakdown": {
     "attention": 262147840,
-    "gdn": 1282096256,
-    "hyperconnections": 409993216,
+    "gdn": 1281301632,
+    "hyperconnections": 410787840,
     "input_embedding_row": 2048,
     "lm_head": 268435456,
     "ple_dense_machinery": 21028864,
@@ -53,13 +53,12 @@
   "base_total_learned_parameters": 50276673408,
   "categories": {
     "attention": 262147840,
-    "gdn": 1282096256,
-    "hyperconnections": 409993216,
+    "gdn": 1281301632,
+    "hyperconnections": 410787840,
     "input_embeddings": 268435456,
     "lm_head": 268435456,
     "mtp_attention": 27263488,
-    "mtp_gdn": 24576,
-    "mtp_hyperconnections": 21047296,
+    "mtp_hyperconnections": 21071872,
     "mtp_routed_experts": 629145600,
     "mtp_routers": 163840,
     "mtp_shared_experts_and_gates": 7866368,
@@ -100,150 +99,6 @@
       "shape": [
         131072,
         2048
-      ]
-    },
-    {
-      "category": "ple_table",
-      "name": "ple.tables.0.weight",
-      "numel": 1073742976,
-      "shape": [
-        8388617,
-        128
-      ]
-    },
-    {
-      "category": "ple_table",
-      "name": "ple.tables.1.weight",
-      "numel": 1073743232,
-      "shape": [
-        8388619,
-        128
-      ]
-    },
-    {
-      "category": "ple_table",
-      "name": "ple.tables.2.weight",
-      "numel": 1073743744,
-      "shape": [
-        8388623,
-        128
-      ]
-    },
-    {
-      "category": "ple_table",
-      "name": "ple.tables.3.weight",
-      "numel": 1073745536,
-      "shape": [
-        8388637,
-        128
-      ]
-    },
-    {
-      "category": "ple_table",
-      "name": "ple.tables.4.weight",
-      "numel": 1073750144,
-      "shape": [
-        8388673,
-        128
-      ]
-    },
-    {
-      "category": "ple_table",
-      "name": "ple.tables.5.weight",
-      "numel": 1073751424,
-      "shape": [
-        8388683,
-        128
-      ]
-    },
-    {
-      "category": "ple_table",
-      "name": "ple.tables.6.weight",
-      "numel": 1073752448,
-      "shape": [
-        8388691,
-        128
-      ]
-    },
-    {
-      "category": "ple_table",
-      "name": "ple.tables.7.weight",
-      "numel": 1073753216,
-      "shape": [
-        8388697,
-        128
-      ]
-    },
-    {
-      "category": "ple_table",
-      "name": "ple.tables.8.weight",
-      "numel": 1073757824,
-      "shape": [
-        8388733,
-        128
-      ]
-    },
-    {
-      "category": "ple_table",
-      "name": "ple.tables.9.weight",
-      "numel": 1073758592,
-      "shape": [
-        8388739,
-        128
-      ]
-    },
-    {
-      "category": "ple_table",
-      "name": "ple.tables.10.weight",
-      "numel": 1073761408,
-      "shape": [
-        8388761,
-        128
-      ]
-    },
-    {
-      "category": "ple_table",
-      "name": "ple.tables.11.weight",
-      "numel": 1073761664,
-      "shape": [
-        8388763,
-        128
-      ]
-    },
-    {
-      "category": "ple_table",
-      "name": "ple.tables.12.weight",
-      "numel": 1073765248,
-      "shape": [
-        8388791,
-        128
-      ]
-    },
-    {
-      "category": "ple_table",
-      "name": "ple.tables.13.weight",
-      "numel": 1073767808,
-      "shape": [
-        8388811,
-        128
-      ]
-    },
-    {
-      "category": "ple_table",
-      "name": "ple.tables.14.weight",
-      "numel": 1073770624,
-      "shape": [
-        8388833,
-        128
-      ]
-    },
-    {
-      "category": "ple_table",
-      "name": "ple.tables.15.weight",
-      "numel": 1073771648,
-      "shape": [
-        8388841,
-        128
       ]
     },
     {
@@ -2565,7 +2420,7 @@
       ]
     },
     {
-      "category": "gdn",
+      "category": "hyperconnections",
       "name": "blocks.0.mixer_hc.norm_offset",
       "numel": 8192,
       "shape": [
@@ -2600,7 +2455,7 @@
       ]
     },
     {
-      "category": "gdn",
+      "category": "hyperconnections",
       "name": "blocks.0.moe_hc.norm_offset",
       "numel": 8192,
       "shape": [
@@ -4901,7 +4756,7 @@
       ]
     },
     {
-      "category": "gdn",
+      "category": "hyperconnections",
       "name": "blocks.1.mixer_hc.norm_offset",
       "numel": 8192,
       "shape": [
@@ -4936,7 +4791,7 @@
       ]
     },
     {
-      "category": "gdn",
+      "category": "hyperconnections",
       "name": "blocks.1.moe_hc.norm_offset",
       "numel": 8192,
       "shape": [
@@ -7237,7 +7092,7 @@
       ]
     },
     {
-      "category": "gdn",
+      "category": "hyperconnections",
       "name": "blocks.2.mixer_hc.norm_offset",
       "numel": 8192,
       "shape": [
@@ -7272,7 +7127,7 @@
       ]
     },
     {
-      "category": "gdn",
+      "category": "hyperconnections",
       "name": "blocks.2.moe_hc.norm_offset",
       "numel": 8192,
       "shape": [
@@ -9564,7 +9419,7 @@
       ]
     },
     {
-      "category": "gdn",
+      "category": "hyperconnections",
       "name": "blocks.3.mixer_hc.norm_offset",
       "numel": 8192,
       "shape": [
@@ -9599,7 +9454,7 @@
       ]
     },
     {
-      "category": "gdn",
+      "category": "hyperconnections",
       "name": "blocks.3.moe_hc.norm_offset",
       "numel": 8192,
       "shape": [
@@ -11900,7 +11755,7 @@
       ]
     },
     {
-      "category": "gdn",
+      "category": "hyperconnections",
       "name": "blocks.4.mixer_hc.norm_offset",
       "numel": 8192,
       "shape": [
@@ -11935,7 +11790,7 @@
       ]
     },
     {
-      "category": "gdn",
+      "category": "hyperconnections",
       "name": "blocks.4.moe_hc.norm_offset",
       "numel": 8192,
       "shape": [
@@ -14236,7 +14091,7 @@
       ]
     },
     {
-      "category": "gdn",
+      "category": "hyperconnections",
       "name": "blocks.5.mixer_hc.norm_offset",
       "numel": 8192,
       "shape": [
@@ -14271,7 +14126,7 @@
       ]
     },
     {
-      "category": "gdn",
+      "category": "hyperconnections",
       "name": "blocks.5.moe_hc.norm_offset",
       "numel": 8192,
       "shape": [
@@ -16572,7 +16427,7 @@
       ]
     },
     {
-      "category": "gdn",
+      "category": "hyperconnections",
       "name": "blocks.6.mixer_hc.norm_offset",
       "numel": 8192,
       "shape": [
@@ -16607,7 +16462,7 @@
       ]
     },
     {
-      "category": "gdn",
+      "category": "hyperconnections",
       "name": "blocks.6.moe_hc.norm_offset",
       "numel": 8192,
       "shape": [
@@ -18873,7 +18728,7 @@
       ]
     },
     {
-      "category": "gdn",
+      "category": "hyperconnections",
       "name": "blocks.7.mixer_hc.norm_offset",
       "numel": 8192,
       "shape": [
@@ -18908,7 +18763,7 @@
       ]
     },
     {
-      "category": "gdn",
+      "category": "hyperconnections",
       "name": "blocks.7.moe_hc.norm_offset",
       "numel": 8192,
       "shape": [
@@ -21209,7 +21064,7 @@
       ]
     },
     {
-      "category": "gdn",
+      "category": "hyperconnections",
       "name": "blocks.8.mixer_hc.norm_offset",
       "numel": 8192,
       "shape": [
@@ -21244,7 +21099,7 @@
       ]
     },
     {
-      "category": "gdn",
+      "category": "hyperconnections",
       "name": "blocks.8.moe_hc.norm_offset",
       "numel": 8192,
       "shape": [
@@ -23545,7 +23400,7 @@
       ]
     },
     {
-      "category": "gdn",
+      "category": "hyperconnections",
       "name": "blocks.9.mixer_hc.norm_offset",
       "numel": 8192,
       "shape": [
@@ -23580,7 +23435,7 @@
       ]
     },
     {
-      "category": "gdn",
+      "category": "hyperconnections",
       "name": "blocks.9.moe_hc.norm_offset",
       "numel": 8192,
       "shape": [
@@ -25881,7 +25736,7 @@
       ]
     },
     {
-      "category": "gdn",
+      "category": "hyperconnections",
       "name": "blocks.10.mixer_hc.norm_offset",
       "numel": 8192,
       "shape": [
@@ -25916,7 +25771,7 @@
       ]
     },
     {
-      "category": "gdn",
+      "category": "hyperconnections",
       "name": "blocks.10.moe_hc.norm_offset",
       "numel": 8192,
       "shape": [
@@ -28208,7 +28063,7 @@
       ]
     },
     {
-      "category": "gdn",
+      "category": "hyperconnections",
       "name": "blocks.11.mixer_hc.norm_offset",
       "numel": 8192,
       "shape": [
@@ -28243,7 +28098,7 @@
       ]
     },
     {
-      "category": "gdn",
+      "category": "hyperconnections",
       "name": "blocks.11.moe_hc.norm_offset",
       "numel": 8192,
       "shape": [
@@ -30544,7 +30399,7 @@
       ]
     },
     {
-      "category": "gdn",
+      "category": "hyperconnections",
       "name": "blocks.12.mixer_hc.norm_offset",
       "numel": 8192,
       "shape": [
@@ -30579,7 +30434,7 @@
       ]
     },
     {
-      "category": "gdn",
+      "category": "hyperconnections",
       "name": "blocks.12.moe_hc.norm_offset",
       "numel": 8192,
       "shape": [
@@ -32880,7 +32735,7 @@
       ]
     },
     {
-      "category": "gdn",
+      "category": "hyperconnections",
       "name": "blocks.13.mixer_hc.norm_offset",
       "numel": 8192,
       "shape": [
@@ -32915,7 +32770,7 @@
       ]
     },
     {
-      "category": "gdn",
+      "category": "hyperconnections",
       "name": "blocks.13.moe_hc.norm_offset",
       "numel": 8192,
       "shape": [
@@ -35216,7 +35071,7 @@
       ]
     },
     {
-      "category": "gdn",
+      "category": "hyperconnections",
       "name": "blocks.14.mixer_hc.norm_offset",
       "numel": 8192,
       "shape": [
@@ -35251,7 +35106,7 @@
       ]
     },
     {
-      "category": "gdn",
+      "category": "hyperconnections",
       "name": "blocks.14.moe_hc.norm_offset",
       "numel": 8192,
       "shape": [
@@ -37517,7 +37372,7 @@
       ]
     },
     {
-      "category": "gdn",
+      "category": "hyperconnections",
       "name": "blocks.15.mixer_hc.norm_offset",
       "numel": 8192,
       "shape": [
@@ -37552,7 +37407,7 @@
       ]
     },
     {
-      "category": "gdn",
+      "category": "hyperconnections",
       "name": "blocks.15.moe_hc.norm_offset",
       "numel": 8192,
       "shape": [
@@ -39853,7 +39708,7 @@
       ]
     },
     {
-      "category": "gdn",
+      "category": "hyperconnections",
       "name": "blocks.16.mixer_hc.norm_offset",
       "numel": 8192,
       "shape": [
@@ -39888,7 +39743,7 @@
       ]
     },
     {
-      "category": "gdn",
+      "category": "hyperconnections",
       "name": "blocks.16.moe_hc.norm_offset",
       "numel": 8192,
       "shape": [
@@ -42189,7 +42044,7 @@
       ]
     },
     {
-      "category": "gdn",
+      "category": "hyperconnections",
       "name": "blocks.17.mixer_hc.norm_offset",
       "numel": 8192,
       "shape": [
@@ -42224,7 +42079,7 @@
       ]
     },
     {
-      "category": "gdn",
+      "category": "hyperconnections",
       "name": "blocks.17.moe_hc.norm_offset",
       "numel": 8192,
       "shape": [
@@ -44525,7 +44380,7 @@
       ]
     },
     {
-      "category": "gdn",
+      "category": "hyperconnections",
       "name": "blocks.18.mixer_hc.norm_offset",
       "numel": 8192,
       "shape": [
@@ -44560,7 +44415,7 @@
       ]
     },
     {
-      "category": "gdn",
+      "category": "hyperconnections",
       "name": "blocks.18.moe_hc.norm_offset",
       "numel": 8192,
       "shape": [
@@ -46852,7 +46707,7 @@
       ]
     },
     {
-      "category": "gdn",
+      "category": "hyperconnections",
       "name": "blocks.19.mixer_hc.norm_offset",
       "numel": 8192,
       "shape": [
@@ -46887,7 +46742,7 @@
       ]
     },
     {
-      "category": "gdn",
+      "category": "hyperconnections",
       "name": "blocks.19.moe_hc.norm_offset",
       "numel": 8192,
       "shape": [
@@ -49188,7 +49043,7 @@
       ]
     },
     {
-      "category": "gdn",
+      "category": "hyperconnections",
       "name": "blocks.20.mixer_hc.norm_offset",
       "numel": 8192,
       "shape": [
@@ -49223,7 +49078,7 @@
       ]
     },
     {
-      "category": "gdn",
+      "category": "hyperconnections",
       "name": "blocks.20.moe_hc.norm_offset",
       "numel": 8192,
       "shape": [
@@ -51524,7 +51379,7 @@
       ]
     },
     {
-      "category": "gdn",
+      "category": "hyperconnections",
       "name": "blocks.21.mixer_hc.norm_offset",
       "numel": 8192,
       "shape": [
@@ -51559,7 +51414,7 @@
       ]
     },
     {
-      "category": "gdn",
+      "category": "hyperconnections",
       "name": "blocks.21.moe_hc.norm_offset",
       "numel": 8192,
       "shape": [
@@ -53860,7 +53715,7 @@
       ]
     },
     {
-      "category": "gdn",
+      "category": "hyperconnections",
       "name": "blocks.22.mixer_hc.norm_offset",
       "numel": 8192,
       "shape": [
@@ -53895,7 +53750,7 @@
       ]
     },
     {
-      "category": "gdn",
+      "category": "hyperconnections",
       "name": "blocks.22.moe_hc.norm_offset",
       "numel": 8192,
       "shape": [
@@ -56161,7 +56016,7 @@
       ]
     },
     {
-      "category": "gdn",
+      "category": "hyperconnections",
       "name": "blocks.23.mixer_hc.norm_offset",
       "numel": 8192,
       "shape": [
@@ -56196,7 +56051,7 @@
       ]
     },
     {
-      "category": "gdn",
+      "category": "hyperconnections",
       "name": "blocks.23.moe_hc.norm_offset",
       "numel": 8192,
       "shape": [
@@ -58497,7 +58352,7 @@
       ]
     },
     {
-      "category": "gdn",
+      "category": "hyperconnections",
       "name": "blocks.24.mixer_hc.norm_offset",
       "numel": 8192,
       "shape": [
@@ -58532,7 +58387,7 @@
       ]
     },
     {
-      "category": "gdn",
+      "category": "hyperconnections",
       "name": "blocks.24.moe_hc.norm_offset",
       "numel": 8192,
       "shape": [
@@ -60833,7 +60688,7 @@
       ]
     },
     {
-      "category": "gdn",
+      "category": "hyperconnections",
       "name": "blocks.25.mixer_hc.norm_offset",
       "numel": 8192,
       "shape": [
@@ -60868,7 +60723,7 @@
       ]
     },
     {
-      "category": "gdn",
+      "category": "hyperconnections",
       "name": "blocks.25.moe_hc.norm_offset",
       "numel": 8192,
       "shape": [
@@ -63169,7 +63024,7 @@
       ]
     },
     {
-      "category": "gdn",
+      "category": "hyperconnections",
       "name": "blocks.26.mixer_hc.norm_offset",
       "numel": 8192,
       "shape": [
@@ -63204,7 +63059,7 @@
       ]
     },
     {
-      "category": "gdn",
+      "category": "hyperconnections",
       "name": "blocks.26.moe_hc.norm_offset",
       "numel": 8192,
       "shape": [
@@ -65505,7 +65360,7 @@
       ]
     },
     {
-      "category": "gdn",
+      "category": "hyperconnections",
       "name": "blocks.27.mixer_hc.norm_offset",
       "numel": 8192,
       "shape": [
@@ -65540,7 +65395,7 @@
       ]
     },
     {
-      "category": "gdn",
+      "category": "hyperconnections",
       "name": "blocks.27.moe_hc.norm_offset",
       "numel": 8192,
       "shape": [
@@ -67832,7 +67687,7 @@
       ]
     },
     {
-      "category": "gdn",
+      "category": "hyperconnections",
       "name": "blocks.28.mixer_hc.norm_offset",
       "numel": 8192,
       "shape": [
@@ -67867,7 +67722,7 @@
       ]
     },
     {
-      "category": "gdn",
+      "category": "hyperconnections",
       "name": "blocks.28.moe_hc.norm_offset",
       "numel": 8192,
       "shape": [
@@ -70168,7 +70023,7 @@
       ]
     },
     {
-      "category": "gdn",
+      "category": "hyperconnections",
       "name": "blocks.29.mixer_hc.norm_offset",
       "numel": 8192,
       "shape": [
@@ -70203,7 +70058,7 @@
       ]
     },
     {
-      "category": "gdn",
+      "category": "hyperconnections",
       "name": "blocks.29.moe_hc.norm_offset",
       "numel": 8192,
       "shape": [
@@ -72504,7 +72359,7 @@
       ]
     },
     {
-      "category": "gdn",
+      "category": "hyperconnections",
       "name": "blocks.30.mixer_hc.norm_offset",
       "numel": 8192,
       "shape": [
@@ -72539,7 +72394,7 @@
       ]
     },
     {
-      "category": "gdn",
+      "category": "hyperconnections",
       "name": "blocks.30.moe_hc.norm_offset",
       "numel": 8192,
       "shape": [
@@ -74840,7 +74695,7 @@
       ]
     },
     {
-      "category": "gdn",
+      "category": "hyperconnections",
       "name": "blocks.31.mixer_hc.norm_offset",
       "numel": 8192,
       "shape": [
@@ -74875,7 +74730,7 @@
       ]
     },
     {
-      "category": "gdn",
+      "category": "hyperconnections",
       "name": "blocks.31.moe_hc.norm_offset",
       "numel": 8192,
       "shape": [
@@ -77176,7 +77031,7 @@
       ]
     },
     {
-      "category": "gdn",
+      "category": "hyperconnections",
       "name": "blocks.32.mixer_hc.norm_offset",
       "numel": 8192,
       "shape": [
@@ -77211,7 +77066,7 @@
       ]
     },
     {
-      "category": "gdn",
+      "category": "hyperconnections",
       "name": "blocks.32.moe_hc.norm_offset",
       "numel": 8192,
       "shape": [
@@ -79477,7 +79332,7 @@
       ]
     },
     {
-      "category": "gdn",
+      "category": "hyperconnections",
       "name": "blocks.33.mixer_hc.norm_offset",
       "numel": 8192,
       "shape": [
@@ -79512,7 +79367,7 @@
       ]
     },
     {
-      "category": "gdn",
+      "category": "hyperconnections",
       "name": "blocks.33.moe_hc.norm_offset",
       "numel": 8192,
       "shape": [
@@ -81813,7 +81668,7 @@
       ]
     },
     {
-      "category": "gdn",
+      "category": "hyperconnections",
       "name": "blocks.34.mixer_hc.norm_offset",
       "numel": 8192,
       "shape": [
@@ -81848,7 +81703,7 @@
       ]
     },
     {
-      "category": "gdn",
+      "category": "hyperconnections",
       "name": "blocks.34.moe_hc.norm_offset",
       "numel": 8192,
       "shape": [
@@ -84149,7 +84004,7 @@
       ]
     },
     {
-      "category": "gdn",
+      "category": "hyperconnections",
       "name": "blocks.35.mixer_hc.norm_offset",
       "numel": 8192,
       "shape": [
@@ -84184,7 +84039,7 @@
       ]
     },
     {
-      "category": "gdn",
+      "category": "hyperconnections",
       "name": "blocks.35.moe_hc.norm_offset",
       "numel": 8192,
       "shape": [
@@ -86485,7 +86340,7 @@
       ]
     },
     {
-      "category": "gdn",
+      "category": "hyperconnections",
       "name": "blocks.36.mixer_hc.norm_offset",
       "numel": 8192,
       "shape": [
@@ -86520,7 +86375,7 @@
       ]
     },
     {
-      "category": "gdn",
+      "category": "hyperconnections",
       "name": "blocks.36.moe_hc.norm_offset",
       "numel": 8192,
       "shape": [
@@ -88821,7 +88676,7 @@
       ]
     },
     {
-      "category": "gdn",
+      "category": "hyperconnections",
       "name": "blocks.37.mixer_hc.norm_offset",
       "numel": 8192,
       "shape": [
@@ -88856,7 +88711,7 @@
       ]
     },
     {
-      "category": "gdn",
+      "category": "hyperconnections",
       "name": "blocks.37.moe_hc.norm_offset",
       "numel": 8192,
       "shape": [
@@ -91148,7 +91003,7 @@
       ]
     },
     {
-      "category": "gdn",
+      "category": "hyperconnections",
       "name": "blocks.38.mixer_hc.norm_offset",
       "numel": 8192,
       "shape": [
@@ -91183,7 +91038,7 @@
       ]
     },
     {
-      "category": "gdn",
+      "category": "hyperconnections",
       "name": "blocks.38.moe_hc.norm_offset",
       "numel": 8192,
       "shape": [
@@ -93484,7 +93339,7 @@
       ]
     },
     {
-      "category": "gdn",
+      "category": "hyperconnections",
       "name": "blocks.39.mixer_hc.norm_offset",
       "numel": 8192,
       "shape": [
@@ -93519,7 +93374,7 @@
       ]
     },
     {
-      "category": "gdn",
+      "category": "hyperconnections",
       "name": "blocks.39.moe_hc.norm_offset",
       "numel": 8192,
       "shape": [
@@ -95820,7 +95675,7 @@
       ]
     },
     {
-      "category": "gdn",
+      "category": "hyperconnections",
       "name": "blocks.40.mixer_hc.norm_offset",
       "numel": 8192,
       "shape": [
@@ -95855,7 +95710,7 @@
       ]
     },
     {
-      "category": "gdn",
+      "category": "hyperconnections",
       "name": "blocks.40.moe_hc.norm_offset",
       "numel": 8192,
       "shape": [
@@ -98156,7 +98011,7 @@
       ]
     },
     {
-      "category": "gdn",
+      "category": "hyperconnections",
       "name": "blocks.41.mixer_hc.norm_offset",
       "numel": 8192,
       "shape": [
@@ -98191,7 +98046,7 @@
       ]
     },
     {
-      "category": "gdn",
+      "category": "hyperconnections",
       "name": "blocks.41.moe_hc.norm_offset",
       "numel": 8192,
       "shape": [
@@ -100492,7 +100347,7 @@
       ]
     },
     {
-      "category": "gdn",
+      "category": "hyperconnections",
       "name": "blocks.42.mixer_hc.norm_offset",
       "numel": 8192,
       "shape": [
@@ -100527,7 +100382,7 @@
       ]
     },
     {
-      "category": "gdn",
+      "category": "hyperconnections",
       "name": "blocks.42.moe_hc.norm_offset",
       "numel": 8192,
       "shape": [
@@ -102793,7 +102648,7 @@
       ]
     },
     {
-      "category": "gdn",
+      "category": "hyperconnections",
       "name": "blocks.43.mixer_hc.norm_offset",
       "numel": 8192,
       "shape": [
@@ -102828,7 +102683,7 @@
       ]
     },
     {
-      "category": "gdn",
+      "category": "hyperconnections",
       "name": "blocks.43.moe_hc.norm_offset",
       "numel": 8192,
       "shape": [
@@ -105129,7 +104984,7 @@
       ]
     },
     {
-      "category": "gdn",
+      "category": "hyperconnections",
       "name": "blocks.44.mixer_hc.norm_offset",
       "numel": 8192,
       "shape": [
@@ -105164,7 +105019,7 @@
       ]
     },
     {
-      "category": "gdn",
+      "category": "hyperconnections",
       "name": "blocks.44.moe_hc.norm_offset",
       "numel": 8192,
       "shape": [
@@ -107465,7 +107320,7 @@
       ]
     },
     {
-      "category": "gdn",
+      "category": "hyperconnections",
       "name": "blocks.45.mixer_hc.norm_offset",
       "numel": 8192,
       "shape": [
@@ -107500,7 +107355,7 @@
       ]
     },
     {
-      "category": "gdn",
+      "category": "hyperconnections",
       "name": "blocks.45.moe_hc.norm_offset",
       "numel": 8192,
       "shape": [
@@ -109801,7 +109656,7 @@
       ]
     },
     {
-      "category": "gdn",
+      "category": "hyperconnections",
       "name": "blocks.46.mixer_hc.norm_offset",
       "numel": 8192,
       "shape": [
@@ -109836,7 +109691,7 @@
       ]
     },
     {
-      "category": "gdn",
+      "category": "hyperconnections",
       "name": "blocks.46.moe_hc.norm_offset",
       "numel": 8192,
       "shape": [
@@ -112137,7 +111992,7 @@
       ]
     },
     {
-      "category": "gdn",
+      "category": "hyperconnections",
       "name": "blocks.47.mixer_hc.norm_offset",
       "numel": 8192,
       "shape": [
@@ -112172,7 +112027,7 @@
       ]
     },
     {
-      "category": "gdn",
+      "category": "hyperconnections",
       "name": "blocks.47.moe_hc.norm_offset",
       "numel": 8192,
       "shape": [
@@ -112207,7 +112062,7 @@
       ]
     },
     {
-      "category": "gdn",
+      "category": "hyperconnections",
       "name": "final_hc.norm_offset",
       "numel": 8192,
       "shape": [
@@ -114533,7 +114388,7 @@
       ]
     },
     {
-      "category": "mtp_gdn",
+      "category": "mtp_hyperconnections",
       "name": "mtp.block.mixer_hc.norm_offset",
       "numel": 8192,
       "shape": [
@@ -114568,7 +114423,7 @@
       ]
     },
     {
-      "category": "mtp_gdn",
+      "category": "mtp_hyperconnections",
       "name": "mtp.block.moe_hc.norm_offset",
       "numel": 8192,
       "shape": [
@@ -114603,7 +114458,7 @@
       ]
     },
     {
-      "category": "mtp_gdn",
+      "category": "mtp_hyperconnections",
       "name": "mtp.final_hc.norm_offset",
       "numel": 8192,
       "shape": [
@@ -114626,6 +114481,150 @@
       "shape": [
         8192,
         256
+      ]
+    },
+    {
+      "category": "ple_table",
+      "name": "ple.tables.0.weight",
+      "numel": 1073742976,
+      "shape": [
+        8388617,
+        128
+      ]
+    },
+    {
+      "category": "ple_table",
+      "name": "ple.tables.1.weight",
+      "numel": 1073743232,
+      "shape": [
+        8388619,
+        128
+      ]
+    },
+    {
+      "category": "ple_table",
+      "name": "ple.tables.2.weight",
+      "numel": 1073743744,
+      "shape": [
+        8388623,
+        128
+      ]
+    },
+    {
+      "category": "ple_table",
+      "name": "ple.tables.3.weight",
+      "numel": 1073745536,
+      "shape": [
+        8388637,
+        128
+      ]
+    },
+    {
+      "category": "ple_table",
+      "name": "ple.tables.4.weight",
+      "numel": 1073750144,
+      "shape": [
+        8388673,
+        128
+      ]
+    },
+    {
+      "category": "ple_table",
+      "name": "ple.tables.5.weight",
+      "numel": 1073751424,
+      "shape": [
+        8388683,
+        128
+      ]
+    },
+    {
+      "category": "ple_table",
+      "name": "ple.tables.6.weight",
+      "numel": 1073752448,
+      "shape": [
+        8388691,
+        128
+      ]
+    },
+    {
+      "category": "ple_table",
+      "name": "ple.tables.7.weight",
+      "numel": 1073753216,
+      "shape": [
+        8388697,
+        128
+      ]
+    },
+    {
+      "category": "ple_table",
+      "name": "ple.tables.8.weight",
+      "numel": 1073757824,
+      "shape": [
+        8388733,
+        128
+      ]
+    },
+    {
+      "category": "ple_table",
+      "name": "ple.tables.9.weight",
+      "numel": 1073758592,
+      "shape": [
+        8388739,
+        128
+      ]
+    },
+    {
+      "category": "ple_table",
+      "name": "ple.tables.10.weight",
+      "numel": 1073761408,
+      "shape": [
+        8388761,
+        128
+      ]
+    },
+    {
+      "category": "ple_table",
+      "name": "ple.tables.11.weight",
+      "numel": 1073761664,
+      "shape": [
+        8388763,
+        128
+      ]
+    },
+    {
+      "category": "ple_table",
+      "name": "ple.tables.12.weight",
+      "numel": 1073765248,
+      "shape": [
+        8388791,
+        128
+      ]
+    },
+    {
+      "category": "ple_table",
+      "name": "ple.tables.13.weight",
+      "numel": 1073767808,
+      "shape": [
+        8388811,
+        128
+      ]
+    },
+    {
+      "category": "ple_table",
+      "name": "ple.tables.14.weight",
+      "numel": 1073770624,
+      "shape": [
+        8388833,
+        128
+      ]
+    },
+    {
+      "category": "ple_table",
+      "name": "ple.tables.15.weight",
+      "numel": 1073771648,
+      "shape": [
+        8388841,
+        128
       ]
     }
   ]

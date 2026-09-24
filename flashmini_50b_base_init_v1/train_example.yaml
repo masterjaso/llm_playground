@@ -1,0 +1,84 @@
+# FlashMini-50B v4 donor training config template.
+# Every `null` is a donor decision; the runner and preflight refuse to start until
+# each one is set. Frozen contract values (main loss weight 1.0, MTP window base+3,
+# MTP coefficient 0.30 -> 0.10 at 70% of planned tokens) are not configurable.
+schema_version: 1
+run:
+  name: flashmini-50b-v4-run1
+  purpose: production
+  output_dir: /path/to/run1
+  seed: 500277
+  deterministic: false            # true forces deterministic kernels (slower)
+  stop_after_optimizer_steps: null  # optional; null trains to schedule.planned_total_tokens
+
+model:
+  config: configs/flashmini/flashmini_50b_base_init_v1.yaml
+  bundle: flashmini_50b_base_init_v1
+  init_checkpoint: /path/to/flashmini_50b_init_checkpoint
+  gdn_kernel: chunked
+  activation_checkpointing: true
+  compute_dtype: bfloat16
+
+tokenizer:
+  manifest: training_data/tokenizer/flashmini_50b_v4/tokenizer_manifest.json
+  fingerprint: ad7e623aca9d08891d9db1d270c7d6a8c612780890e01511255e0bbeb597e56e
+
+distributed:
+  strategy: fsdp2
+  nodes: null
+  gpus_per_node: null
+  ple_backing: shm                # shm: one host copy of the PLE tables per node
+  ple_shm_dir: /dev/shm/flashmini_ple
+
+schedule:
+  planned_total_tokens: null      # e.g. the 10B / 25B / 50B gate plan
+  lr:
+    kind: null                    # constant | cosine | linear | wsd
+    warmup_tokens: null
+    min_lr_ratio: null
+    decay_start_fraction: null    # required for wsd
+
+optimizer:
+  muon:
+    lr: null
+    weight_decay: null
+    ns_dtype: bfloat16
+  adamw:
+    lr: null
+    betas: null
+    eps: null
+    weight_decay:
+      embedding: null
+      control_matrix: null
+      no_decay: 0.0
+  ple:
+    lr: null
+    betas: null
+    eps: null
+  grad_clip: null
+
+loss:
+  router_aux_coefficient: null    # no default by design; record the chosen value
+  router_balance_mode: exact_prepass  # exact_prepass (exact logical batch) | ga_buffer (Qwen buffer)
+
+data:
+  teacher_mixture: null           # e.g. {real: 0.8, teacher_generated: 0.2}; must sum to 1
+  phases:                         # long-context curriculum; last until_tokens == planned_total_tokens
+    - name: short_context
+      manifest: /path/to/packed/short/packed_manifest.json
+      sequence_length: null
+      micro_batch_sequences: null
+      gradient_accumulation: null
+      until_tokens: null
+
+checkpoint:
+  dir: /path/to/run1/checkpoints
+  interval_optimizer_steps: null
+  keep_last: 3
+
+observability:
+  metrics_path: /path/to/run1/metrics.jsonl
+  log_expert_distribution: true
+
+watchdog:
+  step_timeout_seconds: null

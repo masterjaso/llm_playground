@@ -1,3 +1,9 @@
-torch>=2.7
-safetensors>=0.4
-pyyaml>=6.0
+# FlashMini-50B v4 exact tested environment (pip requirements format).
+# python==3.13.14
+# torch CUDA runtime: 13.0; initialization runs on CPU and does not depend on CUDA.
+# Muon is implemented in-repo (flashmini.v4_optim); no external Muon package.
+torch==2.13.0
+safetensors==0.8.0
+PyYAML==6.0.3
+tokenizers==0.22.2
+numpy==2.5.2

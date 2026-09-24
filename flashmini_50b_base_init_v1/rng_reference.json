@@ -1,0 +1,184 @@
+{
+  "environment": {
+    "external_muon_package": null,
+    "materialization_depends_on_cuda": false,
+    "materialization_device": "cpu",
+    "packages": {
+      "PyYAML": "6.0.3",
+      "numpy": "2.5.2",
+      "safetensors": "0.8.0",
+      "tokenizers": "0.22.2",
+      "torch": "2.13.0"
+    },
+    "python": "3.13.14",
+    "torch_cuda": "13.0"
+  },
+  "vectors": [
+    {
+      "chunk0_seed": 7738173321035805575,
+      "first_bf16_bits": [
+        16364,
+        16409,
+        16273,
+        48809,
+        16414,
+        16378,
+        16398,
+        16423,
+        16176,
+        16329,
+        49159,
+        16298,
+        16400,
+        16281,
+        16408,
+        16397
+      ],
+      "name": "blocks.0.mixer.A_log",
+      "rule": "gdn_A_log_log_uniform",
+      "shape": [
+        32
+      ]
+    },
+    {
+      "chunk0_seed": 7330954813865541188,
+      "first_bf16_bits": [
+        15389,
+        15552,
+        15518,
+        48386,
+        15628,
+        15399,
+        48288,
+        48383,
+        48117,
+        48285,
+        48137,
+        15599,
+        15542,
+        48168,
+        47888,
+        14851
+      ],
+      "name": "blocks.0.mixer.conv1d.weight",
+      "rule": "gdn_conv_normal",
+      "shape": [
+        8192,
+        1,
+        4
+      ]
+    },
+    {
+      "chunk0_seed": 1361677382704523796,
+      "first_bf16_bits": [
+        48231,
+        48117,
+        48050,
+        15592,
+        15322,
+        15633,
+        15443,
+        15063,
+        48348,
+        47957,
+        48361,
+        15625,
+        15527,
+        48373,
+        15362,
+        48398
+      ],
+      "name": "blocks.3.mixer.q_proj.weight",
+      "rule": "attention_projection_normal",
+      "shape": [
+        8192,
+        2048
+      ]
+    },
+    {
+      "chunk0_seed": 2714235725032153511,
+      "first_bf16_bits": [
+        48197,
+        15635,
+        15140,
+        48408,
+        15600,
+        48212,
+        48407,
+        48075,
+        15422,
+        15621,
+        47995,
+        15381,
+        15536,
+        15509,
+        15624,
+        15460
+      ],
+      "name": "blocks.0.moe.router.weight",
+      "rule": "router_normal",
+      "shape": [
+        80,
+        2048
+      ]
+    },
+    {
+      "chunk0_seed": 3460186300280252680,
+      "first_bf16_bits": [
+        15035,
+        15471,
+        47165,
+        47755,
+        48064,
+        48303,
+        15659,
+        48455,
+        15396,
+        15031,
+        47847,
+        15375,
+        15511,
+        15413,
+        15533,
+        15357
+      ],
+      "name": "ple.tables.0.weight",
+      "rule": "ple_table_normal",
+      "shape": [
+        8388617,
+        128
+      ]
+    },
+    {
+      "chunk0_seed": 5020366499514157989,
+      "first_bf16_bits": [
+        15529,
+        15521,
+        15533,
+        15547,
+        48216,
+        15523,
+        48215,
+        15282,
+        15663,
+        15357,
+        15538,
+        48159,
+        15286,
+        48335,
+        48357,
+        48139
+      ],
+      "name": "mtp.fusion.fc_hidden.weight",
+      "rule": "mtp_fusion_projection_normal",
+      "shape": [
+        2048,
+        2048
+      ]
+    },
+    {
+      "full_tensor_sha256": "09936072d628655e8c8a6af084dcacaca60c6356c847845d3891336699366b75",
+      "name": "blocks.0.mixer.A_log"
+    }
+  ]
+}

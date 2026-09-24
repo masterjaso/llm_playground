@@ -1,76 +1,222 @@
 {
-  "architecture_sha256": "d5b34f116c7557245605678a24495e3f83a8c047448fdb9b8faef456a0a5c7dd",
+  "architecture_sha256": "cb62c5d3f6234585bf689a4c28207c793654f9fb56c8b179026e6297289bd1f9",
   "architecture_version": 4,
   "checkpoint_id": "FlashMini-50B-Base-Init-v1",
-  "config_sha256": "22096230c998b53dca038ac0f680b792004aad146a3341df5ab482b8ab66b5cd",
-  "deterministic_algorithm": {
-    "chunk_elements": 1048576,
-    "generator": "torch.Generator(device=cpu).manual_seed(seed)",
-    "hash": "sha256",
-    "input": "flashmini-init-v1\u0000<global_seed_decimal>\u0000<tensor_name>\u0000<chunk_index_decimal>",
-    "seed_bytes": "first_16_bytes_little_endian_mod_2^63_minus_1",
-    "version": "flashmini-sha256-name-seed-v1"
-  },
+  "chunk_elements": 1048576,
+  "config_sha256": "05667f1e3ab4e5378bb655dca399244bd5f2907c70aa98bda6cf23eb83e29dcb",
   "dtype": "bfloat16",
+  "expected_shard_hashes": "shard_hashes.json",
+  "generator": "torch.Generator(device='cpu') per (name, chunk); float32 draw then round to bfloat16",
   "global_initialization_seed": 500277,
-  "materialization": "python -m flashmini.base_init_bundle materialize --bundle . --output <checkpoint-dir>",
+  "init_rules": [
+    {
+      "high": 16.0,
+      "kind": "log_uniform",
+      "low": 0.01,
+      "pattern": "^(mtp\\.)?blocks\\.\\d+\\.mixer\\.A_log$",
+      "rule": "gdn_A_log_log_uniform"
+    },
+    {
+      "kind": "ones",
+      "pattern": "^(mtp\\.)?blocks\\.\\d+\\.mixer\\.dt_bias$",
+      "rule": "gdn_dt_bias_ones"
+    },
+    {
+      "kind": "zeros",
+      "pattern": "^(mtp\\.)?blocks\\.\\d+\\.mixer\\.norm_offset$",
+      "rule": "gdn_gated_norm_offset_zero"
+    },
+    {
+      "kind": "normal",
+      "mean": 0.0,
+      "pattern": "^(mtp\\.)?blocks\\.\\d+\\.mixer\\.conv1d\\.weight$",
+      "rule": "gdn_conv_normal",
+      "std": 0.02
+    },
+    {
+      "kind": "normal",
+      "mean": 0.0,
+      "pattern": "^(mtp\\.)?blocks\\.\\d+\\.mixer\\.(in_proj_qkvz|in_proj_ba|out_proj)\\.weight$",
+      "rule": "gdn_projection_normal",
+      "std": 0.02
+    },
+    {
+      "kind": "normal",
+      "mean": 0.0,
+      "pattern": "^(mtp\\.block|blocks\\.\\d+)\\.mixer\\.(q_proj|k_proj|v_proj|o_proj)\\.weight$",
+      "rule": "attention_projection_normal",
+      "std": 0.02
+    },
+    {
+      "kind": "zeros",
+      "pattern": "^(mtp\\.block|blocks\\.\\d+)\\.mixer\\.(q_norm|k_norm)\\.offset$",
+      "rule": "attention_qk_norm_offset_zero"
+    },
+    {
+      "kind": "zeros",
+      "pattern": "^(mtp\\.block\\.|blocks\\.\\d+\\.|mtp\\.)?(mixer_hc|moe_hc|final_hc)\\.norm_offset$",
+      "rule": "hc_norm_offset_zero"
+    },
+    {
+      "kind": "normal",
+      "mean": 0.0,
+      "pattern": "^(mtp\\.block\\.|blocks\\.\\d+\\.|mtp\\.)?(mixer_hc|moe_hc|final_hc)\\.(read_down|read_up|write_gate)\\.weight$",
+      "rule": "hc_projection_normal",
+      "std": 0.02
+    },
+    {
+      "kind": "normal",
+      "mean": 0.0,
+      "pattern": "^(mtp\\.block|blocks\\.\\d+)\\.moe\\.router\\.weight$",
+      "rule": "router_normal",
+      "std": 0.02
+    },
+    {
+      "kind": "normal",
+      "mean": 0.0,
+      "pattern": "^(mtp\\.block|blocks\\.\\d+)\\.moe\\.shared_gate\\.weight$",
+      "rule": "shared_gate_normal",
+      "std": 0.02
+    },
+    {
+      "kind": "normal",
+      "mean": 0.0,
+      "pattern": "^(mtp\\.block|blocks\\.\\d+)\\.moe\\.experts\\.\\d+\\.(gate_proj|up_proj|down_proj)\\.weight$",
+      "rule": "routed_expert_normal",
+      "std": 0.02
+    },
+    {
+      "kind": "normal",
+      "mean": 0.0,
+      "pattern": "^(mtp\\.block|blocks\\.\\d+)\\.moe\\.shared_expert\\.(gate_proj|up_proj|down_proj)\\.weight$",
+      "rule": "shared_expert_normal",
+      "std": 0.02
+    },
+    {
+      "kind": "normal",
+      "mean": 0.0,
+      "pattern": "^ple\\.tables\\.\\d+\\.weight$",
+      "rule": "ple_table_normal",
+      "std": 0.02
+    },
+    {
+      "kind": "normal",
+      "mean": 0.0,
+      "pattern": "^ple\\.(key_proj|value_proj)\\.weight$",
+      "rule": "ple_dense_projection_normal",
+      "std": 0.02
+    },
+    {
+      "kind": "zeros",
+      "pattern": "^ple\\.(key_norm|query_norm|conv_norm)\\.offset$",
+      "rule": "ple_grouped_norm_offset_zero"
+    },
+    {
+      "kind": "zeros",
+      "pattern": "^ple\\.conv1d\\.weight$",
+      "rule": "ple_conv_exact_zero"
+    },
+    {
+      "kind": "zeros",
+      "pattern": "^mtp\\.fusion\\.(hidden_norm|embedding_norm)\\.offset$",
+      "rule": "mtp_fusion_norm_offset_zero"
+    },
+    {
+      "kind": "normal",
+      "mean": 0.0,
+      "pattern": "^mtp\\.fusion\\.(fc_hidden|fc_embedding)\\.weight$",
+      "rule": "mtp_fusion_projection_normal",
+      "std": 0.02
+    },
+    {
+      "kind": "normal",
+      "mean": 0.0,
+      "pattern": "^embed_tokens\\.weight$",
+      "rule": "input_embedding_normal",
+      "std": 0.02
+    },
+    {
+      "kind": "normal",
+      "mean": 0.0,
+      "pattern": "^lm_head\\.weight$",
+      "rule": "lm_head_normal",
+      "std": 0.02
+    }
+  ],
+  "materialization": "python -m flashmini.base_init_bundle materialize --bundle flashmini_50b_base_init_v1 --output <checkpoint-dir>",
   "model_id": "FlashMini-50B-Base",
   "optimizer_contract": {
     "adamw": {
-      "parameters": "embeddings, lm_head, routers, shared gates, HC controls, attention/GDN controls, norms, scalars, biases"
+      "parameters": "embeddings, lm_head, routers, shared gates, HC controls, GDN beta/decay controls, norms, scalars, short convolutions",
+      "weight_decay_classes": [
+        "embedding",
+        "control_matrix",
+        "no_decay"
+      ]
     },
     "batch_size_warmup": false,
+    "hyperparameters": "donor training configuration (explicit; startup fails if unset)",
     "muon": {
       "epsilon": 1e-14,
       "iterations": 8,
-      "logical_operator_rule": "never orthogonalize a physical fusion across gate/up/down or attention Q/K/V operators",
+      "logical_operator_rule": "physical_fusion_allowed_but_no_cross_operator_orthogonalization",
       "momentum": 0.95,
       "nesterov": true,
-      "update_scale": "0.2 * sqrt(max(A, B))"
+      "parameters": "genuine 2-D learned transformations, one Newton-Schulz orthogonalization per logical slice",
+      "update_scale": "0.2 * sqrt(max(rows, columns)) of the logical slice"
     },
     "ple": {
       "optimizer": "Adam",
-      "storage": "host/distributed off-accelerator",
+      "storage": "host BF16 master tables; fp32 moments on owner ranks",
+      "update": "row-sparse, per-row step count",
       "weight_decay": 0
     }
   },
-  "ordinary_initializer": "normal_mean_0_std_0.02_fp32_then_cast",
   "parameter_counts": {
     "base": 50276673408,
     "base_active_per_token": 4894079872,
     "mtp": 685511168,
     "total": 50962184576
   },
-  "schema_version": 1,
+  "schema_version": 2,
+  "seed_algorithm": "flashmini-sha256-name-seed-v1",
   "shard_mapping": "model.safetensors.index.json",
-  "source_git_sha": "e507c1783f25769ebe047f5b664a7e53ef63f960",
-  "special_initializers": {
-    "gdn": {
-      "A_log": "log_uniform_fp32_0.01_to_16_shape_32",
-      "dt_bias": "ones_32"
-    },
-    "hc": {
-      "norm_offset": "zeros",
-      "projections": "normal_0.02"
-    },
-    "moe": {
-      "experts": "normal_0.02",
-      "router": "normal_0.02",
-      "shared_gate": "normal_0.02"
-    },
-    "mtp": "mirror_corresponding_backbone_rules_plus_fusion_rules",
-    "ple": {
-      "convolution": "exact_zero",
-      "dense_projections": "normal_0.02",
-      "table": "normal_0.02"
-    }
+  "source_git_sha": "6b07972b2d0f0d82cd1e256b2ed076ba9b02caf2",
+  "source_provenance": {
+    "bundle_directory": "flashmini_50b_base_init_v1",
+    "rule": "HEAD must equal source_commit outside flashmini_50b_base_init_v1/ and reproduce source_tree_sha256",
+    "source_commit": "6b07972b2d0f0d82cd1e256b2ed076ba9b02caf2",
+    "source_tree_algorithm": "sha256(git ls-tree -r --full-tree <commit>, excluding flashmini_50b_base_init_v1/)",
+    "source_tree_sha256": "078bde3c71449536deb42ddb224bf897ed9625a89f5dd4129d5fad56dc316cc4"
   },
   "tensor_manifest": "tensor_manifest.json",
   "tokenizer": {
     "family": "custom_byte_level_bpe",
+    "fingerprint": "ad7e623aca9d08891d9db1d270c7d6a8c612780890e01511255e0bbeb597e56e",
+    "fingerprint_algorithm": "sha256_canonical_tokenizer_json_v1",
     "freeze_before_optimizer_step": true,
-    "identity_status": "pending_donor_tokenizer_artifact",
-    "special_token_ids": {},
+    "identity_status": "frozen",
+    "manifest": "training_data/tokenizer/flashmini_50b_v4/tokenizer_manifest.json",
+    "special_token_ids": {
+      "bos": 2,
+      "eos": 0,
+      "file_sep": 10,
+      "fim_middle": 6,
+      "fim_pad": 8,
+      "fim_prefix": 5,
+      "fim_suffix": 7,
+      "im_end": 4,
+      "im_start": 3,
+      "pad": 1,
+      "repo_name": 9,
+      "think_end": 12,
+      "think_start": 11,
+      "tool_call_end": 14,
+      "tool_call_start": 13,
+      "tool_response_end": 16,
+      "tool_response_start": 15
+    },
+    "special_token_slots": 256,
     "vocab_size": 131072
   }
 }

@@ -1,0 +1,1 @@
+torchrun --nnodes $NNODES --nproc-per-node $GPUS_PER_NODE --node-rank $NODE_RANK --rdzv-backend c10d --rdzv-endpoint $MASTER_ADDR:29500 -m flashmini.v4_train --config /path/to/train.yaml

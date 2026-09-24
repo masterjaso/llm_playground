@@ -1,14 +1,28 @@
 {
   "planned_bytes": 101924369152,
-  "schema_version": 1,
+  "schema_version": 2,
   "shard_count": 32,
   "shards": [
     {
       "bytes": 4291229824,
+      "contains_mtp": false,
+      "init_rules": [
+        "attention_projection_normal",
+        "attention_qk_norm_offset_zero",
+        "gdn_A_log_log_uniform",
+        "gdn_conv_normal",
+        "gdn_dt_bias_ones",
+        "gdn_gated_norm_offset_zero",
+        "gdn_projection_normal",
+        "hc_norm_offset_zero",
+        "hc_projection_normal",
+        "routed_expert_normal",
+        "router_normal",
+        "shared_expert_normal",
+        "shared_gate_normal"
+      ],
       "kind": "dense_or_expert",
-      "sha256": null,
       "shard": "model-00001.safetensors",
-      "status": "planned_not_materialized",
       "tensors": [
         "blocks.0.mixer.A_log",
         "blocks.0.mixer.conv1d.weight",
@@ -833,10 +847,22 @@
     },
     {
       "bytes": 4291146880,
+      "contains_mtp": false,
+      "init_rules": [
+        "gdn_A_log_log_uniform",
+        "gdn_conv_normal",
+        "gdn_dt_bias_ones",
+        "gdn_gated_norm_offset_zero",
+        "gdn_projection_normal",
+        "hc_norm_offset_zero",
+        "hc_projection_normal",
+        "routed_expert_normal",
+        "router_normal",
+        "shared_expert_normal",
+        "shared_gate_normal"
+      ],
       "kind": "dense_or_expert",
-      "sha256": null,
       "shard": "model-00002.safetensors",
-      "status": "planned_not_materialized",
       "tensors": [
         "blocks.11.moe.experts.17.up_proj.weight",
         "blocks.11.moe.experts.18.down_proj.weight",
@@ -1663,10 +1689,24 @@
     },
     {
       "bytes": 4289770752,
+      "contains_mtp": false,
+      "init_rules": [
+        "attention_projection_normal",
+        "attention_qk_norm_offset_zero",
+        "gdn_A_log_log_uniform",
+        "gdn_conv_normal",
+        "gdn_dt_bias_ones",
+        "gdn_gated_norm_offset_zero",
+        "gdn_projection_normal",
+        "hc_norm_offset_zero",
+        "hc_projection_normal",
+        "routed_expert_normal",
+        "router_normal",
+        "shared_expert_normal",
+        "shared_gate_normal"
+      ],
       "kind": "dense_or_expert",
-      "sha256": null,
       "shard": "model-00003.safetensors",
-      "status": "planned_not_materialized",
       "tensors": [
         "blocks.14.moe.experts.3.gate_proj.weight",
         "blocks.14.moe.experts.3.up_proj.weight",
@@ -2492,10 +2532,24 @@
     },
     {
       "bytes": 4293965568,
+      "contains_mtp": false,
+      "init_rules": [
+        "attention_projection_normal",
+        "attention_qk_norm_offset_zero",
+        "gdn_A_log_log_uniform",
+        "gdn_conv_normal",
+        "gdn_dt_bias_ones",
+        "gdn_gated_norm_offset_zero",
+        "gdn_projection_normal",
+        "hc_norm_offset_zero",
+        "hc_projection_normal",
+        "routed_expert_normal",
+        "router_normal",
+        "shared_expert_normal",
+        "shared_gate_normal"
+      ],
       "kind": "dense_or_expert",
-      "sha256": null,
       "shard": "model-00004.safetensors",
-      "status": "planned_not_materialized",
       "tensors": [
         "blocks.17.moe.experts.43.down_proj.weight",
         "blocks.17.moe.experts.43.gate_proj.weight",
@@ -3324,10 +3378,22 @@
     },
     {
       "bytes": 4291146880,
+      "contains_mtp": false,
+      "init_rules": [
+        "gdn_A_log_log_uniform",
+        "gdn_conv_normal",
+        "gdn_dt_bias_ones",
+        "gdn_gated_norm_offset_zero",
+        "gdn_projection_normal",
+        "hc_norm_offset_zero",
+        "hc_projection_normal",
+        "routed_expert_normal",
+        "router_normal",
+        "shared_expert_normal",
+        "shared_gate_normal"
+      ],
       "kind": "dense_or_expert",
-      "sha256": null,
       "shard": "model-00005.safetensors",
-      "status": "planned_not_materialized",
       "tensors": [
         "blocks.2.moe.experts.56.up_proj.weight",
         "blocks.2.moe.experts.57.down_proj.weight",
@@ -4154,10 +4220,24 @@
     },
     {
       "bytes": 4294313216,
+      "contains_mtp": false,
+      "init_rules": [
+        "attention_projection_normal",
+        "attention_qk_norm_offset_zero",
+        "gdn_A_log_log_uniform",
+        "gdn_conv_normal",
+        "gdn_dt_bias_ones",
+        "gdn_gated_norm_offset_zero",
+        "gdn_projection_normal",
+        "hc_norm_offset_zero",
+        "hc_projection_normal",
+        "routed_expert_normal",
+        "router_normal",
+        "shared_expert_normal",
+        "shared_gate_normal"
+      ],
       "kind": "dense_or_expert",
-      "sha256": null,
       "shard": "model-00006.safetensors",
-      "status": "planned_not_materialized",
       "tensors": [
         "blocks.22.moe.experts.69.gate_proj.weight",
         "blocks.22.moe.experts.69.up_proj.weight",
@@ -4987,10 +5067,24 @@
     },
     {
       "bytes": 4290246784,
+      "contains_mtp": false,
+      "init_rules": [
+        "attention_projection_normal",
+        "attention_qk_norm_offset_zero",
+        "gdn_A_log_log_uniform",
+        "gdn_conv_normal",
+        "gdn_dt_bias_ones",
+        "gdn_gated_norm_offset_zero",
+        "gdn_projection_normal",
+        "hc_norm_offset_zero",
+        "hc_projection_normal",
+        "routed_expert_normal",
+        "router_normal",
+        "shared_expert_normal",
+        "shared_gate_normal"
+      ],
       "kind": "dense_or_expert",
-      "sha256": null,
       "shard": "model-00007.safetensors",
-      "status": "planned_not_materialized",
       "tensors": [
         "blocks.25.moe_hc.read_up.weight",
         "blocks.25.moe_hc.write_gate.weight",
@@ -5816,10 +5910,24 @@
     },
     {
       "bytes": 4293965568,
+      "contains_mtp": false,
+      "init_rules": [
+        "attention_projection_normal",
+        "attention_qk_norm_offset_zero",
+        "gdn_A_log_log_uniform",
+        "gdn_conv_normal",
+        "gdn_dt_bias_ones",
+        "gdn_gated_norm_offset_zero",
+        "gdn_projection_normal",
+        "hc_norm_offset_zero",
+        "hc_projection_normal",
+        "routed_expert_normal",
+        "router_normal",
+        "shared_expert_normal",
+        "shared_gate_normal"
+      ],
       "kind": "dense_or_expert",
-      "sha256": null,
       "shard": "model-00008.safetensors",
-      "status": "planned_not_materialized",
       "tensors": [
         "blocks.29.moe.experts.17.gate_proj.weight",
         "blocks.29.moe.experts.17.up_proj.weight",
@@ -6648,10 +6756,24 @@
     },
     {
       "bytes": 4289770752,
+      "contains_mtp": false,
+      "init_rules": [
+        "attention_projection_normal",
+        "attention_qk_norm_offset_zero",
+        "gdn_A_log_log_uniform",
+        "gdn_conv_normal",
+        "gdn_dt_bias_ones",
+        "gdn_gated_norm_offset_zero",
+        "gdn_projection_normal",
+        "hc_norm_offset_zero",
+        "hc_projection_normal",
+        "routed_expert_normal",
+        "router_normal",
+        "shared_expert_normal",
+        "shared_gate_normal"
+      ],
       "kind": "dense_or_expert",
-      "sha256": null,
       "shard": "model-00009.safetensors",
-      "status": "planned_not_materialized",
       "tensors": [
         "blocks.31.moe.experts.30.down_proj.weight",
         "blocks.31.moe.experts.30.gate_proj.weight",
@@ -7477,10 +7599,22 @@
     },
     {
       "bytes": 4291146880,
+      "contains_mtp": false,
+      "init_rules": [
+        "gdn_A_log_log_uniform",
+        "gdn_conv_normal",
+        "gdn_dt_bias_ones",
+        "gdn_gated_norm_offset_zero",
+        "gdn_projection_normal",
+        "hc_norm_offset_zero",
+        "hc_projection_normal",
+        "routed_expert_normal",
+        "router_normal",
+        "shared_expert_normal",
+        "shared_gate_normal"
+      ],
       "kind": "dense_or_expert",
-      "sha256": null,
       "shard": "model-00010.safetensors",
-      "status": "planned_not_materialized",
       "tensors": [
         "blocks.34.moe.experts.43.up_proj.weight",
         "blocks.34.moe.experts.44.down_proj.weight",
@@ -8307,10 +8441,24 @@
     },
     {
       "bytes": 4293965568,
+      "contains_mtp": false,
+      "init_rules": [
+        "attention_projection_normal",
+        "attention_qk_norm_offset_zero",
+        "gdn_A_log_log_uniform",
+        "gdn_conv_normal",
+        "gdn_dt_bias_ones",
+        "gdn_gated_norm_offset_zero",
+        "gdn_projection_normal",
+        "hc_norm_offset_zero",
+        "hc_projection_normal",
+        "routed_expert_normal",
+        "router_normal",
+        "shared_expert_normal",
+        "shared_gate_normal"
+      ],
       "kind": "dense_or_expert",
-      "sha256": null,
       "shard": "model-00011.safetensors",
-      "status": "planned_not_materialized",
       "tensors": [
         "blocks.37.moe.experts.56.gate_proj.weight",
         "blocks.37.moe.experts.56.up_proj.weight",
@@ -9139,10 +9287,22 @@
     },
     {
       "bytes": 4291474560,
+      "contains_mtp": false,
+      "init_rules": [
+        "gdn_A_log_log_uniform",
+        "gdn_conv_normal",
+        "gdn_dt_bias_ones",
+        "gdn_gated_norm_offset_zero",
+        "gdn_projection_normal",
+        "hc_norm_offset_zero",
+        "hc_projection_normal",
+        "routed_expert_normal",
+        "router_normal",
+        "shared_expert_normal",
+        "shared_gate_normal"
+      ],
       "kind": "dense_or_expert",
-      "sha256": null,
       "shard": "model-00012.safetensors",
-      "status": "planned_not_materialized",
       "tensors": [
         "blocks.4.moe.experts.7.down_proj.weight",
         "blocks.4.moe.experts.7.gate_proj.weight",
@@ -9970,10 +10130,24 @@
     },
     {
       "bytes": 4290266752,
+      "contains_mtp": false,
+      "init_rules": [
+        "attention_projection_normal",
+        "attention_qk_norm_offset_zero",
+        "gdn_A_log_log_uniform",
+        "gdn_conv_normal",
+        "gdn_dt_bias_ones",
+        "gdn_gated_norm_offset_zero",
+        "gdn_projection_normal",
+        "hc_norm_offset_zero",
+        "hc_projection_normal",
+        "routed_expert_normal",
+        "router_normal",
+        "shared_expert_normal",
+        "shared_gate_normal"
+      ],
       "kind": "dense_or_expert",
-      "sha256": null,
       "shard": "model-00013.safetensors",
-      "status": "planned_not_materialized",
       "tensors": [
         "blocks.42.moe.shared_expert.up_proj.weight",
         "blocks.42.moe.shared_gate.weight",
@@ -10799,10 +10973,22 @@
     },
     {
       "bytes": 4291146880,
+      "contains_mtp": false,
+      "init_rules": [
+        "gdn_A_log_log_uniform",
+        "gdn_conv_normal",
+        "gdn_dt_bias_ones",
+        "gdn_gated_norm_offset_zero",
+        "gdn_projection_normal",
+        "hc_norm_offset_zero",
+        "hc_projection_normal",
+        "routed_expert_normal",
+        "router_normal",
+        "shared_expert_normal",
+        "shared_gate_normal"
+      ],
       "kind": "dense_or_expert",
-      "sha256": null,
       "shard": "model-00014.safetensors",
-      "status": "planned_not_materialized",
       "tensors": [
         "blocks.46.moe.experts.17.down_proj.weight",
         "blocks.46.moe.experts.17.gate_proj.weight",
@@ -11629,10 +11815,24 @@
     },
     {
       "bytes": 4289770752,
+      "contains_mtp": false,
+      "init_rules": [
+        "attention_projection_normal",
+        "attention_qk_norm_offset_zero",
+        "gdn_A_log_log_uniform",
+        "gdn_conv_normal",
+        "gdn_dt_bias_ones",
+        "gdn_gated_norm_offset_zero",
+        "gdn_projection_normal",
+        "hc_norm_offset_zero",
+        "hc_projection_normal",
+        "routed_expert_normal",
+        "router_normal",
+        "shared_expert_normal",
+        "shared_gate_normal"
+      ],
       "kind": "dense_or_expert",
-      "sha256": null,
       "shard": "model-00015.safetensors",
-      "status": "planned_not_materialized",
       "tensors": [
         "blocks.6.moe.experts.29.up_proj.weight",
         "blocks.6.moe.experts.3.down_proj.weight",
@@ -12457,11 +12657,219 @@
       ]
     },
     {
-      "bytes": 3182457856,
-      "kind": "dense_or_expert",
-      "sha256": null,
+      "bytes": 2147485952,
+      "contains_mtp": false,
+      "init_rules": [
+        "ple_table_normal"
+      ],
+      "kind": "ple_hash_head",
       "shard": "model-00016.safetensors",
-      "status": "planned_not_materialized",
+      "tensors": [
+        "ple.tables.0.weight"
+      ]
+    },
+    {
+      "bytes": 2147486464,
+      "contains_mtp": false,
+      "init_rules": [
+        "ple_table_normal"
+      ],
+      "kind": "ple_hash_head",
+      "shard": "model-00017.safetensors",
+      "tensors": [
+        "ple.tables.1.weight"
+      ]
+    },
+    {
+      "bytes": 2147522816,
+      "contains_mtp": false,
+      "init_rules": [
+        "ple_table_normal"
+      ],
+      "kind": "ple_hash_head",
+      "shard": "model-00018.safetensors",
+      "tensors": [
+        "ple.tables.10.weight"
+      ]
+    },
+    {
+      "bytes": 2147523328,
+      "contains_mtp": false,
+      "init_rules": [
+        "ple_table_normal"
+      ],
+      "kind": "ple_hash_head",
+      "shard": "model-00019.safetensors",
+      "tensors": [
+        "ple.tables.11.weight"
+      ]
+    },
+    {
+      "bytes": 2147530496,
+      "contains_mtp": false,
+      "init_rules": [
+        "ple_table_normal"
+      ],
+      "kind": "ple_hash_head",
+      "shard": "model-00020.safetensors",
+      "tensors": [
+        "ple.tables.12.weight"
+      ]
+    },
+    {
+      "bytes": 2147535616,
+      "contains_mtp": false,
+      "init_rules": [
+        "ple_table_normal"
+      ],
+      "kind": "ple_hash_head",
+      "shard": "model-00021.safetensors",
+      "tensors": [
+        "ple.tables.13.weight"
+      ]
+    },
+    {
+      "bytes": 2147541248,
+      "contains_mtp": false,
+      "init_rules": [
+        "ple_table_normal"
+      ],
+      "kind": "ple_hash_head",
+      "shard": "model-00022.safetensors",
+      "tensors": [
+        "ple.tables.14.weight"
+      ]
+    },
+    {
+      "bytes": 2147543296,
+      "contains_mtp": false,
+      "init_rules": [
+        "ple_table_normal"
+      ],
+      "kind": "ple_hash_head",
+      "shard": "model-00023.safetensors",
+      "tensors": [
+        "ple.tables.15.weight"
+      ]
+    },
+    {
+      "bytes": 2147487488,
+      "contains_mtp": false,
+      "init_rules": [
+        "ple_table_normal"
+      ],
+      "kind": "ple_hash_head",
+      "shard": "model-00024.safetensors",
+      "tensors": [
+        "ple.tables.2.weight"
+      ]
+    },
+    {
+      "bytes": 2147491072,
+      "contains_mtp": false,
+      "init_rules": [
+        "ple_table_normal"
+      ],
+      "kind": "ple_hash_head",
+      "shard": "model-00025.safetensors",
+      "tensors": [
+        "ple.tables.3.weight"
+      ]
+    },
+    {
+      "bytes": 2147500288,
+      "contains_mtp": false,
+      "init_rules": [
+        "ple_table_normal"
+      ],
+      "kind": "ple_hash_head",
+      "shard": "model-00026.safetensors",
+      "tensors": [
+        "ple.tables.4.weight"
+      ]
+    },
+    {
+      "bytes": 2147502848,
+      "contains_mtp": false,
+      "init_rules": [
+        "ple_table_normal"
+      ],
+      "kind": "ple_hash_head",
+      "shard": "model-00027.safetensors",
+      "tensors": [
+        "ple.tables.5.weight"
+      ]
+    },
+    {
+      "bytes": 2147504896,
+      "contains_mtp": false,
+      "init_rules": [
+        "ple_table_normal"
+      ],
+      "kind": "ple_hash_head",
+      "shard": "model-00028.safetensors",
+      "tensors": [
+        "ple.tables.6.weight"
+      ]
+    },
+    {
+      "bytes": 2147506432,
+      "contains_mtp": false,
+      "init_rules": [
+        "ple_table_normal"
+      ],
+      "kind": "ple_hash_head",
+      "shard": "model-00029.safetensors",
+      "tensors": [
+        "ple.tables.7.weight"
+      ]
+    },
+    {
+      "bytes": 2147515648,
+      "contains_mtp": false,
+      "init_rules": [
+        "ple_table_normal"
+      ],
+      "kind": "ple_hash_head",
+      "shard": "model-00030.safetensors",
+      "tensors": [
+        "ple.tables.8.weight"
+      ]
+    },
+    {
+      "bytes": 2147517184,
+      "contains_mtp": false,
+      "init_rules": [
+        "ple_table_normal"
+      ],
+      "kind": "ple_hash_head",
+      "shard": "model-00031.safetensors",
+      "tensors": [
+        "ple.tables.9.weight"
+      ]
+    },
+    {
+      "bytes": 3190846464,
+      "contains_mtp": true,
+      "init_rules": [
+        "attention_projection_normal",
+        "attention_qk_norm_offset_zero",
+        "hc_norm_offset_zero",
+        "hc_projection_normal",
+        "input_embedding_normal",
+        "lm_head_normal",
+        "mtp_fusion_norm_offset_zero",
+        "mtp_fusion_projection_normal",
+        "ple_conv_exact_zero",
+        "ple_dense_projection_normal",
+        "ple_grouped_norm_offset_zero",
+        "routed_expert_normal",
+        "router_normal",
+        "shared_expert_normal",
+        "shared_gate_normal"
+      ],
+      "kind": "dense_or_expert",
+      "shard": "model-00032.safetensors",
       "tensors": [
         "blocks.9.moe.experts.42.gate_proj.weight",
         "blocks.9.moe.experts.42.up_proj.weight",
@@ -12875,167 +13283,7 @@
         "ple.conv_norm.offset",
         "ple.key_norm.offset",
         "ple.key_proj.weight",
-        "ple.query_norm.offset"
-      ]
-    },
-    {
-      "bytes": 2147485952,
-      "kind": "dense_or_expert",
-      "sha256": null,
-      "shard": "model-00017.safetensors",
-      "status": "planned_not_materialized",
-      "tensors": [
-        "ple.tables.0.weight"
-      ]
-    },
-    {
-      "bytes": 2147486464,
-      "kind": "dense_or_expert",
-      "sha256": null,
-      "shard": "model-00018.safetensors",
-      "status": "planned_not_materialized",
-      "tensors": [
-        "ple.tables.1.weight"
-      ]
-    },
-    {
-      "bytes": 2147522816,
-      "kind": "dense_or_expert",
-      "sha256": null,
-      "shard": "model-00019.safetensors",
-      "status": "planned_not_materialized",
-      "tensors": [
-        "ple.tables.10.weight"
-      ]
-    },
-    {
-      "bytes": 2147523328,
-      "kind": "dense_or_expert",
-      "sha256": null,
-      "shard": "model-00020.safetensors",
-      "status": "planned_not_materialized",
-      "tensors": [
-        "ple.tables.11.weight"
-      ]
-    },
-    {
-      "bytes": 2147530496,
-      "kind": "dense_or_expert",
-      "sha256": null,
-      "shard": "model-00021.safetensors",
-      "status": "planned_not_materialized",
-      "tensors": [
-        "ple.tables.12.weight"
-      ]
-    },
-    {
-      "bytes": 2147535616,
-      "kind": "dense_or_expert",
-      "sha256": null,
-      "shard": "model-00022.safetensors",
-      "status": "planned_not_materialized",
-      "tensors": [
-        "ple.tables.13.weight"
-      ]
-    },
-    {
-      "bytes": 2147541248,
-      "kind": "dense_or_expert",
-      "sha256": null,
-      "shard": "model-00023.safetensors",
-      "status": "planned_not_materialized",
-      "tensors": [
-        "ple.tables.14.weight"
-      ]
-    },
-    {
-      "bytes": 2147543296,
-      "kind": "dense_or_expert",
-      "sha256": null,
-      "shard": "model-00024.safetensors",
-      "status": "planned_not_materialized",
-      "tensors": [
-        "ple.tables.15.weight"
-      ]
-    },
-    {
-      "bytes": 2147487488,
-      "kind": "dense_or_expert",
-      "sha256": null,
-      "shard": "model-00025.safetensors",
-      "status": "planned_not_materialized",
-      "tensors": [
-        "ple.tables.2.weight"
-      ]
-    },
-    {
-      "bytes": 2147491072,
-      "kind": "dense_or_expert",
-      "sha256": null,
-      "shard": "model-00026.safetensors",
-      "status": "planned_not_materialized",
-      "tensors": [
-        "ple.tables.3.weight"
-      ]
-    },
-    {
-      "bytes": 2147500288,
-      "kind": "dense_or_expert",
-      "sha256": null,
-      "shard": "model-00027.safetensors",
-      "status": "planned_not_materialized",
-      "tensors": [
-        "ple.tables.4.weight"
-      ]
-    },
-    {
-      "bytes": 2147502848,
-      "kind": "dense_or_expert",
-      "sha256": null,
-      "shard": "model-00028.safetensors",
-      "status": "planned_not_materialized",
-      "tensors": [
-        "ple.tables.5.weight"
-      ]
-    },
-    {
-      "bytes": 2147504896,
-      "kind": "dense_or_expert",
-      "sha256": null,
-      "shard": "model-00029.safetensors",
-      "status": "planned_not_materialized",
-      "tensors": [
-        "ple.tables.6.weight"
-      ]
-    },
-    {
-      "bytes": 2147506432,
-      "kind": "dense_or_expert",
-      "sha256": null,
-      "shard": "model-00030.safetensors",
-      "status": "planned_not_materialized",
-      "tensors": [
-        "ple.tables.7.weight"
-      ]
-    },
-    {
-      "bytes": 2147515648,
-      "kind": "dense_or_expert",
-      "sha256": null,
-      "shard": "model-00031.safetensors",
-      "status": "planned_not_materialized",
-      "tensors": [
-        "ple.tables.8.weight"
-      ]
-    },
-    {
-      "bytes": 2155905792,
-      "kind": "dense_or_expert",
-      "sha256": null,
-      "shard": "model-00032.safetensors",
-      "status": "planned_not_materialized",
-      "tensors": [
-        "ple.tables.9.weight",
+        "ple.query_norm.offset",
         "ple.value_proj.weight"
       ]
     }

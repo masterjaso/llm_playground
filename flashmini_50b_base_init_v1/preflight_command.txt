@@ -1,0 +1,1 @@
+python -m flashmini.v4_preflight --bundle flashmini_50b_base_init_v1 --checkpoint /path/to/flashmini_50b_init_checkpoint --train-config /path/to/train.yaml
