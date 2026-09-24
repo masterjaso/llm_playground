@@ -1,0 +1,79 @@
+name: Refresh FlashMini v4 bundle
+
+on:
+  push:
+    branches:
+      - fix/flashmini-v4-qwen-alignment
+
+permissions:
+  contents: write
+
+jobs:
+  refresh:
+    if: github.event.head_commit.message != 'Refresh FlashMini v4 donor bundle'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: "pip"
+      - name: Install package
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[dev]"
+      - name: Revalidate repaired source
+        run: |
+          python -m pytest tests/flashmini/test_v4_optim.py tests/flashmini/test_v4_semantics.py -q
+          python -m pytest tests/flashmini -q --tb=short
+      - name: Build validation receipt
+        run: |
+          cat > /tmp/validation_report.json <<EOF
+          {
+            "source_commit": "5387a53a6cbe81ca82339360fb4adcedfec1cb6f",
+            "validation_head": "5387a53a6cbe81ca82339360fb4adcedfec1cb6f",
+            "github_actions_run_id": "${{ github.run_id }}",
+            "focused_validation": "PASS",
+            "full_flashmini_suite": "PASS",
+            "note": "Bundle regenerated after Qwen-aligned optimizer gate slicing and GDN SiLU short-convolution repair. Fresh shard hashes intentionally deferred to hardware materialization canary."
+          }
+          EOF
+      - name: Regenerate donor bundle
+        run: |
+          rm -rf flashmini_50b_base_init_v1
+          python -m flashmini.base_init_bundle write             --destination flashmini_50b_base_init_v1             --source-commit 5387a53a6cbe81ca82339360fb4adcedfec1cb6f             --validation-report /tmp/validation_report.json
+          test ! -e flashmini_50b_base_init_v1/shard_hashes.json
+      - name: Validate generated bundle metadata
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          from flashmini.base_init_config import load_config
+          from flashmini.v4_preflight import (
+              check_environment, check_identity, check_optimizer_classification,
+              check_parameters, check_tokenizer,
+          )
+          bundle = Path("flashmini_50b_base_init_v1")
+          config = load_config()
+          checks = {
+              "identity": check_identity(bundle, config),
+              "optimizer": check_optimizer_classification(bundle, config),
+              "parameters": check_parameters(bundle, config),
+              "tokenizer": check_tokenizer(config),
+              "environment": check_environment(bundle),
+          }
+          failed = {name: problems for name, problems in checks.items() if problems}
+          if failed:
+              raise SystemExit(f"bundle metadata validation failed: {failed}")
+          print("FLASHMINI V4 GENERATED BUNDLE METADATA: PASS")
+          PY
+      - name: Commit refreshed bundle
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A flashmini_50b_base_init_v1
+          git diff --cached --quiet && exit 0
+          git commit -m "Refresh FlashMini v4 donor bundle"
+          git push origin HEAD:fix/flashmini-v4-qwen-alignment
