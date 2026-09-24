@@ -1,9 +1,9 @@
 {
-  "architecture_sha256": "cb62c5d3f6234585bf689a4c28207c793654f9fb56c8b179026e6297289bd1f9",
+  "architecture_sha256": "93db9ff8ae480999afaa98e6893f9be0978e87683bab8c52eb0228c9313aba70",
   "architecture_version": 4,
   "base_tensor_count": 12482,
   "checkpoint_id": "FlashMini-50B-Base-Init-v1",
-  "config_sha256": "05667f1e3ab4e5378bb655dca399244bd5f2907c70aa98bda6cf23eb83e29dcb",
+  "config_sha256": "ad29879d043e09d78b96b42c1d2a6e63df81e01978755b59d80c91a9b8a712b1",
   "model_id": "FlashMini-50B-Base",
   "mtp_tensor_count": 266,
   "parameter_counts": {
@@ -390,7 +390,7 @@
     },
     {
       "category": "gdn",
-      "decay_class": "muon_matrix",
+      "decay_class": "mixed",
       "dtype": "bfloat16",
       "init_law": {
         "dtype": "bfloat16",
@@ -444,8 +444,8 @@
           "block": 768,
           "blocks": 16,
           "columns": 2048,
-          "decay_class": "muon_matrix",
-          "family": "Muon",
+          "decay_class": "control_matrix",
+          "family": "AdamW",
           "logical_operator": "gdn_output_gate_z",
           "offset": 512,
           "rows": 4096,
@@ -454,7 +454,7 @@
       ],
       "name": "blocks.0.mixer.in_proj_qkvz.weight",
       "numel": 25165824,
-      "optimizer": "Muon",
+      "optimizer": "mixed",
       "shape": [
         12288,
         2048
@@ -10562,7 +10562,7 @@
     },
     {
       "category": "gdn",
-      "decay_class": "muon_matrix",
+      "decay_class": "mixed",
       "dtype": "bfloat16",
       "init_law": {
         "dtype": "bfloat16",
@@ -10616,8 +10616,8 @@
           "block": 768,
           "blocks": 16,
           "columns": 2048,
-          "decay_class": "muon_matrix",
-          "family": "Muon",
+          "decay_class": "control_matrix",
+          "family": "AdamW",
           "logical_operator": "gdn_output_gate_z",
           "offset": 512,
           "rows": 4096,
@@ -10626,7 +10626,7 @@
       ],
       "name": "blocks.1.mixer.in_proj_qkvz.weight",
       "numel": 25165824,
-      "optimizer": "Muon",
+      "optimizer": "mixed",
       "shape": [
         12288,
         2048
@@ -20734,7 +20734,7 @@
     },
     {
       "category": "gdn",
-      "decay_class": "muon_matrix",
+      "decay_class": "mixed",
       "dtype": "bfloat16",
       "init_law": {
         "dtype": "bfloat16",
@@ -20788,8 +20788,8 @@
           "block": 768,
           "blocks": 16,
           "columns": 2048,
-          "decay_class": "muon_matrix",
-          "family": "Muon",
+          "decay_class": "control_matrix",
+          "family": "AdamW",
           "logical_operator": "gdn_output_gate_z",
           "offset": 512,
           "rows": 4096,
@@ -20798,7 +20798,7 @@
       ],
       "name": "blocks.2.mixer.in_proj_qkvz.weight",
       "numel": 25165824,
-      "optimizer": "Muon",
+      "optimizer": "mixed",
       "shape": [
         12288,
         2048
@@ -30796,7 +30796,7 @@
     },
     {
       "category": "attention",
-      "decay_class": "muon_matrix",
+      "decay_class": "mixed",
       "dtype": "bfloat16",
       "init_law": {
         "dtype": "bfloat16",
@@ -30828,8 +30828,8 @@
           "block": 512,
           "blocks": 16,
           "columns": 2048,
-          "decay_class": "muon_matrix",
-          "family": "Muon",
+          "decay_class": "control_matrix",
+          "family": "AdamW",
           "logical_operator": "attention_output_gate",
           "offset": 256,
           "rows": 4096,
@@ -30838,7 +30838,7 @@
       ],
       "name": "blocks.3.mixer.q_proj.weight",
       "numel": 16777216,
-      "optimizer": "Muon",
+      "optimizer": "mixed",
       "shape": [
         8192,
         2048
@@ -41006,7 +41006,7 @@
     },
     {
       "category": "gdn",
-      "decay_class": "muon_matrix",
+      "decay_class": "mixed",
       "dtype": "bfloat16",
       "init_law": {
         "dtype": "bfloat16",
@@ -41060,8 +41060,8 @@
           "block": 768,
           "blocks": 16,
           "columns": 2048,
-          "decay_class": "muon_matrix",
-          "family": "Muon",
+          "decay_class": "control_matrix",
+          "family": "AdamW",
           "logical_operator": "gdn_output_gate_z",
           "offset": 512,
           "rows": 4096,
@@ -41070,7 +41070,7 @@
       ],
       "name": "blocks.4.mixer.in_proj_qkvz.weight",
       "numel": 25165824,
-      "optimizer": "Muon",
+      "optimizer": "mixed",
       "shape": [
         12288,
         2048
@@ -51178,7 +51178,7 @@
     },
     {
       "category": "gdn",
-      "decay_class": "muon_matrix",
+      "decay_class": "mixed",
       "dtype": "bfloat16",
       "init_law": {
         "dtype": "bfloat16",
@@ -51232,8 +51232,8 @@
           "block": 768,
           "blocks": 16,
           "columns": 2048,
-          "decay_class": "muon_matrix",
-          "family": "Muon",
+          "decay_class": "control_matrix",
+          "family": "AdamW",
           "logical_operator": "gdn_output_gate_z",
           "offset": 512,
           "rows": 4096,
@@ -51242,7 +51242,7 @@
       ],
       "name": "blocks.5.mixer.in_proj_qkvz.weight",
       "numel": 25165824,
-      "optimizer": "Muon",
+      "optimizer": "mixed",
       "shape": [
         12288,
         2048
@@ -61350,7 +61350,7 @@
     },
     {
       "category": "gdn",
-      "decay_class": "muon_matrix",
+      "decay_class": "mixed",
       "dtype": "bfloat16",
       "init_law": {
         "dtype": "bfloat16",
@@ -61404,8 +61404,8 @@
           "block": 768,
           "blocks": 16,
           "columns": 2048,
-          "decay_class": "muon_matrix",
-          "family": "Muon",
+          "decay_class": "control_matrix",
+          "family": "AdamW",
           "logical_operator": "gdn_output_gate_z",
           "offset": 512,
           "rows": 4096,
@@ -61414,7 +61414,7 @@
       ],
       "name": "blocks.6.mixer.in_proj_qkvz.weight",
       "numel": 25165824,
-      "optimizer": "Muon",
+      "optimizer": "mixed",
       "shape": [
         12288,
         2048
@@ -71412,7 +71412,7 @@
     },
     {
       "category": "attention",
-      "decay_class": "muon_matrix",
+      "decay_class": "mixed",
       "dtype": "bfloat16",
       "init_law": {
         "dtype": "bfloat16",
@@ -71444,8 +71444,8 @@
           "block": 512,
           "blocks": 16,
           "columns": 2048,
-          "decay_class": "muon_matrix",
-          "family": "Muon",
+          "decay_class": "control_matrix",
+          "family": "AdamW",
           "logical_operator": "attention_output_gate",
           "offset": 256,
           "rows": 4096,
@@ -71454,7 +71454,7 @@
       ],
       "name": "blocks.7.mixer.q_proj.weight",
       "numel": 16777216,
-      "optimizer": "Muon",
+      "optimizer": "mixed",
       "shape": [
         8192,
         2048
@@ -81508,7 +81508,7 @@
     },
     {
       "category": "gdn",
-      "decay_class": "muon_matrix",
+      "decay_class": "mixed",
       "dtype": "bfloat16",
       "init_law": {
         "dtype": "bfloat16",
@@ -81562,8 +81562,8 @@
           "block": 768,
           "blocks": 16,
           "columns": 2048,
-          "decay_class": "muon_matrix",
-          "family": "Muon",
+          "decay_class": "control_matrix",
+          "family": "AdamW",
           "logical_operator": "gdn_output_gate_z",
           "offset": 512,
           "rows": 4096,
@@ -81572,7 +81572,7 @@
       ],
       "name": "blocks.8.mixer.in_proj_qkvz.weight",
       "numel": 25165824,
-      "optimizer": "Muon",
+      "optimizer": "mixed",
       "shape": [
         12288,
         2048
@@ -91680,7 +91680,7 @@
     },
     {
       "category": "gdn",
-      "decay_class": "muon_matrix",
+      "decay_class": "mixed",
       "dtype": "bfloat16",
       "init_law": {
         "dtype": "bfloat16",
@@ -91734,8 +91734,8 @@
           "block": 768,
           "blocks": 16,
           "columns": 2048,
-          "decay_class": "muon_matrix",
-          "family": "Muon",
+          "decay_class": "control_matrix",
+          "family": "AdamW",
           "logical_operator": "gdn_output_gate_z",
           "offset": 512,
           "rows": 4096,
@@ -91744,7 +91744,7 @@
       ],
       "name": "blocks.9.mixer.in_proj_qkvz.weight",
       "numel": 25165824,
-      "optimizer": "Muon",
+      "optimizer": "mixed",
       "shape": [
         12288,
         2048
@@ -101852,7 +101852,7 @@
     },
     {
       "category": "gdn",
-      "decay_class": "muon_matrix",
+      "decay_class": "mixed",
       "dtype": "bfloat16",
       "init_law": {
         "dtype": "bfloat16",
@@ -101906,8 +101906,8 @@
           "block": 768,
           "blocks": 16,
           "columns": 2048,
-          "decay_class": "muon_matrix",
-          "family": "Muon",
+          "decay_class": "control_matrix",
+          "family": "AdamW",
           "logical_operator": "gdn_output_gate_z",
           "offset": 512,
           "rows": 4096,
@@ -101916,7 +101916,7 @@
       ],
       "name": "blocks.10.mixer.in_proj_qkvz.weight",
       "numel": 25165824,
-      "optimizer": "Muon",
+      "optimizer": "mixed",
       "shape": [
         12288,
         2048
@@ -111914,7 +111914,7 @@
     },
     {
       "category": "attention",
-      "decay_class": "muon_matrix",
+      "decay_class": "mixed",
       "dtype": "bfloat16",
       "init_law": {
         "dtype": "bfloat16",
@@ -111946,8 +111946,8 @@
           "block": 512,
           "blocks": 16,
           "columns": 2048,
-          "decay_class": "muon_matrix",
-          "family": "Muon",
+          "decay_class": "control_matrix",
+          "family": "AdamW",
           "logical_operator": "attention_output_gate",
           "offset": 256,
           "rows": 4096,
@@ -111956,7 +111956,7 @@
       ],
       "name": "blocks.11.mixer.q_proj.weight",
       "numel": 16777216,
-      "optimizer": "Muon",
+      "optimizer": "mixed",
       "shape": [
         8192,
         2048
@@ -122124,7 +122124,7 @@
     },
     {
       "category": "gdn",
-      "decay_class": "muon_matrix",
+      "decay_class": "mixed",
       "dtype": "bfloat16",
       "init_law": {
         "dtype": "bfloat16",
@@ -122178,8 +122178,8 @@
           "block": 768,
           "blocks": 16,
           "columns": 2048,
-          "decay_class": "muon_matrix",
-          "family": "Muon",
+          "decay_class": "control_matrix",
+          "family": "AdamW",
           "logical_operator": "gdn_output_gate_z",
           "offset": 512,
           "rows": 4096,
@@ -122188,7 +122188,7 @@
       ],
       "name": "blocks.12.mixer.in_proj_qkvz.weight",
       "numel": 25165824,
-      "optimizer": "Muon",
+      "optimizer": "mixed",
       "shape": [
         12288,
         2048
@@ -132296,7 +132296,7 @@
     },
     {
       "category": "gdn",
-      "decay_class": "muon_matrix",
+      "decay_class": "mixed",
       "dtype": "bfloat16",
       "init_law": {
         "dtype": "bfloat16",
@@ -132350,8 +132350,8 @@
           "block": 768,
           "blocks": 16,
           "columns": 2048,
-          "decay_class": "muon_matrix",
-          "family": "Muon",
+          "decay_class": "control_matrix",
+          "family": "AdamW",
           "logical_operator": "gdn_output_gate_z",
           "offset": 512,
           "rows": 4096,
@@ -132360,7 +132360,7 @@
       ],
       "name": "blocks.13.mixer.in_proj_qkvz.weight",
       "numel": 25165824,
-      "optimizer": "Muon",
+      "optimizer": "mixed",
       "shape": [
         12288,
         2048
@@ -142468,7 +142468,7 @@
     },
     {
       "category": "gdn",
-      "decay_class": "muon_matrix",
+      "decay_class": "mixed",
       "dtype": "bfloat16",
       "init_law": {
         "dtype": "bfloat16",
@@ -142522,8 +142522,8 @@
           "block": 768,
           "blocks": 16,
           "columns": 2048,
-          "decay_class": "muon_matrix",
-          "family": "Muon",
+          "decay_class": "control_matrix",
+          "family": "AdamW",
           "logical_operator": "gdn_output_gate_z",
           "offset": 512,
           "rows": 4096,
@@ -142532,7 +142532,7 @@
       ],
       "name": "blocks.14.mixer.in_proj_qkvz.weight",
       "numel": 25165824,
-      "optimizer": "Muon",
+      "optimizer": "mixed",
       "shape": [
         12288,
         2048
@@ -152530,7 +152530,7 @@
     },
     {
       "category": "attention",
-      "decay_class": "muon_matrix",
+      "decay_class": "mixed",
       "dtype": "bfloat16",
       "init_law": {
         "dtype": "bfloat16",
@@ -152562,8 +152562,8 @@
           "block": 512,
           "blocks": 16,
           "columns": 2048,
-          "decay_class": "muon_matrix",
-          "family": "Muon",
+          "decay_class": "control_matrix",
+          "family": "AdamW",
           "logical_operator": "attention_output_gate",
           "offset": 256,
           "rows": 4096,
@@ -152572,7 +152572,7 @@
       ],
       "name": "blocks.15.mixer.q_proj.weight",
       "numel": 16777216,
-      "optimizer": "Muon",
+      "optimizer": "mixed",
       "shape": [
         8192,
         2048
@@ -162626,7 +162626,7 @@
     },
     {
       "category": "gdn",
-      "decay_class": "muon_matrix",
+      "decay_class": "mixed",
       "dtype": "bfloat16",
       "init_law": {
         "dtype": "bfloat16",
@@ -162680,8 +162680,8 @@
           "block": 768,
           "blocks": 16,
           "columns": 2048,
-          "decay_class": "muon_matrix",
-          "family": "Muon",
+          "decay_class": "control_matrix",
+          "family": "AdamW",
           "logical_operator": "gdn_output_gate_z",
           "offset": 512,
           "rows": 4096,
@@ -162690,7 +162690,7 @@
       ],
       "name": "blocks.16.mixer.in_proj_qkvz.weight",
       "numel": 25165824,
-      "optimizer": "Muon",
+      "optimizer": "mixed",
       "shape": [
         12288,
         2048
@@ -172798,7 +172798,7 @@
     },
     {
       "category": "gdn",
-      "decay_class": "muon_matrix",
+      "decay_class": "mixed",
       "dtype": "bfloat16",
       "init_law": {
         "dtype": "bfloat16",
@@ -172852,8 +172852,8 @@
           "block": 768,
           "blocks": 16,
           "columns": 2048,
-          "decay_class": "muon_matrix",
-          "family": "Muon",
+          "decay_class": "control_matrix",
+          "family": "AdamW",
           "logical_operator": "gdn_output_gate_z",
           "offset": 512,
           "rows": 4096,
@@ -172862,7 +172862,7 @@
       ],
       "name": "blocks.17.mixer.in_proj_qkvz.weight",
       "numel": 25165824,
-      "optimizer": "Muon",
+      "optimizer": "mixed",
       "shape": [
         12288,
         2048
@@ -182970,7 +182970,7 @@
     },
     {
       "category": "gdn",
-      "decay_class": "muon_matrix",
+      "decay_class": "mixed",
       "dtype": "bfloat16",
       "init_law": {
         "dtype": "bfloat16",
@@ -183024,8 +183024,8 @@
           "block": 768,
           "blocks": 16,
           "columns": 2048,
-          "decay_class": "muon_matrix",
-          "family": "Muon",
+          "decay_class": "control_matrix",
+          "family": "AdamW",
           "logical_operator": "gdn_output_gate_z",
           "offset": 512,
           "rows": 4096,
@@ -183034,7 +183034,7 @@
       ],
       "name": "blocks.18.mixer.in_proj_qkvz.weight",
       "numel": 25165824,
-      "optimizer": "Muon",
+      "optimizer": "mixed",
       "shape": [
         12288,
         2048
@@ -193032,7 +193032,7 @@
     },
     {
       "category": "attention",
-      "decay_class": "muon_matrix",
+      "decay_class": "mixed",
       "dtype": "bfloat16",
       "init_law": {
         "dtype": "bfloat16",
@@ -193064,8 +193064,8 @@
           "block": 512,
           "blocks": 16,
           "columns": 2048,
-          "decay_class": "muon_matrix",
-          "family": "Muon",
+          "decay_class": "control_matrix",
+          "family": "AdamW",
           "logical_operator": "attention_output_gate",
           "offset": 256,
           "rows": 4096,
@@ -193074,7 +193074,7 @@
       ],
       "name": "blocks.19.mixer.q_proj.weight",
       "numel": 16777216,
-      "optimizer": "Muon",
+      "optimizer": "mixed",
       "shape": [
         8192,
         2048
@@ -203242,7 +203242,7 @@
     },
     {
       "category": "gdn",
-      "decay_class": "muon_matrix",
+      "decay_class": "mixed",
       "dtype": "bfloat16",
       "init_law": {
         "dtype": "bfloat16",
@@ -203296,8 +203296,8 @@
           "block": 768,
           "blocks": 16,
           "columns": 2048,
-          "decay_class": "muon_matrix",
-          "family": "Muon",
+          "decay_class": "control_matrix",
+          "family": "AdamW",
           "logical_operator": "gdn_output_gate_z",
           "offset": 512,
           "rows": 4096,
@@ -203306,7 +203306,7 @@
       ],
       "name": "blocks.20.mixer.in_proj_qkvz.weight",
       "numel": 25165824,
-      "optimizer": "Muon",
+      "optimizer": "mixed",
       "shape": [
         12288,
         2048
@@ -213414,7 +213414,7 @@
     },
     {
       "category": "gdn",
-      "decay_class": "muon_matrix",
+      "decay_class": "mixed",
       "dtype": "bfloat16",
       "init_law": {
         "dtype": "bfloat16",
@@ -213468,8 +213468,8 @@
           "block": 768,
           "blocks": 16,
           "columns": 2048,
-          "decay_class": "muon_matrix",
-          "family": "Muon",
+          "decay_class": "control_matrix",
+          "family": "AdamW",
           "logical_operator": "gdn_output_gate_z",
           "offset": 512,
           "rows": 4096,
@@ -213478,7 +213478,7 @@
       ],
       "name": "blocks.21.mixer.in_proj_qkvz.weight",
       "numel": 25165824,
-      "optimizer": "Muon",
+      "optimizer": "mixed",
       "shape": [
         12288,
         2048
@@ -223586,7 +223586,7 @@
     },
     {
       "category": "gdn",
-      "decay_class": "muon_matrix",
+      "decay_class": "mixed",
       "dtype": "bfloat16",
       "init_law": {
         "dtype": "bfloat16",
@@ -223640,8 +223640,8 @@
           "block": 768,
           "blocks": 16,
           "columns": 2048,
-          "decay_class": "muon_matrix",
-          "family": "Muon",
+          "decay_class": "control_matrix",
+          "family": "AdamW",
           "logical_operator": "gdn_output_gate_z",
           "offset": 512,
           "rows": 4096,
@@ -223650,7 +223650,7 @@
       ],
       "name": "blocks.22.mixer.in_proj_qkvz.weight",
       "numel": 25165824,
-      "optimizer": "Muon",
+      "optimizer": "mixed",
       "shape": [
         12288,
         2048
@@ -233648,7 +233648,7 @@
     },
     {
       "category": "attention",
-      "decay_class": "muon_matrix",
+      "decay_class": "mixed",
       "dtype": "bfloat16",
       "init_law": {
         "dtype": "bfloat16",
@@ -233680,8 +233680,8 @@
           "block": 512,
           "blocks": 16,
           "columns": 2048,
-          "decay_class": "muon_matrix",
-          "family": "Muon",
+          "decay_class": "control_matrix",
+          "family": "AdamW",
           "logical_operator": "attention_output_gate",
           "offset": 256,
           "rows": 4096,
@@ -233690,7 +233690,7 @@
       ],
       "name": "blocks.23.mixer.q_proj.weight",
       "numel": 16777216,
-      "optimizer": "Muon",
+      "optimizer": "mixed",
       "shape": [
         8192,
         2048
@@ -243744,7 +243744,7 @@
     },
     {
       "category": "gdn",
-      "decay_class": "muon_matrix",
+      "decay_class": "mixed",
       "dtype": "bfloat16",
       "init_law": {
         "dtype": "bfloat16",
@@ -243798,8 +243798,8 @@
           "block": 768,
           "blocks": 16,
           "columns": 2048,
-          "decay_class": "muon_matrix",
-          "family": "Muon",
+          "decay_class": "control_matrix",
+          "family": "AdamW",
           "logical_operator": "gdn_output_gate_z",
           "offset": 512,
           "rows": 4096,
@@ -243808,7 +243808,7 @@
       ],
       "name": "blocks.24.mixer.in_proj_qkvz.weight",
       "numel": 25165824,
-      "optimizer": "Muon",
+      "optimizer": "mixed",
       "shape": [
         12288,
         2048
@@ -253916,7 +253916,7 @@
     },
     {
       "category": "gdn",
-      "decay_class": "muon_matrix",
+      "decay_class": "mixed",
       "dtype": "bfloat16",
       "init_law": {
         "dtype": "bfloat16",
@@ -253970,8 +253970,8 @@
           "block": 768,
           "blocks": 16,
           "columns": 2048,
-          "decay_class": "muon_matrix",
-          "family": "Muon",
+          "decay_class": "control_matrix",
+          "family": "AdamW",
           "logical_operator": "gdn_output_gate_z",
           "offset": 512,
           "rows": 4096,
@@ -253980,7 +253980,7 @@
       ],
       "name": "blocks.25.mixer.in_proj_qkvz.weight",
       "numel": 25165824,
-      "optimizer": "Muon",
+      "optimizer": "mixed",
       "shape": [
         12288,
         2048
@@ -264088,7 +264088,7 @@
     },
     {
       "category": "gdn",
-      "decay_class": "muon_matrix",
+      "decay_class": "mixed",
       "dtype": "bfloat16",
       "init_law": {
         "dtype": "bfloat16",
@@ -264142,8 +264142,8 @@
           "block": 768,
           "blocks": 16,
           "columns": 2048,
-          "decay_class": "muon_matrix",
-          "family": "Muon",
+          "decay_class": "control_matrix",
+          "family": "AdamW",
           "logical_operator": "gdn_output_gate_z",
           "offset": 512,
           "rows": 4096,
@@ -264152,7 +264152,7 @@
       ],
       "name": "blocks.26.mixer.in_proj_qkvz.weight",
       "numel": 25165824,
-      "optimizer": "Muon",
+      "optimizer": "mixed",
       "shape": [
         12288,
         2048
@@ -274260,7 +274260,7 @@
     },
     {
       "category": "gdn",
-      "decay_class": "muon_matrix",
+      "decay_class": "mixed",
       "dtype": "bfloat16",
       "init_law": {
         "dtype": "bfloat16",
@@ -274314,8 +274314,8 @@
           "block": 768,
           "blocks": 16,
           "columns": 2048,
-          "decay_class": "muon_matrix",
-          "family": "Muon",
+          "decay_class": "control_matrix",
+          "family": "AdamW",
           "logical_operator": "gdn_output_gate_z",
           "offset": 512,
           "rows": 4096,
@@ -274324,7 +274324,7 @@
       ],
       "name": "blocks.27.mixer.in_proj_qkvz.weight",
       "numel": 25165824,
-      "optimizer": "Muon",
+      "optimizer": "mixed",
       "shape": [
         12288,
         2048
@@ -284322,7 +284322,7 @@
     },
     {
       "category": "attention",
-      "decay_class": "muon_matrix",
+      "decay_class": "mixed",
       "dtype": "bfloat16",
       "init_law": {
         "dtype": "bfloat16",
@@ -284354,8 +284354,8 @@
           "block": 512,
           "blocks": 16,
           "columns": 2048,
-          "decay_class": "muon_matrix",
-          "family": "Muon",
+          "decay_class": "control_matrix",
+          "family": "AdamW",
           "logical_operator": "attention_output_gate",
           "offset": 256,
           "rows": 4096,
@@ -284364,7 +284364,7 @@
       ],
       "name": "blocks.28.mixer.q_proj.weight",
       "numel": 16777216,
-      "optimizer": "Muon",
+      "optimizer": "mixed",
       "shape": [
         8192,
         2048
@@ -294532,7 +294532,7 @@
     },
     {
       "category": "gdn",
-      "decay_class": "muon_matrix",
+      "decay_class": "mixed",
       "dtype": "bfloat16",
       "init_law": {
         "dtype": "bfloat16",
@@ -294586,8 +294586,8 @@
           "block": 768,
           "blocks": 16,
           "columns": 2048,
-          "decay_class": "muon_matrix",
-          "family": "Muon",
+          "decay_class": "control_matrix",
+          "family": "AdamW",
           "logical_operator": "gdn_output_gate_z",
           "offset": 512,
           "rows": 4096,
@@ -294596,7 +294596,7 @@
       ],
       "name": "blocks.29.mixer.in_proj_qkvz.weight",
       "numel": 25165824,
-      "optimizer": "Muon",
+      "optimizer": "mixed",
       "shape": [
         12288,
         2048
@@ -304704,7 +304704,7 @@
     },
     {
       "category": "gdn",
-      "decay_class": "muon_matrix",
+      "decay_class": "mixed",
       "dtype": "bfloat16",
       "init_law": {
         "dtype": "bfloat16",
@@ -304758,8 +304758,8 @@
           "block": 768,
           "blocks": 16,
           "columns": 2048,
-          "decay_class": "muon_matrix",
-          "family": "Muon",
+          "decay_class": "control_matrix",
+          "family": "AdamW",
           "logical_operator": "gdn_output_gate_z",
           "offset": 512,
           "rows": 4096,
@@ -304768,7 +304768,7 @@
       ],
       "name": "blocks.30.mixer.in_proj_qkvz.weight",
       "numel": 25165824,
-      "optimizer": "Muon",
+      "optimizer": "mixed",
       "shape": [
         12288,
         2048
@@ -314876,7 +314876,7 @@
     },
     {
       "category": "gdn",
-      "decay_class": "muon_matrix",
+      "decay_class": "mixed",
       "dtype": "bfloat16",
       "init_law": {
         "dtype": "bfloat16",
@@ -314930,8 +314930,8 @@
           "block": 768,
           "blocks": 16,
           "columns": 2048,
-          "decay_class": "muon_matrix",
-          "family": "Muon",
+          "decay_class": "control_matrix",
+          "family": "AdamW",
           "logical_operator": "gdn_output_gate_z",
           "offset": 512,
           "rows": 4096,
@@ -314940,7 +314940,7 @@
       ],
       "name": "blocks.31.mixer.in_proj_qkvz.weight",
       "numel": 25165824,
-      "optimizer": "Muon",
+      "optimizer": "mixed",
       "shape": [
         12288,
         2048
@@ -325048,7 +325048,7 @@
     },
     {
       "category": "gdn",
-      "decay_class": "muon_matrix",
+      "decay_class": "mixed",
       "dtype": "bfloat16",
       "init_law": {
         "dtype": "bfloat16",
@@ -325102,8 +325102,8 @@
           "block": 768,
           "blocks": 16,
           "columns": 2048,
-          "decay_class": "muon_matrix",
-          "family": "Muon",
+          "decay_class": "control_matrix",
+          "family": "AdamW",
           "logical_operator": "gdn_output_gate_z",
           "offset": 512,
           "rows": 4096,
@@ -325112,7 +325112,7 @@
       ],
       "name": "blocks.32.mixer.in_proj_qkvz.weight",
       "numel": 25165824,
-      "optimizer": "Muon",
+      "optimizer": "mixed",
       "shape": [
         12288,
         2048
@@ -335110,7 +335110,7 @@
     },
     {
       "category": "attention",
-      "decay_class": "muon_matrix",
+      "decay_class": "mixed",
       "dtype": "bfloat16",
       "init_law": {
         "dtype": "bfloat16",
@@ -335142,8 +335142,8 @@
           "block": 512,
           "blocks": 16,
           "columns": 2048,
-          "decay_class": "muon_matrix",
-          "family": "Muon",
+          "decay_class": "control_matrix",
+          "family": "AdamW",
           "logical_operator": "attention_output_gate",
           "offset": 256,
           "rows": 4096,
@@ -335152,7 +335152,7 @@
       ],
       "name": "blocks.33.mixer.q_proj.weight",
       "numel": 16777216,
-      "optimizer": "Muon",
+      "optimizer": "mixed",
       "shape": [
         8192,
         2048
@@ -345206,7 +345206,7 @@
     },
     {
       "category": "gdn",
-      "decay_class": "muon_matrix",
+      "decay_class": "mixed",
       "dtype": "bfloat16",
       "init_law": {
         "dtype": "bfloat16",
@@ -345260,8 +345260,8 @@
           "block": 768,
           "blocks": 16,
           "columns": 2048,
-          "decay_class": "muon_matrix",
-          "family": "Muon",
+          "decay_class": "control_matrix",
+          "family": "AdamW",
           "logical_operator": "gdn_output_gate_z",
           "offset": 512,
           "rows": 4096,
@@ -345270,7 +345270,7 @@
       ],
       "name": "blocks.34.mixer.in_proj_qkvz.weight",
       "numel": 25165824,
-      "optimizer": "Muon",
+      "optimizer": "mixed",
       "shape": [
         12288,
         2048
@@ -355378,7 +355378,7 @@
     },
     {
       "category": "gdn",
-      "decay_class": "muon_matrix",
+      "decay_class": "mixed",
       "dtype": "bfloat16",
       "init_law": {
         "dtype": "bfloat16",
@@ -355432,8 +355432,8 @@
           "block": 768,
           "blocks": 16,
           "columns": 2048,
-          "decay_class": "muon_matrix",
-          "family": "Muon",
+          "decay_class": "control_matrix",
+          "family": "AdamW",
           "logical_operator": "gdn_output_gate_z",
           "offset": 512,
           "rows": 4096,
@@ -355442,7 +355442,7 @@
       ],
       "name": "blocks.35.mixer.in_proj_qkvz.weight",
       "numel": 25165824,
-      "optimizer": "Muon",
+      "optimizer": "mixed",
       "shape": [
         12288,
         2048
@@ -365550,7 +365550,7 @@
     },
     {
       "category": "gdn",
-      "decay_class": "muon_matrix",
+      "decay_class": "mixed",
       "dtype": "bfloat16",
       "init_law": {
         "dtype": "bfloat16",
@@ -365604,8 +365604,8 @@
           "block": 768,
           "blocks": 16,
           "columns": 2048,
-          "decay_class": "muon_matrix",
-          "family": "Muon",
+          "decay_class": "control_matrix",
+          "family": "AdamW",
           "logical_operator": "gdn_output_gate_z",
           "offset": 512,
           "rows": 4096,
@@ -365614,7 +365614,7 @@
       ],
       "name": "blocks.36.mixer.in_proj_qkvz.weight",
       "numel": 25165824,
-      "optimizer": "Muon",
+      "optimizer": "mixed",
       "shape": [
         12288,
         2048
@@ -375722,7 +375722,7 @@
     },
     {
       "category": "gdn",
-      "decay_class": "muon_matrix",
+      "decay_class": "mixed",
       "dtype": "bfloat16",
       "init_law": {
         "dtype": "bfloat16",
@@ -375776,8 +375776,8 @@
           "block": 768,
           "blocks": 16,
           "columns": 2048,
-          "decay_class": "muon_matrix",
-          "family": "Muon",
+          "decay_class": "control_matrix",
+          "family": "AdamW",
           "logical_operator": "gdn_output_gate_z",
           "offset": 512,
           "rows": 4096,
@@ -375786,7 +375786,7 @@
       ],
       "name": "blocks.37.mixer.in_proj_qkvz.weight",
       "numel": 25165824,
-      "optimizer": "Muon",
+      "optimizer": "mixed",
       "shape": [
         12288,
         2048
@@ -385784,7 +385784,7 @@
     },
     {
       "category": "attention",
-      "decay_class": "muon_matrix",
+      "decay_class": "mixed",
       "dtype": "bfloat16",
       "init_law": {
         "dtype": "bfloat16",
@@ -385816,8 +385816,8 @@
           "block": 512,
           "blocks": 16,
           "columns": 2048,
-          "decay_class": "muon_matrix",
-          "family": "Muon",
+          "decay_class": "control_matrix",
+          "family": "AdamW",
           "logical_operator": "attention_output_gate",
           "offset": 256,
           "rows": 4096,
@@ -385826,7 +385826,7 @@
       ],
       "name": "blocks.38.mixer.q_proj.weight",
       "numel": 16777216,
-      "optimizer": "Muon",
+      "optimizer": "mixed",
       "shape": [
         8192,
         2048
@@ -395994,7 +395994,7 @@
     },
     {
       "category": "gdn",
-      "decay_class": "muon_matrix",
+      "decay_class": "mixed",
       "dtype": "bfloat16",
       "init_law": {
         "dtype": "bfloat16",
@@ -396048,8 +396048,8 @@
           "block": 768,
           "blocks": 16,
           "columns": 2048,
-          "decay_class": "muon_matrix",
-          "family": "Muon",
+          "decay_class": "control_matrix",
+          "family": "AdamW",
           "logical_operator": "gdn_output_gate_z",
           "offset": 512,
           "rows": 4096,
@@ -396058,7 +396058,7 @@
       ],
       "name": "blocks.39.mixer.in_proj_qkvz.weight",
       "numel": 25165824,
-      "optimizer": "Muon",
+      "optimizer": "mixed",
       "shape": [
         12288,
         2048
@@ -406166,7 +406166,7 @@
     },
     {
       "category": "gdn",
-      "decay_class": "muon_matrix",
+      "decay_class": "mixed",
       "dtype": "bfloat16",
       "init_law": {
         "dtype": "bfloat16",
@@ -406220,8 +406220,8 @@
           "block": 768,
           "blocks": 16,
           "columns": 2048,
-          "decay_class": "muon_matrix",
-          "family": "Muon",
+          "decay_class": "control_matrix",
+          "family": "AdamW",
           "logical_operator": "gdn_output_gate_z",
           "offset": 512,
           "rows": 4096,
@@ -406230,7 +406230,7 @@
       ],
       "name": "blocks.40.mixer.in_proj_qkvz.weight",
       "numel": 25165824,
-      "optimizer": "Muon",
+      "optimizer": "mixed",
       "shape": [
         12288,
         2048
@@ -416338,7 +416338,7 @@
     },
     {
       "category": "gdn",
-      "decay_class": "muon_matrix",
+      "decay_class": "mixed",
       "dtype": "bfloat16",
       "init_law": {
         "dtype": "bfloat16",
@@ -416392,8 +416392,8 @@
           "block": 768,
           "blocks": 16,
           "columns": 2048,
-          "decay_class": "muon_matrix",
-          "family": "Muon",
+          "decay_class": "control_matrix",
+          "family": "AdamW",
           "logical_operator": "gdn_output_gate_z",
           "offset": 512,
           "rows": 4096,
@@ -416402,7 +416402,7 @@
       ],
       "name": "blocks.41.mixer.in_proj_qkvz.weight",
       "numel": 25165824,
-      "optimizer": "Muon",
+      "optimizer": "mixed",
       "shape": [
         12288,
         2048
@@ -426510,7 +426510,7 @@
     },
     {
       "category": "gdn",
-      "decay_class": "muon_matrix",
+      "decay_class": "mixed",
       "dtype": "bfloat16",
       "init_law": {
         "dtype": "bfloat16",
@@ -426564,8 +426564,8 @@
           "block": 768,
           "blocks": 16,
           "columns": 2048,
-          "decay_class": "muon_matrix",
-          "family": "Muon",
+          "decay_class": "control_matrix",
+          "family": "AdamW",
           "logical_operator": "gdn_output_gate_z",
           "offset": 512,
           "rows": 4096,
@@ -426574,7 +426574,7 @@
       ],
       "name": "blocks.42.mixer.in_proj_qkvz.weight",
       "numel": 25165824,
-      "optimizer": "Muon",
+      "optimizer": "mixed",
       "shape": [
         12288,
         2048
@@ -436572,7 +436572,7 @@
     },
     {
       "category": "attention",
-      "decay_class": "muon_matrix",
+      "decay_class": "mixed",
       "dtype": "bfloat16",
       "init_law": {
         "dtype": "bfloat16",
@@ -436604,8 +436604,8 @@
           "block": 512,
           "blocks": 16,
           "columns": 2048,
-          "decay_class": "muon_matrix",
-          "family": "Muon",
+          "decay_class": "control_matrix",
+          "family": "AdamW",
           "logical_operator": "attention_output_gate",
           "offset": 256,
           "rows": 4096,
@@ -436614,7 +436614,7 @@
       ],
       "name": "blocks.43.mixer.q_proj.weight",
       "numel": 16777216,
-      "optimizer": "Muon",
+      "optimizer": "mixed",
       "shape": [
         8192,
         2048
@@ -446668,7 +446668,7 @@
     },
     {
       "category": "gdn",
-      "decay_class": "muon_matrix",
+      "decay_class": "mixed",
       "dtype": "bfloat16",
       "init_law": {
         "dtype": "bfloat16",
@@ -446722,8 +446722,8 @@
           "block": 768,
           "blocks": 16,
           "columns": 2048,
-          "decay_class": "muon_matrix",
-          "family": "Muon",
+          "decay_class": "control_matrix",
+          "family": "AdamW",
           "logical_operator": "gdn_output_gate_z",
           "offset": 512,
           "rows": 4096,
@@ -446732,7 +446732,7 @@
       ],
       "name": "blocks.44.mixer.in_proj_qkvz.weight",
       "numel": 25165824,
-      "optimizer": "Muon",
+      "optimizer": "mixed",
       "shape": [
         12288,
         2048
@@ -456840,7 +456840,7 @@
     },
     {
       "category": "gdn",
-      "decay_class": "muon_matrix",
+      "decay_class": "mixed",
       "dtype": "bfloat16",
       "init_law": {
         "dtype": "bfloat16",
@@ -456894,8 +456894,8 @@
           "block": 768,
           "blocks": 16,
           "columns": 2048,
-          "decay_class": "muon_matrix",
-          "family": "Muon",
+          "decay_class": "control_matrix",
+          "family": "AdamW",
           "logical_operator": "gdn_output_gate_z",
           "offset": 512,
           "rows": 4096,
@@ -456904,7 +456904,7 @@
       ],
       "name": "blocks.45.mixer.in_proj_qkvz.weight",
       "numel": 25165824,
-      "optimizer": "Muon",
+      "optimizer": "mixed",
       "shape": [
         12288,
         2048
@@ -467012,7 +467012,7 @@
     },
     {
       "category": "gdn",
-      "decay_class": "muon_matrix",
+      "decay_class": "mixed",
       "dtype": "bfloat16",
       "init_law": {
         "dtype": "bfloat16",
@@ -467066,8 +467066,8 @@
           "block": 768,
           "blocks": 16,
           "columns": 2048,
-          "decay_class": "muon_matrix",
-          "family": "Muon",
+          "decay_class": "control_matrix",
+          "family": "AdamW",
           "logical_operator": "gdn_output_gate_z",
           "offset": 512,
           "rows": 4096,
@@ -467076,7 +467076,7 @@
       ],
       "name": "blocks.46.mixer.in_proj_qkvz.weight",
       "numel": 25165824,
-      "optimizer": "Muon",
+      "optimizer": "mixed",
       "shape": [
         12288,
         2048
@@ -477184,7 +477184,7 @@
     },
     {
       "category": "gdn",
-      "decay_class": "muon_matrix",
+      "decay_class": "mixed",
       "dtype": "bfloat16",
       "init_law": {
         "dtype": "bfloat16",
@@ -477238,8 +477238,8 @@
           "block": 768,
           "blocks": 16,
           "columns": 2048,
-          "decay_class": "muon_matrix",
-          "family": "Muon",
+          "decay_class": "control_matrix",
+          "family": "AdamW",
           "logical_operator": "gdn_output_gate_z",
           "offset": 512,
           "rows": 4096,
@@ -477248,7 +477248,7 @@
       ],
       "name": "blocks.47.mixer.in_proj_qkvz.weight",
       "numel": 25165824,
-      "optimizer": "Muon",
+      "optimizer": "mixed",
       "shape": [
         12288,
         2048
@@ -487549,7 +487549,7 @@
     },
     {
       "category": "mtp_attention",
-      "decay_class": "muon_matrix",
+      "decay_class": "mixed",
       "dtype": "bfloat16",
       "init_law": {
         "dtype": "bfloat16",
@@ -487581,8 +487581,8 @@
           "block": 512,
           "blocks": 16,
           "columns": 2048,
-          "decay_class": "muon_matrix",
-          "family": "Muon",
+          "decay_class": "control_matrix",
+          "family": "AdamW",
           "logical_operator": "mtp_attention_output_gate",
           "offset": 256,
           "rows": 4096,
@@ -487591,7 +487591,7 @@
       ],
       "name": "mtp.block.mixer.q_proj.weight",
       "numel": 16777216,
-      "optimizer": "Muon",
+      "optimizer": "mixed",
       "shape": [
         8192,
         2048

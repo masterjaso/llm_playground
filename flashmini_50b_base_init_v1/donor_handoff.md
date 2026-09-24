@@ -4,7 +4,7 @@
 **MTP PARAMETER COUNT:** 685,511,168
 **TOTAL CHECKPOINT PARAMS:** 50,962,184,576
 
-Source commit: `37862655989083a91f1f091cc71fbebc14ac0f4b` (tree `78c5d80ffcdcd39f68f333698841f1a4398e3bb9461f780e1dac7616a90be9c7`).
+Source commit: `5387a53a6cbe81ca82339360fb4adcedfec1cb6f` (tree `5ed8ad6e83c155bbd773034150e2a9e6347e5fe03b461d01320e5b2598dadb66`).
 Tokenizer fingerprint: `ad7e623aca9d08891d9db1d270c7d6a8c612780890e01511255e0bbeb597e56e`.
 
 1. Check out `main` at or after the source commit; outside `flashmini_50b_base_init_v1/` it must equal the source commit.
