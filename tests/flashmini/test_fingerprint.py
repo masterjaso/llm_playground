@@ -136,9 +136,16 @@ def test_environment_fingerprint_sensitive_to_shared_properties() -> None:
     mutated["torch"] = dict(fp_a["torch"])
     mutated["torch"]["cuda_version"] = "99.99"
     assert environment_fingerprint_sha256(mutated) != baseline
-    # GPU identity (nested under torch.devices).
-    mutated = dict(fp_a)
-    mutated["torch"] = dict(fp_a["torch"])
-    mutated["torch"]["devices"] = [dict(d) for d in fp_a["torch"]["devices"]]
-    mutated["torch"]["devices"][0]["name"] = "NVIDIA GeForce RTX 9999"
-    assert environment_fingerprint_sha256(mutated) != baseline
+    # GPU identity (nested under torch.devices).  A CPU-only host records an
+    # empty device list; the mutation is only defined when a device exists.
+    if fp_a["torch"]["devices"]:
+        mutated = dict(fp_a)
+        mutated["torch"] = dict(fp_a["torch"])
+        mutated["torch"]["devices"] = [dict(d) for d in fp_a["torch"]["devices"]]
+        mutated["torch"]["devices"][0]["name"] = "NVIDIA GeForce RTX 9999"
+        assert environment_fingerprint_sha256(mutated) != baseline
+    else:
+        mutated = dict(fp_a)
+        mutated["torch"] = dict(fp_a["torch"])
+        mutated["torch"]["devices"] = [{"name": "NVIDIA GeForce RTX 9999", "index": 0}]
+        assert environment_fingerprint_sha256(mutated) != baseline

@@ -6,9 +6,30 @@ architecture_version: 4
 tokenizer:
   family: custom_byte_level_bpe
   vocab_size: 131072
-  special_token_ids: {}
-  identity_status: pending_donor_tokenizer_artifact
+  special_token_ids:
+    eos: 0
+    pad: 1
+    bos: 2
+    im_start: 3
+    im_end: 4
+    fim_prefix: 5
+    fim_middle: 6
+    fim_suffix: 7
+    fim_pad: 8
+    repo_name: 9
+    file_sep: 10
+    think_start: 11
+    think_end: 12
+    tool_call_start: 13
+    tool_call_end: 14
+    tool_response_start: 15
+    tool_response_end: 16
+  special_token_slots: 256
+  identity_status: frozen
   freeze_before_optimizer_step: true
+  manifest: training_data/tokenizer/flashmini_50b_v4/tokenizer_manifest.json
+  fingerprint_algorithm: sha256_canonical_tokenizer_json_v1
+  fingerprint: ad7e623aca9d08891d9db1d270c7d6a8c612780890e01511255e0bbeb597e56e
 
 architecture:
   d_model: 2048
@@ -109,6 +130,11 @@ ple:
     dilation: 1
     init: exact_zero
   reset_isolation: eos_segment_local_history_and_convolution
+  hash:
+    algorithm: xor_of_odd_splitmix64_multiplier_products_mod_head_prime_v1
+    preimage: x_t_x_t_minus_1_x_t_minus_2_segment_local
+    reset_sentinel: tokenizer_eos_id
+    seed: 500277
   training_storage: bf16_master_host_or_distributed_off_accelerator
   inference_storage: fp8_e4m3_host_ram_mmap_async_row_prefetch_optional_hot_rows_4bit_optional
 

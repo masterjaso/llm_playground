@@ -1,0 +1,538 @@
+{
+  "artifact": "tokenizer.json",
+  "artifact_sha256": "ad7e623aca9d08891d9db1d270c7d6a8c612780890e01511255e0bbeb597e56e",
+  "build": {
+    "tokenizers_version": "0.22.2",
+    "trainer": {
+      "initial_alphabet": "ByteLevel.alphabet()",
+      "min_frequency": 2,
+      "model": "BPE"
+    },
+    "training_data": {
+      "corpus_repository": "mjaso/flashmini-data-v1",
+      "corpus_revision": "e83398462169164d9e4127627ad4f72d95b05a41",
+      "domain_usage": {
+        "books_reference": {
+          "budget_characters": 64375000,
+          "passes": 1,
+          "selected_characters": 64394030,
+          "selected_documents": 3298,
+          "unique_documents_available": 18463
+        },
+        "code": {
+          "budget_characters": 131874999,
+          "passes": 3,
+          "selected_characters": 76708578,
+          "selected_documents": 26172,
+          "unique_documents_available": 8724
+        },
+        "general_web": {
+          "budget_characters": 179374999,
+          "passes": 2,
+          "selected_characters": 179378680,
+          "selected_documents": 51816,
+          "unique_documents_available": 32436
+        },
+        "math_stem": {
+          "budget_characters": 71562500,
+          "passes": 2,
+          "selected_characters": 71573981,
+          "selected_documents": 13555,
+          "unique_documents_available": 11348
+        },
+        "reasoning": {
+          "budget_characters": 12500000,
+          "passes": 1,
+          "selected_characters": 12500195,
+          "selected_documents": 627,
+          "unique_documents_available": 3446
+        },
+        "synthetic_edu": {
+          "budget_characters": 40312500,
+          "passes": 2,
+          "selected_characters": 40313331,
+          "selected_documents": 10763,
+          "unique_documents_available": 10756
+        }
+      },
+      "recipe": "training_data/recipes/flashmini_50b_full_v1.yaml",
+      "recipe_domain_weights": {
+        "books_reference": 0.12875,
+        "code": 0.26375,
+        "general_web": 0.35874999999999996,
+        "math_stem": 0.143125,
+        "reasoning": 0.025,
+        "synthetic_edu": 0.080625
+      },
+      "rejected_shards": [
+        {
+          "expected_sha256": "8345272345f85db8b9297986c6656a2264828ce706b74e305165f45a8c42b2d1",
+          "path": "flashmini_1b_full_v1-shard-000002.parquet",
+          "reason": "missing_from_release_revision",
+          "split": "train"
+        },
+        {
+          "expected_sha256": "fcceffe6f9eed153b6ffed2bbae99385b271c3aacc19692e09e1fc4f06fd77fe",
+          "path": "flashmini_1b_full_v1-shard-000011.parquet",
+          "reason": "missing_from_release_revision",
+          "split": "train"
+        },
+        {
+          "expected_sha256": "f01645c34c2e46795c070c3eba8e23647268c2eb627d79e2207c1e64fed5272a",
+          "path": "flashmini_1b_full_v1-shard-000019.parquet",
+          "reason": "missing_from_release_revision",
+          "split": "train"
+        },
+        {
+          "expected_sha256": "0bb99f04d970e411437649748e3210effa60b65b6491128a57e02f329444b312",
+          "path": "flashmini_1b_full_v1-shard-000027.parquet",
+          "reason": "missing_from_release_revision",
+          "split": "train"
+        },
+        {
+          "expected_sha256": "773556030d5867d41a92677689e3c3848b9ea0b634b276ee6cd4439ef4c96b80",
+          "path": "flashmini_1b_full_v1-shard-000035.parquet",
+          "reason": "missing_from_release_revision",
+          "split": "train"
+        },
+        {
+          "expected_sha256": "08b59979a5589bc3742d441ae084b8367efff7c5a5fdf245da09d4a0d2567ff8",
+          "path": "flashmini_1b_full_v1-shard-000043.parquet",
+          "reason": "missing_from_release_revision",
+          "split": "train"
+        },
+        {
+          "expected_sha256": "e23c27526d2e1f156dad12f32df62b92c614c0266a4677a615e807af41eca845",
+          "path": "flashmini_1b_full_v1-shard-000051.parquet",
+          "reason": "missing_from_release_revision",
+          "split": "train"
+        },
+        {
+          "expected_sha256": "18711aef2dc5e6cf93d77c7852f1b6d50d0df82eec51d9ee569277c05d6d2916",
+          "path": "flashmini_1b_full_v1-shard-000059.parquet",
+          "reason": "missing_from_release_revision",
+          "split": "train"
+        },
+        {
+          "expected_sha256": "4f5df8cd8358bc1ab044dd39d037d162efa2345bcd43ebcef6e781c849d8ad9e",
+          "path": "flashmini_1b_full_v1-shard-000067.parquet",
+          "reason": "missing_from_release_revision",
+          "split": "train"
+        },
+        {
+          "expected_sha256": "444b7c434470c0cfd03ef285e461297b98ae2737bd56d9daa6b25597b6f2b0dc",
+          "path": "flashmini_1b_full_v1-shard-000075.parquet",
+          "reason": "missing_from_release_revision",
+          "split": "train"
+        },
+        {
+          "expected_sha256": "25e94fcc7d91cc829fb58fd9eca8a1bddb71a0048f6b49a692055a1b5d190bdb",
+          "path": "flashmini_1b_full_v1-shard-000083.parquet",
+          "reason": "missing_from_release_revision",
+          "split": "train"
+        },
+        {
+          "expected_sha256": "183bffbb7ac506bd322d7b77c1b381bf72d98837ed55d0643c305c3054b9f989",
+          "path": "flashmini_1b_full_v1-shard-000084.parquet",
+          "reason": "sha256_mismatch",
+          "split": "train"
+        },
+        {
+          "expected_sha256": "ff150fad6c71ae5f96ee91fabe16f5fd61312d4aaac735922c720024fb9cfc7f",
+          "path": "flashmini_1b_full_v1-shard-000086.parquet",
+          "reason": "sha256_mismatch",
+          "split": "train"
+        },
+        {
+          "expected_sha256": "5c2b00ccd7b6cefd1e3b0d1b75121141373ebb421db2290a6700dea43977819f",
+          "path": "flashmini_1b_full_v1-shard-000088.parquet",
+          "reason": "sha256_mismatch",
+          "split": "train"
+        },
+        {
+          "expected_sha256": "ef00ec84d497b5f08448afffe2306961160efa7eea67153278681c40db2027fe",
+          "path": "flashmini_1b_full_v1-shard-000089.parquet",
+          "reason": "sha256_mismatch",
+          "split": "train"
+        },
+        {
+          "expected_sha256": "893a93229a3a1fe6c859b143c0085231e55cae5f091b6d9c6dfaf1d352b8e89b",
+          "path": "flashmini_1b_full_v1-shard-000091.parquet",
+          "reason": "sha256_mismatch",
+          "split": "train"
+        },
+        {
+          "expected_sha256": "56cc85b11d40d0a9858ea556783149079fbaa8d897ad6e714d6b1002757b63e7",
+          "path": "flashmini_1b_full_v1-shard-000093.parquet",
+          "reason": "sha256_mismatch",
+          "split": "train"
+        }
+      ],
+      "sample_policy": {
+        "document_order": "manifest_shard_order_then_row_order",
+        "domain_merge": {
+          "multilingual": "general_web",
+          "tech_docs": "books_reference"
+        },
+        "max_characters_per_document": 20000,
+        "max_repeats_per_domain": 3,
+        "shard_filter": "split_train_and_local_sha256_equals_release_manifest",
+        "target_total_characters": 500000000,
+        "version": "flashmini-v4-tokenizer-sample-v1"
+      },
+      "selected_characters": 444868795,
+      "selected_documents": 106231,
+      "selected_text_sha256": "8ba5d8a8931abd18af0324b69a14eac39cf0df3bd3056a048b3c634c6d5c8ff6",
+      "verified_shards": [
+        {
+          "path": "flashmini_1b_full_v1-shard-000000.parquet",
+          "sha256": "ebfe30d5d941cda8a4d3c8e8fbfa15c5a92f39c3e022879ae7d72e6bf4fc9eb9"
+        },
+        {
+          "path": "flashmini_1b_full_v1-shard-000001.parquet",
+          "sha256": "ce303712c55e4249bda18076a0919981bff7ec6c2ac23b326cc38bfc65740818"
+        },
+        {
+          "path": "flashmini_1b_full_v1-shard-000003.parquet",
+          "sha256": "b316d8307353707d5f25216da6662d5135162ae5eaddf3539e8aa92669ee779f"
+        },
+        {
+          "path": "flashmini_1b_full_v1-shard-000004.parquet",
+          "sha256": "469134ce105f883f66a4ce67bf5ede9426335f9b61d3cebaa4fec65314488c0c"
+        },
+        {
+          "path": "flashmini_1b_full_v1-shard-000005.parquet",
+          "sha256": "2e6ce0f96a5d085a7f835b1879e72fb1b3cd39a74847c03c7dd20be18d9336cd"
+        },
+        {
+          "path": "flashmini_1b_full_v1-shard-000006.parquet",
+          "sha256": "b4061065cbfe094a46bacf8ccd7bb24c903171ef323d0ae98fa3f00dc6692e24"
+        },
+        {
+          "path": "flashmini_1b_full_v1-shard-000007.parquet",
+          "sha256": "ac3d99bb55749e621e4ca8503f777cd78a37a97e62a8634092a4e6ed641c5040"
+        },
+        {
+          "path": "flashmini_1b_full_v1-shard-000008.parquet",
+          "sha256": "e8fd7e5a721d16671d1db3840eb9e66eeeddd17d4e7a20a770fd9b3f9dcacacb"
+        },
+        {
+          "path": "flashmini_1b_full_v1-shard-000009.parquet",
+          "sha256": "5338496a0621f00db01c2ac3d384a8460f672814560a6237e3b25d4f6b238ee8"
+        },
+        {
+          "path": "flashmini_1b_full_v1-shard-000010.parquet",
+          "sha256": "7666e660fd3212b7be8f97d39a7a2a4f7d5be4927207b79e9e9fcba1229088f6"
+        },
+        {
+          "path": "flashmini_1b_full_v1-shard-000012.parquet",
+          "sha256": "c87e7f662998632566c455e58e5aea009844c3dfadb94933cd3d5fb1b6b4e3c6"
+        },
+        {
+          "path": "flashmini_1b_full_v1-shard-000013.parquet",
+          "sha256": "b58d7031bc8c749f78871cb8cfecb414df4a9d4149d8ac5f571bebeb89a47faf"
+        },
+        {
+          "path": "flashmini_1b_full_v1-shard-000014.parquet",
+          "sha256": "1b17166523f6e39e5cbd2d495b7164f17a559fd9e859488382ac948908326058"
+        },
+        {
+          "path": "flashmini_1b_full_v1-shard-000015.parquet",
+          "sha256": "38295b0d6b8351903fde5b7081f61e6c09473b8e725f308a678f964c4355ccd3"
+        },
+        {
+          "path": "flashmini_1b_full_v1-shard-000016.parquet",
+          "sha256": "23697c06beb11152e2db3b9e89a3851ff69d0fe0b6625bef6a1df8b0eff74480"
+        },
+        {
+          "path": "flashmini_1b_full_v1-shard-000017.parquet",
+          "sha256": "0e8e64f03fc107e50cb0d598b49cacfbd7186235f0d1a83132aa19b75cbb455b"
+        },
+        {
+          "path": "flashmini_1b_full_v1-shard-000018.parquet",
+          "sha256": "ec69f2c83677e20c6b4f88c675e3dd7683e54e97f45e7337a28c8ecf405a9f55"
+        },
+        {
+          "path": "flashmini_1b_full_v1-shard-000020.parquet",
+          "sha256": "ce525178b3cca88efa15d55eb8aab5fdfb538c4ec574ebd28575f4d7bd4b2160"
+        },
+        {
+          "path": "flashmini_1b_full_v1-shard-000021.parquet",
+          "sha256": "628fc484edb83e41f8ee8fb746f066a9c20ab6ee9927230d5932f058f584cd83"
+        },
+        {
+          "path": "flashmini_1b_full_v1-shard-000022.parquet",
+          "sha256": "ff852ab7bede401389f30496a0315d9531884436171bc9f8bd16977ff773a4ca"
+        },
+        {
+          "path": "flashmini_1b_full_v1-shard-000023.parquet",
+          "sha256": "67a49daa579c4bce02a6fcd4ebac0baa0bbb727cbd64353dc2c6bd10f5640788"
+        },
+        {
+          "path": "flashmini_1b_full_v1-shard-000024.parquet",
+          "sha256": "e9ddd22adef7fe21e468df158c99620a9dfdf91f706f6e90bbd650a0311646ae"
+        },
+        {
+          "path": "flashmini_1b_full_v1-shard-000025.parquet",
+          "sha256": "b82f1ef42e88062340a0317564f779205518cea21ae787735fca282b608bc337"
+        },
+        {
+          "path": "flashmini_1b_full_v1-shard-000026.parquet",
+          "sha256": "97953cc6f6c2ff32dfbaeca051b6ed7d9845fcb8cf5a137ca7413b720bdb165c"
+        },
+        {
+          "path": "flashmini_1b_full_v1-shard-000028.parquet",
+          "sha256": "ec34454069a06177794628a94bd8bbd38f283044d233b0deb2b150e6218a772c"
+        },
+        {
+          "path": "flashmini_1b_full_v1-shard-000029.parquet",
+          "sha256": "84a63d2b9af4ec1504eb6685b80263d30a93d73c93c9ec3ece6fb4022f6148f4"
+        },
+        {
+          "path": "flashmini_1b_full_v1-shard-000030.parquet",
+          "sha256": "11898d2c295439007bbd2b336893eec8f942207ca14810ea69f5008009de4585"
+        },
+        {
+          "path": "flashmini_1b_full_v1-shard-000031.parquet",
+          "sha256": "423e4e1afa86bf1a66d7afd123225a7e8a9ddd35891627b5b3d1b10de9061f71"
+        },
+        {
+          "path": "flashmini_1b_full_v1-shard-000032.parquet",
+          "sha256": "ac817a3730baf9e456cc3343c5887b47c8587191d57e748c4eab4af76a043ca6"
+        },
+        {
+          "path": "flashmini_1b_full_v1-shard-000033.parquet",
+          "sha256": "af631f843c7ab314f4397664fddaace62786943aaf80f88135d322e4ea4f108b"
+        },
+        {
+          "path": "flashmini_1b_full_v1-shard-000034.parquet",
+          "sha256": "18d1d7548f60b6709685df33810c8e77a7833e35e04330dbf65ce0019bb178a8"
+        },
+        {
+          "path": "flashmini_1b_full_v1-shard-000036.parquet",
+          "sha256": "771f572cfec5c9a1be4f2da2e261822ee5e0ba75443b2d22bde7d59b41680ac1"
+        },
+        {
+          "path": "flashmini_1b_full_v1-shard-000037.parquet",
+          "sha256": "9956d4e06e7e12a62bf453046594812c7dcab22c38a03b7e56b140930f6e5b5d"
+        },
+        {
+          "path": "flashmini_1b_full_v1-shard-000038.parquet",
+          "sha256": "03148c34df3863876ef6eb6d7ac555ded5e2667eaf1ca27f95b76aedc011ade5"
+        },
+        {
+          "path": "flashmini_1b_full_v1-shard-000039.parquet",
+          "sha256": "c8b45417757dfed11b5a411e5ce7043192de6ba2af9c9df043234fdae30c8abd"
+        },
+        {
+          "path": "flashmini_1b_full_v1-shard-000040.parquet",
+          "sha256": "7f9797b5ff426a266c6b4271f12c50c8e0e04ba32370be4c345f379b869bcb94"
+        },
+        {
+          "path": "flashmini_1b_full_v1-shard-000041.parquet",
+          "sha256": "ce09a935265c387fab288f8851b4a11e9d7768b4500590be486d529991aa3ee1"
+        },
+        {
+          "path": "flashmini_1b_full_v1-shard-000042.parquet",
+          "sha256": "1ccda4fef53671244e5cbea8a3efcc2e0ee9f78ad30217b9a8dc8ae7b078d5d1"
+        },
+        {
+          "path": "flashmini_1b_full_v1-shard-000044.parquet",
+          "sha256": "373d236dac867f6c9486759ef120071ad4c475e0b70d0e4f6f42fb3870b5ea2b"
+        },
+        {
+          "path": "flashmini_1b_full_v1-shard-000045.parquet",
+          "sha256": "72516a589cb28e217533d833150c6b3be2f662546ff451e8364e6228a43c37bf"
+        },
+        {
+          "path": "flashmini_1b_full_v1-shard-000046.parquet",
+          "sha256": "f01a6fb3fb74180d56ba323168477c06e48fcd34a02e3a9eed14b453194e4a41"
+        },
+        {
+          "path": "flashmini_1b_full_v1-shard-000047.parquet",
+          "sha256": "b99b6a529c59be4886edfccfef8d926a61e13e8cecb41f0d6d8e50090146232f"
+        },
+        {
+          "path": "flashmini_1b_full_v1-shard-000048.parquet",
+          "sha256": "88ab79e4043798f2cbec51e332a0fe184973f4b54a1a2e1af3f0a08acc5c97fa"
+        },
+        {
+          "path": "flashmini_1b_full_v1-shard-000049.parquet",
+          "sha256": "881f6fba029172c6fa3dce3e870de92c1e7cbca68488b3bb3d62b1dd18f6383f"
+        },
+        {
+          "path": "flashmini_1b_full_v1-shard-000050.parquet",
+          "sha256": "859a19cefbad0aa68f1ae740e0d63c60b52cc803e21a30ceadc42a4d3e8eb770"
+        },
+        {
+          "path": "flashmini_1b_full_v1-shard-000052.parquet",
+          "sha256": "7f46afcf2f52b5b25493c2393822ca8103de246d7592d5187b8319c8963108a9"
+        },
+        {
+          "path": "flashmini_1b_full_v1-shard-000053.parquet",
+          "sha256": "b786f926d85ab2fdc764ca1c64acdad55c3a5ab4ad2821ada02e6b8a250c26de"
+        },
+        {
+          "path": "flashmini_1b_full_v1-shard-000054.parquet",
+          "sha256": "228fc00533f2b7c6c21c2d3f56cbcb1c36baacf0d82bd799eed74dad543ccfa4"
+        },
+        {
+          "path": "flashmini_1b_full_v1-shard-000055.parquet",
+          "sha256": "2204ba19da32c036a1e5fe551723f5d65f2e193689d384179f0ac299e6a81033"
+        },
+        {
+          "path": "flashmini_1b_full_v1-shard-000056.parquet",
+          "sha256": "1e01c75ec05650ec9de14d1215401c53b5ca78ae9b05315d90a8c028099d90ea"
+        },
+        {
+          "path": "flashmini_1b_full_v1-shard-000057.parquet",
+          "sha256": "e5b54f3c32d6771444925f8818c8358b50bab63dd91f763731de8fc6432b7bd5"
+        },
+        {
+          "path": "flashmini_1b_full_v1-shard-000058.parquet",
+          "sha256": "bbebad9779fe1b7316e836e53af0cbe9ab9ff440b1d11208807a11cf42182a59"
+        },
+        {
+          "path": "flashmini_1b_full_v1-shard-000060.parquet",
+          "sha256": "161dde09eae5890c0fce16d3759d52e684ead10753b63d17f92bf2f0fa374bee"
+        },
+        {
+          "path": "flashmini_1b_full_v1-shard-000061.parquet",
+          "sha256": "2ee4162223851bfdb822cfbef06c797ca702199329e95ea1cd9a425aef04a502"
+        },
+        {
+          "path": "flashmini_1b_full_v1-shard-000062.parquet",
+          "sha256": "c0c6d0f51a49ffcee6b8a097dabb44d548f0157aa3e99eae73525590e4ce8a57"
+        },
+        {
+          "path": "flashmini_1b_full_v1-shard-000063.parquet",
+          "sha256": "3c071c57a444db36f2c197e41359d592bf2c2ea8a626bf87584a9376358dd8a1"
+        },
+        {
+          "path": "flashmini_1b_full_v1-shard-000064.parquet",
+          "sha256": "d8b11b17fe1d16bce00d80cb0c34467e9c523e27a7f803cfdf6d3eafeeff3b98"
+        },
+        {
+          "path": "flashmini_1b_full_v1-shard-000065.parquet",
+          "sha256": "18099b842399961aa9d17def9f51fb8caaedc47d5a4d22287e954517108f5c41"
+        },
+        {
+          "path": "flashmini_1b_full_v1-shard-000066.parquet",
+          "sha256": "91f0ecbc7844c2799ca81ebde8aca0d5eb437d5b80104d3af52e6a61c46e0516"
+        },
+        {
+          "path": "flashmini_1b_full_v1-shard-000068.parquet",
+          "sha256": "b650e72dd84353f4dc807887289684c407d0e9d3d1f78371e65a49297ea868cd"
+        },
+        {
+          "path": "flashmini_1b_full_v1-shard-000069.parquet",
+          "sha256": "d6800f90d79018600ff64cbadc2e14beb063a62499408b7a693c804032078367"
+        },
+        {
+          "path": "flashmini_1b_full_v1-shard-000070.parquet",
+          "sha256": "69fa4b4d9cb4512faf20a60ee6ec1f7cee0ee895e14e33c40812e4612e183acb"
+        },
+        {
+          "path": "flashmini_1b_full_v1-shard-000071.parquet",
+          "sha256": "c39fac2cbedc969e43a712d4441d0e2f6c544c8b8682fe438bec09f20226a653"
+        },
+        {
+          "path": "flashmini_1b_full_v1-shard-000072.parquet",
+          "sha256": "a65c59bcabe5e3d4cc9a6c76968b093ae81779d9d9a597fd37e832bd5bbc5865"
+        },
+        {
+          "path": "flashmini_1b_full_v1-shard-000073.parquet",
+          "sha256": "80a280011d858aac8aa8f1e8cdea5712db62562c484cc6a2c8092d3f975df157"
+        },
+        {
+          "path": "flashmini_1b_full_v1-shard-000074.parquet",
+          "sha256": "566ad03b90ef04c8fae8fddceeca312ae11f75a83bc5ae1386579c8f60bb7332"
+        },
+        {
+          "path": "flashmini_1b_full_v1-shard-000076.parquet",
+          "sha256": "a88c6916d884f1b58f60f3807f5c8c1221f0aa88b967095548f6a29227f24de3"
+        },
+        {
+          "path": "flashmini_1b_full_v1-shard-000077.parquet",
+          "sha256": "6c67ccf9ef88e3b0374206e1c7d4e67db251d74178723c694921af88fb1e6952"
+        },
+        {
+          "path": "flashmini_1b_full_v1-shard-000078.parquet",
+          "sha256": "798540fceb1f4d51c4f292c70bda70dd0f19343a7bb25e080ab9105127825b20"
+        },
+        {
+          "path": "flashmini_1b_full_v1-shard-000079.parquet",
+          "sha256": "dc1e36ae0206050e6658d4a04c3a0c91bd4c89e95bb67fe6a2721a7afdba4869"
+        },
+        {
+          "path": "flashmini_1b_full_v1-shard-000080.parquet",
+          "sha256": "f967e1ab19f6257fe0fde5c21b3d8d8c41fb8df798554e0dc1d4a658bc3f7e9e"
+        },
+        {
+          "path": "flashmini_1b_full_v1-shard-000081.parquet",
+          "sha256": "da4749259c7b6c8d5603e535f31faf18cbedabc8681c8a2cb4f77e6458214a14"
+        },
+        {
+          "path": "flashmini_1b_full_v1-shard-000082.parquet",
+          "sha256": "72ecca37b7368e6e157977377b9f291aa44ece9b9578ff8485982dc58e4c2229"
+        },
+        {
+          "path": "flashmini_1b_full_v1-shard-000085.parquet",
+          "sha256": "1470dc928264dcf857530af4c1995287e72aa565ce7fcb450fe41228633a90a5"
+        },
+        {
+          "path": "flashmini_1b_full_v1-shard-000087.parquet",
+          "sha256": "49132b6d801da9252e688d6bbe5a6a7fd858200684eb279d2b3f9b667235b61d"
+        },
+        {
+          "path": "flashmini_1b_full_v1-shard-000090.parquet",
+          "sha256": "3f27adb4cdecf38ea3ec84848d11b09157b853ff74796b77d7b13b725f9e0f92"
+        },
+        {
+          "path": "flashmini_1b_full_v1-shard-000092.parquet",
+          "sha256": "80dc662cb202b82e7aa00cc20e1448f189255512526697f7b35ea204d2b40f32"
+        },
+        {
+          "path": "flashmini_1b_full_v1-shard-000094.parquet",
+          "sha256": "c60fda06380982bb0573045c7e5d65c173a0d7bb2c75d2cb2cd6c9fa7ec9f53a"
+        }
+      ]
+    }
+  },
+  "byte_alphabet_size": 256,
+  "family": "custom_byte_level_bpe",
+  "fingerprint": "ad7e623aca9d08891d9db1d270c7d6a8c612780890e01511255e0bbeb597e56e",
+  "fingerprint_algorithm": "sha256_canonical_tokenizer_json_v1",
+  "identity_status": "frozen",
+  "immutable_after_optimizer_step": 1,
+  "name": "flashmini-50b-v4-bpe131072",
+  "normalization": "none",
+  "pretokenize_pattern": "(?i:'s|'t|'re|'ve|'m|'ll|'d)|[^\\r\\n\\p{L}\\p{N}]?\\p{L}+|\\p{N}{1,3}| ?[^\\s\\p{L}\\p{N}]+[\\r\\n]*|\\s*[\\r\\n]+|\\s+(?!\\S)|\\s+",
+  "schema_version": 1,
+  "special_token_count": 256,
+  "special_token_ids": {
+    "bos": 2,
+    "eos": 0,
+    "file_sep": 10,
+    "fim_middle": 6,
+    "fim_pad": 8,
+    "fim_prefix": 5,
+    "fim_suffix": 7,
+    "im_end": 4,
+    "im_start": 3,
+    "pad": 1,
+    "repo_name": 9,
+    "think_end": 12,
+    "think_start": 11,
+    "tool_call_end": 14,
+    "tool_call_start": 13,
+    "tool_response_end": 16,
+    "tool_response_start": 15
+  },
+  "special_tokens_range": [
+    0,
+    255
+  ],
+  "token_dtype": "uint32",
+  "vocab_size": 131072
+}

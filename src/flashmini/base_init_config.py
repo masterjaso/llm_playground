@@ -33,6 +33,38 @@ def canonical_sha256(value: Any) -> str:
     return hashlib.sha256(canonical_json(value)).hexdigest()
 
 
+# Fields excluded from the architecture fingerprint: training/inference policy,
+# storage, initialization, optimizer, and freeze metadata.  Everything else in
+# these sections defines forward semantics or tensor geometry.
+_ARCHITECTURE_SECTION_EXCLUSIONS = {
+    "architecture": {"parameter_target"},
+    "mixer": set(),
+    "attention": set(),
+    "kvc": {"inference_representation"},
+    "gdn": set(),
+    "moe": set(),
+    "hyperconnections": set(),
+    "ple": {"training_storage", "inference_storage"},
+    "mtp": {"teacher_forcing", "main_loss_weight", "auxiliary_loss", "coefficient_schedule", "inference_precision"},
+}
+
+
+def architecture_fingerprint_payload(raw: Mapping[str, Any]) -> dict[str, Any]:
+    """Architecture-defining fields only (geometry, topology, sharing, forward semantics)."""
+    payload: dict[str, Any] = {
+        "model_id": raw["model_id"],
+        "architecture_version": raw["architecture_version"],
+        "tokenizer_geometry": {
+            "family": raw["tokenizer"]["family"],
+            "vocab_size": raw["tokenizer"]["vocab_size"],
+            "ple_reset_eos_id": raw["tokenizer"]["special_token_ids"].get("eos"),
+        },
+    }
+    for section, excluded in _ARCHITECTURE_SECTION_EXCLUSIONS.items():
+        payload[section] = {key: value for key, value in raw[section].items() if key not in excluded}
+    return payload
+
+
 def _require_exact_keys(value: Mapping[str, Any], required: set[str], path: str) -> None:
     missing = sorted(required - set(value))
     unknown = sorted(set(value) - required)
@@ -96,7 +128,7 @@ class FlashMini50BConfig:
 
     @property
     def architecture_sha256(self) -> str:
-        return canonical_sha256(self._raw["architecture_contract"])
+        return canonical_sha256(architecture_fingerprint_payload(self._raw))
 
     def section(self, name: str) -> dict[str, Any]:
         return copy.deepcopy(self._raw[name])
@@ -118,17 +150,27 @@ class FlashMini50BConfig:
 
         tokenizer = self._raw["tokenizer"]
         _require_exact_keys(tokenizer, {
-            "family", "vocab_size", "special_token_ids", "identity_status", "freeze_before_optimizer_step"
+            "family", "vocab_size", "special_token_ids", "special_token_slots", "identity_status",
+            "freeze_before_optimizer_step", "manifest", "fingerprint_algorithm", "fingerprint",
         }, "tokenizer")
         if tokenizer["family"] != "custom_byte_level_bpe" or tokenizer["vocab_size"] != 131_072:
             raise ValueError("v4 requires custom byte-level BPE with 131072 vocabulary slots")
-        if tokenizer["identity_status"] != "pending_donor_tokenizer_artifact":
-            raise ValueError("v4 tokenizer contract must remain explicitly pending until finalized")
+        if tokenizer["identity_status"] != "frozen":
+            raise ValueError("v4 tokenizer must be frozen before training")
         if tokenizer["freeze_before_optimizer_step"] is not True:
             raise ValueError("tokenizer must freeze before the first optimizer step")
+        if tokenizer["fingerprint_algorithm"] != "sha256_canonical_tokenizer_json_v1":
+            raise ValueError("v4 tokenizer fingerprint algorithm mismatch")
+        fingerprint = tokenizer["fingerprint"]
+        if not isinstance(fingerprint, str) or len(fingerprint) != 64 or any(c not in "0123456789abcdef" for c in fingerprint):
+            raise ValueError("tokenizer.fingerprint must be lowercase SHA256 hex")
         special = tokenizer["special_token_ids"]
-        if not isinstance(special, dict):
-            raise ValueError("tokenizer.special_token_ids must be a mapping")
+        slots = tokenizer["special_token_slots"]
+        if not isinstance(special, dict) or not {"eos", "pad"} <= set(special):
+            raise ValueError("tokenizer.special_token_ids must define at least eos and pad")
+        ids = list(special.values())
+        if len(set(ids)) != len(ids) or any(isinstance(i, bool) or not isinstance(i, int) or not 0 <= i < slots for i in ids):
+            raise ValueError("tokenizer special IDs must be distinct integers inside the special slot range")
 
         architecture = self._raw["architecture"]
         _require_exact_keys(architecture, {
@@ -250,9 +292,16 @@ class FlashMini50BConfig:
             "injections", "injection_layer_zero_based", "ngram_orders", "heads_per_order",
             "total_heads", "aggregate_width", "head_dim", "ngram_vocab_size_base",
             "table_capacity_policy", "hash_head_rows", "table_tensor_layout",
-            "dense_machinery", "convolution", "reset_isolation", "training_storage",
+            "dense_machinery", "convolution", "reset_isolation", "hash", "training_storage",
             "inference_storage"
         }, "ple")
+        if ple["hash"] != {
+            "algorithm": "xor_of_odd_splitmix64_multiplier_products_mod_head_prime_v1",
+            "preimage": "x_t_x_t_minus_1_x_t_minus_2_segment_local",
+            "reset_sentinel": "tokenizer_eos_id",
+            "seed": 500_277,
+        }:
+            raise ValueError("v4 PLE hash contract mismatch")
         if (ple["injections"], ple["injection_layer_zero_based"], ple["ngram_orders"], ple["heads_per_order"], ple["total_heads"]) != (1, 1, [2, 3], 8, 16):
             raise ValueError("v4 PLE topology/injection mismatch")
         if (ple["aggregate_width"], ple["head_dim"], ple["ngram_vocab_size_base"]) != (2048, 128, 8_388_608):
@@ -413,5 +462,5 @@ def load_config(path: Path | str = DEFAULT_CONFIG_PATH) -> FlashMini50BConfig:
 
 __all__ = [
     "ARCHITECTURE_VERSION", "CHECKPOINT_ID", "DEFAULT_CONFIG_PATH", "MODEL_ID",
-    "FlashMini50BConfig", "canonical_sha256", "load_config",
+    "FlashMini50BConfig", "architecture_fingerprint_payload", "canonical_sha256", "load_config",
 ]

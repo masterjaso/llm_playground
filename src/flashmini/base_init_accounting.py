@@ -23,9 +23,12 @@ def _is_attention_tensor(name: str) -> bool:
 
 
 def _is_gdn_tensor(name: str) -> bool:
+    # Match the GDN mixer only. ``.mixer.norm_offset`` must not also match
+    # ``mixer_hc.norm_offset`` or PLE ``conv1d``.
     return any(token in name for token in (
-        ".in_proj_qkvz.", ".in_proj_ba.", ".dt_bias", ".A_log", ".norm_offset", ".conv1d.", ".out_proj."
-    )) and not _is_attention_tensor(name)
+        ".mixer.in_proj_qkvz.", ".mixer.in_proj_ba.", ".mixer.dt_bias",
+        ".mixer.A_log", ".mixer.norm_offset", ".mixer.conv1d.", ".mixer.out_proj.",
+    ))
 
 
 def classify_tensor(name: str) -> str:
@@ -73,9 +76,7 @@ def parameter_report(config: FlashMini50BConfig, model: FlashMini50BBaseInit | N
     model = model or build_meta_model(config)
     categories = _empty_counts(_ALL_CATEGORIES)
     tensors: list[dict[str, Any]] = []
-    for name, parameter in model.named_parameters():
-        if not parameter.requires_grad:
-            continue
+    for name, parameter in model.named_logical_tensors():
         category = classify_tensor(name)
         count = int(parameter.numel())
         categories[category] += count

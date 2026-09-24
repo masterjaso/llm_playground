@@ -13,7 +13,13 @@ from flashmini.base_init_optimizer import classify_parameters
 
 
 def test_frozen_config_and_exact_meta_accounting():
+    from flashmini.base_init_accounting import classify_tensor
+
     config = load_config()
+    assert classify_tensor("blocks.0.mixer.norm_offset") == "gdn"
+    assert classify_tensor("blocks.0.mixer_hc.norm_offset") == "hyperconnections"
+    assert classify_tensor("blocks.0.mixer_hc.read_down.weight") == "hyperconnections"
+    assert classify_tensor("ple.conv1d.weight") == "ple_dense_machinery"
     assert config.architecture_version == 4
     assert config.attention_layers == [3, 7, 11, 15, 19, 23, 28, 33, 38, 43]
     assert config.kvc_pairs == [[3, 7], [11, 15], [19, 23], [28, 33], [38, 43]]
@@ -28,19 +34,47 @@ def test_frozen_config_and_exact_meta_accounting():
 
 
 def test_meta_model_topology_and_untied_head():
+    from flashmini.base_init_accounting import classify_tensor
+    from flashmini.base_init_model import AttentionV4, GatedDeltaNetV4
+
     config = load_config()
     with torch.device("meta"):
         model = FlashMini50BBaseInit(config)
     names = dict(model.named_parameters())
+    logical = dict(model.named_logical_tensors())
     assert names["embed_tokens.weight"].shape == (131_072, 2048)
     assert names["lm_head.weight"].shape == (2048, 131_072)
     assert names["embed_tokens.weight"] is not names["lm_head.weight"]
+    assert all(tensor.dtype == torch.bfloat16 or tensor.is_meta for tensor in logical.values())
+    assert len(model.blocks) == 48
+    assert sum(isinstance(block.mixer, GatedDeltaNetV4) for block in model.blocks) == 38
+    assert sum(isinstance(block.mixer, AttentionV4) for block in model.blocks) == 10
+    assert [i for i, block in enumerate(model.blocks) if isinstance(block.mixer, AttentionV4)] == config.attention_layers
+    assert config.attention_layers == [3, 7, 11, 15, 19, 23, 28, 33, 38, 43]
+    assert len(config.kvc_pairs) == 5
+    assert model.ple.store.num_heads == 16
+    assert config.ple_injection_layer == 1
+    assert model.blocks[0].mixer_hc.streams == 4
+    assert model.mtp.block.mixer.role is None
+    assert "mtp.fusion.fc_hidden.weight" in names
     assert sum(name.startswith("mtp.") for name in names) > 0
+    assert not any(name.startswith("ple.tables.") for name in names)
+    assert all(f"ple.tables.{head}.weight" in logical for head in range(16))
     for source, reuse in config.kvc_pairs:
         source_names = [name for name in names if name.startswith(f"blocks.{source}.mixer.")]
         reuse_names = [name for name in names if name.startswith(f"blocks.{reuse}.mixer.")]
         assert any("q_proj" in name for name in source_names)
+        assert any("o_proj" in name for name in reuse_names)
         assert not any("k_proj" in name or "v_proj" in name for name in reuse_names)
+    for name in logical:
+        category = classify_tensor(name)
+        if "mixer_hc" in name or "moe_hc" in name or "final_hc" in name:
+            assert category.endswith("hyperconnections"), name
+        if name.startswith("blocks.") and ".mixer.norm_offset" in name and "mixer_hc" not in name:
+            assert category == "gdn", name
+    for block in model.blocks:
+        assert block.moe.num_experts == 80 and block.moe.top_k == 6
+        assert hasattr(block.moe, "shared_expert") and hasattr(block.moe, "shared_gate")
 
 
 def test_surrogate_forward_backward_mtp_and_kvc():
@@ -48,7 +82,10 @@ def test_surrogate_forward_backward_mtp_and_kvc():
     model = FlashMini50BBaseInit(config)
     input_ids = torch.randint(0, config.vocab_size, (1, 8))
     labels = torch.roll(input_ids, -1, dims=1)
-    result = model(input_ids, labels=labels, mtp_window=3)
+    # mtp_window is the total predicted positions (base + MTP). Window 4 is
+    # base + 3 recursive MTP steps; the previous reading treated the value as
+    # the recursive step count and was incorrect.
+    result = model(input_ids, labels=labels, mtp_window=4)
     assert result["logits"].shape == (1, 8, config.vocab_size)
     assert len(result["mtp_logits"]) == 3
     assert torch.isfinite(result["loss"])
@@ -80,7 +117,8 @@ def test_manifest_is_complete_and_reproducible(tmp_path):
     assert all(item["dtype"] == "bfloat16" for item in manifest["tensors"])
     plan = plan_shards(manifest)
     assert plan["shard_count"] > 20
-    assert all(shard["sha256"] is None for shard in plan["shards"])
+    assert "sha256" not in plan["shards"][0]
+    assert all(shard["bytes"] > 0 for shard in plan["shards"])
     sample = next(item for item in manifest["tensors"] if item["name"] == "blocks.0.moe.router.weight")
     first, second = materialize_tensor(sample), materialize_tensor(sample)
     assert torch.equal(first, second)
@@ -94,7 +132,9 @@ def test_donor_bundle_contains_handoff_contract(tmp_path):
         "flashmini_50b_base_init_v1.yaml", "init_spec.json", "parameter_report.json",
         "tensor_manifest.json", "shard_plan.json", "architecture.md", "training_recipe.md",
         "donor_handoff.md", "source_git_sha.txt", "tokenizer_manifest.json", "environment.lock",
-        "materialization_command.txt", "donor_smoke_test_command.txt",
+        "materialization_command.txt", "preflight_command.txt",
+        "training_launch_command.txt", "source_provenance.json", "rng_reference.json",
+        "train_example.yaml",
     }
     assert required <= {path.name for path in bundle.iterdir()}
     handoff = (bundle / "donor_handoff.md").read_text()
