@@ -49,14 +49,28 @@ def newton_schulz(matrix: torch.Tensor, steps: int = 8, eps: float = 1e-14, dtyp
 def _local(tensor: torch.Tensor) -> torch.Tensor:
     return tensor.to_local() if isinstance(tensor, DTensor) else tensor
 
+def _local_slice_rows(param: torch.Tensor, item) -> torch.Tensor:
+    """Return logical slice row indices in the local storage of the parameter."""
+    if isinstance(param, DTensor):
+        rank = param.device_mesh.get_local_rank()
+        world = param.device_mesh.size()
+        total_rows = int(param.shape[0])
+        chunk = -(-total_rows // world)
+        start, stop = min(rank * chunk, total_rows), min((rank + 1) * chunk, total_rows)
+        rows = item.row_index("cpu")
+        rows = rows[(rows >= start) & (rows < stop)] - start
+        return rows.to(param.to_local().device)
+    return item.row_index(param.device)
+
+
 
 class LogicalMuon(torch.optim.Optimizer):
     def __init__(self, named: list[tuple[str, torch.nn.Parameter, ParameterClass]], *, lr: float, weight_decay: float,
                  momentum: float = 0.95, nesterov: bool = True, ns_steps: int = 8, eps: float = 1e-14,
                  ns_dtype: torch.dtype = torch.float32, group: Any = None):
         for name, _, cls in named:
-            if cls.family != MUON:
-                raise ValueError(f"{name} is {cls.family}, not Muon")
+            if not any(item.family == MUON for item in cls.slices):
+                raise ValueError(f"{name} has no Muon logical slices")
         super().__init__([{"params": [p for _, p, _ in named], "lr": lr, "weight_decay": weight_decay}],
                          {"lr": lr, "weight_decay": weight_decay})
         self.names = [name for name, _, _ in named]
@@ -67,8 +81,10 @@ class LogicalMuon(torch.optim.Optimizer):
         self.rank = dist.get_rank(group) if self.world > 1 else 0
 
     def _orthogonalized(self, full: torch.Tensor, cls: ParameterClass) -> torch.Tensor:
-        update = torch.empty_like(full, dtype=torch.float32)
+        update = torch.zeros_like(full, dtype=torch.float32)
         for item in cls.slices:
+            if item.family != MUON:
+                continue
             rows = item.row_index(full.device)
             matrix = full.index_select(0, rows).float()
             scale = 0.2 * math.sqrt(max(item.rows, item.columns))
@@ -109,8 +125,16 @@ class LogicalMuon(torch.optim.Optimizer):
                 else:
                     update = self._orthogonalized(_local(source), cls)
                 local = _local(param)
-                local.mul_(1 - lr * decay)
-                local.add_(update.to(local.dtype), alpha=-lr)
+                local_update = update.to(local.dtype)
+                for item in cls.slices:
+                    if item.family != MUON:
+                        continue
+                    rows = _local_slice_rows(param, item)
+                    values = local.index_select(0, rows)
+                    if decay:
+                        values = values * (1 - lr * decay)
+                    values = values.add(local_update.index_select(0, rows), alpha=-lr)
+                    local.index_copy_(0, rows, values)
         return None
 
     def state_dict(self):
@@ -122,6 +146,79 @@ class LogicalMuon(torch.optim.Optimizer):
         expected = {name: [item.as_dict() for item in cls.slices] for name, cls in zip(self.names, self.classes)}
         if state_dict.get("flashmini_logical_slices") != expected:
             raise ValueError("Muon checkpoint logical slices do not match the current model")
+        state_dict = dict(state_dict)
+        state_dict.pop("flashmini_logical_slices")
+        super().load_state_dict(state_dict)
+
+
+class LogicalAdamW(torch.optim.Optimizer):
+    """AdamW over only the AdamW logical row slices of dense parameters."""
+
+    def __init__(self, named: list[tuple[str, torch.nn.Parameter, ParameterClass]], *, lr: float,
+                 betas: tuple[float, float], eps: float, weight_decay: dict[str, float]):
+        for name, _, cls in named:
+            if not any(item.family == ADAMW for item in cls.slices):
+                raise ValueError(f"{name} has no AdamW logical slices")
+        super().__init__([{"params": [p for _, p, _ in named], "lr": lr}], {"lr": lr})
+        self.names = [name for name, _, _ in named]
+        self.classes = [cls for _, _, cls in named]
+        self.betas, self.eps = betas, eps
+        self.weight_decay = dict(weight_decay)
+
+    @torch.no_grad()
+    def step(self, closure=None):
+        beta1, beta2 = self.betas
+        for group in self.param_groups:
+            lr = group["lr"]
+            for param, cls in zip(group["params"], self.classes):
+                if param.grad is None:
+                    continue
+                grad = _local(param.grad).float()
+                local = _local(param)
+                state = self.state[param]
+                if "step" not in state:
+                    state["step"] = torch.zeros((), dtype=torch.int64, device=local.device)
+                    state["exp_avg"] = torch.zeros_like(local, dtype=torch.float32)
+                    state["exp_avg_sq"] = torch.zeros_like(local, dtype=torch.float32)
+                state["step"].add_(1)
+                step = int(state["step"].item())
+                exp_avg, exp_avg_sq = _local(state["exp_avg"]), _local(state["exp_avg_sq"])
+                bias1, bias2 = 1 - beta1 ** step, 1 - beta2 ** step
+                for item in cls.slices:
+                    if item.family != ADAMW:
+                        continue
+                    rows = _local_slice_rows(param, item)
+                    if rows.numel() == 0:
+                        continue
+                    g = grad.index_select(0, rows)
+                    m = exp_avg.index_select(0, rows).mul_(beta1).add_(g, alpha=1 - beta1)
+                    v = exp_avg_sq.index_select(0, rows).mul_(beta2).addcmul_(g, g, value=1 - beta2)
+                    values = local.index_select(0, rows)
+                    decay = self.weight_decay[item.decay_class]
+                    if decay:
+                        values = values * (1 - lr * decay)
+                    update = (m / bias1) / ((v / bias2).sqrt().add_(self.eps))
+                    values = values.add(update.to(values.dtype), alpha=-lr)
+                    local.index_copy_(0, rows, values)
+                    exp_avg.index_copy_(0, rows, m)
+                    exp_avg_sq.index_copy_(0, rows, v)
+        return None
+
+    def state_dict(self):
+        state = super().state_dict()
+        state["flashmini_logical_slices"] = {
+            name: [item.as_dict() for item in cls.slices if item.family == ADAMW]
+            for name, cls in zip(self.names, self.classes)
+        }
+        return state
+
+    def load_state_dict(self, state_dict):
+        expected = {
+            name: [item.as_dict() for item in cls.slices if item.family == ADAMW]
+            for name, cls in zip(self.names, self.classes)
+        }
+        if state_dict.get("flashmini_logical_slices") != expected:
+            raise ValueError("AdamW checkpoint logical slices do not match the current model")
         state_dict = dict(state_dict)
         state_dict.pop("flashmini_logical_slices")
         super().load_state_dict(state_dict)
@@ -163,8 +260,8 @@ def classify_model(model, taxonomy: OptimizerTaxonomy) -> list[tuple[str, torch.
         if not param.requires_grad:
             raise ValueError(f"v4 has no frozen parameters; {name} has requires_grad=False")
         cls = taxonomy.classify(name, tuple(param.shape))
-        if cls.family not in {MUON, ADAMW}:
-            raise ValueError(f"{name}: dense parameter classified as {cls.family}")
+        if not {item.family for item in cls.slices} <= {MUON, ADAMW}:
+            raise ValueError(f"{name}: dense parameter has unsupported logical families")
         result.append((name, param, cls))
     for name in model.ple.store.names():
         if taxonomy.classify(name, (model.ple.store.rows[int(name.split('.')[2])], model.ple.store.head_dim)).family != PLE_ADAM:
@@ -179,18 +276,15 @@ class OptimizerStack:
                  ple_group: Any = None):
         self.settings = settings
         classified = classify_model(model, taxonomy)
-        muon = [item for item in classified if item[2].family == MUON]
-        adamw = [item for item in classified if item[2].family == ADAMW]
+        muon = [item for item in classified if any(s.family == MUON for s in item[2].slices)]
+        adamw = [item for item in classified if any(s.family == ADAMW for s in item[2].slices)]
         self.families = {MUON: [p for _, p, _ in muon], ADAMW: [p for _, p, _ in adamw]}
+        self.dense_params = [p for _, p, _ in classified]
         self.muon = LogicalMuon(muon, lr=settings.muon_lr, weight_decay=settings.muon_weight_decay,
                                 ns_dtype=getattr(torch, settings.muon_ns_dtype), group=group)
-        groups = []
-        for decay_class in ("embedding", "control_matrix", "no_decay"):
-            params = [p for _, p, cls in adamw if cls.decay_class == decay_class]
-            if params:
-                groups.append({"params": params, "weight_decay": settings.adamw_weight_decay[decay_class], "decay_class": decay_class})
-        self.adamw_names = [name for _, _, cls in adamw for name in [cls.name]]
-        self.adamw = torch.optim.AdamW(groups, lr=settings.adamw_lr, betas=settings.adamw_betas, eps=settings.adamw_eps, foreach=False)
+        self.adamw_names = [name for name, _, _ in adamw]
+        self.adamw = LogicalAdamW(adamw, lr=settings.adamw_lr, betas=settings.adamw_betas,
+                                  eps=settings.adamw_eps, weight_decay=settings.adamw_weight_decay)
         self.ple = PLESparseAdam(model.ple.store, lr=settings.ple_lr, betas=settings.ple_betas, eps=settings.ple_eps, group=ple_group)
         self.base_lr = {"muon": settings.muon_lr, "adamw": settings.adamw_lr, "ple": settings.ple_lr}
         self.lr_multiplier = 1.0
@@ -226,7 +320,8 @@ class OptimizerStack:
         reduced = self.ple.reduce_gradients()
         squared = {MUON: self._squared_norm(self.families[MUON]), ADAMW: self._squared_norm(self.families[ADAMW]),
                    PLE_ADAM: self.ple.global_squared_norm(reduced)}
-        total = math.sqrt(float(sum(squared.values())))
+        dense_squared = self._squared_norm(self.dense_params)
+        total = math.sqrt(float(dense_squared + squared[PLE_ADAM]))
         norms = {family: math.sqrt(float(value)) for family, value in squared.items()}
         if not math.isfinite(total):
             self.zero_grad()
@@ -234,10 +329,9 @@ class OptimizerStack:
         clip = self.settings.grad_clip
         coefficient = min(1.0, clip / (total + 1e-6)) if clip > 0 else 1.0
         if coefficient < 1.0:
-            for params in self.families.values():
-                for param in params:
-                    if param.grad is not None:
-                        param.grad.mul_(coefficient)
+            for param in self.dense_params:
+                if param.grad is not None:
+                    param.grad.mul_(coefficient)
         self.muon.step()
         self.adamw.step()
         self.ple.step(reduced, lr=self.base_lr["ple"] * self.lr_multiplier, grad_scale=coefficient)
@@ -257,4 +351,4 @@ class OptimizerStack:
         self.set_lr_multiplier(state["lr_multiplier"])
 
 
-__all__ = ["LogicalMuon", "OptimizerSettings", "OptimizerStack", "classify_model", "newton_schulz"]
+__all__ = ["LogicalAdamW", "LogicalMuon", "OptimizerSettings", "OptimizerStack", "classify_model", "newton_schulz"]

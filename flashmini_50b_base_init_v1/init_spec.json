@@ -1,9 +1,9 @@
 {
-  "architecture_sha256": "cb62c5d3f6234585bf689a4c28207c793654f9fb56c8b179026e6297289bd1f9",
+  "architecture_sha256": "93db9ff8ae480999afaa98e6893f9be0978e87683bab8c52eb0228c9313aba70",
   "architecture_version": 4,
   "checkpoint_id": "FlashMini-50B-Base-Init-v1",
   "chunk_elements": 1048576,
-  "config_sha256": "05667f1e3ab4e5378bb655dca399244bd5f2907c70aa98bda6cf23eb83e29dcb",
+  "config_sha256": "ad29879d043e09d78b96b42c1d2a6e63df81e01978755b59d80c91a9b8a712b1",
   "dtype": "bfloat16",
   "expected_shard_hashes": "shard_hashes.json",
   "generator": "torch.Generator(device='cpu') per (name, chunk); float32 draw then round to bfloat16",
@@ -147,7 +147,7 @@
   "model_id": "FlashMini-50B-Base",
   "optimizer_contract": {
     "adamw": {
-      "parameters": "embeddings, lm_head, routers, shared gates, HC controls, GDN beta/decay controls, norms, scalars, short convolutions",
+      "parameters": "embeddings, lm_head, routers, attention/GDN output gates, shared gates, HC controls, GDN beta/decay controls, norms, scalars, short convolutions",
       "weight_decay_classes": [
         "embedding",
         "control_matrix",
@@ -181,13 +181,13 @@
   "schema_version": 2,
   "seed_algorithm": "flashmini-sha256-name-seed-v1",
   "shard_mapping": "model.safetensors.index.json",
-  "source_git_sha": "37862655989083a91f1f091cc71fbebc14ac0f4b",
+  "source_git_sha": "5387a53a6cbe81ca82339360fb4adcedfec1cb6f",
   "source_provenance": {
     "bundle_directory": "flashmini_50b_base_init_v1",
     "rule": "HEAD must equal source_commit outside flashmini_50b_base_init_v1/ and reproduce source_tree_sha256",
-    "source_commit": "37862655989083a91f1f091cc71fbebc14ac0f4b",
+    "source_commit": "5387a53a6cbe81ca82339360fb4adcedfec1cb6f",
     "source_tree_algorithm": "sha256(git ls-tree -r --full-tree <commit>, excluding flashmini_50b_base_init_v1/)",
-    "source_tree_sha256": "78c5d80ffcdcd39f68f333698841f1a4398e3bb9461f780e1dac7616a90be9c7"
+    "source_tree_sha256": "5ed8ad6e83c155bbd773034150e2a9e6347e5fe03b461d01320e5b2598dadb66"
   },
   "tensor_manifest": "tensor_manifest.json",
   "tokenizer": {

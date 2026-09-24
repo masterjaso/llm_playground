@@ -239,8 +239,8 @@ class GatedDeltaNetV4(nn.Module):
 
     ``in_proj_qkvz`` physically stores, per key head, ``[q(128) k(128) v(256) z(256)]``
     and ``in_proj_ba`` stores ``[beta(2) a(2)]``; each is a separate logical operator.
-    The depthwise short convolution is applied additively (``x + conv(x)``) on the
-    q/k/v channels, the reviewed FlashMini v4 formulation.
+    The q/k/v path follows Qwen3-Next semantics: causal depthwise convolution followed
+    by SiLU, with no additive residual around the short convolution.
     """
 
     def __init__(self, config: FlashMini50BConfig, chunk_size: int = 64, kernel: str = "chunked"):
@@ -275,8 +275,12 @@ class GatedDeltaNetV4(nn.Module):
         beta = beta_raw.reshape(batch, steps, self.num_v_heads).float().sigmoid()
         a = a_raw.reshape(batch, steps, self.num_v_heads)
         conv_input = torch.cat((query.reshape(batch, steps, self.key_dim), key.reshape(batch, steps, self.key_dim), value.reshape(batch, steps, self.value_dim)), dim=-1)
-        conv = F.conv1d(F.pad(conv_input.transpose(1, 2), (self.conv1d.kernel_size[0] - 1, 0)), self.conv1d.weight, groups=self.conv_dim)[..., :steps].transpose(1, 2)
-        mixed_qkv = conv_input + conv
+        conv = F.conv1d(
+            F.pad(conv_input.transpose(1, 2), (self.conv1d.kernel_size[0] - 1, 0)),
+            self.conv1d.weight,
+            groups=self.conv_dim,
+        )[..., :steps].transpose(1, 2)
+        mixed_qkv = F.silu(conv)
         query = mixed_qkv[..., :self.key_dim].reshape(batch, steps, self.num_k_heads, self.head_k)
         key = mixed_qkv[..., self.key_dim:2 * self.key_dim].reshape(batch, steps, self.num_k_heads, self.head_k)
         value = mixed_qkv[..., 2 * self.key_dim:].reshape(batch, steps, self.num_v_heads, self.head_v)

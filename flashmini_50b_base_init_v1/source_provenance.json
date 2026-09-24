@@ -1,7 +1,7 @@
 {
   "bundle_directory": "flashmini_50b_base_init_v1",
   "rule": "HEAD must equal source_commit outside flashmini_50b_base_init_v1/ and reproduce source_tree_sha256",
-  "source_commit": "37862655989083a91f1f091cc71fbebc14ac0f4b",
+  "source_commit": "5387a53a6cbe81ca82339360fb4adcedfec1cb6f",
   "source_tree_algorithm": "sha256(git ls-tree -r --full-tree <commit>, excluding flashmini_50b_base_init_v1/)",
-  "source_tree_sha256": "78c5d80ffcdcd39f68f333698841f1a4398e3bb9461f780e1dac7616a90be9c7"
+  "source_tree_sha256": "5ed8ad6e83c155bbd773034150e2a9e6347e5fe03b461d01320e5b2598dadb66"
 }

@@ -2,7 +2,7 @@
 
 `FlashMini-50B-Base` / `FlashMini-50B-Base-Init-v1`. The canonical YAML
 (`flashmini_50b_base_init_v1.yaml`) is the source of truth; `architecture_sha256`
-(cb62c5d3f6234585bf689a4c28207c793654f9fb56c8b179026e6297289bd1f9) covers every geometry field and excludes
+(93db9ff8ae480999afaa98e6893f9be0978e87683bab8c52eb0228c9313aba70) covers every geometry field and excludes
 training, inference, storage and provenance metadata.
 
 - vocab 131072, d_model 2048, 48 layers (38 Gated DeltaNet, 10 attention at 1-based 4,8,12,16,20,24,29,34,39,44)
@@ -15,4 +15,4 @@ training, inference, storage and provenance metadata.
 
 Parameters: base 50,276,673,408; MTP 685,511,168; total 50,962,184,576; active base per token 4,894,079,872.
 
-GDN short convolution is additive (`x + conv(x)`) as frozen in the v4 design, not Qwen's `silu(conv(x))`.
+GDN short convolution follows Qwen3-Next semantics: causal depthwise convolution followed by SiLU, with no additive residual around the convolution.

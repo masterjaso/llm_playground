@@ -145,6 +145,17 @@ def test_gdn_module_kernels_agree(config):
     torch.testing.assert_close(chunked(hidden), recurrent(hidden), atol=1e-5, rtol=1e-4)
 
 
+def test_gdn_short_conv_is_qwen_silu_without_additive_residual(config):
+    gdn = GatedDeltaNetV4(config, kernel="recurrent")
+    hidden = torch.randn(2, 5, config.d_model)
+    with torch.no_grad():
+        gdn.conv1d.weight.zero_()
+    query, key, value, _, _, _ = gdn._project(hidden)
+    assert torch.count_nonzero(query) == 0
+    assert torch.count_nonzero(key) == 0
+    assert torch.count_nonzero(value) == 0
+
+
 # -- PLE -----------------------------------------------------------------------------
 
 def _python_keys(ple, components):

@@ -12,7 +12,7 @@ from flashmini.base_init_config import load_config
 from flashmini.base_init_model import FlashMini50BBaseInit, surrogate_config
 from flashmini.base_init_optimizer import ADAMW, MUON, PLE_ADAM, OptimizerTaxonomy
 from flashmini.v4_balance import RouterBalance
-from flashmini.v4_optim import LogicalMuon, OptimizerSettings, OptimizerStack, newton_schulz
+from flashmini.v4_optim import LogicalAdamW, LogicalMuon, OptimizerSettings, OptimizerStack, newton_schulz
 from flashmini.v4_ple_store import PLESparseAdam, PLETableStore
 
 SETTINGS = {
@@ -41,7 +41,8 @@ def test_every_production_tensor_is_classified_and_partitioned():
     for name, tensor in build_meta_model(config).named_logical_tensors():
         cls = taxonomy.classify(name, tuple(tensor.shape))
         _assert_partition(cls)
-        families[cls.family] += 1
+        for family in {item.family for item in cls.slices}:
+            families[family] += 1
     assert families[PLE_ADAM] == 16 and families[MUON] > 10_000 and families[ADAMW] > 500
 
 
@@ -51,6 +52,7 @@ def test_fused_projections_split_into_logical_operators(config):
     heads, dim = attention["query_heads"], attention["head_dim"]
     q = taxonomy.classify("blocks.3.mixer.q_proj.weight", (heads * dim * 2, config.d_model))
     assert [s.logical_operator for s in q.slices] == ["attention_query", "attention_output_gate"]
+    assert [s.family for s in q.slices] == [MUON, ADAMW]
     query_rows = q.slices[0].row_index()
     assert query_rows[:dim].tolist() == list(range(dim))
     assert query_rows[dim:2 * dim].tolist() == list(range(2 * dim, 3 * dim))
@@ -59,7 +61,8 @@ def test_fused_projections_split_into_logical_operators(config):
     widths = [gdn["key_head_dim"], gdn["key_head_dim"], ratio * gdn["value_head_dim"], ratio * gdn["value_head_dim"]]
     qkvz = taxonomy.classify("blocks.0.mixer.in_proj_qkvz.weight", (gdn["key_query_heads"] * sum(widths), config.d_model))
     assert [s.logical_operator for s in qkvz.slices] == ["gdn_query", "gdn_key", "gdn_value", "gdn_output_gate_z"]
-    assert [s.width for s in qkvz.slices] == widths and all(s.family == MUON for s in qkvz.slices)
+    assert [s.width for s in qkvz.slices] == widths
+    assert [s.family for s in qkvz.slices] == [MUON, MUON, MUON, ADAMW]
     ba = taxonomy.classify("blocks.0.mixer.in_proj_ba.weight", (gdn["value_heads"] * 2, config.d_model))
     assert [s.logical_operator for s in ba.slices] == ["gdn_beta", "gdn_decay_a"] and ba.family == ADAMW
     mtp_q = taxonomy.classify("mtp.block.mixer.q_proj.weight", (heads * dim * 2, config.d_model))
@@ -95,6 +98,8 @@ def test_muon_orthogonalizes_each_logical_slice_separately(config):
     muon.step()
     expected = torch.zeros(shape)
     for item in cls.slices:
+        if item.family != MUON:
+            continue
         rows = item.row_index()
         expected[rows] = -newton_schulz(param.grad[rows]) * 0.2 * math.sqrt(max(item.rows, item.columns))
     torch.testing.assert_close(param.detach(), expected, atol=1e-5, rtol=1e-4)
@@ -105,17 +110,47 @@ def test_muon_orthogonalizes_each_logical_slice_separately(config):
 def test_optimizer_stack_families_and_decay_classes(config):
     model = FlashMini50BBaseInit(config)
     stack = OptimizerStack(model, OptimizerTaxonomy(config), OptimizerSettings.from_mapping(SETTINGS))
-    groups = {group["decay_class"]: group for group in stack.adamw.param_groups}
-    assert groups["no_decay"]["weight_decay"] == 0.0
-    assert groups["embedding"]["weight_decay"] == 0.05 and groups["control_matrix"]["weight_decay"] == 0.1
-    embedding_ids = {id(p) for p in groups["embedding"]["params"]}
-    assert id(model.embed_tokens.weight) in embedding_ids and id(model.lm_head.weight) in embedding_ids
+    assert isinstance(stack.adamw, LogicalAdamW)
+    assert stack.adamw.weight_decay == {"embedding": 0.05, "control_matrix": 0.1, "no_decay": 0.0}
+    adamw_ids = {id(p) for p in stack.adamw.param_groups[0]["params"]}
+    assert id(model.embed_tokens.weight) in adamw_ids and id(model.lm_head.weight) in adamw_ids
     muon_ids = {id(p) for p in stack.muon.param_groups[0]["params"]}
     assert id(model.blocks[0].moe.experts[0].gate_proj.weight) in muon_ids
     assert id(model.blocks[0].moe.router.weight) not in muon_ids
+    mixed = model.blocks[3].mixer.q_proj.weight
+    assert id(mixed) in muon_ids and id(mixed) in adamw_ids
     assert stack.ple.lr == 1e-2
-    total = len(muon_ids) + sum(len(g["params"]) for g in stack.adamw.param_groups)
-    assert total == sum(1 for _ in model.parameters())
+    covered = muon_ids | adamw_ids
+    assert covered == {id(p) for p in model.parameters()}
+
+
+def test_mixed_attention_projection_uses_muon_for_query_and_adamw_for_gate(config):
+    taxonomy = OptimizerTaxonomy(config)
+    attention = config.section("attention")
+    shape = (attention["query_heads"] * attention["head_dim"] * 2, config.d_model)
+    cls = taxonomy.classify("blocks.3.mixer.q_proj.weight", shape)
+    param = torch.nn.Parameter(torch.zeros(shape))
+    param.grad = torch.ones_like(param)
+
+    muon = LogicalMuon(
+        [("blocks.3.mixer.q_proj.weight", param, cls)],
+        lr=0.1, weight_decay=0.0, momentum=0.0, nesterov=False,
+    )
+    adamw = LogicalAdamW(
+        [("blocks.3.mixer.q_proj.weight", param, cls)],
+        lr=0.01, betas=(0.0, 0.0), eps=1e-8,
+        weight_decay={"embedding": 0.0, "control_matrix": 0.0, "no_decay": 0.0},
+    )
+    muon.step()
+    after_muon = param.detach().clone()
+    query_rows = cls.slices[0].row_index()
+    gate_rows = cls.slices[1].row_index()
+    assert torch.count_nonzero(after_muon.index_select(0, query_rows)) > 0
+    assert torch.count_nonzero(after_muon.index_select(0, gate_rows)) == 0
+
+    adamw.step()
+    assert torch.equal(param.detach().index_select(0, query_rows), after_muon.index_select(0, query_rows))
+    assert torch.count_nonzero(param.detach().index_select(0, gate_rows)) > 0
 
 
 def test_optimizer_settings_require_explicit_values():
