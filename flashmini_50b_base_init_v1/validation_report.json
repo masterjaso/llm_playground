@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "verdict": "FLASHMINI-50B V4 TRAINING READY",
-  "source_commit_sha": "6b07972b2d0f0d82cd1e256b2ed076ba9b02caf2",
+  "source_commit_sha": "37862655989083a91f1f091cc71fbebc14ac0f4b",
   "branch": "main",
   "config_sha256": "05667f1e3ab4e5378bb655dca399244bd5f2907c70aa98bda6cf23eb83e29dcb",
   "architecture_sha256": "cb62c5d3f6234585bf689a4c28207c793654f9fb56c8b179026e6297289bd1f9",

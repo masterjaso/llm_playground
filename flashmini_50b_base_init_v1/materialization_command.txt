@@ -1,1 +1,5 @@
+# First run on a host that does not yet have shard_hashes.json:
+python -m flashmini.base_init_bundle materialize --bundle flashmini_50b_base_init_v1 --output /path/to/flashmini_50b_init_checkpoint --no-expected-hashes
+python -m flashmini.base_init_bundle record-hashes --bundle flashmini_50b_base_init_v1 --receipt /path/to/flashmini_50b_init_checkpoint/materialization_receipt.json
+# Subsequent runs check every shard against shard_hashes.json:
 python -m flashmini.base_init_bundle materialize --bundle flashmini_50b_base_init_v1 --output /path/to/flashmini_50b_init_checkpoint

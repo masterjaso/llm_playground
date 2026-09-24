@@ -181,13 +181,13 @@
   "schema_version": 2,
   "seed_algorithm": "flashmini-sha256-name-seed-v1",
   "shard_mapping": "model.safetensors.index.json",
-  "source_git_sha": "6b07972b2d0f0d82cd1e256b2ed076ba9b02caf2",
+  "source_git_sha": "37862655989083a91f1f091cc71fbebc14ac0f4b",
   "source_provenance": {
     "bundle_directory": "flashmini_50b_base_init_v1",
     "rule": "HEAD must equal source_commit outside flashmini_50b_base_init_v1/ and reproduce source_tree_sha256",
-    "source_commit": "6b07972b2d0f0d82cd1e256b2ed076ba9b02caf2",
+    "source_commit": "37862655989083a91f1f091cc71fbebc14ac0f4b",
     "source_tree_algorithm": "sha256(git ls-tree -r --full-tree <commit>, excluding flashmini_50b_base_init_v1/)",
-    "source_tree_sha256": "078bde3c71449536deb42ddb224bf897ed9625a89f5dd4129d5fad56dc316cc4"
+    "source_tree_sha256": "78c5d80ffcdcd39f68f333698841f1a4398e3bb9461f780e1dac7616a90be9c7"
   },
   "tensor_manifest": "tensor_manifest.json",
   "tokenizer": {
