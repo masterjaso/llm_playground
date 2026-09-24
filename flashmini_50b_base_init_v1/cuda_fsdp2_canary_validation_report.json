@@ -1,0 +1,148 @@
+{
+  "schema_version": 1,
+  "validation_kind": "flashmini_50b_cuda_fsdp2_canary",
+  "timestamp_utc": "2026-09-24T14:35:41.018693Z",
+  "tested_main_commit": "e4996f6f2e1c626cb8fafe46b060378db78c256b",
+  "tested_git_sha": "e4996f6f2e1c626cb8fafe46b060378db78c256b",
+  "source_architecture_commit": "5387a53a6cbe81ca82339360fb4adcedfec1cb6f",
+  "source_is_ancestor": true,
+  "machine": {
+    "gpus": [
+      {
+        "index": 0,
+        "name": "NVIDIA GeForce RTX 5060 Ti",
+        "total_memory_bytes": 17102864384
+      },
+      {
+        "index": 1,
+        "name": "NVIDIA GeForce RTX 5060 Ti",
+        "total_memory_bytes": 17102864384
+      }
+    ],
+    "host_ram_available_bytes": 15006568448,
+    "shm_free_bytes": 16828645376,
+    "python": "3.13.14",
+    "torch": "2.14.0+cu130",
+    "torch_cuda": "13.0",
+    "driver": "610.88"
+  },
+  "gates": {
+    "focused_software_tests": "PASS",
+    "full_flashmini_tests": "PASS",
+    "taxonomy_mixed_fused_tensors": "PASS",
+    "complete_materialization": "PASS",
+    "fresh_shard_hashes_recorded": "PASS",
+    "deterministic_rematerialization": "PASS",
+    "checkpoint_verify": "PASS",
+    "full_preflight": "FAIL",
+    "fsdp2_initialization": "NOT_RUN",
+    "optimizer_step_1": "NOT_RUN",
+    "optimizer_step_2": "NOT_RUN",
+    "checkpoint_write": "NOT_RUN",
+    "resume": "NOT_RUN",
+    "optimizer_step_3": "NOT_RUN",
+    "mixed_muon_adamw_runtime": "NOT_RUN",
+    "qwen_gdn_conv_runtime": "NOT_RUN",
+    "ple_runtime": "NOT_RUN",
+    "mtp_runtime": "NOT_RUN"
+  },
+  "materialization": {
+    "all_shards_emitted": true,
+    "shard_count": 32,
+    "total_bytes": 101925875912,
+    "expected_hashes_checked_on_rematerialize": true,
+    "mismatches": []
+  },
+  "verify": {
+    "ok": true,
+    "problems": [],
+    "tensors": 12748,
+    "parameters": 50962184576,
+    "shards_checked": 32,
+    "hashes_checked": true,
+    "recomputed": [
+      "blocks.0.mixer.A_log",
+      "ple.conv1d.weight",
+      "mtp.fusion.fc_hidden.weight"
+    ]
+  },
+  "preflight_checks": {
+    "source_provenance": "PASS",
+    "config_and_architecture_sha": "PASS",
+    "tokenizer": "PASS",
+    "parameter_count": "PASS",
+    "optimizer_classification": "PASS",
+    "environment": "FAIL",
+    "checkpoint_shards": "PASS",
+    "training_hyperparameters": "PASS",
+    "ple_storage": "FAIL",
+    "distributed_topology": "FAIL"
+  },
+  "preflight_problems": {
+    "environment": [
+      "python 3.13.14 != pinned 3.13.15"
+    ],
+    "ple_storage": [
+      "PLE storage unavailable: node needs 172,337,853,408 host bytes, 16,042,872,832 available",
+      "PLE storage unavailable: /dev/shm/flashmini_ple has 16,828,645,376 bytes free, tables need 34,360,195,072"
+    ],
+    "distributed_topology": [
+      "incompatible topology: ~272,974,155,520 bytes/GPU of sharded state exceeds 80% of 17,102,864,384"
+    ]
+  },
+  "resource_gap": {
+    "topology_requested": {
+      "nodes": 1,
+      "gpus_per_node": 2,
+      "strategy": "fsdp2"
+    },
+    "gpu_count_available": 2,
+    "gpu_memory_bytes": 17102864384,
+    "preflight_needed_bytes_per_gpu": 272974155520,
+    "preflight_80pct_budget": 13682291507,
+    "topology_would_pass": false,
+    "min_world_size_estimate_for_16gb": 64,
+    "ple_need": {
+      "table_bytes": 34360195072,
+      "table_replicas_per_node": 1,
+      "node_state_bytes": 137977658336,
+      "node_total_bytes": 172337853408,
+      "heads": 16
+    },
+    "host_available_bytes": 15006568448,
+    "shm_free_bytes": 16828645376,
+    "ple_would_pass": false,
+    "python_pin_gap": {
+      "have": "3.13.14",
+      "need": "3.13.15"
+    }
+  },
+  "config_sha256": "ad29879d043e09d78b96b42c1d2a6e63df81e01978755b59d80c91a9b8a712b1",
+  "architecture_sha256": "93db9ff8ae480999afaa98e6893f9be0978e87683bab8c52eb0228c9313aba70",
+  "gdn_frozen": {
+    "short_conv_kernel": 4,
+    "short_conv_activation": "silu",
+    "short_conv_residual": false,
+    "source_note": "base_init_model.py uses F.silu(causal_depthwise_conv(qkv)) with no additive residual; runtime FSDP2 execution was NOT reached on this host"
+  },
+  "taxonomy_software": {
+    "blocks.3.mixer.q_proj.weight": [
+      "Muon",
+      "AdamW"
+    ],
+    "blocks.0.mixer.in_proj_qkvz.weight": [
+      "Muon",
+      "Muon",
+      "Muon",
+      "AdamW"
+    ],
+    "runtime_fsdp2_exercised": false
+  },
+  "first_unresolved_blocker": {
+    "class": "insufficient GPU memory + insufficient host/PLE memory + environment/toolchain defect",
+    "primary": "distributed_topology",
+    "detail": "FSDP2 preflight requires ~272.97 GiB/GPU sharded-state budget on world_size=2; available 2x RTX 5060 Ti @ 16 GiB. Independently, PLE needs 172.34 GiB host and 34.36 GiB /dev/shm; host has ~16 GiB available and /dev/shm has ~16 GiB free. Python is 3.13.14 vs pinned 3.13.15 (packages otherwise match environment.lock).",
+    "repair_recommendation": "Re-run this exact canary on donor hardware with (a) Python 3.13.15 matching environment.lock, (b) host RAM and /dev/shm large enough for PLE tables (~34.4 GiB shm + ~172 GiB node host budget), and (c) enough GPUs that preflight topology estimate fits under 80% VRAM (about 64x16GiB-class or fewer larger GPUs, strategy=fsdp2). Do not weaken model/precision/PLE/FSDP2."
+  },
+  "final_verdict": "FLASHMINI-50B CUDA/FSDP2 CANARY: FAIL"
+}
