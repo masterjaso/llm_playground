@@ -457,7 +457,8 @@ Tokenizer fingerprint: `{tokenizer['fingerprint']}`.
 1. Check out `main` at or after the source commit; outside `{BUNDLE_DIRNAME}/` it must equal the source commit.
 2. Create the environment from `environment.lock` (Python {PINNED_PYTHON}).
 3. Materialize all {plan['shard_count']} shards ({plan['planned_bytes']:,} bytes): see `materialization_command.txt`.
-   Every shard is checked against `shard_hashes.json`.
+   The first run uses `--no-expected-hashes` and then `record-hashes`. After
+   `shard_hashes.json` exists, rematerialize once so every shard is checked.
 4. Run preflight: see `preflight_command.txt`. It must end with `FLASHMINI V4 TRAINING PREFLIGHT: PASS`.
 5. Fill every null in a copy of `train_example.yaml`, then launch with `training_launch_command.txt`.
 6. Resume: rerun the same launch command; the runner restores `checkpoint.dir/latest`.
@@ -496,6 +497,10 @@ def write_bundle(destination: Path | str = DEFAULT_BUNDLE, *, config_path: Path 
     (destination / "source_git_sha.txt").write_text(provenance["source_commit"] + "\n")
     (destination / "environment.lock").write_text(environment_lock_text(environment))
     (destination / "materialization_command.txt").write_text(
+        "# First run on a host that does not yet have shard_hashes.json:\n"
+        "python -m flashmini.base_init_bundle materialize --bundle flashmini_50b_base_init_v1 --output /path/to/flashmini_50b_init_checkpoint --no-expected-hashes\n"
+        "python -m flashmini.base_init_bundle record-hashes --bundle flashmini_50b_base_init_v1 --receipt /path/to/flashmini_50b_init_checkpoint/materialization_receipt.json\n"
+        "# Subsequent runs check every shard against shard_hashes.json:\n"
         "python -m flashmini.base_init_bundle materialize --bundle flashmini_50b_base_init_v1 --output /path/to/flashmini_50b_init_checkpoint\n")
     (destination / "preflight_command.txt").write_text(
         "python -m flashmini.v4_preflight --bundle flashmini_50b_base_init_v1 --checkpoint /path/to/flashmini_50b_init_checkpoint --train-config /path/to/train.yaml\n")
