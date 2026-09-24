@@ -1,8 +1,13 @@
 {
   "source_commit": "5387a53a6cbe81ca82339360fb4adcedfec1cb6f",
-  "validation_head": "5387a53a6cbe81ca82339360fb4adcedfec1cb6f",
-  "github_actions_run_id": "36004665616",
+  "validation_head": "e4996f6f2e1c626cb8fafe46b060378db78c256b",
   "focused_validation": "PASS",
   "full_flashmini_suite": "PASS",
-  "note": "Bundle regenerated after Qwen-aligned optimizer gate slicing and GDN SiLU short-convolution repair. Fresh shard hashes intentionally deferred to hardware materialization canary."
+  "materialization": "PASS",
+  "deterministic_shard_hashes": "PASS",
+  "checkpoint_verify": "PASS",
+  "full_preflight": "FAIL",
+  "cuda_fsdp2_canary": "FAIL",
+  "report": "cuda_fsdp2_canary_validation_report.json",
+  "note": "Software contracts, complete deterministic materialization, shard hashes, and bitwise/recompute verify PASSED. Full CUDA/FSDP2 training canary STOPPED at preflight: insufficient GPU VRAM, insufficient host/PLE memory, and Python 3.13.14!=3.13.15. Not safe to declare donor training PASS on this host."
 }
