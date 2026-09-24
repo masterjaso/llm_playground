@@ -182,7 +182,7 @@ class LogicalAdamW(torch.optim.Optimizer):
                     state["exp_avg_sq"] = torch.zeros_like(local, dtype=torch.float32)
                 state["step"].add_(1)
                 step = int(state["step"].item())
-                exp_avg, exp_avg_sq = state["exp_avg"], state["exp_avg_sq"]
+                exp_avg, exp_avg_sq = _local(state["exp_avg"]), _local(state["exp_avg_sq"])
                 bias1, bias2 = 1 - beta1 ** step, 1 - beta2 ** step
                 for item in cls.slices:
                     if item.family != ADAMW:
