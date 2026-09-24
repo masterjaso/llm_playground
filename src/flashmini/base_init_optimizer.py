@@ -80,11 +80,20 @@ def _whole(name: str, shape: tuple[int, ...], operator: str, family: str, decay:
 
 
 def _interleaved(name: str, shape: tuple[int, ...], blocks: int, parts: list[tuple[str, int]], family: str, decay: str) -> tuple[LogicalSlice, ...]:
-    block = sum(width for _, width in parts)
+    return _interleaved_mixed(name, shape, blocks, [(operator, width, family, decay) for operator, width in parts])
+
+
+def _interleaved_mixed(
+    name: str,
+    shape: tuple[int, ...],
+    blocks: int,
+    parts: list[tuple[str, int, str, str]],
+) -> tuple[LogicalSlice, ...]:
+    block = sum(width for _, width, _, _ in parts)
     if block * blocks != shape[0]:
-        raise ValueError(f"{name}: fused layout {parts} x {blocks} does not cover {shape[0]} rows")
+        raise ValueError(f"{name}: fused layout {[(op, width) for op, width, _, _ in parts]} x {blocks} does not cover {shape[0]} rows")
     slices, offset = [], 0
-    for operator, width in parts:
+    for operator, width, family, decay in parts:
         slices.append(LogicalSlice(name, operator, family, decay, block, offset, width, blocks, shape[1]))
         offset += width
     return tuple(slices)
@@ -110,10 +119,12 @@ class OptimizerTaxonomy:
         if not bool((covered == 1).all()):
             raise ValueError(f"{name}: logical slices do not partition the tensor rows exactly")
         families = {item.family for item in slices}
-        family = families.pop() if len(families) == 1 else "mixed"
+        family = next(iter(families)) if len(families) == 1 else "mixed"
+        decay_classes = {item.decay_class for item in slices}
+        decay_class = next(iter(decay_classes)) if len(decay_classes) == 1 else "mixed"
         operator = slices[0].logical_operator if len(slices) == 1 else "+".join(item.logical_operator for item in slices)
         numel = int(torch.Size(shape).numel())
-        return ParameterClass(name, family, operator, shape, numel, slices[0].decay_class, slices)
+        return ParameterClass(name, family, operator, shape, numel, decay_class, slices)
 
     def _slices(self, name: str, shape: tuple[int, ...]) -> tuple[LogicalSlice, ...]:
         local = name[4:] if name.startswith("mtp.") else name
@@ -121,11 +132,19 @@ class OptimizerTaxonomy:
         if re.fullmatch(r"ple\.tables\.\d+\.weight", local):
             return _whole(name, shape, "ple_hash_table", PLE_ADAM, "ple_table")
         rules: list[tuple[str, Any]] = [
-            (r"(block|blocks\.\d+)\.mixer\.q_proj\.weight", lambda: _interleaved(name, shape, self.q_heads, [(prefix + "attention_query", self.head_dim), (prefix + "attention_output_gate", self.head_dim)], MUON, "muon_matrix")),
+            (r"(block|blocks\.\d+)\.mixer\.q_proj\.weight", lambda: _interleaved_mixed(name, shape, self.q_heads, [
+                (prefix + "attention_query", self.head_dim, MUON, "muon_matrix"),
+                (prefix + "attention_output_gate", self.head_dim, ADAMW, "control_matrix"),
+            ])),
             (r"(block|blocks\.\d+)\.mixer\.k_proj\.weight", lambda: _whole(name, shape, prefix + "attention_key", MUON, "muon_matrix")),
             (r"(block|blocks\.\d+)\.mixer\.v_proj\.weight", lambda: _whole(name, shape, prefix + "attention_value", MUON, "muon_matrix")),
             (r"(block|blocks\.\d+)\.mixer\.o_proj\.weight", lambda: _whole(name, shape, prefix + "attention_output", MUON, "muon_matrix")),
-            (r"blocks\.\d+\.mixer\.in_proj_qkvz\.weight", lambda: _interleaved(name, shape, self.k_heads, [("gdn_query", self.head_k), ("gdn_key", self.head_k), ("gdn_value", self.v_ratio * self.head_v), ("gdn_output_gate_z", self.v_ratio * self.head_v)], MUON, "muon_matrix")),
+            (r"blocks\.\d+\.mixer\.in_proj_qkvz\.weight", lambda: _interleaved_mixed(name, shape, self.k_heads, [
+                ("gdn_query", self.head_k, MUON, "muon_matrix"),
+                ("gdn_key", self.head_k, MUON, "muon_matrix"),
+                ("gdn_value", self.v_ratio * self.head_v, MUON, "muon_matrix"),
+                ("gdn_output_gate_z", self.v_ratio * self.head_v, ADAMW, "control_matrix"),
+            ])),
             (r"blocks\.\d+\.mixer\.in_proj_ba\.weight", lambda: _interleaved(name, shape, self.k_heads, [("gdn_beta", self.v_ratio), ("gdn_decay_a", self.v_ratio)], ADAMW, "control_matrix")),
             (r"blocks\.\d+\.mixer\.out_proj\.weight", lambda: _whole(name, shape, "gdn_output", MUON, "muon_matrix")),
             (r"blocks\.\d+\.mixer\.(A_log|dt_bias)", lambda: _whole(name, shape, "gdn_decay_control", ADAMW, "no_decay")),
