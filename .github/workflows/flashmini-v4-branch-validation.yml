@@ -1,0 +1,27 @@
+name: FlashMini v4 branch validation
+
+on:
+  push:
+    branches:
+      - fix/flashmini-v4-qwen-alignment
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: "pip"
+      - name: Install package
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[dev]"
+      - name: Focused v4 validation
+        run: |
+          python -m pytest tests/flashmini/test_v4_optim.py tests/flashmini/test_v4_semantics.py -q
+      - name: Full FlashMini suite
+        run: |
+          python -m pytest tests/flashmini -q --tb=short
