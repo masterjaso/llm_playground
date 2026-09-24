@@ -418,7 +418,7 @@ training, inference, storage and provenance metadata.
 
 Parameters: base {counts['base']:,}; MTP {counts['mtp']:,}; total {counts['total']:,}; active base per token {counts['base_active_per_token']:,}.
 
-GDN short convolution is additive (`x + conv(x)`) as frozen in the v4 design, not Qwen's `silu(conv(x))`.
+GDN short convolution follows Qwen3-Next semantics: causal depthwise convolution followed by SiLU, with no additive residual around the convolution.
 """,
         "training_recipe.md": f"""# v4 training recipe (implemented by `python -m flashmini.v4_train`)
 
