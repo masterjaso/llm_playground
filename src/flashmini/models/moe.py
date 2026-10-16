@@ -126,7 +126,10 @@ class MoE(nn.Module):
             token_ids = torch.div(rows, top_k, rounding_mode="floor")
             slot = rows - token_ids * top_k
             expert_out = self.experts[e](flat[token_ids])
-            out.index_add_(0, token_ids, expert_out * weights[token_ids, slot].unsqueeze(-1))
+            # The router keeps probabilities in float32; BF16-loaded backbones
+            # require the weighted contribution to match the dispatch buffer.
+            contribution = expert_out * weights[token_ids, slot].unsqueeze(-1)
+            out.index_add_(0, token_ids, contribution.to(out.dtype))
 
         # Shared experts
         for se in self.shared_experts:

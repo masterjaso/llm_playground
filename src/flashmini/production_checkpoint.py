@@ -13,6 +13,7 @@ from typing import Any, Protocol
 
 import torch
 
+from .durability import fsync_directory
 from .observability import atomic_write_json
 from .production import CHECKPOINT_SCHEMA_VERSION, model_config_sha256
 
@@ -27,11 +28,7 @@ def sha256_file(path: Path | str) -> str:
 
 def _fsync_directory(path: Path) -> None:
     try:
-        descriptor = os.open(path, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
-        try:
-            os.fsync(descriptor)
-        finally:
-            os.close(descriptor)
+        fsync_directory(path)
     except OSError:
         pass
 
@@ -95,7 +92,7 @@ def save_full_checkpoint(
             "identity": dict(identity), "extra": dict(extra or {}),
         }
         torch.save(payload, payload_path)
-        with payload_path.open("rb") as handle:
+        with payload_path.open("r+b") as handle:
             os.fsync(handle.fileno())
         loaded = torch.load(payload_path, map_location="cpu", weights_only=False)
         required = {"model_state_dict", "data_cursor", "identity", "step", "exact_tokens",

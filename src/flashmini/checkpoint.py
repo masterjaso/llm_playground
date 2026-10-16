@@ -15,6 +15,7 @@ from typing import Any
 import torch
 
 from .config import FlashMiniConfig
+from .durability import fsync_directory
 
 # Checkpoints written by the current FlashMini model must identify the model
 # architecture they belong to.  Keeping this value in the checkpoint envelope
@@ -109,14 +110,10 @@ def save_checkpoint(
         if verified["step"] != step or verified["architecture_version"] != architecture_version:
             raise ValueError("checkpoint read-back metadata mismatch")
         del verified
-        with open(tmp, "rb") as saved:
+        with open(tmp, "r+b") as saved:
             os.fsync(saved.fileno())
         os.replace(tmp, path)
-        directory_fd = os.open(path.parent, os.O_RDONLY | os.O_DIRECTORY)
-        try:
-            os.fsync(directory_fd)
-        finally:
-            os.close(directory_fd)
+        fsync_directory(path.parent)
         if keep_latest_only:
             for previous in path.parent.iterdir():
                 match = re.fullmatch(r"step_(\d+)\.pt", previous.name)
