@@ -31,6 +31,7 @@ from .config import (
 from .data_v4.recipes import load_recipe, recipe_hash
 from .data_v4.registry import merge_source_lock, validate_source_lock
 from .data_v4.tokenizer import TokenizerSpec, load_frozen_spec
+from .durability import fsync_directory
 from .models import FlashMiniModel
 
 CHECKPOINT_SCHEMA_VERSION = 1
@@ -383,11 +384,7 @@ def freeze_manifest(
         handle.flush()
         os.fsync(handle.fileno())
     os.replace(tmp, output)
-    directory_fd = os.open(output.parent, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
-    try:
-        os.fsync(directory_fd)
-    finally:
-        os.close(directory_fd)
+    fsync_directory(output.parent)
     return manifest
 
 

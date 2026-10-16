@@ -14,6 +14,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from .durability import fsync_directory
+
 STATUS_PREFIX = "FLASHMINI_STATUS "
 
 
@@ -34,11 +36,7 @@ def atomic_write_json(path: Path | str, value: Mapping[str, Any]) -> None:
             os.fsync(handle.fileno())
         os.replace(temporary, path)
         try:
-            directory_fd = os.open(path.parent, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
-            try:
-                os.fsync(directory_fd)
-            finally:
-                os.close(directory_fd)
+            fsync_directory(path.parent)
         except OSError:
             # Some mounted filesystems do not permit directory fsync; the
             # atomic replace remains safe and the limitation is not fatal.

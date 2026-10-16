@@ -1,0 +1,24 @@
+# Import as a Desktop training hyperparameter preset.
+# Separately select Full Fine-tuning, 16-bit/BF16 loading, and Trust Remote Code.
+# This is a short integration pilot, not the frozen native production schedule.
+training:
+  max_seq_length: 128
+  num_epochs: 1
+  learning_rate: 0.0001
+  batch_size: 1
+  gradient_accumulation_steps: 1
+  warmup_steps: 0
+  max_steps: 2
+  save_steps: 2
+  eval_steps: 0
+  weight_decay: 0.001
+  random_seed: 17
+  packing: false
+  train_on_completions: false
+  gradient_checkpointing: false
+  optim: adamw_torch
+  lr_scheduler_type: linear
+logging:
+  enable_wandb: false
+  enable_tensorboard: false
+  log_frequency: 1

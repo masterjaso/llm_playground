@@ -63,7 +63,9 @@ def _split_document(digest: bytes, split_salt: bytes, val_fraction: float) -> st
 
 
 def _fsync_file(path: Path) -> None:
-    fd = os.open(path, os.O_RDONLY)
+    # Windows requires write access for FlushFileBuffers, which backs
+    # os.fsync; all callers have just produced or updated this file.
+    fd = os.open(path, os.O_RDWR)
     try:
         os.fsync(fd)
     finally:

@@ -16,6 +16,8 @@ import tempfile
 from pathlib import Path
 from typing import Any
 
+from .durability import fsync_directory
+
 
 def _sha256_file(path: Path) -> str:
     h = hashlib.sha256()
@@ -57,10 +59,12 @@ def preserve_milestone(
             )
         return {"milestone": str(destination), "sha256": existing, "created": False}
 
-    tmp = Path(tempfile.mkstemp(dir=str(milestones_dir), suffix=".tmp")[1])
+    tmp_fd, tmp_name = tempfile.mkstemp(dir=str(milestones_dir), suffix=".tmp")
+    os.close(tmp_fd)
+    tmp = Path(tmp_name)
     try:
         shutil.copyfile(checkpoint_path, tmp)
-        with open(tmp, "rb") as saved:
+        with open(tmp, "r+b") as saved:
             os.fsync(saved.fileno())
         # Read back and verify the copy matches the source before installing.
         if _sha256_file(tmp) != _sha256_file(checkpoint_path):
@@ -69,11 +73,7 @@ def preserve_milestone(
     finally:
         if tmp.exists():
             tmp.unlink()
-    directory_fd = os.open(str(milestones_dir), os.O_RDONLY | os.O_DIRECTORY)
-    try:
-        os.fsync(directory_fd)
-    finally:
-        os.close(directory_fd)
+    fsync_directory(milestones_dir)
     return {"milestone": str(destination), "sha256": _sha256_file(destination), "created": True}
 
 
