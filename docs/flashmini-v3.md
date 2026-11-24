@@ -35,7 +35,9 @@ allocation. Tests enforce shared initialization and B/C config matching.
 V2 retains its old semantics and cannot resume as v3.
 
 See [upstream semantics and deviations](flashmini-v3-upstream.md). QSA and MTP
-remain off. FlashMini is not a full Qwen reproduction.
+remain off. FlashMini is not a full Qwen reproduction. A later exploration of
+adding QSA as treatment E was rejected for now; see
+[flashmini-qsa-decision.md](flashmini-qsa-decision.md).
 
 ## Validity controls
 

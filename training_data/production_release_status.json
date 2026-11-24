@@ -144,7 +144,15 @@
     "FLASHMINI_1B_DATA_READY": false,
     "FLASHMINI_50B_DATA_PIPELINE_READY": true,
     "FLASHMINI_50B_DATA_MATERIALIZED_READY": false,
-    "reason": "The user-requested stop paused the 50B stream at 1,390,902,314 exact train tokens in 3,941 verified canonical shards; four local staged shards are preserved but not remotely verified. The exact 8T domain targets, code-source replacement, full tokenized training view, source-capacity proof, and private benchmark exports remain outstanding."
+    "FLASHMINI_STREAM_FROM_UPSTREAM_DEFAULT": true,
+    "reason": "2026-11-24 decision: default is stream-from-upstream using pinned public Hub sources (training_data/DATA_STRATEGY.md). Hub lake mirroring stays paused after ~1.35B–1.39B exact tokens; code/reasoning domains empty; Nemotron gated; private-eval exports missing. Do not resume 8T Hub publish without a new written decision."
+  },
+  "data_strategy": {
+    "decision_id": "flashmini-data-stream-upstream-2026-11-24",
+    "default_mode": "stream_from_upstream",
+    "hub_mirror_mode": "paused",
+    "document": "training_data/DATA_STRATEGY.md",
+    "machine_readable": "training_data/data_strategy.json"
   },
   "materialization": {
     "one_b_train_tokens": 100000000000,
@@ -161,10 +169,9 @@
     ]
   },
   "next_actions": [
-    "Resume the paused 50B stream only if explicitly requested; durable state and four local staged shards are preserved.",
-    "Resolve the pinned stack_edu metadata-only schema or approve a replacement code source before the code-domain deficit can close.",
-    "Supply immutable benchmark exports (including the private FlashMini evaluation release) before final freeze; mjaso/flashmini-eval-v1 is not present in the authenticated Hub account.",
-    "Obtain accepted terms or replace the three gated Nemotron inputs and rerun source-capacity measurement for 50B.",
-    "Verify every production shard remotely, freeze release manifests, and then run the 8T capacity/build path."
+    "Use stream-from-upstream as the default on every machine (DATA_STRATEGY.md / data_strategy.json).",
+    "For v3 PoC, use mjaso/flashmini-v3-frozen-corpus (manifest b06f559f...).",
+    "Do not resume Hub lake mirroring to 8T unless a new written decision re-opens hub_mirror_mode.",
+    "If Hub lake work is re-opened later: restore durable cursors, resolve code/reasoning redistribution, Nemotron terms, and private-eval exports before freeze."
   ]
 }

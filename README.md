@@ -30,6 +30,11 @@ with a pre-registered gate policy on a frozen FineWeb-EDU corpus.
   treatment D adds 4-bit KVC at quality parity (30.02 ppl / 0.379 top-1).
 - **Data**: `HuggingFaceFW/fineweb-edu` train split, GPT-2 tokenizer,
   manifest-hashed and identical across all treatments.
+- **Data strategy (2026-11-24):** stream pinned public Hub sources by default;
+  do not grow a full self-hosted 8T mirror. See
+  [training_data/DATA_STRATEGY.md](training_data/DATA_STRATEGY.md).
+- **QSA:** explored and rejected for the current track; see
+  [docs/flashmini-qsa-decision.md](docs/flashmini-qsa-decision.md).
 
 ## Usage
 
@@ -50,6 +55,8 @@ uv sync --extra dev
 - [docs/flashmini-v3-data.md](docs/flashmini-v3-data.md) — frozen corpus contract
 - [docs/flashmini-v3-upstream.md](docs/flashmini-v3-upstream.md) — upstream checks
 - [docs/flashmini-v3-validation.md](docs/flashmini-v3-validation.md) — validation evidence
+- [training_data/DATA_STRATEGY.md](training_data/DATA_STRATEGY.md) — locked stream-from-upstream data policy
+- [docs/flashmini-qsa-decision.md](docs/flashmini-qsa-decision.md) — QSA rejection for now
 
 ## Good resources
 

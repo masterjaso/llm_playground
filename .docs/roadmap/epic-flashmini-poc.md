@@ -54,6 +54,9 @@ promising to justify renting datacenter GPUs for a future ~18–24B-main-paramet
 - MoE sparse top-k routing, 16–32 experts, shared expert if supported
 - PLE / Engram n-gram capacity (off-GPU-capable)
 - MTP OFF, QSA OFF during this epic
+- **2026-11-24:** bolting QSA on as a post-hoc treatment E was explored and
+  rejected for cost and weak proof at seq-256; see
+  [`docs/flashmini-qsa-decision.md`](../../docs/flashmini-qsa-decision.md)
 
 ## Tokenizer
 

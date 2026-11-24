@@ -3,7 +3,7 @@ id: feature.flashmini-production-data
 kind: feature-doc
 audience: end-user
 status: active
-description: Build and resume bounded, provenance-preserving FlashMini training-data releases.
+description: Stream pinned public sources by default; optional bounded Hub lake builds remain available but paused at production scale.
 resource: ezra://feature/flashmini-production-data
 scope: features
 persona: release-operations
@@ -23,10 +23,12 @@ replacedBy:
 
 ## What this feature does
 
-The data operator can turn pinned public sources into deterministic training
-views while keeping the workstation bounded. The workflow streams a window,
-filters and deduplicates it, publishes verified shards, and resumes from saved
-progress without rebuilding the whole corpus.
+The data operator trains against **pinned public Hub sources** (stream from
+upstream) using the locked recipes and `source_snapshot.lock.json`. Optional
+tooling can still turn those sources into a deterministic Hub lake while
+keeping the workstation bounded (stream a window, filter, dedupe, publish,
+resume). **As of 2026-11-24, Hub lake growth is paused**; see
+`training_data/DATA_STRATEGY.md`.
 
 ## Who uses it
 

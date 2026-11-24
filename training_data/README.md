@@ -1,13 +1,21 @@
 # FlashMini training data (v4)
 
-One logical master data lake, multiple deterministic training views. The
-workstation never holds the whole corpus: bounded local cache (default 20-40
-GiB via `FLASHMINI_DATA_CACHE_GB` / `FLASHMINI_DATA_CACHE_DIR`), stream one
-window, validate, shard to Parquet+ZSTD, upload to Hugging Face, verify
-remote, evict local, continue. Disk watermark stops ingestion below ~10 GiB
-free. Never delete outside the cache/work dir.
+**Locked policy (2026-11-24):** default is **stream from pinned public Hub
+sources**. Do not resume multi-terabyte mirroring into `mjaso/flashmini-data-v1`
+unless a new written decision re-opens it. Full rationale and operator table:
+[`DATA_STRATEGY.md`](DATA_STRATEGY.md) and [`data_strategy.json`](data_strategy.json).
+
+The v4 tooling can still build a bounded local window, publish verified shards,
+and resume a Hub lake. That path is optional and paused for production scale.
+The workstation never holds the whole corpus: bounded local cache (default
+20-40 GiB via `FLASHMINI_DATA_CACHE_GB` / `FLASHMINI_DATA_CACHE_DIR`), stream
+one window, validate, and either train from upstream or (only if re-approved)
+shard to Parquet+ZSTD, upload, verify remote, and evict. Disk watermark stops
+ingestion below ~10 GiB free. Never delete outside the cache/work dir.
 
 v3 (`src/flashmini/data.py`) is frozen for PoC reproduction; v4 is additive.
+PoC machines should use the locked dataset `mjaso/flashmini-v3-frozen-corpus`
+(manifest `b06f559f...`) rather than rebuilding from scratch when possible.
 
 ## Quick start
 
@@ -24,9 +32,11 @@ flashmini-data train-smoke
 flashmini-data cache-status
 ```
 
-## Production stream operator loop
+## Production stream operator loop (paused by default)
 
-The 1B production command writes only bounded staging and publishes verified
+Hub mirroring toward the 1B/50B exact-token targets is **paused**. Prefer
+`plan` + streaming from the source lock. If a new decision re-opens publish,
+the 1B production command writes only bounded staging and publishes verified
 progress under `releases/pretrain-production-v1/1b/canonical`:
 
 ```bash

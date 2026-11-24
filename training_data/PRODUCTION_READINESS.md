@@ -1,8 +1,12 @@
 # FlashMini production pretraining data
 
-This branch owns the tokenizer-independent canonical lake and the shared
-training-view machinery for the 1B and future 50B base models.  It does not
-contain SFT, DPO, GRPO, RLHF, or assistant/chat data.
+**Policy lock (2026-11-24):** training defaults to **streaming pinned public
+Hub sources**. Growing the self-hosted Hub lake is paused. See
+`DATA_STRATEGY.md` and `data_strategy.json`.
+
+This branch owns the tokenizer-independent canonical lake tooling and the
+shared training-view machinery for the 1B and future 50B base models. It does
+not contain SFT, DPO, GRPO, RLHF, or assistant/chat data.
 
 ## Release identity
 

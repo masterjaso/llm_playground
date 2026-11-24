@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "decision_id": "flashmini-data-stream-upstream-2026-11-24",
+  "decided_at": "2026-11-24",
+  "status": "active",
+  "default_mode": "stream_from_upstream",
+  "hub_mirror_mode": "paused",
+  "rationale": "Full Hub re-host of the 8T mix is incomplete (~1.35B tokens), missing code/reasoning, blocked on gated/review sources, and unnecessary because upstream HF datasets are already public and pinned.",
+  "poc_corpus": {
+    "repository": "mjaso/flashmini-v3-frozen-corpus",
+    "local_dir": "data/fineweb_v3_2b",
+    "manifest_sha256": "b06f559f65e6969a9dae36d392873610330b8a2425fe27f47518c4d200d42dab",
+    "role": "locked_v3_poc"
+  },
+  "production_lake": {
+    "repository": "mjaso/flashmini-data-v1",
+    "role": "partial_historical",
+    "resume_default": false,
+    "note": "Do not resume multi-TiB mirroring unless a new written decision re-opens hub_mirror_mode."
+  },
+  "source_of_truth": [
+    "training_data/registry/source_snapshot.lock.json",
+    "training_data/registry/sources.yaml",
+    "training_data/recipes/",
+    "training_data/DATA_STRATEGY.md"
+  ],
+  "operator_defaults": {
+    "prefer_plan_and_stream": true,
+    "prefer_build_no_publish": true,
+    "require_explicit_decision_to_publish_production": true
+  }
+}
