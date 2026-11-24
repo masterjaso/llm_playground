@@ -23,7 +23,11 @@ RUN_DIR = Path(os.environ.get("FLASHMINI_1B_RUN_DIR", str(REPO_ROOT / "runs/flas
 WORKER_DIR = REPO_ROOT / "kaggle" / "flashmini_1b_worker"
 KERNEL_ID = os.environ.get("FLASHMINI_1B_KERNEL_ID", "masterjaso/flashmini-1b-tpu-v5e-8-production-worker")
 KAGGLE_CLI = os.environ.get("KAGGLE_CLI", shutil.which("kaggle") or "kaggle")
-DEFAULT_CHECKPOINT_DATASET = f"{KERNEL_ID.split('/', 1)[0]}/flashmini-1b-checkpoints"
+OWNER = KERNEL_ID.split("/", 1)[0]
+DEFAULT_CHECKPOINT_DATASET = f"{OWNER}/flashmini-1b-checkpoints"
+# Notebook kernels only ship the .ipynb; companion code must arrive as a dataset.
+# The worker also probes /kaggle/input/flashmini-source explicitly.
+DEFAULT_SOURCE_DATASET = os.environ.get("FLASHMINI_SOURCE_DATASET", f"{OWNER}/flashmini-source")
 
 
 def utc_now() -> str:
@@ -147,8 +151,101 @@ def prepare() -> int:
     return 0
 
 
+def _copytree_clean(src: Path, dst: Path) -> None:
+    """Copy a tree while dropping caches and local package metadata."""
+    def _ignore(_directory: str, names: list[str]) -> set[str]:
+        drop = {"__pycache__", ".pytest_cache", ".mypy_cache", "flashmini.egg-info", ".venv"}
+        return {name for name in names if name in drop or name.endswith(".pyc")}
+
+    if dst.exists():
+        shutil.rmtree(dst)
+    shutil.copytree(src, dst, ignore=_ignore)
+
+
+def _publish_source_dataset() -> str:
+    """Upload worker code as a private Kaggle dataset the notebook can mount.
+
+    Notebook kernels only ship ``code_file``; companion ``.py`` / ``src`` next to
+    the notebook never appear under ``/kaggle/working``. The worker already
+    probes ``/kaggle/input/flashmini-source``.
+    """
+    handle = load_env().get("FLASHMINI_SOURCE_DATASET", DEFAULT_SOURCE_DATASET)
+    slug = handle.split("/", 1)[-1]
+    stage = RUN_DIR / "source_dataset_stage"
+    if stage.exists():
+        shutil.rmtree(stage)
+    stage.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(REPO_ROOT / "scripts/flashmini_1b_kaggle_worker.py",
+                    stage / "flashmini_1b_kaggle_worker.py")
+    freeze = RUN_DIR / "freeze_manifest.json"
+    if freeze.is_file():
+        shutil.copyfile(freeze, stage / "freeze_manifest.json")
+    _copytree_clean(REPO_ROOT / "src", stage / "src")
+    for relative in ("configs", "training_data/recipes", "training_data/registry",
+                     "training_data/tokenizer", "training_data/manifests"):
+        src = REPO_ROOT / relative
+        if src.is_dir():
+            _copytree_clean(src, stage / relative)
+    (stage / "dataset-metadata.json").write_text(json.dumps({
+        "title": "FlashMini Source",
+        "id": handle,
+        "licenses": [{"name": "other"}],
+    }, indent=2))
+    status = run_kaggle(["datasets", "status", handle], timeout=120)
+    ready = status.returncode == 0 and "ready" in (status.stdout or "").lower()
+    if ready:
+        published = run_kaggle(
+            ["datasets", "version", "-p", str(stage), "-m",
+             f"flashmini source {utc_now()}", "--dir-mode", "zip"],
+            timeout=1800,
+        )
+    else:
+        published = run_kaggle(
+            ["datasets", "create", "-p", str(stage), "--dir-mode", "zip"],
+            timeout=1800,
+        )
+    if published.returncode:
+        detail = (published.stderr or published.stdout or "")[-2000:]
+        raise SystemExit(f"failed to publish source dataset {handle}: {detail}")
+    print(f"published source dataset {handle} (mount /kaggle/input/{slug})")
+    return handle
+
+
+def _ensure_checkpoint_dataset() -> str:
+    """Ensure the private checkpoint dataset exists with an empty LATEST pointer."""
+    handle = load_env().get("FLASHMINI_REMOTE_CHECKPOINT_DATASET", DEFAULT_CHECKPOINT_DATASET)
+    status = run_kaggle(["datasets", "status", handle], timeout=120)
+    if status.returncode == 0 and "ready" in (status.stdout or "").lower():
+        return handle
+    stage = RUN_DIR / "checkpoint_dataset_stage"
+    if stage.exists():
+        shutil.rmtree(stage)
+    stage.mkdir(parents=True, exist_ok=True)
+    (stage / "LATEST.json").write_text(json.dumps({
+        "checkpoint": None,
+        "checkpoint_sha256": None,
+        "initialized_at_utc": utc_now(),
+    }, indent=2))
+    (stage / "dataset-metadata.json").write_text(json.dumps({
+        "title": "FlashMini-1B Checkpoints",
+        "id": handle,
+        "licenses": [{"name": "other"}],
+    }, indent=2))
+    created = run_kaggle(
+        ["datasets", "create", "-p", str(stage), "--dir-mode", "zip"],
+        timeout=1800,
+    )
+    if created.returncode:
+        detail = (created.stderr or created.stdout or "")[-2000:]
+        raise SystemExit(f"failed to create checkpoint dataset {handle}: {detail}")
+    print(f"initialized checkpoint dataset {handle}")
+    return handle
+
+
 def _ensure_worker_surface(*, smoke: bool = False) -> None:
     WORKER_DIR.mkdir(parents=True, exist_ok=True)
+    source_handle = _publish_source_dataset()
+    checkpoint_handle = _ensure_checkpoint_dataset()
     metadata = {
         "id": KERNEL_ID,
         "title": "FlashMini-1B TPU v5e-8 production worker",
@@ -156,43 +253,56 @@ def _ensure_worker_surface(*, smoke: bool = False) -> None:
         "language": "python", "kernel_type": "notebook",
         "is_private": True, "enable_gpu": False, "enable_tpu": True,
         "accelerator_type": "TPU VM v5e-8",
-        "dataset_sources": [], "competition_sources": [], "enable_internet": True,
+        "dataset_sources": [source_handle, checkpoint_handle],
+        "competition_sources": [], "enable_internet": True,
     }
     (WORKER_DIR / "kernel-metadata.json").write_text(json.dumps(metadata, indent=2))
-    # Kaggle accepts a script kernel, but retaining a one-cell notebook keeps
-    # the worker surface inspectable and follows the thin-notebook contract.
+    # Keep a thin one-cell notebook; the real worker code mounts via dataset.
+    smoke_arg = ", '--smoke'" if smoke else ""
     notebook = {
         "nbformat": 4, "nbformat_minor": 5,
-        "metadata": {"kernelspec": {"display_name": "Python 3", "language": "python", "name": "python3"}},
-        "cells": [{"cell_type": "code", "execution_count": None, "metadata": {},
-                   "outputs": [], "source": ["%run flashmini_1b_kaggle_worker.py --run-dir /kaggle/working/flashmini_run\n"]}],
+        "metadata": {
+            "kernelspec": {
+                "display_name": "Python 3",
+                "language": "python",
+                "name": "python3",
+            }
+        },
+        "cells": [{
+            "cell_type": "code",
+            "execution_count": None,
+            "id": "flashmini-1b-worker-entry",
+            "metadata": {},
+            "outputs": [],
+            "source": [
+                "import os, runpy, sys\n",
+                "from pathlib import Path\n",
+                f"os.environ.setdefault('FLASHMINI_REMOTE_CHECKPOINT_DATASET', {json.dumps(checkpoint_handle)})\n",
+                f"os.environ.setdefault('FLASHMINI_SOURCE_DIR', '/kaggle/input/{source_handle.split('/', 1)[-1]}')\n",
+                "bundle_roots = [\n",
+                "    Path(os.environ['FLASHMINI_SOURCE_DIR']),\n",
+                "    Path.cwd(), Path('/kaggle/working'),\n",
+                "] + list(Path('/kaggle/input').glob('*'))\n",
+                "bundle = next((root for root in bundle_roots if (root / 'flashmini_1b_kaggle_worker.py').is_file()), None)\n",
+                "if bundle is None:\n",
+                "    raise RuntimeError('FlashMini worker bundle is not mounted under /kaggle/input or /kaggle/working')\n",
+                "sys.path.insert(0, str(bundle / 'src'))\n",
+                "sys.argv = ['flashmini_1b_kaggle_worker.py', '--run-dir', '/kaggle/working/flashmini_run', '--freeze-manifest', str(bundle / 'freeze_manifest.json')" + smoke_arg + "]\n",
+                "runpy.run_path(str(bundle / 'flashmini_1b_kaggle_worker.py'), run_name='__main__')\n",
+            ],
+        }],
     }
     (WORKER_DIR / "flashmini_1b_kaggle_worker.ipynb").write_text(json.dumps(notebook, indent=2))
-    source = REPO_ROOT / "scripts/flashmini_1b_kaggle_worker.py"
-    shutil.copyfile(source, WORKER_DIR / source.name)
-    # Bundle the tested package and freeze contract so a pushed kernel is
-    # self-contained.  No credentials or local caches are copied.
-    bundled_src = WORKER_DIR / "src"
-    if bundled_src.exists():
-        shutil.rmtree(bundled_src)
-    shutil.copytree(REPO_ROOT / "src", bundled_src)
+    # Keep a local mirror of the worker entry for dry-run inspection only.
+    shutil.copyfile(
+        REPO_ROOT / "scripts/flashmini_1b_kaggle_worker.py",
+        WORKER_DIR / "flashmini_1b_kaggle_worker.py",
+    )
     freeze = RUN_DIR / "freeze_manifest.json"
     if freeze.is_file():
         shutil.copyfile(freeze, WORKER_DIR / "freeze_manifest.json")
-    notebook = json.loads((WORKER_DIR / "flashmini_1b_kaggle_worker.ipynb").read_text())
-    smoke_arg = ", '--smoke'" if smoke else ""
-    notebook["cells"][0]["source"] = [
-        "import os, runpy, sys\n",
-        "from pathlib import Path\n",
-        f"os.environ.setdefault('FLASHMINI_REMOTE_CHECKPOINT_DATASET', {json.dumps(load_env().get('FLASHMINI_REMOTE_CHECKPOINT_DATASET', DEFAULT_CHECKPOINT_DATASET))})\n",
-        "bundle_roots = [Path.cwd(), Path('/kaggle/working')] + list(Path('/kaggle/input').glob('*'))\n",
-        "bundle = next((root for root in bundle_roots if (root / 'flashmini_1b_kaggle_worker.py').is_file()), None)\n",
-        "if bundle is None:\n    raise RuntimeError('FlashMini worker bundle is not mounted under /kaggle/input or /kaggle/working')\n",
-        "sys.path.insert(0, str(bundle / 'src'))\n",
-        "sys.argv = ['flashmini_1b_kaggle_worker.py', '--run-dir', '/kaggle/working/flashmini_run', '--freeze-manifest', str(bundle / 'freeze_manifest.json')" + smoke_arg + "]\n",
-        "runpy.run_path(str(bundle / 'flashmini_1b_kaggle_worker.py'), run_name='__main__')\n",
-    ]
-    (WORKER_DIR / "flashmini_1b_kaggle_worker.ipynb").write_text(json.dumps(notebook, indent=2))
+    bundled_src = WORKER_DIR / "src"
+    _copytree_clean(REPO_ROOT / "src", bundled_src)
 
 
 def run_remote(*, dry_run: bool = False, max_wait: int = 22_200, smoke: bool = False) -> int:

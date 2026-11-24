@@ -8,7 +8,10 @@
   "enable_gpu": false,
   "enable_tpu": true,
   "accelerator_type": "TPU VM v5e-8",
-  "dataset_sources": [],
+  "dataset_sources": [
+    "masterjaso/flashmini-source",
+    "masterjaso/flashmini-1b-checkpoints"
+  ],
   "competition_sources": [],
   "enable_internet": true
 }
