@@ -246,13 +246,15 @@ def _ensure_worker_surface(*, smoke: bool = False) -> None:
     WORKER_DIR.mkdir(parents=True, exist_ok=True)
     source_handle = _publish_source_dataset()
     checkpoint_handle = _ensure_checkpoint_dataset()
+    machine_shape = load_env().get("FLASHMINI_KAGGLE_MACHINE_SHAPE", "TpuV5E8")
     metadata = {
         "id": KERNEL_ID,
         "title": "FlashMini-1B TPU v5e-8 production worker",
         "code_file": "flashmini_1b_kaggle_worker.ipynb",
         "language": "python", "kernel_type": "notebook",
         "is_private": True, "enable_gpu": False, "enable_tpu": True,
-        "accelerator_type": "TPU VM v5e-8",
+        # Current Kaggle CLI field; legacy accelerator_type is ignored on push.
+        "machine_shape": machine_shape,
         "dataset_sources": [source_handle, checkpoint_handle],
         "competition_sources": [], "enable_internet": True,
     }

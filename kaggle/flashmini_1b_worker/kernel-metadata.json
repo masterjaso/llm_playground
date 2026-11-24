@@ -7,7 +7,7 @@
   "is_private": true,
   "enable_gpu": false,
   "enable_tpu": true,
-  "accelerator_type": "TPU VM v5e-8",
+  "machine_shape": "TpuV5E8",
   "dataset_sources": [
     "masterjaso/flashmini-source",
     "masterjaso/flashmini-1b-checkpoints"
