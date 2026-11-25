@@ -412,10 +412,20 @@ def main(argv: list[str] | None = None) -> int:
     status = StatusLogger(run_dir, run_id=manifest["run_id"],
                           heartbeat_interval=float(os.environ.get("FLASHMINI_HEARTBEAT_SECONDS", "60")))
     status.start()
+    # Discover after import so SPMD/PJRT chip counts are visible before the gate.
+    initial_topology = discover_topology()
     status.update(phase="xla_compile", event="worker_start", global_exact_tokens=0,
-                  topology=discover_topology(), backend="pytorch_xla")
+                  topology=initial_topology, backend="pytorch_xla")
     try:
-        topology = validate_topology(allow_local_cpu=args.allow_local_cpu or args.smoke)
+        # Smoke may run on a single visible device when Kaggle exposes chips
+        # slowly; official training still requires the full 8-chip topology.
+        if args.smoke and int(initial_topology.get("world_size") or 0) < 8:
+            topology = validate_topology(
+                expected_world_size=max(1, int(initial_topology.get("world_size") or 0)),
+                allow_local_cpu=args.allow_local_cpu or args.smoke,
+            )
+        else:
+            topology = validate_topology(allow_local_cpu=args.allow_local_cpu or args.smoke)
         identity = {
             "git_commit": manifest.get("git_commit"),
             "source_fingerprint": manifest.get("source_fingerprint"),

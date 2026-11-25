@@ -101,21 +101,81 @@ def tpu_available() -> bool:
         return False
 
 
+def _enable_spmd_if_available(xr: Any) -> bool:
+    """Single-process Kaggle TPU notebooks expose chips via PJRT SPMD, not process world size."""
+    if xr is None:
+        return False
+    use_spmd = getattr(xr, "use_spmd", None)
+    if not callable(use_spmd):
+        return False
+    try:
+        # Idempotent on supported runtimes; ignore if already enabled or unsupported.
+        use_spmd()
+        return True
+    except Exception:  # noqa: BLE001 - optional runtime probing
+        return False
+
+
+def _runtime_device_count(xm: Any, xr: Any) -> int:
+    """Return TPU chip count for PJRT/SPMD notebooks.
+
+    ``xr.world_size()`` is the process mesh size and stays 1 for a papermill
+    notebook even on TpuV5E8. Prefer runtime/global device counts, then fall
+    back to process world size / a single local device.
+    """
+    if xr is not None:
+        for name in (
+            "global_runtime_device_count",
+            "global_device_count",
+            "local_device_count",
+            "world_size",
+        ):
+            fn = getattr(xr, name, None)
+            if not callable(fn):
+                continue
+            try:
+                count = int(fn())
+            except Exception:  # noqa: BLE001 - optional runtime probing
+                continue
+            if count > 0:
+                return count
+    if xm is not None:
+        for name in ("xrt_world_size", "xla_device_count"):
+            fn = getattr(xm, name, None)
+            if callable(fn):
+                try:
+                    count = int(fn())
+                except Exception:  # noqa: BLE001 - optional runtime probing
+                    continue
+                if count > 0:
+                    return count
+        try:
+            if xm.xla_device() is not None:
+                return 1
+        except Exception:  # noqa: BLE001 - optional runtime probing
+            return 0
+    return 0
+
+
 def discover_topology() -> dict[str, Any]:
     xm, xr = _xla_modules()
     result = {"available": xm is not None, "world_size": 0, "device": None,
               "torch_version": torch.__version__, "torch_xla_version": None,
-              "topology": "unavailable"}
+              "topology": "unavailable", "spmd_enabled": False,
+              "process_world_size": None}
     try:
         import torch_xla
         result["torch_xla_version"] = getattr(torch_xla, "__version__", None)
     except ImportError:
         return result
     try:
-        if xr is not None and hasattr(xr, "world_size"):
-            result["world_size"] = int(xr.world_size())
-        elif xm is not None:
-            result["world_size"] = 1
+        result["spmd_enabled"] = _enable_spmd_if_available(xr)
+        if xr is not None and callable(getattr(xr, "world_size", None)):
+            try:
+                result["process_world_size"] = int(xr.world_size())
+            except Exception:  # noqa: BLE001 - optional runtime probing
+                result["process_world_size"] = None
+        result["world_size"] = _runtime_device_count(xm, xr)
         result["device"] = str(xm.xla_device()) if xm is not None else None
         result["topology"] = "TPU-v5e-8" if result["world_size"] == 8 else f"xla-{result['world_size']}"
     except Exception as exc:  # noqa: BLE001 - optional runtime probing
